@@ -14,10 +14,11 @@ export const Ut99DmRulesSchema = z
   .object({
     /** 0 = no frag limit. */
     fragLimit: z.number().int().min(0).max(200).default(20),
-    /** Minutes, 0 = no time limit. Frag limit and time limit cannot both be 0. */
+    /**
+     * Minutes, 0 = no time limit. Frag limit and time limit cannot both be 0.
+     * A tie at the time limit always goes to sudden death (UT overtime: next frag wins).
+     */
     timeLimitMin: z.number().int().min(0).max(60).default(10),
-    /** On a tie at time limit the next frag wins (UT overtime). */
-    suddenDeath: z.boolean().default(true),
 
     mapMode: z.enum(['random', 'vote']).default('vote'),
     /** Map ids (package names) available for this tournament. Validated against the server inventory. */

@@ -45,6 +45,7 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     mv: str(16), // mod version
     eng: int, // engine version, e.g. 469
     lvl: str(64), // current map name
+    gm: z.boolean(), // a match game was started on this level (running or just ended): keep the bridge state
   }),
   /** A player connected. `tk` is the token from the URL; the mod already decided the role from the access list. */
   z.object({
@@ -123,7 +124,6 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     nb: str(MAX_NAME_CHARS),
     fl: int.nonnegative(), // frag limit, 0 = none
     tl: int.nonnegative(), // time limit minutes, 0 = none
-    sd: z.boolean(), // sudden death on tie
   }),
   /** A match side played by a bot. */
   z.object({

@@ -99,39 +99,39 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends 
 
 ### Mod → Bridge
 
-| `t`      | Fields              | Meaning                                                                              |
-| -------- | ------------------- | ------------------------------------------------------------------------------------ |
-| `hello`  | `key pv mv eng lvl` | Shared secret, protocol version, mod version, engine version, current map            |
-| `join`   | `pid tk name role`  | Player connected; role (`a`/`b`/`s`) already decided by the mod from the access list |
-| `leave`  | `pid`               |                                                                                      |
-| `reject` | `name why`          | Connection without a valid token was refused                                         |
-| `ready`  | `pid`               | Match player is ready (UWindow button or `!ready`)                                   |
-| `vote`   | `pid m1 m2 m3`      | Ranked map choices (`""` = none)                                                     |
-| `live`   | `mid g`             | Countdown over, players spawned                                                      |
-| `score`  | `mid g sa sb tl ot` | Periodic and on every frag                                                           |
-| `end`    | `mid g sa sb w why` | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                            |
-| `lost`   | `mid s`             | Match player disconnected during a live game; mod paused the game                    |
-| `hb`     | `up`                | Heartbeat every 5 s                                                                  |
-| `err`    | `msg`               |                                                                                      |
+| `t`      | Fields                 | Meaning                                                                                                                             |
+| -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `hello`  | `key pv mv eng lvl gm` | Shared secret, protocol version, mod version, engine version, current map, a game was started on this level (running or just ended) |
+| `join`   | `pid tk name role`     | Player connected; role (`a`/`b`/`s`) already decided by the mod from the access list                                                |
+| `leave`  | `pid`                  |                                                                                                                                     |
+| `reject` | `name why`             | Connection without a valid token was refused                                                                                        |
+| `ready`  | `pid`                  | Match player is ready (UWindow button or `!ready`)                                                                                  |
+| `vote`   | `pid m1 m2 m3`         | Ranked map choices (`""` = none)                                                                                                    |
+| `live`   | `mid g`                | Countdown over, players spawned                                                                                                     |
+| `score`  | `mid g sa sb tl ot`    | Periodic and on every frag                                                                                                          |
+| `end`    | `mid g sa sb w why`    | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                                                                           |
+| `lost`   | `mid s`                | Match player disconnected during a live game; mod paused the game                                                                   |
+| `hb`     | `up`                   | Heartbeat every 5 s                                                                                                                 |
+| `err`    | `msg`                  |                                                                                                                                     |
 
 ### Bridge → Mod
 
-| `t`                                  | Meaning                                                                                       |
-| ------------------------------------ | --------------------------------------------------------------------------------------------- |
-| `welcome`                            | Handshake accepted                                                                            |
-| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                             |
-| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds |
-| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit, sudden death   |
-| `bot`                                | A side played by a bot (name, skill, class)                                                   |
-| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                              |
-| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                             |
-| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`               |
-| `cd`                                 | Start countdown                                                                               |
-| `pause`                              | Pause / unpause                                                                               |
-| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                      |
-| `brh` / `brm`                        | Bracket for the HUD                                                                           |
-| `sth` / `ste`                        | Standings for the HUD                                                                         |
-| `say`                                | Message to all (`pid: -1`) or one player                                                      |
+| `t`                                  | Meaning                                                                                                           |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `welcome`                            | Handshake accepted                                                                                                |
+| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                                                 |
+| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds                     |
+| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit (a tie always goes to sudden death) |
+| `bot`                                | A side played by a bot (name, skill, class)                                                                       |
+| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                                                  |
+| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                                                 |
+| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                   |
+| `cd`                                 | Start countdown                                                                                                   |
+| `pause`                              | Pause / unpause                                                                                                   |
+| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                                          |
+| `brh` / `brm`                        | Bracket for the HUD                                                                                               |
+| `sth` / `ste`                        | Standings for the HUD                                                                                             |
+| `say`                                | Message to all (`pid: -1`) or one player                                                                          |
 
 ### Typical match sequence
 

@@ -34,7 +34,6 @@ describe('rules', () => {
     expect(r).toMatchObject({
       fragLimit: 20,
       timeLimitMin: 10,
-      suddenDeath: true,
       mapMode: 'vote',
       countdownSec: 5,
       voteTimeoutSec: 30,

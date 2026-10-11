@@ -1,0 +1,24 @@
+{
+  "name": "@tourney/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bridge agent: runs next to the game server, drives matches, talks to the mod and the website.",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "tourney-bridge": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "start": "node dist/cli.js",
+    "sim": "node dist/sim-cli.js"
+  },
+  "dependencies": {
+    "@tourney/adapter-ut99": "workspace:*",
+    "@tourney/bracket": "workspace:*",
+    "@tourney/protocol": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

@@ -101,11 +101,14 @@ export function iniChanges(
     ...(profile.serverName
       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]
       : []),
-    { section: dm, key: 'bMultiWeaponStay', value: bool(rules.weaponStay) },
-    { section: dm, key: 'bHardCoreMode', value: bool(rules.hardcore) },
+    // Per-class config: written for DeathMatchPlus and for our subclass, which reads its own section.
+    ...[dm, MOD_GAME_CLASS].flatMap((section) => [
+      { section, key: 'bMultiWeaponStay', value: bool(rules.weaponStay) },
+      { section, key: 'bHardCoreMode', value: bool(rules.hardcore) },
+    ]),
     { section: dm, key: 'bTournament', value: 'False' }, // our own ready check replaces it
     { section: dm, key: 'MinPlayers', value: '0' }, // bots are spawned by the mod only
-    { section: dm, key: 'MaxPlayers', value: '2' },
+    { section: dm, key: 'MaxPlayers', value: '4' }, // 2 match players + room for a reconnect
     { section: 'Engine.GameInfo', key: 'GameSpeed', value: (rules.gameSpeedPct / 100).toFixed(2) },
     { section: 'Engine.GameInfo', key: 'MaxSpectators', value: String(profile.maxSpectators) },
     { section: `${MOD_PACKAGE}.TournamentConfig`, key: 'BridgeHost', value: mod.bridgeHost },
