@@ -12,15 +12,15 @@ Angular SPA ──HTTP/WS──> API (NestJS, SQLite)  <──WSS──  Bridge 
 
 ## Repository layout
 
-| Path                    | What                                                                          | Status                                  |
-| ----------------------- | ----------------------------------------------------------------------------- | --------------------------------------- |
-| `packages/bracket`      | Deterministic SE/DE bracket engine, seeding, scheduler                        | done                                    |
-| `packages/protocol`     | Schemas: event log, website↔bridge, bridge↔mod lines; tournament projection   | done                                    |
-| `packages/adapter-ut99` | UT99 rules, map vote, bot simulation, server launch config                    | done                                    |
-| `apps/bridge`           | Agent: match director, mod TCP server, event log, simulator (standalone mode) | done (M3)                               |
-| `mods/ut99-tournament`  | UnrealScript game type, bridge link, chat commands                            | written, first real-server test pending |
-| `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                     | planned                                 |
-| `apps/web`              | Angular frontend                                                              | planned                                 |
+| Path                    | What                                                                                   | Status                                  |
+| ----------------------- | -------------------------------------------------------------------------------------- | --------------------------------------- |
+| `packages/bracket`      | Deterministic SE/DE bracket engine, seeding, scheduler                                 | done                                    |
+| `packages/protocol`     | Schemas: event log, website↔bridge, bridge↔mod lines; tournament projection            | done                                    |
+| `packages/adapter-ut99` | UT99 rules, map vote, bot simulation, server launch config                             | done                                    |
+| `apps/bridge`           | Agent: match director, mod TCP server, event log, simulator, server process, inventory | done (M4)                               |
+| `mods/ut99-tournament`  | UnrealScript game type, bridge link, chat commands                                     | written, first real-server test pending |
+| `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                              | planned                                 |
+| `apps/web`              | Angular frontend                                                                       | planned                                 |
 
 ## Development
 

@@ -1,23 +1,51 @@
 import path from 'node:path';
 import readline from 'node:readline';
 import { parseArgs } from 'node:util';
+import { parseRules, validateAgainstInventory } from '@tourney/adapter-ut99';
 import { bootstrapFromFile, TournamentFileSchema } from './bootstrap.js';
 import { realClock } from './clock.js';
-import { BridgeConfigSchema, EXAMPLE_CONFIG, EXAMPLE_TOURNAMENT, readJsonFile } from './config.js';
+import {
+  BridgeConfigSchema,
+  EXAMPLE_CONFIG,
+  EXAMPLE_TOURNAMENT,
+  readJsonFile,
+  type BridgeConfig,
+} from './config.js';
 import { MatchDirector } from './director.js';
 import { LocalEventStore } from './event-store.js';
-import { consoleLogger } from './log.js';
+import { consoleLogger, type Logger } from './log.js';
 import { ModServer } from './mod-server.js';
+import { scanInventory } from './ut99/inventory.js';
+import { prepareServer } from './ut99/prepare.js';
+import { ServerProcess } from './ut99/server-process.js';
 
 const HELP = `tourney-bridge <command>
 
 Commands:
-  run --config <bridge.json> --tournament <tournament.json>
+  run -c <bridge.json> -t <tournament.json>
         Run a tournament defined in a file (standalone mode, no website).
-        Console commands while running: start (force start), pause, resume, status, quit
+        With a "server" section in bridge.json the bridge starts and supervises the UT server.
+        Console commands while running: start (force start), pause [reason], resume, status, quit
+  inventory -c <bridge.json> [--fast]
+        List the maps and bots of the UT installation from the "server" section (--fast: no map titles)
   example
         Print example bridge.json and tournament.json
 `;
+
+function platformOs(): 'linux' | 'windows' | 'other' {
+  return process.platform === 'win32'
+    ? 'windows'
+    : process.platform === 'linux'
+      ? 'linux'
+      : 'other';
+}
+
+function checkServerOs(config: BridgeConfig, log: Logger): void {
+  const os = platformOs();
+  if (config.server && os !== 'other' && config.server.os !== os) {
+    log.warn(`server profile says os=${config.server.os}, but the bridge runs on ${os}`);
+  }
+}
 
 async function main(): Promise<void> {
   const { positionals, values } = parseArgs({
@@ -25,6 +53,7 @@ async function main(): Promise<void> {
     options: {
       config: { type: 'string', short: 'c' },
       tournament: { type: 'string', short: 't' },
+      fast: { type: 'boolean', default: false },
     },
   });
   const cmd = positionals[0];
@@ -36,6 +65,18 @@ async function main(): Promise<void> {
     console.log(JSON.stringify(EXAMPLE_TOURNAMENT, null, 2));
     return;
   }
+
+  if (cmd === 'inventory' && values.config) {
+    const config = readJsonFile(values.config, BridgeConfigSchema);
+    if (!config.server) throw new Error('bridge.json has no "server" section');
+    const inv = scanInventory(config.server, { readMeta: !values.fast });
+    console.log(JSON.stringify(inv, null, 2));
+    console.error(
+      `${inv.maps.length} maps, ${inv.bots.length} bots, ${inv.warnings.length} warnings`,
+    );
+    return;
+  }
+
   if (cmd !== 'run' || !values.config || !values.tournament) {
     console.log(HELP);
     process.exitCode = cmd ? 1 : 0;
@@ -45,6 +86,17 @@ async function main(): Promise<void> {
   const config = readJsonFile(values.config, BridgeConfigSchema);
   const tournament = readJsonFile(values.tournament, TournamentFileSchema);
   const log = consoleLogger(config.logLevel);
+  checkServerOs(config, log);
+  const rules = parseRules(tournament.settings.game.rules);
+
+  // Fail before anything starts if the map pool does not match the installation.
+  if (config.server) {
+    const inv = scanInventory(config.server, { readMeta: false });
+    for (const w of inv.warnings) log.warn(`inventory: ${w}`);
+    const problems = inv.maps.length ? validateAgainstInventory(rules, inv) : [];
+    if (problems.length) throw new Error(`tournament cannot run:\n  ${problems.join('\n  ')}`);
+  }
+
   const store = new LocalEventStore(
     realClock,
     path.resolve(path.dirname(values.config), config.dataDir, 'tournaments'),
@@ -72,11 +124,31 @@ async function main(): Promise<void> {
   director.on('finished', (champion: string) =>
     log.info(`tournament finished, champion ${champion}`),
   );
-  director.on('shutdown', () => log.info('post-tournament time is over'));
   await director.start();
+
+  let server: ServerProcess | undefined;
+  if (config.server?.manage && director.projection.phase !== 'finished') {
+    const prepared = prepareServer(config.server, rules, {
+      bridgeHost: config.mod.host,
+      bridgePort: config.mod.port,
+      sharedKey: config.mod.sharedKey,
+    });
+    log.info(`wrote ${prepared.iniPath}`);
+    server = new ServerProcess({ log, clock: realClock });
+    mod.on('hello', () => server?.markRunning());
+    server.start({ binary: prepared.binary, args: prepared.args, cwd: prepared.systemDir });
+  } else if (config.server && !config.server.manage) {
+    log.info('server.manage is false: start the UT server yourself');
+  }
+
+  director.on('shutdown', () => {
+    log.info('post-tournament time is over');
+    void server?.stop();
+  });
 
   const shutdown = async () => {
     log.info('shutting down');
+    await server?.stop();
     await mod.close();
     process.exit(0);
   };
@@ -93,8 +165,11 @@ async function main(): Promise<void> {
       else if (c === 'status') {
         const p = director.projection;
         log.info(
-          `phase=${p.phase} stage=${director.stageKind} current=${p.currentMatch?.matchId ?? '-'} results=${p.results.length}`,
+          `phase=${p.phase} stage=${director.stageKind} current=${p.currentMatch?.matchId ?? '-'} ` +
+            `results=${p.results.length} server=${server?.state ?? 'external'} mod=${mod.connected ? 'connected' : 'offline'}`,
         );
+        const waiting = director.waitingFor();
+        if (waiting) log.info(`waiting: ${waiting}`);
       } else if (c === 'quit') void shutdown();
       else if (c) log.info('commands: start, pause [reason], resume, status, quit');
     });

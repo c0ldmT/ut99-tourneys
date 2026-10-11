@@ -96,7 +96,7 @@ export function iniChanges(
 ): IniChange[] {
   const dm = 'Botpack.DeathMatchPlus';
   return [
-    { section: 'Engine.GameEngine', key: 'ServerPackages', ensure: MOD_PACKAGE },
+    // No ServerPackages entry yet: nothing in the mod runs on clients until the HUD (milestone 6).
     { section: 'URL', key: 'Port', value: String(profile.port) },
     ...(profile.serverName
       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]

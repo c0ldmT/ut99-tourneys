@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import { z } from 'zod';
+import { ServerProfileSchema } from '@tourney/protocol';
 
 export const BridgeConfigSchema = z.object({
   agentId: z.string().min(1).default('local-agent'),
@@ -11,6 +12,15 @@ export const BridgeConfigSchema = z.object({
   }),
   /** Event logs and other state. */
   dataDir: z.string().default('./data'),
+  /**
+   * The UT server on this machine. With manage=true the bridge writes Tourney.ini, starts the
+   * server for the tournament, restarts it after a crash and stops it afterwards.
+   */
+  server: ServerProfileSchema.extend({
+    id: z.string().default('local'),
+    name: z.string().default('Local UT server'),
+    manage: z.boolean().default(true),
+  }).optional(),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 export type BridgeConfig = z.infer<typeof BridgeConfigSchema>;
@@ -33,6 +43,15 @@ export const EXAMPLE_CONFIG = {
   agentId: 'pi-bridge',
   mod: { host: '127.0.0.1', port: 7790, sharedKey: 'change-me-please' },
   dataDir: './data',
+  server: {
+    os: 'linux',
+    installDir: '/opt/ut99',
+    port: 7777,
+    lobbyMap: 'DM-Deck16][',
+    serverName: 'Friday Cup',
+    maxSpectators: 32,
+    manage: true,
+  },
   logLevel: 'info',
 };
 
