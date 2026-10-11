@@ -1,0 +1,5161 @@
+From 6eedd31c14941f10ad5a1b8ddcc95955a23cf0f7 Mon Sep 17 00:00:00 2001
+From: Mario T <mario.trzensky@cologne-intelligence.de>
+Date: Sun, 11 Oct 2026 15:29:49 +0200
+Subject: [PATCH] Add bridge MVP, mod simulator and UnrealScript mod core
+ (milestone 3)
+
+Bridge (apps/bridge, standalone mode):
+- Match director: check-in with bot replacement, critical-path scheduling, map vote
+  during post-game, travel with cooldown, ready check with no-show forfeit, countdown,
+  live tracking, disconnect grace with forfeit, best-of series with loser pick,
+  bot vs bot simulation, finish, resume from the event log after a restart
+- Mod TCP server (shared-key handshake, flat JSON lines), local JSONL event store
+  with optimistic concurrency, snapshot builder, CLI with console commands
+- Mod simulator speaking the real protocol; 10 end-to-end scenarios
+
+Mod (mods/ut99-tournament, not yet compiled):
+- TournamentDM: token login, player/spectator roles, held ready check, countdown,
+  configured bots, score/end reporting incl. sudden death, soft pause with score
+  restore, travel, ini cache across map changes
+- BridgeLink (TcpLink), TourneyMsg (flat JSON), TourneyMutator (!ready, !vote, ...)
+- build.sh / build.ps1 and a first-test checklist
+
+Protocol: hello.gm, match line without sd (ties always go to sudden death).
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01EJWxP6FTekktW25bHkSWqv
+---
+ README.md                                     |   18 +-
+ apps/bridge/README.md                         |   41 +
+ apps/bridge/package.json                      |   24 +
+ apps/bridge/src/bootstrap.ts                  |  110 ++
+ apps/bridge/src/cli.ts                        |  107 ++
+ apps/bridge/src/clock.ts                      |   87 ++
+ apps/bridge/src/config.ts                     |   79 ++
+ apps/bridge/src/director.ts                   | 1035 ++++++++++++++
+ apps/bridge/src/event-store.ts                |   90 ++
+ apps/bridge/src/index.ts                      |    9 +
+ apps/bridge/src/log.ts                        |   38 +
+ apps/bridge/src/mod-server.ts                 |  157 +++
+ apps/bridge/src/sim-cli.ts                    |   40 +
+ apps/bridge/src/sim/mod-simulator.ts          |  382 ++++++
+ apps/bridge/src/snapshot.ts                   |  188 +++
+ apps/bridge/test/e2e.test.ts                  |  149 ++
+ apps/bridge/test/harness.ts                   |  149 ++
+ apps/bridge/test/unit.test.ts                 |   95 ++
+ apps/bridge/tsconfig.json                     |    5 +
+ apps/bridge/tsup.config.ts                    |   18 +
+ apps/bridge/vitest.config.ts                  |    4 +
+ docs/decisions.md                             |    4 +
+ docs/protocol.md                              |   60 +-
+ mods/ut99-tournament/Classes/BridgeLink.uc    |  120 ++
+ .../Classes/TournamentConfig.uc               |   52 +
+ mods/ut99-tournament/Classes/TournamentDM.uc  | 1208 +++++++++++++++++
+ mods/ut99-tournament/Classes/TourneyMsg.uc    |  261 ++++
+ .../ut99-tournament/Classes/TourneyMutator.uc |   30 +
+ mods/ut99-tournament/README.md                |  107 +-
+ mods/ut99-tournament/build.ps1                |   38 +
+ mods/ut99-tournament/build.sh                 |   41 +
+ package.json                                  |    2 +-
+ packages/adapter-ut99/src/launch.ts           |    9 +-
+ packages/adapter-ut99/src/rules.ts            |    7 +-
+ packages/adapter-ut99/test/adapter.test.ts    |    1 -
+ packages/protocol/src/mod.ts                  |    2 +-
+ pnpm-lock.yaml                                |   15 +
+ 37 files changed, 4724 insertions(+), 58 deletions(-)
+ create mode 100644 apps/bridge/README.md
+ create mode 100644 apps/bridge/package.json
+ create mode 100644 apps/bridge/src/bootstrap.ts
+ create mode 100644 apps/bridge/src/cli.ts
+ create mode 100644 apps/bridge/src/clock.ts
+ create mode 100644 apps/bridge/src/config.ts
+ create mode 100644 apps/bridge/src/director.ts
+ create mode 100644 apps/bridge/src/event-store.ts
+ create mode 100644 apps/bridge/src/index.ts
+ create mode 100644 apps/bridge/src/log.ts
+ create mode 100644 apps/bridge/src/mod-server.ts
+ create mode 100644 apps/bridge/src/sim-cli.ts
+ create mode 100644 apps/bridge/src/sim/mod-simulator.ts
+ create mode 100644 apps/bridge/src/snapshot.ts
+ create mode 100644 apps/bridge/test/e2e.test.ts
+ create mode 100644 apps/bridge/test/harness.ts
+ create mode 100644 apps/bridge/test/unit.test.ts
+ create mode 100644 apps/bridge/tsconfig.json
+ create mode 100644 apps/bridge/tsup.config.ts
+ create mode 100644 apps/bridge/vitest.config.ts
+ create mode 100644 mods/ut99-tournament/Classes/BridgeLink.uc
+ create mode 100644 mods/ut99-tournament/Classes/TournamentConfig.uc
+ create mode 100644 mods/ut99-tournament/Classes/TournamentDM.uc
+ create mode 100644 mods/ut99-tournament/Classes/TourneyMsg.uc
+ create mode 100644 mods/ut99-tournament/Classes/TourneyMutator.uc
+ create mode 100644 mods/ut99-tournament/build.ps1
+ create mode 100755 mods/ut99-tournament/build.sh
+
+diff --git a/README.md b/README.md
+index 1effc52..249251a 100644
+--- a/README.md
++++ b/README.md
+@@ -12,15 +12,15 @@ Angular SPA ──HTTP/WS──> API (NestJS, SQLite)  <──WSS──  Bridge
+ 
+ ## Repository layout
+ 
+-| Path                    | What                                                                        | Status  |
+-| ----------------------- | --------------------------------------------------------------------------- | ------- |
+-| `packages/bracket`      | Deterministic SE/DE bracket engine, seeding, scheduler                      | done    |
+-| `packages/protocol`     | Schemas: event log, website↔bridge, bridge↔mod lines; tournament projection | done    |
+-| `packages/adapter-ut99` | UT99 rules, map vote, bot simulation, server launch config                  | done    |
+-| `apps/bridge`           | Agent: game server process, match flow, mod TCP server, inventory scan      | next    |
+-| `mods/ut99-tournament`  | UnrealScript game type, HUD, vote/ready UI, TcpLink client                  | next    |
+-| `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                   | planned |
+-| `apps/web`              | Angular frontend                                                            | planned |
++| Path                    | What                                                                          | Status                                  |
++| ----------------------- | ----------------------------------------------------------------------------- | --------------------------------------- |
++| `packages/bracket`      | Deterministic SE/DE bracket engine, seeding, scheduler                        | done                                    |
++| `packages/protocol`     | Schemas: event log, website↔bridge, bridge↔mod lines; tournament projection   | done                                    |
++| `packages/adapter-ut99` | UT99 rules, map vote, bot simulation, server launch config                    | done                                    |
++| `apps/bridge`           | Agent: match director, mod TCP server, event log, simulator (standalone mode) | done (M3)                               |
++| `mods/ut99-tournament`  | UnrealScript game type, bridge link, chat commands                            | written, first real-server test pending |
++| `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                     | planned                                 |
++| `apps/web`              | Angular frontend                                                              | planned                                 |
+ 
+ ## Development
+ 
+diff --git a/apps/bridge/README.md b/apps/bridge/README.md
+new file mode 100644
+index 0000000..ac1201a
+--- /dev/null
++++ b/apps/bridge/README.md
+@@ -0,0 +1,41 @@
++# Bridge
++
++Runs on the game server machine. Drives the tournament on the UT server and (from milestone 5) syncs with the
++website.
++
++Current state (milestone 3): **standalone mode**. The tournament is defined in a JSON file, the event log is
++stored in `dataDir/tournaments/<id>.jsonl`, and the UT server is started by hand.
++
++## Run
++
++```sh
++pnpm install && pnpm build
++node apps/bridge/dist/cli.js example            # prints example bridge.json and tournament.json
++node apps/bridge/dist/cli.js run -c bridge.json -t tournament.json
++```
++
++Console commands while running: `start` (force start, missing players are replaced by bots), `pause [reason]`,
++`resume`, `status`, `quit`.
++
++Restarting the bridge with the same files resumes the tournament from the event log. Delete the `.jsonl` file
++to start over.
++
++## Try it without UT
++
++The simulator plays the UT server and the human players over the real protocol:
++
++```sh
++node apps/bridge/dist/cli.js run -c bridge.json -t tournament.json      # terminal 1
++node apps/bridge/dist/sim-cli.js -c bridge.json -t tournament.json --game 5   # terminal 2
++```
++
++## Code map
++
++| File                       | Role                                                                                                            |
++| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
++| `src/director.ts`          | Match director: check-in, scheduling, map vote, travel, ready check, countdown, live, forfeits, best-of, finish |
++| `src/mod-server.ts`        | TCP server for the mod (handshake, line protocol)                                                               |
++| `src/event-store.ts`       | Event log with optimistic concurrency (local JSONL now, website later)                                          |
++| `src/snapshot.ts`          | Builds the lines sent to the mod from the tournament projection                                                 |
++| `src/bootstrap.ts`         | Standalone tournament file → initial events                                                                     |
++| `src/sim/mod-simulator.ts` | Simulated UT server for tests and demos                                                                         |
+diff --git a/apps/bridge/package.json b/apps/bridge/package.json
+new file mode 100644
+index 0000000..dda5fc5
+--- /dev/null
++++ b/apps/bridge/package.json
+@@ -0,0 +1,24 @@
++{
++  "name": "@tourney/bridge",
++  "version": "0.1.0",
++  "private": true,
++  "description": "Bridge agent: runs next to the game server, drives matches, talks to the mod and the website.",
++  "license": "MIT",
++  "type": "module",
++  "bin": {
++    "tourney-bridge": "./dist/cli.js"
++  },
++  "scripts": {
++    "build": "tsup",
++    "typecheck": "tsc -p tsconfig.json",
++    "test": "vitest run",
++    "start": "node dist/cli.js",
++    "sim": "node dist/sim-cli.js"
++  },
++  "dependencies": {
++    "@tourney/adapter-ut99": "workspace:*",
++    "@tourney/bracket": "workspace:*",
++    "@tourney/protocol": "workspace:*",
++    "zod": "^4.6.5"
++  }
++}
+diff --git a/apps/bridge/src/bootstrap.ts b/apps/bridge/src/bootstrap.ts
+new file mode 100644
+index 0000000..9608fa9
+--- /dev/null
++++ b/apps/bridge/src/bootstrap.ts
+@@ -0,0 +1,110 @@
++import { z } from 'zod';
++import { buildSlots, createRng } from '@tourney/bracket';
++import {
++  AccessEntrySchema,
++  BotSpecSchema,
++  TournamentSettingsSchema,
++  type AccessEntry,
++  type BotSpec,
++  type Entrant,
++  type NewTournamentEvent,
++} from '@tourney/protocol';
++import { parseRules } from '@tourney/adapter-ut99';
++import type { EventStore } from './event-store.js';
++
++/**
++ * Standalone mode: a tournament defined in a JSON file instead of the website.
++ * Used for local testing and LAN events until the website exists.
++ */
++const Person = AccessEntrySchema.omit({ entrantId: true });
++
++export const TournamentFileSchema = z.object({
++  tournamentId: z.string().regex(/^[A-Za-z0-9_-]{1,64}$/),
++  name: z.string().min(1).max(100),
++  rngSeed: z.string().optional(),
++  settings: TournamentSettingsSchema,
++  /** Human players. With humanOrder "seeded" the order is the seed order. */
++  players: z.array(Person).min(1),
++  spectators: z.array(Person).default([]),
++  /** Bots that may fill empty slots or replace no-shows. */
++  botPool: z.array(BotSpecSchema).min(1),
++  humanOrder: z.enum(['random', 'seeded']).default('random'),
++  serverProfileId: z.string().default('local'),
++});
++export type TournamentFile = z.infer<typeof TournamentFileSchema>;
++
++export interface BootstrapResult {
++  access: AccessEntry[];
++  botPool: BotSpec[];
++  created: boolean;
++}
++
++export const botEntrantId = (name: string) => `bot-${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
++
++export function botEntrant(spec: BotSpec, id = botEntrantId(spec.name)): Entrant {
++  return { id, kind: 'bot', displayName: spec.name, bot: spec };
++}
++
++export async function bootstrapFromFile(
++  store: EventStore,
++  file: TournamentFile,
++): Promise<BootstrapResult> {
++  parseRules(file.settings.game.rules); // fail early on invalid rules
++
++  const humans: Entrant[] = file.players.map((p, i) => ({
++    id: `p${i + 1}`,
++    kind: 'human',
++    displayName: p.displayName,
++    userId: p.userId,
++  }));
++  const access: AccessEntry[] = [
++    ...file.players.map((p, i) => ({ ...p, entrantId: `p${i + 1}` })),
++    ...file.spectators,
++  ];
++  const result: BootstrapResult = { access, botPool: file.botPool, created: false };
++
++  const existing = await store.load(file.tournamentId);
++  if (existing.length > 0) return result;
++
++  const rngSeed = file.rngSeed ?? `${file.tournamentId}-${Date.now()}`;
++  const rng = createRng(rngSeed);
++  const bots = file.botPool.map((b) => botEntrant(b));
++  const slots = buildSlots({
++    size: file.settings.size,
++    humans: humans.map((h) => h.id),
++    botPool: bots.map((b) => b.id),
++    humanOrder: file.humanOrder,
++    botPlacement: file.settings.botPlacement,
++    rng,
++  });
++  const used = new Set(slots);
++  const entrants = [...humans, ...bots].filter((e) => used.has(e.id));
++  const system = { kind: 'system' as const };
++
++  const events: NewTournamentEvent[] = [
++    {
++      type: 'tournament.created',
++      actor: system,
++      data: { tournamentId: file.tournamentId, name: file.name, settings: file.settings },
++    },
++    {
++      type: 'seeding.set',
++      actor: system,
++      data: {
++        entrants,
++        rngSeed,
++        bracket: {
++          format: file.settings.format,
++          size: file.settings.size,
++          slots,
++          grandFinalReset: file.settings.grandFinalReset,
++          bestOf: file.settings.bestOf,
++        },
++      },
++    },
++    { type: 'checkin.opened', actor: system, data: { serverProfileId: file.serverProfileId } },
++  ];
++  const res = await store.append(file.tournamentId, 0, events);
++  if (!res.accepted) throw new Error(`could not create tournament: ${res.reason}`);
++  return { ...result, created: true };
++}
+diff --git a/apps/bridge/src/cli.ts b/apps/bridge/src/cli.ts
+new file mode 100644
+index 0000000..4f9ef99
+--- /dev/null
++++ b/apps/bridge/src/cli.ts
+@@ -0,0 +1,107 @@
++import path from 'node:path';
++import readline from 'node:readline';
++import { parseArgs } from 'node:util';
++import { bootstrapFromFile, TournamentFileSchema } from './bootstrap.js';
++import { realClock } from './clock.js';
++import { BridgeConfigSchema, EXAMPLE_CONFIG, EXAMPLE_TOURNAMENT, readJsonFile } from './config.js';
++import { MatchDirector } from './director.js';
++import { LocalEventStore } from './event-store.js';
++import { consoleLogger } from './log.js';
++import { ModServer } from './mod-server.js';
++
++const HELP = `tourney-bridge <command>
++
++Commands:
++  run --config <bridge.json> --tournament <tournament.json>
++        Run a tournament defined in a file (standalone mode, no website).
++        Console commands while running: start (force start), pause, resume, status, quit
++  example
++        Print example bridge.json and tournament.json
++`;
++
++async function main(): Promise<void> {
++  const { positionals, values } = parseArgs({
++    allowPositionals: true,
++    options: {
++      config: { type: 'string', short: 'c' },
++      tournament: { type: 'string', short: 't' },
++    },
++  });
++  const cmd = positionals[0];
++
++  if (cmd === 'example') {
++    console.log('// bridge.json');
++    console.log(JSON.stringify(EXAMPLE_CONFIG, null, 2));
++    console.log('\n// tournament.json');
++    console.log(JSON.stringify(EXAMPLE_TOURNAMENT, null, 2));
++    return;
++  }
++  if (cmd !== 'run' || !values.config || !values.tournament) {
++    console.log(HELP);
++    process.exitCode = cmd ? 1 : 0;
++    return;
++  }
++
++  const config = readJsonFile(values.config, BridgeConfigSchema);
++  const tournament = readJsonFile(values.tournament, TournamentFileSchema);
++  const log = consoleLogger(config.logLevel);
++  const store = new LocalEventStore(
++    realClock,
++    path.resolve(path.dirname(values.config), config.dataDir, 'tournaments'),
++  );
++  const boot = await bootstrapFromFile(store, tournament);
++  log.info(
++    boot.created
++      ? `created tournament ${tournament.tournamentId}`
++      : `resuming tournament ${tournament.tournamentId}`,
++  );
++
++  const mod = new ModServer({ ...config.mod, log });
++  await mod.listen();
++  const director = new MatchDirector({
++    tournamentId: tournament.tournamentId,
++    agentId: config.agentId,
++    store,
++    mod,
++    clock: realClock,
++    log,
++    access: boot.access,
++    botPool: boot.botPool,
++  });
++  director.on('live', (info) => log.debug(`live ${JSON.stringify(info)}`));
++  director.on('finished', (champion: string) =>
++    log.info(`tournament finished, champion ${champion}`),
++  );
++  director.on('shutdown', () => log.info('post-tournament time is over'));
++  await director.start();
++
++  const shutdown = async () => {
++    log.info('shutting down');
++    await mod.close();
++    process.exit(0);
++  };
++  process.on('SIGINT', () => void shutdown());
++  process.on('SIGTERM', () => void shutdown());
++
++  if (process.stdin.isTTY) {
++    const rl = readline.createInterface({ input: process.stdin });
++    rl.on('line', (line) => {
++      const [c, ...rest] = line.trim().split(/\s+/);
++      if (c === 'start') void director.forceStart();
++      else if (c === 'pause') void director.pause(rest.join(' ') || 'paused by admin');
++      else if (c === 'resume') void director.resume();
++      else if (c === 'status') {
++        const p = director.projection;
++        log.info(
++          `phase=${p.phase} stage=${director.stageKind} current=${p.currentMatch?.matchId ?? '-'} results=${p.results.length}`,
++        );
++      } else if (c === 'quit') void shutdown();
++      else if (c) log.info('commands: start, pause [reason], resume, status, quit');
++    });
++  }
++}
++
++main().catch((e: unknown) => {
++  console.error(e instanceof Error ? e.message : e);
++  process.exit(1);
++});
+diff --git a/apps/bridge/src/clock.ts b/apps/bridge/src/clock.ts
+new file mode 100644
+index 0000000..708df56
+--- /dev/null
++++ b/apps/bridge/src/clock.ts
+@@ -0,0 +1,87 @@
++/** Time source and timers, injectable so tests can run a whole tournament in milliseconds. */
++export interface Clock {
++  now(): number;
++  setTimeout(fn: () => void, ms: number): TimerHandle;
++  clearTimeout(handle: TimerHandle): void;
++}
++
++export type TimerHandle = { readonly id: number };
++
++class RealClock implements Clock {
++  private nextId = 1;
++  private timers = new Map<number, NodeJS.Timeout>();
++
++  now(): number {
++    return Date.now();
++  }
++
++  setTimeout(fn: () => void, ms: number): TimerHandle {
++    const id = this.nextId++;
++    this.timers.set(
++      id,
++      setTimeout(() => {
++        this.timers.delete(id);
++        fn();
++      }, ms),
++    );
++    return { id };
++  }
++
++  clearTimeout(handle: TimerHandle): void {
++    const t = this.timers.get(handle.id);
++    if (t) clearTimeout(t);
++    this.timers.delete(handle.id);
++  }
++}
++
++export const realClock: Clock = new RealClock();
++
++/** Manually advanced clock for tests. Timers fire in due order during advance(). */
++export class FakeClock implements Clock {
++  private time: number;
++  private nextId = 1;
++  private timers = new Map<number, { at: number; fn: () => void }>();
++
++  constructor(start = Date.UTC(2026, 9, 11, 12, 0, 0)) {
++    this.time = start;
++  }
++
++  now(): number {
++    return this.time;
++  }
++
++  setTimeout(fn: () => void, ms: number): TimerHandle {
++    const id = this.nextId++;
++    this.timers.set(id, { at: this.time + Math.max(0, ms), fn });
++    return { id };
++  }
++
++  clearTimeout(handle: TimerHandle): void {
++    this.timers.delete(handle.id);
++  }
++
++  /** Advances time, firing every timer that becomes due (including timers scheduled meanwhile). */
++  advance(ms: number): void {
++    const target = this.time + ms;
++    for (;;) {
++      let nextId = -1;
++      let nextAt = Infinity;
++      for (const [id, t] of this.timers) {
++        if (t.at <= target && (t.at < nextAt || (t.at === nextAt && id < nextId))) {
++          nextAt = t.at;
++          nextId = id;
++        }
++      }
++      if (nextId < 0) break;
++      const timer = this.timers.get(nextId) as { at: number; fn: () => void };
++      this.timers.delete(nextId);
++      this.time = Math.max(this.time, timer.at);
++      timer.fn();
++    }
++    this.time = target;
++  }
++
++  get pendingTimers(): number {
++    return this.timers.size;
++  }
++}
+diff --git a/apps/bridge/src/config.ts b/apps/bridge/src/config.ts
+new file mode 100644
+index 0000000..980efdf
+--- /dev/null
++++ b/apps/bridge/src/config.ts
+@@ -0,0 +1,79 @@
++import fs from 'node:fs';
++import { z } from 'zod';
++
++export const BridgeConfigSchema = z.object({
++  agentId: z.string().min(1).default('local-agent'),
++  mod: z.object({
++    host: z.string().default('127.0.0.1'),
++    port: z.number().int().min(1).max(65535).default(7790),
++    /** Must match SharedKey in the [UTTourney_v1.TournamentConfig] section of the server ini. */
++    sharedKey: z.string().min(8),
++  }),
++  /** Event logs and other state. */
++  dataDir: z.string().default('./data'),
++  logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
++});
++export type BridgeConfig = z.infer<typeof BridgeConfigSchema>;
++
++export function readJsonFile<T>(file: string, schema: z.ZodType<T>): T {
++  let raw: unknown;
++  try {
++    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
++  } catch (e) {
++    throw new Error(`cannot read ${file}: ${(e as Error).message}`, { cause: e });
++  }
++  const parsed = schema.safeParse(raw);
++  if (!parsed.success) {
++    throw new Error(`invalid ${file}:\n${z.prettifyError(parsed.error)}`);
++  }
++  return parsed.data;
++}
++
++export const EXAMPLE_CONFIG = {
++  agentId: 'pi-bridge',
++  mod: { host: '127.0.0.1', port: 7790, sharedKey: 'change-me-please' },
++  dataDir: './data',
++  logLevel: 'info',
++};
++
++export const EXAMPLE_TOURNAMENT = {
++  tournamentId: 'friday-cup',
++  name: 'Friday Cup',
++  settings: {
++    format: 'double',
++    size: 8,
++    bestOf: { default: 1, grandFinal: 3 },
++    botMatchMode: 'watch',
++    game: {
++      adapter: 'ut99-dm',
++      rules: {
++        fragLimit: 20,
++        timeLimitMin: 10,
++        mapMode: 'vote',
++        mapPool: [
++          'DM-Deck16][',
++          'DM-Morpheus',
++          'DM-Phobos',
++          'DM-Codex',
++          'DM-Pressure',
++          'DM-Curse][',
++        ],
++      },
++    },
++  },
++  players: [
++    { userId: 'mario', displayName: 'Mario', token: 'mario-token-1' },
++    { userId: 'anna', displayName: 'Anna', token: 'anna-token-22' },
++  ],
++  spectators: [{ userId: 'guest', displayName: 'Guest', token: 'guest-token-3' }],
++  botPool: [
++    { name: 'Xan', skill: 6 },
++    { name: 'Loque', skill: 5 },
++    { name: 'Malcolm', skill: 5 },
++    { name: 'Brock', skill: 4 },
++    { name: 'Lauren', skill: 4 },
++    { name: 'Visse', skill: 3 },
++    { name: 'Tamika', skill: 3 },
++    { name: 'Dominator', skill: 2 },
++  ],
++};
+diff --git a/apps/bridge/src/director.ts b/apps/bridge/src/director.ts
+new file mode 100644
+index 0000000..eec6b7f
+--- /dev/null
++++ b/apps/bridge/src/director.ts
+@@ -0,0 +1,1035 @@
++import { EventEmitter } from 'node:events';
++import {
++  createRng,
++  nextMatch as scheduleNextMatch,
++  type MatchResult,
++  type Rng,
++} from '@tourney/bracket';
++import {
++  projectTournament,
++  type AccessEntry,
++  type BotSpec,
++  type BridgeToMod,
++  type MapInfo,
++  type ModPhase,
++  type ModToBridge,
++  type NewTournamentEvent,
++  type TournamentEvent,
++  type TournamentProjection,
++} from '@tourney/protocol';
++import {
++  loserPickMap,
++  parseRules,
++  randomBallot,
++  randomMap,
++  resolveMapVote,
++  simulateSeries,
++  type Ut99DmRules,
++} from '@tourney/adapter-ut99';
++import { botEntrant } from './bootstrap.js';
++import type { Clock, TimerHandle } from './clock.js';
++import type { EventStore } from './event-store.js';
++import type { Logger } from './log.js';
++import type { ModHello, ModLink } from './mod-server.js';
++import {
++  aclLines,
++  bracketLines,
++  entrantName,
++  matchLines,
++  phaseLine,
++  seriesWins,
++  standingsLines,
++  travelLine,
++  voteLines,
++  type Side,
++} from './snapshot.js';
++
++export interface DirectorTiming {
++  /** Minimum time between the end of a game and the next map change (scoreboard time). */
++  postGameDelayMs: number;
++  /** Delay before a simulated bot vs bot match is decided. */
++  simulateDelayMs: number;
++  /** Re-send the travel command if the mod has not come back on the new map after this long. */
++  loadingTimeoutMs: number;
++}
++
++const DEFAULT_TIMING: DirectorTiming = {
++  postGameDelayMs: 10_000,
++  simulateDelayMs: 3_000,
++  loadingTimeoutMs: 90_000,
++};
++
++export interface DirectorOptions {
++  tournamentId: string;
++  agentId: string;
++  store: EventStore;
++  mod: ModLink;
++  clock: Clock;
++  log: Logger;
++  access: AccessEntry[];
++  botPool: BotSpec[];
++  /** Map metadata from the inventory, used for vote titles. */
++  maps?: MapInfo[];
++  timing?: Partial<DirectorTiming>;
++}
++
++/** Non-persistent match telemetry for the website. */
++export interface LiveInfo {
++  tournamentId: string;
++  matchId: string;
++  game: number;
++  phase: 'voting' | 'loading' | 'readyCheck' | 'countdown' | 'live' | 'paused' | 'post';
++  map?: string;
++  scores?: Record<string, number>;
++  ready?: Record<string, boolean>;
++  deadline?: number;
++}
++
++type VoteMethod = 'vote' | 'loserPick';
++
++/** An event as the director writes it; actor, seq and timestamp are added on append. */
++type EventDraft = NewTournamentEvent extends infer E
++  ? E extends NewTournamentEvent
++    ? Omit<E, 'actor'>
++    : never
++  : never;
++
++type Stage =
++  | { kind: 'idle' }
++  | { kind: 'checkIn'; deadline: number }
++  | { kind: 'between' }
++  | {
++      kind: 'voting';
++      matchId: string;
++      game: number;
++      method: VoteMethod;
++      voters: string[];
++      ballots: Map<string, string[]>;
++      deadline: number;
++    }
++  | { kind: 'loading'; matchId: string; game: number; map: string }
++  | {
++      kind: 'readyCheck';
++      matchId: string;
++      game: number;
++      map: string;
++      ready: Set<string>;
++      present: Set<string>;
++      deadline: number;
++    }
++  | { kind: 'countdown'; matchId: string; game: number; map: string }
++  | {
++      kind: 'live';
++      matchId: string;
++      game: number;
++      map: string;
++      scores: [number, number];
++      lost?: string;
++    }
++  | { kind: 'simulating'; matchId: string }
++  | { kind: 'finished' };
++
++interface ConnectedPlayer {
++  pid: number;
++  token: string;
++  name: string;
++  userId?: string;
++  entrantId?: string;
++}
++
++/**
++ * Drives a tournament on one game server: check-in, match order, map vote, travel, ready check,
++ * countdown, live game, forfeits, best-of series and the final.
++ *
++ * All decisions are written to the event log first; the in-memory stage only tracks what is
++ * happening on the server right now. Inputs (mod lines, timers, commands) are processed strictly
++ * one after another through a queue.
++ */
++export class MatchDirector extends EventEmitter {
++  private events: TournamentEvent[] = [];
++  private proj!: TournamentProjection;
++  private rules!: Ut99DmRules;
++  private stage: Stage = { kind: 'idle' };
++  private players = new Map<number, ConnectedPlayer>();
++  private rev = 0;
++  private queue: Promise<void> = Promise.resolve();
++  private timer?: { handle: TimerHandle; due: number; fn: () => Promise<void> | void };
++  private suspended?: { remaining: number; fn: () => Promise<void> | void };
++  private cooldownUntil = 0;
++  private readonly timing: DirectorTiming;
++
++  constructor(private readonly o: DirectorOptions) {
++    super();
++    this.timing = { ...DEFAULT_TIMING, ...o.timing };
++  }
++
++  // -------------------------------------------------------------------------------------------
++  // Public API
++  // -------------------------------------------------------------------------------------------
++
++  private readonly onHelloListener = (h: ModHello) => void this.enqueue(() => this.onHello(h));
++  private readonly onMessageListener = (m: Exclude<ModToBridge, ModHello>) =>
++    void this.enqueue(() => this.onMessage(m));
++  private stopped = false;
++
++  start(): Promise<void> {
++    this.o.mod.on('hello', this.onHelloListener);
++    this.o.mod.on('message', this.onMessageListener);
++    return this.enqueue(async () => {
++      await this.reload();
++      await this.resumeFromProjection();
++    });
++  }
++
++  /** Detaches from the mod link and cancels timers. The event log is untouched. */
++  async stop(): Promise<void> {
++    this.stopped = true;
++    this.o.mod.off('hello', this.onHelloListener);
++    this.o.mod.off('message', this.onMessageListener);
++    await this.queue;
++    this.clearTimer();
++  }
++
++  /** Resolves when all queued work is done (tests). */
++  idle(): Promise<void> {
++    return this.queue;
++  }
++
++  get projection(): TournamentProjection {
++    return this.proj;
++  }
++
++  get stageKind(): Stage['kind'] {
++    return this.stage.kind;
++  }
++
++  forceStart(): Promise<void> {
++    return this.enqueue(async () => {
++      if (this.stage.kind === 'checkIn') await this.startTournament();
++    });
++  }
++
++  pause(reason: string): Promise<void> {
++    return this.enqueue(async () => {
++      if (this.proj.phase !== 'running' && this.proj.phase !== 'checkIn') return;
++      if (!(await this.append({ type: 'tournament.paused', data: { reason } }))) return;
++      this.suspendTimer();
++      this.send([{ t: 'pause', on: true, why: reason.slice(0, 100) }, this.phase()]);
++      this.telemetry('paused');
++    });
++  }
++
++  resume(): Promise<void> {
++    return this.enqueue(async () => {
++      if (this.proj.phase !== 'paused') return;
++      if (!(await this.append({ type: 'tournament.resumed', data: {} }))) return;
++      this.send([{ t: 'pause', on: false, why: '' }, this.phase()]);
++      this.rearmTimer();
++    });
++  }
++
++  // -------------------------------------------------------------------------------------------
++  // Plumbing
++  // -------------------------------------------------------------------------------------------
++
++  private enqueue(fn: () => Promise<void> | void): Promise<void> {
++    this.queue = this.queue
++      .then(() => (this.stopped ? undefined : fn()))
++      .catch((e: unknown) => {
++        this.o.log.error(`director: ${e instanceof Error ? (e.stack ?? e.message) : String(e)}`);
++      });
++    return this.queue;
++  }
++
++  private async reload(): Promise<void> {
++    this.events = await this.o.store.load(this.o.tournamentId);
++    if (this.events.length === 0)
++      throw new Error(`tournament ${this.o.tournamentId} has no events`);
++    this.proj = projectTournament(this.events);
++    this.rules = parseRules(this.proj.settings.game.rules);
++  }
++
++  /** Appends events. On a concurrency conflict it reloads, re-plans and returns false. */
++  private async append(...events: EventDraft[]): Promise<boolean> {
++    const actor = { kind: 'bridge' as const, id: this.o.agentId };
++    const full = events.map((e) => ({ ...e, actor })) as NewTournamentEvent[];
++    const res = await this.o.store.append(this.o.tournamentId, this.proj.headSeq, full);
++    if (res.accepted) {
++      this.events.push(...res.events);
++      this.proj = projectTournament(this.events);
++      return true;
++    }
++    this.o.log.warn(`event append rejected (${res.reason}), re-planning`);
++    await this.reload();
++    await this.resumeFromProjection();
++    return false;
++  }
++
++  private setTimer(ms: number, fn: () => Promise<void> | void): void {
++    this.clearTimer();
++    if (this.proj.phase === 'paused') {
++      this.suspended = { remaining: ms, fn };
++      return;
++    }
++    const handle = this.o.clock.setTimeout(() => {
++      if (this.timer?.handle === handle) this.timer = undefined;
++      void this.enqueue(fn);
++    }, ms);
++    this.timer = { handle, due: this.o.clock.now() + ms, fn };
++  }
++
++  private clearTimer(): void {
++    if (this.timer) this.o.clock.clearTimeout(this.timer.handle);
++    this.timer = undefined;
++    this.suspended = undefined;
++  }
++
++  private suspendTimer(): void {
++    if (!this.timer) return;
++    const remaining = Math.max(0, this.timer.due - this.o.clock.now());
++    const fn = this.timer.fn;
++    this.clearTimer();
++    this.suspended = { remaining, fn };
++  }
++
++  private rearmTimer(): void {
++    const s = this.suspended;
++    this.suspended = undefined;
++    if (s) this.setTimer(s.remaining, s.fn);
++  }
++
++  private send(lines: readonly BridgeToMod[]): void {
++    this.o.mod.send(lines);
++  }
++
++  private say(msg: string, pid = -1): void {
++    this.send([{ t: 'say', pid, msg: msg.slice(0, 160) }]);
++  }
++
++  private rng(...parts: (string | number)[]): Rng {
++    return createRng(
++      [this.proj.rngSeed ?? this.o.tournamentId, this.proj.headSeq, ...parts].join('|'),
++    );
++  }
++
++  private get pool(): string[] {
++    return this.rules.mapPool;
++  }
++
++  private name(entrantId: string | undefined): string {
++    return entrantName(this.proj, entrantId) || '?';
++  }
++
++  private isBot(entrantId: string): boolean {
++    return this.proj.entrants[entrantId]?.kind === 'bot';
++  }
++
++  private current(): { matchId: string; entrants: [string, string] } {
++    const cm = this.proj.currentMatch;
++    if (!cm) throw new Error('no current match');
++    return cm;
++  }
++
++  private telemetry(phase: LiveInfo['phase'], extra: Partial<LiveInfo> = {}): void {
++    const cm = this.proj.currentMatch;
++    if (!cm) return;
++    this.emit('live', {
++      tournamentId: this.o.tournamentId,
++      matchId: cm.matchId,
++      game: cm.game,
++      phase,
++      ...(cm.map ? { map: cm.map } : {}),
++      ...extra,
++    } satisfies LiveInfo);
++  }
++
++  // -------------------------------------------------------------------------------------------
++  // Snapshot / phases
++  // -------------------------------------------------------------------------------------------
++
++  private phase(): BridgeToMod {
++    const s = this.stage;
++    const secs = (deadline: number) =>
++      Math.max(0, Math.round((deadline - this.o.clock.now()) / 1000));
++    if (this.proj.phase === 'paused')
++      return phaseLine('paused', this.proj.currentMatch?.matchId ?? '');
++    const map: Record<Stage['kind'], ModPhase> = {
++      idle: 'lobby',
++      checkIn: 'lobby',
++      between: 'post',
++      voting: 'vote',
++      loading: 'post',
++      readyCheck: 'ready',
++      countdown: 'countdown',
++      live: 'live',
++      simulating: 'post',
++      finished: 'finished',
++    };
++    const mid = 'matchId' in s ? s.matchId : (this.proj.currentMatch?.matchId ?? '');
++    const sec = 'deadline' in s ? secs(s.deadline) : -1;
++    return phaseLine(map[s.kind], mid, sec);
++  }
++
++  private bracketUpdate(): BridgeToMod[] {
++    this.rev++;
++    const live = this.stage.kind === 'live' ? this.stage.matchId : undefined;
++    return [...bracketLines(this.proj, live, this.rev), ...standingsLines(this.proj, this.rev)];
++  }
++
++  private snapshot(): BridgeToMod[] {
++    this.rev++;
++    const cm = this.proj.currentMatch;
++    const lines: BridgeToMod[] = [
++      { t: 'welcome', pv: 1, rev: this.rev },
++      { t: 'sync', st: 'begin', rev: this.rev },
++    ];
++    if (cm) lines.push(...matchLines(this.proj, this.rules, cm.matchId, cm.game, cm.entrants));
++    lines.push(...aclLines(this.proj, this.o.access, cm?.entrants, this.rev));
++    lines.push(...this.bracketUpdate());
++    if (this.stage.kind === 'voting') {
++      lines.push(
++        ...voteLines(
++          this.stage.matchId,
++          this.voteOptions(),
++          this.secondsUntil(this.stage.deadline),
++        ),
++      );
++    }
++    if (this.stage.kind === 'live' && this.stage.lost) {
++      lines.push({ t: 'pause', on: true, why: `${this.name(this.stage.lost)} disconnected` });
++    }
++    lines.push(this.phase(), { t: 'sync', st: 'end', rev: this.rev });
++    return lines;
++  }
++
++  private secondsUntil(deadline: number): number {
++    return Math.max(1, Math.round((deadline - this.o.clock.now()) / 1000));
++  }
++
++  private voteOptions(): { id: string; title?: string }[] {
++    const info = new Map((this.o.maps ?? []).map((m) => [m.id.toLowerCase(), m]));
++    return this.pool.map((id) => {
++      const title = info.get(id.toLowerCase())?.title;
++      return title ? { id, title } : { id };
++    });
++  }
++
++  // -------------------------------------------------------------------------------------------
++  // Flow
++  // -------------------------------------------------------------------------------------------
++
++  private async resumeFromProjection(): Promise<void> {
++    this.clearTimer();
++    const p = this.proj;
++    switch (p.phase) {
++      case 'draft':
++      case 'seeded':
++      case 'aborted':
++        this.stage = { kind: 'idle' };
++        this.send(this.snapshot());
++        return;
++      case 'finished':
++        this.stage = { kind: 'finished' };
++        this.send(this.snapshot());
++        return;
++      case 'checkIn':
++        return this.enterCheckIn();
++      case 'running':
++      case 'paused': {
++        const cm = p.currentMatch;
++        if (!cm) return this.nextMatch();
++        if (cm.status === 'called') return this.startGame(cm.matchId, cm.game);
++        // mapSelected or live: (re)load the map; a game interrupted by a restart is replayed.
++        if (cm.map) return this.travel(cm.matchId, cm.game, cm.map);
++        return this.startGame(cm.matchId, cm.game);
++      }
++    }
++  }
++
++  private async enterCheckIn(): Promise<void> {
++    const opened = [...this.events].reverse().find((e) => e.type === 'checkin.opened');
++    const openedAt = opened ? Date.parse(opened.at) : this.o.clock.now();
++    const deadline = openedAt + this.proj.settings.checkInWindowMin * 60_000;
++    this.stage = { kind: 'checkIn', deadline };
++    this.setTimer(Math.max(0, deadline - this.o.clock.now()), () => this.startTournament());
++    this.send(this.snapshot());
++    await this.maybeCompleteCheckIn();
++  }
++
++  private humans(): string[] {
++    return Object.values(this.proj.entrants)
++      .filter((e) => e.kind === 'human')
++      .map((e) => e.id);
++  }
++
++  private async maybeCompleteCheckIn(): Promise<void> {
++    if (this.stage.kind !== 'checkIn') return;
++    const missing = this.humans().filter((id) => !this.proj.checkedIn.includes(id));
++    if (missing.length === 0) {
++      await this.startTournament();
++    } else {
++      this.say(
++        `Check-in: ${this.humans().length - missing.length}/${this.humans().length} players. Waiting for ${missing.map((m) => this.name(m)).join(', ')}`,
++      );
++    }
++  }
++
++  private async startTournament(): Promise<void> {
++    if (this.stage.kind !== 'checkIn') return;
++    this.clearTimer();
++    const missing = this.humans().filter((id) => !this.proj.checkedIn.includes(id));
++    const usedNames = new Set(
++      Object.values(this.proj.entrants)
++        .filter((e) => e.kind === 'bot')
++        .map((e) => (e.kind === 'bot' ? e.bot.name : '')),
++    );
++    const replacements: EventDraft[] = missing.map((entrantId, i) => {
++      let spec = this.o.botPool.find((b) => !usedNames.has(b.name));
++      if (!spec) {
++        const base = this.o.botPool[i % this.o.botPool.length] as BotSpec;
++        spec = { ...base, name: `${base.name}${i + 2}`.slice(0, 32) };
++      }
++      usedNames.add(spec.name);
++      this.say(`${this.name(entrantId)} did not check in and is replaced by bot ${spec.name}`);
++      return {
++        type: 'entrant.replaced',
++        data: { entrantId, replacement: botEntrant(spec, entrantId), reason: 'noShowCheckIn' },
++      };
++    });
++    if (!(await this.append(...replacements, { type: 'tournament.started', data: {} }))) return;
++    this.say('The tournament starts now!');
++    // Roles changed for replaced players: refresh the access list on the server.
++    this.send(aclLines(this.proj, this.o.access, undefined, ++this.rev));
++    await this.nextMatch();
++  }
++
++  private async nextMatch(): Promise<void> {
++    const bracket = this.proj.bracket;
++    if (!bracket) throw new Error('no bracket');
++    if (bracket.status === 'finished') return this.finish();
++    const m = scheduleNextMatch(bracket, this.proj.results);
++    if (!m) {
++      this.o.log.error(
++        `no playable match, but bracket not finished (issues: ${bracket.issues.length})`,
++      );
++      this.stage = { kind: 'between' };
++      return;
++    }
++    const entrants = m.entrants as [string, string];
++    if (!(await this.append({ type: 'match.called', data: { matchId: m.id, entrants } }))) return;
++    // Tell the server who plays next, so it can show vote/ready UI to the right players.
++    this.send([
++      ...matchLines(this.proj, this.rules, m.id, 1, entrants),
++      ...aclLines(this.proj, this.o.access, entrants, ++this.rev),
++    ]);
++    this.say(`Next match (${m.id}): ${this.name(entrants[0])} vs ${this.name(entrants[1])}`);
++    if (
++      this.isBot(entrants[0]) &&
++      this.isBot(entrants[1]) &&
++      this.proj.settings.botMatchMode === 'simulate'
++    ) {
++      return this.simulate(m.id, entrants, m.bestOf);
++    }
++    await this.startGame(m.id, 1);
++  }
++
++  private async startGame(matchId: string, game: number): Promise<void> {
++    const { entrants } = this.current();
++    if (game === 1) {
++      if (this.rules.mapMode === 'vote') {
++        return this.openVote(
++          matchId,
++          game,
++          'vote',
++          entrants.filter((e) => !this.isBot(e)),
++        );
++      }
++      const map = randomMap({
++        pool: this.pool,
++        entrants,
++        history: this.proj.mapHistory,
++        avoidRecentMaps: this.rules.avoidRecentMaps,
++        rng: this.rng(matchId, game, 'random'),
++      });
++      return this.selectMap(matchId, game, map, 'random');
++    }
++    // Game 2+: the loser of the previous game picks.
++    const games = this.proj.games[matchId] ?? [];
++    const last = games[games.length - 1];
++    const loser = entrants.find((e) => e !== last?.winnerId) as string;
++    return this.openVote(matchId, game, 'loserPick', this.isBot(loser) ? [] : [loser]);
++  }
++
++  private async openVote(
++    matchId: string,
++    game: number,
++    method: VoteMethod,
++    voters: string[],
++  ): Promise<void> {
++    const deadline = this.o.clock.now() + this.rules.voteTimeoutSec * 1000;
++    this.stage = { kind: 'voting', matchId, game, method, voters, ballots: new Map(), deadline };
++    if (voters.length === 0) return this.closeVote();
++    this.send([...voteLines(matchId, this.voteOptions(), this.rules.voteTimeoutSec), this.phase()]);
++    const who = voters.map((v) => this.name(v)).join(' and ');
++    this.say(
++      method === 'vote'
++        ? `Map vote for ${who}: pick up to ${this.rules.picksPerPlayer} maps (!vote 3 1 5)`
++        : `${who} lost the last game and picks the next map (!vote <number>)`,
++    );
++    this.setTimer(this.rules.voteTimeoutSec * 1000, () => this.closeVote());
++    this.telemetry('voting', { deadline });
++  }
++
++  private async onVote(entrantId: string, picks: string[]): Promise<void> {
++    const s = this.stage;
++    if (s.kind !== 'voting' || !s.voters.includes(entrantId)) return;
++    s.ballots.set(entrantId, picks);
++    if (s.voters.every((v) => s.ballots.has(v))) await this.closeVote();
++  }
++
++  private async closeVote(): Promise<void> {
++    const s = this.stage;
++    if (s.kind !== 'voting') return;
++    this.clearTimer();
++    const { entrants } = this.current();
++    const rng = this.rng(s.matchId, s.game, s.method);
++    if (s.method === 'vote') {
++      const out = resolveMapVote({
++        pool: this.pool,
++        entrants,
++        ballots: [...s.ballots].map(([entrantId, picks]) => ({ entrantId, picks })),
++        history: this.proj.mapHistory,
++        picksPerPlayer: this.rules.picksPerPlayer,
++        avoidRecentMaps: this.rules.avoidRecentMaps,
++        rng,
++      });
++      return this.selectMap(s.matchId, s.game, out.map, 'vote', {
++        ballots: out.ballots,
++        scores: out.scores,
++        tiedFor: out.tiedFor,
++      });
++    }
++    const games = this.proj.games[s.matchId] ?? [];
++    const loser = s.voters[0];
++    const picks = (loser && s.ballots.get(loser)) || randomBallot(this.pool, 3, rng);
++    const r = loserPickMap({
++      pool: this.pool,
++      loserPicks: picks,
++      playedInSeries: games.map((g) => g.map),
++      rng,
++    });
++    return this.selectMap(s.matchId, s.game, r.map, 'loserPick', { picks, random: r.random });
++  }
++
++  private async selectMap(
++    matchId: string,
++    game: number,
++    map: string,
++    method: 'vote' | 'random' | 'loserPick',
++    details?: Record<string, unknown>,
++  ): Promise<void> {
++    if (
++      !(await this.append({
++        type: 'match.mapSelected',
++        data: { matchId, game, map, method, ...(details ? { details } : {}) },
++      }))
++    ) {
++      return;
++    }
++    if (method !== 'random') this.send([{ t: 'vclose', map }]);
++    this.say(`Map: ${map}`);
++    await this.travel(matchId, game, map);
++  }
++
++  private async travel(matchId: string, game: number, map: string): Promise<void> {
++    this.stage = { kind: 'loading', matchId, game, map };
++    const wait = this.cooldownUntil - this.o.clock.now();
++    if (wait > 0) {
++      this.send([this.phase()]);
++      this.setTimer(wait, () => this.sendTravel());
++      return;
++    }
++    this.sendTravel();
++  }
++
++  private sendTravel(): void {
++    const s = this.stage;
++    if (s.kind !== 'loading') return;
++    const { entrants } = this.current();
++    // The mod caches match and access list before travelling, so logins on the new level work
++    // before the bridge connection is re-established.
++    this.send([
++      ...matchLines(this.proj, this.rules, s.matchId, s.game, entrants),
++      ...aclLines(this.proj, this.o.access, entrants, ++this.rev),
++      this.phase(),
++      travelLine(this.rules, s.map, s.matchId, s.game),
++    ]);
++    this.telemetry('loading');
++    this.setTimer(this.timing.loadingTimeoutMs, () => {
++      this.o.log.warn(`no mod connection on ${s.map} after travel, sending travel again`);
++      this.sendTravel();
++    });
++  }
++
++  private async onHello(hello: ModHello): Promise<void> {
++    this.players.clear();
++    const s = this.stage;
++    const onMap = (map: string) => hello.lvl.toLowerCase() === map.toLowerCase();
++    switch (s.kind) {
++      case 'loading':
++        if (onMap(s.map)) return this.enterReadyCheck(s.matchId, s.game, s.map);
++        this.send(this.snapshot());
++        this.sendTravel();
++        return;
++      case 'live':
++        if (hello.gm && onMap(s.map)) {
++          this.send(this.snapshot()); // only the bridge connection dropped, the game goes on
++          return;
++        }
++        this.o.log.warn(
++          `game ${s.matchId}#${s.game} was interrupted (level ${hello.lvl}), replaying it`,
++        );
++        return this.travel(s.matchId, s.game, s.map);
++      case 'readyCheck':
++      case 'countdown':
++        if (onMap(s.map)) return this.enterReadyCheck(s.matchId, s.game, s.map);
++        return this.travel(s.matchId, s.game, s.map);
++      default:
++        this.send(this.snapshot());
++    }
++  }
++
++  private async enterReadyCheck(matchId: string, game: number, map: string): Promise<void> {
++    const deadline = this.o.clock.now() + this.proj.settings.noShowSec * 1000;
++    this.stage = {
++      kind: 'readyCheck',
++      matchId,
++      game,
++      map,
++      ready: new Set(),
++      present: new Set(),
++      deadline,
++    };
++    this.send(this.snapshot());
++    this.setTimer(this.proj.settings.noShowSec * 1000, () => this.onNoShow());
++    this.telemetry('readyCheck', { deadline });
++    await this.checkAllReady();
++  }
++
++  private async checkAllReady(): Promise<void> {
++    const s = this.stage;
++    if (s.kind !== 'readyCheck') return;
++    const { entrants } = this.current();
++    const ready = Object.fromEntries(entrants.map((e) => [e, this.isBot(e) || s.ready.has(e)]));
++    this.telemetry('readyCheck', { ready, deadline: s.deadline });
++    if (!entrants.every((e) => ready[e])) return;
++    this.clearTimer();
++    this.stage = { kind: 'countdown', matchId: s.matchId, game: s.game, map: s.map };
++    this.send([{ t: 'cd', sec: this.rules.countdownSec }, this.phase()]);
++    this.telemetry('countdown');
++  }
++
++  private async onNoShow(): Promise<void> {
++    const s = this.stage;
++    if (s.kind !== 'readyCheck') return;
++    const { entrants } = this.current();
++    const notReady = entrants.filter((e) => !this.isBot(e) && !s.ready.has(e));
++    if (notReady.length === 0) return this.checkAllReady();
++    let loser: string;
++    if (notReady.length === 1) loser = notReady[0] as string;
++    else {
++      const absent = notReady.filter((e) => !s.present.has(e));
++      const candidates = absent.length === 1 ? absent : notReady;
++      loser = candidates[Math.floor(this.rng(s.matchId, 'noshow')() * candidates.length)] as string;
++    }
++    this.say(`${this.name(loser)} was not ready in time and forfeits ${s.matchId}`);
++    await this.forfeit(s.matchId, loser);
++  }
++
++  private async forfeit(matchId: string, loser: string): Promise<void> {
++    this.clearTimer();
++    const { entrants } = this.current();
++    const winnerId = entrants.find((e) => e !== loser) as string;
++    const result: MatchResult = {
++      matchId,
++      entrants,
++      winnerId,
++      outcome: 'forfeit',
++      games: (this.proj.games[matchId] ?? []).map((g) => ({
++        map: g.map,
++        scores: g.scores,
++        winnerId: g.winnerId,
++      })),
++    };
++    if (!(await this.append({ type: 'match.result', data: { result } }))) return;
++    await this.afterResult();
++  }
++
++  private async afterResult(): Promise<void> {
++    this.cooldownUntil = this.o.clock.now() + this.timing.postGameDelayMs;
++    this.stage = { kind: 'between' };
++    this.send([...this.bracketUpdate(), this.phase()]);
++    this.telemetry('post');
++    if (this.proj.bracket?.status === 'finished') return this.finish();
++    await this.nextMatch();
++  }
++
++  private async finish(): Promise<void> {
++    const champion = this.proj.bracket?.championId;
++    if (!champion) return;
++    if (this.proj.phase !== 'finished') {
++      if (!(await this.append({ type: 'tournament.finished', data: { championId: champion } })))
++        return;
++    }
++    this.stage = { kind: 'finished' };
++    this.send([...this.bracketUpdate(), this.phase()]);
++    this.say(`${this.name(champion)} wins the tournament!`);
++    this.emit('finished', champion);
++    this.setTimer(this.proj.settings.postTournamentShutdownMin * 60_000, () => {
++      this.emit('shutdown');
++    });
++  }
++
++  private async simulate(
++    matchId: string,
++    entrants: [string, string],
++    bestOf: number,
++  ): Promise<void> {
++    this.stage = { kind: 'simulating', matchId };
++    this.send([this.phase()]);
++    this.setTimer(this.timing.simulateDelayMs, async () => {
++      const skills = entrants.map((e) => {
++        const ent = this.proj.entrants[e];
++        return ent?.kind === 'bot' ? ent.bot.skill : 3;
++      }) as [number, number];
++      const series = simulateSeries({
++        skills,
++        bestOf,
++        fragLimit: this.rules.fragLimit,
++        rng: this.rng(matchId, 'simulate'),
++      });
++      const games = series.games.map((g) => ({
++        map: '(simulated)',
++        scores: { [entrants[0]]: g.scores[0], [entrants[1]]: g.scores[1] },
++        winnerId: entrants[g.winner],
++      }));
++      const ok = await this.append(
++        ...games.map((g, i) => ({
++          type: 'match.gameFinished' as const,
++          data: { matchId, game: i + 1, ...g, endReason: 'fragLimit' as const },
++        })),
++        {
++          type: 'match.result',
++          data: {
++            result: {
++              matchId,
++              entrants,
++              winnerId: entrants[series.winner],
++              outcome: 'simulated' as const,
++              games,
++            },
++          },
++        },
++      );
++      if (!ok) return;
++      this.say(`${matchId} simulated: ${this.name(entrants[series.winner])} wins`);
++      await this.afterResult();
++    });
++  }
++
++  // -------------------------------------------------------------------------------------------
++  // Mod input
++  // -------------------------------------------------------------------------------------------
++
++  private entrantFor(token: string): { entry?: AccessEntry; entrantId?: string } {
++    const entry = this.o.access.find((a) => a.token === token);
++    if (!entry?.entrantId) return entry ? { entry } : {};
++    const ent = this.proj.entrants[entry.entrantId];
++    const isTheirs = ent?.kind === 'human' && ent.userId === entry.userId;
++    return isTheirs ? { entry, entrantId: entry.entrantId } : { entry };
++  }
++
++  private sideOf(entrantId: string | undefined): Side | undefined {
++    const cm = this.proj.currentMatch;
++    if (!cm || !entrantId) return undefined;
++    return cm.entrants[0] === entrantId ? 'a' : cm.entrants[1] === entrantId ? 'b' : undefined;
++  }
++
++  private async onMessage(msg: Exclude<ModToBridge, ModHello>): Promise<void> {
++    switch (msg.t) {
++      case 'join':
++        return this.onJoin(msg.pid, msg.tk, msg.name);
++      case 'leave':
++        return this.onLeave(msg.pid);
++      case 'reject':
++        this.o.log.info(`server rejected ${msg.name}: ${msg.why}`);
++        return;
++      case 'ready': {
++        const p = this.players.get(msg.pid);
++        const s = this.stage;
++        if (s.kind !== 'readyCheck' || !p?.entrantId || !this.sideOf(p.entrantId)) return;
++        if (!s.ready.has(p.entrantId)) {
++          s.ready.add(p.entrantId);
++          this.say(`${this.name(p.entrantId)} is ready`);
++        }
++        return this.checkAllReady();
++      }
++      case 'vote': {
++        const p = this.players.get(msg.pid);
++        if (!p?.entrantId) return;
++        return this.onVote(p.entrantId, [msg.m1, msg.m2, msg.m3].filter(Boolean));
++      }
++      case 'live': {
++        const s = this.stage;
++        if (s.kind !== 'countdown' || s.matchId !== msg.mid) return;
++        this.stage = { kind: 'live', matchId: s.matchId, game: s.game, map: s.map, scores: [0, 0] };
++        if (
++          !(await this.append({
++            type: 'match.started',
++            data: { matchId: s.matchId, game: s.game },
++          }))
++        )
++          return;
++        this.send([...this.bracketUpdate(), this.phase()]);
++        this.telemetry('live');
++        return;
++      }
++      case 'score': {
++        const s = this.stage;
++        if (s.kind !== 'live' || s.matchId !== msg.mid) return;
++        s.scores = [msg.sa, msg.sb];
++        const { entrants } = this.current();
++        this.telemetry('live', { scores: { [entrants[0]]: msg.sa, [entrants[1]]: msg.sb } });
++        return;
++      }
++      case 'lost': {
++        const s = this.stage;
++        if (s.kind !== 'live' || s.matchId !== msg.mid) return;
++        const { entrants } = this.current();
++        return this.onMatchPlayerLost(entrants[msg.s === 'a' ? 0 : 1]);
++      }
++      case 'end':
++        return this.onGameEnd(msg);
++      case 'hb':
++        return;
++      case 'err':
++        this.o.log.warn(`mod error: ${msg.msg}`);
++        return;
++    }
++  }
++
++  private async onJoin(pid: number, token: string, name: string): Promise<void> {
++    const { entry, entrantId } = this.entrantFor(token);
++    if (!entry) {
++      this.o.log.warn(`unknown token joined as ${name} (pid ${pid})`);
++      return;
++    }
++    this.players.set(pid, {
++      pid,
++      token,
++      name,
++      userId: entry.userId,
++      ...(entrantId ? { entrantId } : {}),
++    });
++    const s = this.stage;
++    if (s.kind === 'checkIn' && entrantId && !this.proj.checkedIn.includes(entrantId)) {
++      if (!(await this.append({ type: 'entrant.checkedIn', data: { entrantId } }))) return;
++      this.say(`${this.name(entrantId)} checked in`);
++      return this.maybeCompleteCheckIn();
++    }
++    if (s.kind === 'readyCheck' && entrantId && this.sideOf(entrantId)) {
++      s.present.add(entrantId);
++      return;
++    }
++    if (s.kind === 'live' && s.lost && s.lost === entrantId) {
++      s.lost = undefined;
++      this.clearTimer();
++      this.send([{ t: 'pause', on: false, why: '' }]);
++      this.say(`${this.name(entrantId)} is back, the game continues`);
++      this.telemetry('live');
++    }
++  }
++
++  private async onLeave(pid: number): Promise<void> {
++    const p = this.players.get(pid);
++    this.players.delete(pid);
++    if (!p?.entrantId) return;
++    const s = this.stage;
++    if (s.kind === 'readyCheck') {
++      s.present.delete(p.entrantId);
++      s.ready.delete(p.entrantId);
++    } else if (s.kind === 'countdown' && this.sideOf(p.entrantId)) {
++      this.say(`${this.name(p.entrantId)} left during the countdown, back to the ready check`);
++      await this.enterReadyCheck(s.matchId, s.game, s.map);
++    } else if (s.kind === 'live' && this.sideOf(p.entrantId)) {
++      await this.onMatchPlayerLost(p.entrantId);
++    }
++  }
++
++  private async onMatchPlayerLost(entrantId: string | undefined): Promise<void> {
++    const s = this.stage;
++    if (s.kind !== 'live' || !entrantId || s.lost || this.isBot(entrantId)) return;
++    s.lost = entrantId;
++    const grace = this.proj.settings.reconnectGraceSec;
++    this.send([{ t: 'pause', on: true, why: `${this.name(entrantId)} disconnected` }]);
++    this.say(`${this.name(entrantId)} disconnected. Game paused, ${grace}s to reconnect`);
++    this.telemetry('paused', { deadline: this.o.clock.now() + grace * 1000 });
++    this.setTimer(grace * 1000, async () => {
++      const cur = this.stage;
++      if (cur.kind !== 'live' || cur.lost !== entrantId) return;
++      const winnerSide: Side = this.sideOf(entrantId) === 'a' ? 'b' : 'a';
++      this.send([{ t: 'abort', mid: cur.matchId, w: winnerSide, why: 'forfeit' }]);
++      this.say(`${this.name(entrantId)} did not come back and forfeits`);
++      await this.forfeit(cur.matchId, entrantId);
++    });
++  }
++
++  private async onGameEnd(msg: Extract<ModToBridge, { t: 'end' }>): Promise<void> {
++    const s = this.stage;
++    if (s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g) return;
++    this.clearTimer();
++    const { entrants } = this.current();
++    const winnerId = entrants[msg.w === 'a' ? 0 : 1];
++    const endReason = (
++      { frag: 'fragLimit', time: 'timeLimit', sd: 'suddenDeath', forfeit: 'forfeit' } as const
++    )[msg.why];
++    if (
++      !(await this.append({
++        type: 'match.gameFinished',
++        data: {
++          matchId: s.matchId,
++          game: s.game,
++          map: s.map,
++          scores: { [entrants[0]]: msg.sa, [entrants[1]]: msg.sb },
++          winnerId,
++          endReason,
++        },
++      }))
++    ) {
++      return;
++    }
++    const bestOf = this.proj.bracket?.byId[s.matchId]?.bestOf ?? 1;
++    const wins = seriesWins(this.proj, s.matchId, entrants);
++    const needed = Math.ceil(bestOf / 2);
++    this.say(`${this.name(winnerId)} wins game ${s.game} (${msg.sa}:${msg.sb})`);
++    if (wins[0] < needed && wins[1] < needed) {
++      this.cooldownUntil = this.o.clock.now() + this.timing.postGameDelayMs;
++      this.stage = { kind: 'between' };
++      this.send([...this.bracketUpdate(), this.phase()]);
++      return this.startGame(s.matchId, s.game + 1);
++    }
++    const result: MatchResult = {
++      matchId: s.matchId,
++      entrants,
++      winnerId,
++      outcome: 'played',
++      games: (this.proj.games[s.matchId] ?? []).map((g) => ({
++        map: g.map,
++        scores: g.scores,
++        winnerId: g.winnerId,
++      })),
++    };
++    if (!(await this.append({ type: 'match.result', data: { result } }))) return;
++    await this.afterResult();
++  }
++}
+diff --git a/apps/bridge/src/event-store.ts b/apps/bridge/src/event-store.ts
+new file mode 100644
+index 0000000..c736ecf
+--- /dev/null
++++ b/apps/bridge/src/event-store.ts
+@@ -0,0 +1,90 @@
++import fs from 'node:fs';
++import path from 'node:path';
++import {
++  TournamentEventSchema,
++  type NewTournamentEvent,
++  type TournamentEvent,
++} from '@tourney/protocol';
++import type { Clock } from './clock.js';
++
++export type AppendResult =
++  | { accepted: true; events: TournamentEvent[] }
++  /** Someone else appended first; `missing` are the events after baseSeq. */
++  | { accepted: false; missing: TournamentEvent[]; reason: string };
++
++/**
++ * Where the tournament event log lives. Standalone: a local JSONL file. With a website: the
++ * website is canonical and this becomes a sync client (same interface, optimistic concurrency).
++ */
++export interface EventStore {
++  load(tournamentId: string): Promise<TournamentEvent[]>;
++  append(
++    tournamentId: string,
++    baseSeq: number,
++    events: readonly NewTournamentEvent[],
++  ): Promise<AppendResult>;
++}
++
++/** Event log kept by the bridge itself, persisted as one JSONL file per tournament. */
++export class LocalEventStore implements EventStore {
++  private logs = new Map<string, TournamentEvent[]>();
++
++  constructor(
++    private readonly clock: Clock,
++    /** Directory for <tournamentId>.jsonl files; undefined = memory only. */
++    private readonly dir?: string,
++  ) {
++    if (dir) fs.mkdirSync(dir, { recursive: true });
++  }
++
++  private file(id: string): string | undefined {
++    if (!this.dir) return undefined;
++    if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error(`invalid tournament id ${id}`);
++    return path.join(this.dir, `${id}.jsonl`);
++  }
++
++  async load(tournamentId: string): Promise<TournamentEvent[]> {
++    const cached = this.logs.get(tournamentId);
++    if (cached) return [...cached];
++    const file = this.file(tournamentId);
++    let events: TournamentEvent[] = [];
++    if (file && fs.existsSync(file)) {
++      events = fs
++        .readFileSync(file, 'utf8')
++        .split('\n')
++        .filter((l) => l.trim())
++        .map((l, i) => {
++          const parsed = TournamentEventSchema.safeParse(JSON.parse(l));
++          if (!parsed.success) throw new Error(`${file}:${i + 1}: ${parsed.error.message}`);
++          return parsed.data;
++        });
++    }
++    this.logs.set(tournamentId, events);
++    return [...events];
++  }
++
++  async append(
++    tournamentId: string,
++    baseSeq: number,
++    events: readonly NewTournamentEvent[],
++  ): Promise<AppendResult> {
++    const log =
++      this.logs.get(tournamentId) ?? (await this.load(tournamentId), this.logs.get(tournamentId)!);
++    const head = log.length;
++    if (baseSeq !== head) {
++      return {
++        accepted: false,
++        missing: log.slice(baseSeq),
++        reason: `head is ${head}, not ${baseSeq}`,
++      };
++    }
++    const at = new Date(this.clock.now()).toISOString();
++    const stored = events.map((e, i) =>
++      TournamentEventSchema.parse({ ...e, seq: head + i + 1, at }),
++    );
++    log.push(...stored);
++    const file = this.file(tournamentId);
++    if (file) fs.appendFileSync(file, stored.map((e) => JSON.stringify(e)).join('\n') + '\n');
++    return { accepted: true, events: stored };
++  }
++}
+diff --git a/apps/bridge/src/index.ts b/apps/bridge/src/index.ts
+new file mode 100644
+index 0000000..19694d3
+--- /dev/null
++++ b/apps/bridge/src/index.ts
+@@ -0,0 +1,9 @@
++export * from './clock.js';
++export * from './log.js';
++export * from './config.js';
++export * from './event-store.js';
++export * from './bootstrap.js';
++export * from './snapshot.js';
++export * from './mod-server.js';
++export * from './director.js';
++export * from './sim/mod-simulator.js';
+diff --git a/apps/bridge/src/log.ts b/apps/bridge/src/log.ts
+new file mode 100644
+index 0000000..3ce1c7a
+--- /dev/null
++++ b/apps/bridge/src/log.ts
+@@ -0,0 +1,38 @@
++export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
++
++export interface Logger {
++  debug(msg: string): void;
++  info(msg: string): void;
++  warn(msg: string): void;
++  error(msg: string): void;
++}
++
++const ORDER: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 };
++
++export function consoleLogger(min: LogLevel = 'info', scope = 'bridge'): Logger {
++  const out = (level: LogLevel, msg: string) => {
++    if (ORDER[level] < ORDER[min]) return;
++    const line = `${new Date().toISOString()} ${level.toUpperCase().padEnd(5)} [${scope}] ${msg}`;
++    if (level === 'error' || level === 'warn') console.error(line);
++    else console.log(line);
++  };
++  return {
++    debug: (m) => out('debug', m),
++    info: (m) => out('info', m),
++    warn: (m) => out('warn', m),
++    error: (m) => out('error', m),
++  };
++}
++
++/** Collects log lines in memory (tests). */
++export function memoryLogger(): Logger & { lines: string[] } {
++  const lines: string[] = [];
++  const push = (level: string) => (m: string) => void lines.push(`${level}: ${m}`);
++  return {
++    lines,
++    debug: push('debug'),
++    info: push('info'),
++    warn: push('warn'),
++    error: push('error'),
++  };
++}
+diff --git a/apps/bridge/src/mod-server.ts b/apps/bridge/src/mod-server.ts
+new file mode 100644
+index 0000000..7d9c979
+--- /dev/null
++++ b/apps/bridge/src/mod-server.ts
+@@ -0,0 +1,157 @@
++import { EventEmitter } from 'node:events';
++import net from 'node:net';
++import {
++  decodeModToBridge,
++  encodeModLine,
++  LineSplitter,
++  MOD_PROTOCOL_VERSION,
++  ModLineError,
++  type BridgeToMod,
++  type ModToBridge,
++} from '@tourney/protocol';
++import type { Logger } from './log.js';
++
++export type ModHello = Extract<ModToBridge, { t: 'hello' }>;
++
++/** What the match director needs from the connection to the mod. */
++export interface ModLink {
++  readonly connected: boolean;
++  send(messages: readonly BridgeToMod[]): void;
++  on(event: 'hello', listener: (hello: ModHello) => void): this;
++  on(event: 'message', listener: (msg: Exclude<ModToBridge, ModHello>) => void): this;
++  on(event: 'close', listener: () => void): this;
++  // eslint-disable-next-line @typescript-eslint/no-explicit-any
++  off(event: 'hello' | 'message' | 'close', listener: (...args: any[]) => void): this;
++}
++
++export interface ModServerOptions {
++  host: string;
++  port: number;
++  sharedKey: string;
++  log: Logger;
++  /** Drop the connection when the mod is silent this long (it sends a heartbeat every 5 s). */
++  idleTimeoutMs?: number;
++}
++
++/**
++ * TCP server for the UT mod. Exactly one mod connection is active; a new connection replaces the
++ * old one (after a map change the old socket may linger for a moment).
++ */
++export class ModServer extends EventEmitter implements ModLink {
++  private server?: net.Server;
++  private active?: net.Socket;
++
++  constructor(private readonly opts: ModServerOptions) {
++    super();
++  }
++
++  get connected(): boolean {
++    return this.active !== undefined;
++  }
++
++  get address(): net.AddressInfo | undefined {
++    const a = this.server?.address();
++    return a && typeof a === 'object' ? a : undefined;
++  }
++
++  listen(): Promise<void> {
++    return new Promise((resolve, reject) => {
++      const server = net.createServer((socket) => this.accept(socket));
++      server.once('error', reject);
++      server.listen(this.opts.port, this.opts.host, () => {
++        server.off('error', reject);
++        this.server = server;
++        this.opts.log.info(`mod server listening on ${this.opts.host}:${this.address?.port}`);
++        resolve();
++      });
++    });
++  }
++
++  close(): Promise<void> {
++    this.active?.destroy();
++    this.active = undefined;
++    return new Promise((resolve) => (this.server ? this.server.close(() => resolve()) : resolve()));
++  }
++
++  send(messages: readonly BridgeToMod[]): void {
++    const socket = this.active;
++    if (!socket) {
++      this.opts.log.debug(`mod not connected, dropped ${messages.length} line(s)`);
++      return;
++    }
++    let payload = '';
++    for (const m of messages) {
++      try {
++        payload += encodeModLine(m);
++      } catch (e) {
++        this.opts.log.error(`cannot encode ${m.t}: ${(e as Error).message}`);
++      }
++    }
++    if (payload) socket.write(payload, 'latin1');
++  }
++
++  private accept(socket: net.Socket): void {
++    const peer = `${socket.remoteAddress}:${socket.remotePort}`;
++    const splitter = new LineSplitter();
++    let authed = false;
++    socket.setEncoding('latin1');
++    socket.setNoDelay(true);
++    socket.setTimeout(this.opts.idleTimeoutMs ?? 20_000);
++    socket.on('timeout', () => {
++      this.opts.log.warn(`mod ${peer} idle, closing`);
++      socket.destroy();
++    });
++
++    socket.on('data', (chunk: string) => {
++      let lines: string[];
++      try {
++        lines = splitter.push(chunk);
++      } catch (e) {
++        this.opts.log.warn(`mod ${peer}: ${(e as Error).message}`);
++        socket.destroy();
++        return;
++      }
++      for (const line of lines) {
++        let msg: ModToBridge;
++        try {
++          msg = decodeModToBridge(line);
++        } catch (e) {
++          const text = e instanceof ModLineError ? e.message : String(e);
++          this.opts.log.warn(`mod ${peer}: bad line (${text})`);
++          continue;
++        }
++        if (!authed) {
++          if (msg.t !== 'hello' || msg.key !== this.opts.sharedKey) {
++            this.opts.log.warn(`mod ${peer}: rejected (bad handshake)`);
++            socket.destroy();
++            return;
++          }
++          if (msg.pv !== MOD_PROTOCOL_VERSION) {
++            this.opts.log.warn(
++              `mod ${peer}: protocol ${msg.pv}, bridge speaks ${MOD_PROTOCOL_VERSION}`,
++            );
++          }
++          authed = true;
++          if (this.active && this.active !== socket) this.active.destroy();
++          this.active = socket;
++          this.opts.log.info(
++            `mod connected from ${peer} (mod ${msg.mv}, engine ${msg.eng}, level ${msg.lvl})`,
++          );
++          this.emit('hello', msg);
++          continue;
++        }
++        if (socket !== this.active) return;
++        this.emit('message', msg);
++      }
++    });
++
++    socket.on('close', () => {
++      if (this.active === socket) {
++        this.active = undefined;
++        this.opts.log.info('mod disconnected');
++        this.emit('close');
++      }
++    });
++    socket.on('error', (e) => this.opts.log.debug(`mod socket ${peer}: ${e.message}`));
++  }
++}
+diff --git a/apps/bridge/src/sim-cli.ts b/apps/bridge/src/sim-cli.ts
+new file mode 100644
+index 0000000..13c9b9d
+--- /dev/null
++++ b/apps/bridge/src/sim-cli.ts
+@@ -0,0 +1,40 @@
++import { parseArgs } from 'node:util';
++import { TournamentFileSchema } from './bootstrap.js';
++import { realClock } from './clock.js';
++import { BridgeConfigSchema, readJsonFile } from './config.js';
++import { consoleLogger } from './log.js';
++import { ModSimulator } from './sim/mod-simulator.js';
++
++/**
++ * Plays a tournament against a running bridge without UT:
++ *   tourney-bridge run -c bridge.json -t tournament.json     (terminal 1)
++ *   node dist/sim-cli.js -c bridge.json -t tournament.json   (terminal 2)
++ */
++const { values } = parseArgs({
++  options: {
++    config: { type: 'string', short: 'c' },
++    tournament: { type: 'string', short: 't' },
++    game: { type: 'string', default: '20' },
++  },
++});
++if (!values.config || !values.tournament) {
++  console.log('usage: sim-cli -c bridge.json -t tournament.json [--game <seconds per game>]');
++  process.exit(1);
++}
++const config = readJsonFile(values.config, BridgeConfigSchema);
++const tournament = readJsonFile(values.tournament, TournamentFileSchema);
++const log = consoleLogger('debug', 'sim');
++const sim = new ModSimulator({
++  host: config.mod.host,
++  port: config.mod.port,
++  sharedKey: config.mod.sharedKey,
++  players: [...tournament.players, ...tournament.spectators].map((p) => ({
++    token: p.token,
++    name: p.displayName,
++  })),
++  clock: realClock,
++  log,
++  behaviour: { gameDurationMs: Number(values.game) * 1000, scoreIntervalMs: 3000 },
++});
++sim.start();
++log.info(`simulated UT server connected to ${config.mod.host}:${config.mod.port}`);
+diff --git a/apps/bridge/src/sim/mod-simulator.ts b/apps/bridge/src/sim/mod-simulator.ts
+new file mode 100644
+index 0000000..bb5142a
+--- /dev/null
++++ b/apps/bridge/src/sim/mod-simulator.ts
+@@ -0,0 +1,382 @@
++import net from 'node:net';
++import { createRng, shuffle, type Rng } from '@tourney/bracket';
++import {
++  decodeBridgeToMod,
++  encodeModLine,
++  LineSplitter,
++  MOD_PROTOCOL_VERSION,
++  type BridgeToMod,
++  type ModToBridge,
++} from '@tourney/protocol';
++import type { Clock, TimerHandle } from '../clock.js';
++import type { Logger } from '../log.js';
++
++/**
++ * Simulates a UT99 server running the tournament mod, including the human players on it.
++ * It speaks the real line protocol over TCP, so it exercises the bridge exactly like the mod.
++ */
++
++export interface SimPlayer {
++  token: string;
++  name: string;
++}
++
++export interface SimBehaviour {
++  /** Players (tokens) that never connect. */
++  absent: string[];
++  /** Players that connect but never ready up. */
++  neverReady: string[];
++  /** One player that disconnects during its next live game; optionally returns after ms. */
++  dropDuringLive?: { token: string; returnAfterMs?: number };
++  readyDelayMs: number;
++  voteDelayMs: number;
++  /** Players that skip voting (their ballot is filled randomly by the bridge). */
++  noVote: string[];
++  gameDurationMs: number;
++  levelLoadMs: number;
++  scoreIntervalMs: number;
++  /** Chance that side a wins a game. */
++  winChanceA: number;
++}
++
++export interface SimOptions {
++  host: string;
++  port: number;
++  sharedKey: string;
++  players: SimPlayer[];
++  clock: Clock;
++  log?: Logger;
++  startLevel?: string;
++  seed?: string;
++  behaviour?: Partial<SimBehaviour>;
++}
++
++const DEFAULT_BEHAVIOUR: SimBehaviour = {
++  absent: [],
++  neverReady: [],
++  readyDelayMs: 1_000,
++  voteDelayMs: 500,
++  noVote: [],
++  gameDurationMs: 30_000,
++  levelLoadMs: 1_000,
++  scoreIntervalMs: 5_000,
++  winChanceA: 0.5,
++};
++
++interface Joined {
++  pid: number;
++  token: string;
++  role: 'a' | 'b' | 's';
++}
++
++export class ModSimulator {
++  readonly b: SimBehaviour;
++  private socket?: net.Socket;
++  private level: string;
++  private inGame = false;
++  private paused = false;
++  private nextPid = 1;
++  private acl = new Map<string, { name: string; r: 'a' | 'b' | 's' }>();
++  private joined = new Map<string, Joined>();
++  private voteOptions: string[] = [];
++  private match?: { mid: string; g: number };
++  private phase = 'lobby';
++  private inSync = false;
++  private gameTimers: TimerHandle[] = [];
++  private endTimer?: { handle: TimerHandle; due: number };
++  private endRemaining?: number;
++  private dropped = new Set<string>();
++  private rng: Rng;
++  private stopped = false;
++  /** Every line received from the bridge (tests inspect it). */
++  readonly received: BridgeToMod[] = [];
++  readonly receivedAt: number[] = [];
++  /** Travels performed, in order. */
++  readonly travels: string[] = [];
++
++  constructor(private readonly o: SimOptions) {
++    this.b = { ...DEFAULT_BEHAVIOUR, ...o.behaviour };
++    this.level = o.startLevel ?? 'DM-Lobby';
++    this.rng = createRng(o.seed ?? 'sim');
++  }
++
++  start(): void {
++    this.connect();
++  }
++
++  stop(): void {
++    this.stopped = true;
++    this.clearGame();
++    this.socket?.destroy();
++  }
++
++  get currentLevel(): string {
++    return this.level;
++  }
++
++  private log(msg: string): void {
++    this.o.log?.debug(`[sim] ${msg}`);
++  }
++
++  private connect(): void {
++    if (this.stopped) return;
++    const socket = net.connect(this.o.port, this.o.host);
++    const splitter = new LineSplitter();
++    this.socket = socket;
++    socket.setEncoding('latin1');
++    socket.setNoDelay(true); // small lines must not wait for Nagle
++    socket.on('connect', () => {
++      this.joined.clear();
++      const beat = () => {
++        if (this.socket !== socket || socket.destroyed) return;
++        this.send({ t: 'hb', up: 0 });
++        this.later(5_000, beat);
++      };
++      this.later(5_000, beat);
++      this.send({
++        t: 'hello',
++        key: this.o.sharedKey,
++        pv: MOD_PROTOCOL_VERSION,
++        mv: 'sim',
++        eng: 469,
++        lvl: this.level,
++        gm: this.inGame,
++      });
++    });
++    socket.on('data', (chunk: string) => {
++      for (const line of splitter.push(chunk)) {
++        try {
++          this.handle(decodeBridgeToMod(line));
++        } catch (e) {
++          this.o.log?.warn(`[sim] bad line from bridge: ${(e as Error).message}`);
++        }
++      }
++    });
++    socket.on('error', (e) => this.log(`socket error ${e.message}`));
++    socket.on('close', () => {
++      if (this.socket === socket) this.socket = undefined;
++    });
++  }
++
++  private send(msg: ModToBridge): void {
++    this.socket?.write(encodeModLine(msg), 'latin1');
++  }
++
++  private later(ms: number, fn: () => void): TimerHandle {
++    return this.o.clock.setTimeout(() => {
++      if (!this.stopped) fn();
++    }, ms);
++  }
++
++  private handle(msg: BridgeToMod): void {
++    this.received.push(msg);
++    this.receivedAt.push(this.o.clock.now());
++    switch (msg.t) {
++      case 'acl':
++        this.acl.clear();
++        return;
++      case 'acle':
++      case 'acladd': {
++        this.acl.set(msg.tk, { name: msg.name, r: msg.r });
++        const j = this.joined.get(msg.tk);
++        if (j) j.role = msg.r;
++        return;
++      }
++      case 'acldel':
++        this.acl.delete(msg.tk);
++        return;
++      case 'match':
++        this.match = { mid: msg.mid, g: msg.g };
++        return;
++      case 'sync':
++        this.inSync = msg.st === 'begin';
++        if (msg.st === 'end') {
++          this.joinPlayers();
++          this.onPhase();
++        }
++        return;
++      case 'vopen':
++        this.voteOptions = [];
++        return;
++      case 'vmap':
++        this.voteOptions.push(msg.map);
++        return;
++      case 'phase':
++        this.phase = msg.p;
++        if (!this.inSync) this.onPhase();
++        return;
++      case 'travel':
++        this.travels.push(msg.map);
++        this.clearGame();
++        this.inGame = false;
++        this.level = msg.map;
++        this.socket?.destroy();
++        this.socket = undefined;
++        this.later(this.b.levelLoadMs, () => this.connect());
++        return;
++      case 'cd':
++        this.later(msg.sec * 1000, () => this.startGame());
++        return;
++      case 'pause':
++        this.setPaused(msg.on);
++        return;
++      case 'abort':
++        this.clearGame();
++        this.inGame = false;
++        return;
++      default:
++        return;
++    }
++  }
++
++  /** Players react to a phase like humans would: ready up, vote. */
++  private onPhase(): void {
++    if (this.phase === 'ready') this.scheduleReady();
++    if (this.phase === 'vote') this.scheduleVotes();
++  }
++
++  private joinPlayers(): void {
++    for (const p of this.o.players) {
++      if (this.b.absent.includes(p.token) || this.dropped.has(p.token)) continue;
++      const entry = this.acl.get(p.token);
++      if (!entry) continue;
++      const existing = this.joined.get(p.token);
++      if (existing) {
++        existing.role = entry.r;
++        continue;
++      }
++      this.join(p, entry.r);
++    }
++  }
++
++  private join(p: SimPlayer, role: 'a' | 'b' | 's'): void {
++    const j: Joined = { pid: this.nextPid++, token: p.token, role };
++    this.joined.set(p.token, j);
++    this.send({ t: 'join', pid: j.pid, tk: p.token, name: p.name, role });
++  }
++
++  private matchPlayers(): Joined[] {
++    return [...this.joined.values()].filter((j) => j.role !== 's');
++  }
++
++  private scheduleReady(): void {
++    for (const j of this.matchPlayers()) {
++      if (this.b.neverReady.includes(j.token)) continue;
++      this.later(this.b.readyDelayMs, () => {
++        if (this.joined.get(j.token) === j) this.send({ t: 'ready', pid: j.pid });
++      });
++    }
++  }
++
++  private scheduleVotes(): void {
++    for (const j of this.matchPlayers()) {
++      if (this.b.noVote.includes(j.token)) continue;
++      this.later(this.b.voteDelayMs, () => {
++        const picks = shuffle(this.voteOptions, this.rng).slice(0, 3);
++        this.send({
++          t: 'vote',
++          pid: j.pid,
++          m1: picks[0] ?? '',
++          m2: picks[1] ?? '',
++          m3: picks[2] ?? '',
++        });
++      });
++    }
++  }
++
++  private startGame(): void {
++    const m = this.match;
++    if (!m) return;
++    this.inGame = true;
++    this.send({ t: 'live', mid: m.mid, g: m.g });
++    let sa = 0;
++    let sb = 0;
++    const tick = () => {
++      if (!this.inGame) return;
++      if (!this.paused) {
++        sa += Math.floor(this.rng() * 3);
++        sb += Math.floor(this.rng() * 3);
++        this.send({
++          t: 'score',
++          mid: m.mid,
++          g: m.g,
++          sa: Math.min(sa, 19),
++          sb: Math.min(sb, 19),
++          tl: -1,
++          ot: false,
++        });
++      }
++      this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
++    };
++    this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
++    this.armEnd(this.b.gameDurationMs);
++
++    const drop = this.b.dropDuringLive;
++    const dropper = drop && this.matchPlayers().find((j) => j.token === drop.token);
++    if (drop && dropper && !this.dropped.has(drop.token)) {
++      this.gameTimers.push(
++        this.later(this.b.gameDurationMs / 3, () => {
++          this.dropped.add(drop.token);
++          this.joined.delete(drop.token);
++          this.send({ t: 'leave', pid: dropper.pid });
++          this.send({ t: 'lost', mid: m.mid, s: dropper.role === 'a' ? 'a' : 'b' });
++          this.setPaused(true);
++          if (drop.returnAfterMs !== undefined) {
++            this.gameTimers.push(
++              this.later(drop.returnAfterMs, () => {
++                const p = this.o.players.find((x) => x.token === drop.token);
++                if (p) this.join(p, dropper.role);
++                this.b.dropDuringLive = undefined;
++                this.dropped.delete(drop.token);
++              }),
++            );
++          }
++        }),
++      );
++    }
++  }
++
++  private armEnd(ms: number): void {
++    const m = this.match;
++    if (!m) return;
++    const handle = this.later(ms, () => {
++      if (!this.inGame) return;
++      this.inGame = false;
++      this.clearGame();
++      const w = this.rng() < this.b.winChanceA ? 'a' : 'b';
++      const loserScore = Math.floor(this.rng() * 20);
++      this.send({
++        t: 'end',
++        mid: m.mid,
++        g: m.g,
++        sa: w === 'a' ? 20 : loserScore,
++        sb: w === 'b' ? 20 : loserScore,
++        w,
++        why: 'frag',
++      });
++    });
++    this.endTimer = { handle, due: this.o.clock.now() + ms };
++  }
++
++  private setPaused(on: boolean): void {
++    if (on === this.paused) return;
++    this.paused = on;
++    if (on && this.endTimer) {
++      this.endRemaining = Math.max(0, this.endTimer.due - this.o.clock.now());
++      this.o.clock.clearTimeout(this.endTimer.handle);
++      this.endTimer = undefined;
++    } else if (!on && this.inGame && this.endRemaining !== undefined) {
++      this.armEnd(this.endRemaining);
++      this.endRemaining = undefined;
++    }
++  }
++
++  private clearGame(): void {
++    for (const t of this.gameTimers) this.o.clock.clearTimeout(t);
++    this.gameTimers = [];
++    if (this.endTimer) this.o.clock.clearTimeout(this.endTimer.handle);
++    this.endTimer = undefined;
++    this.endRemaining = undefined;
++    this.paused = false;
++  }
++}
+diff --git a/apps/bridge/src/snapshot.ts b/apps/bridge/src/snapshot.ts
+new file mode 100644
+index 0000000..4495863
+--- /dev/null
++++ b/apps/bridge/src/snapshot.ts
+@@ -0,0 +1,188 @@
++import {
++  wireName,
++  type AccessEntry,
++  type BridgeToMod,
++  type Entrant,
++  type ModPhase,
++  type TournamentProjection,
++} from '@tourney/protocol';
++import { travelOptions, type Ut99DmRules } from '@tourney/adapter-ut99';
++
++/** Builds the bridge -> mod lines from the tournament projection. Pure functions. */
++
++export type Side = 'a' | 'b';
++
++export function entrantName(proj: TournamentProjection, id: string | null | undefined): string {
++  if (!id) return '';
++  return wireName(proj.entrants[id]?.displayName ?? id);
++}
++
++/** Role of a website user on the game server: match player a/b of the current match, else spectator. */
++export function roleOf(
++  proj: TournamentProjection,
++  entry: AccessEntry,
++  matchEntrants: readonly [string, string] | undefined,
++): 'a' | 'b' | 's' {
++  if (!entry.entrantId || !matchEntrants) return 's';
++  const entrant = proj.entrants[entry.entrantId];
++  // A user replaced by a bot is a spectator from then on.
++  if (!entrant || entrant.kind !== 'human' || entrant.userId !== entry.userId) return 's';
++  if (matchEntrants[0] === entry.entrantId) return 'a';
++  if (matchEntrants[1] === entry.entrantId) return 'b';
++  return 's';
++}
++
++export function aclLines(
++  proj: TournamentProjection,
++  access: readonly AccessEntry[],
++  matchEntrants: readonly [string, string] | undefined,
++  rev: number,
++): BridgeToMod[] {
++  return [
++    { t: 'acl', n: access.length, rev },
++    ...access.map((e): BridgeToMod => ({
++      t: 'acle',
++      tk: e.token,
++      name: wireName(e.displayName),
++      r: roleOf(proj, e, matchEntrants),
++    })),
++  ];
++}
++
++export function seriesWins(
++  proj: TournamentProjection,
++  matchId: string,
++  entrants: readonly [string, string],
++) {
++  const games = proj.games[matchId] ?? [];
++  return [
++    games.filter((g) => g.winnerId === entrants[0]).length,
++    games.filter((g) => g.winnerId === entrants[1]).length,
++  ] as [number, number];
++}
++
++export function matchLines(
++  proj: TournamentProjection,
++  rules: Ut99DmRules,
++  matchId: string,
++  game: number,
++  entrants: readonly [string, string],
++): BridgeToMod[] {
++  const node = proj.bracket?.byId[matchId];
++  const [wa, wb] = seriesWins(proj, matchId, entrants);
++  const lines: BridgeToMod[] = [
++    {
++      t: 'match',
++      mid: matchId,
++      g: game,
++      bo: node?.bestOf ?? 1,
++      wa,
++      wb,
++      na: entrantName(proj, entrants[0]),
++      nb: entrantName(proj, entrants[1]),
++      fl: rules.fragLimit,
++      tl: rules.timeLimitMin,
++    },
++  ];
++  entrants.forEach((id, i) => {
++    const e: Entrant | undefined = proj.entrants[id];
++    if (e?.kind === 'bot') {
++      lines.push({
++        t: 'bot',
++        s: i === 0 ? 'a' : 'b',
++        name: wireName(e.bot.name),
++        sk: Math.max(0, Math.min(7, Math.round(e.bot.skill))),
++        cls: e.bot.botClass ?? '',
++      });
++    }
++  });
++  return lines;
++}
++
++export function bracketLines(
++  proj: TournamentProjection,
++  liveMatchId: string | undefined,
++  rev: number,
++): BridgeToMod[] {
++  const b = proj.bracket;
++  if (!b) return [];
++  const lines: BridgeToMod[] = [
++    { t: 'brh', fmt: b.definition.format, size: b.definition.size, n: b.matches.length, rev },
++  ];
++  for (const m of b.matches) {
++    let sa = -1;
++    let sb = -1;
++    const [ea, eb] = m.entrants;
++    if (ea && eb) {
++      const games = proj.games[m.id] ?? [];
++      if (m.bestOf === 1 && games[0]) {
++        sa = games[0].scores[ea] ?? -1;
++        sb = games[0].scores[eb] ?? -1;
++      } else if (games.length) {
++        [sa, sb] = seriesWins(proj, m.id, [ea, eb]);
++      }
++    }
++    const st =
++      m.id === liveMatchId
++        ? 'l'
++        : ({ waiting: 'w', ready: 'r', completed: 'c', void: 'v' } as const)[m.status];
++    lines.push({
++      t: 'brm',
++      id: m.id,
++      s: m.side,
++      r: m.round,
++      i: m.index,
++      na: entrantName(proj, ea),
++      nb: entrantName(proj, eb),
++      sa,
++      sb,
++      st,
++      w: m.winnerId ? (m.winnerId === ea ? 'a' : 'b') : '',
++    });
++  }
++  return lines;
++}
++
++export function standingsLines(proj: TournamentProjection, rev: number): BridgeToMod[] {
++  const s = proj.bracket?.standings ?? [];
++  return [
++    { t: 'sth', n: s.length, rev },
++    ...s.map((x): BridgeToMod => ({
++      t: 'ste',
++      name: entrantName(proj, x.entrantId),
++      pl: x.placement ?? 0,
++      w: x.wins,
++      l: x.losses,
++      bot: proj.entrants[x.entrantId]?.kind === 'bot',
++    })),
++  ];
++}
++
++export function voteLines(
++  matchId: string,
++  pool: readonly { id: string; title?: string }[],
++  seconds: number,
++): BridgeToMod[] {
++  return [
++    { t: 'vopen', mid: matchId, n: pool.length, sec: seconds },
++    ...pool.map((m, i): BridgeToMod => ({
++      t: 'vmap',
++      i: i + 1,
++      map: m.id,
++      title: wireName(m.title ?? m.id),
++    })),
++  ];
++}
++
++export function travelLine(
++  rules: Ut99DmRules,
++  map: string,
++  matchId: string,
++  game: number,
++): BridgeToMod {
++  return { t: 'travel', map, mid: matchId, g: game, opt: travelOptions(rules) };
++}
++
++export function phaseLine(p: ModPhase, matchId = '', sec = -1): BridgeToMod {
++  return { t: 'phase', p, mid: matchId, sec };
++}
+diff --git a/apps/bridge/test/e2e.test.ts b/apps/bridge/test/e2e.test.ts
+new file mode 100644
+index 0000000..9c1d542
+--- /dev/null
++++ b/apps/bridge/test/e2e.test.ts
+@@ -0,0 +1,149 @@
++import { afterEach, describe, expect, it } from 'vitest';
++import { players, setup, tournamentFile } from './harness.js';
++
++type Env = Awaited<ReturnType<typeof setup>>;
++let env: Env | undefined;
++afterEach(async () => {
++  await env?.close();
++  env = undefined;
++});
++
++const finished = (e: Env) => () => e.director.projection.phase === 'finished';
++const events = (e: Env, type: string) =>
++  // eslint-disable-next-line @typescript-eslint/no-explicit-any
++  (e.director as any).events.filter((x: { type: string }) => x.type === type) as any[];
++
++describe('end to end against the simulated UT server', () => {
++  it('plays a full double elimination tournament (5 humans, 3 bots)', async () => {
++    env = await setup({});
++    const t0 = env.clock.now();
++    await env.run(finished(env));
++    const p = env.director.projection;
++    expect(p.championId).toBeDefined();
++    // ~20 s per match (vote, load, ready, countdown, 10 s game): no step waited for a timeout.
++    expect(env.clock.now() - t0).toBeLessThan(15 * 25_000);
++    expect(p.bracket?.status).toBe('finished');
++    expect(p.bracket?.issues).toEqual([]);
++    expect([14, 15]).toContain(p.results.length);
++    // Every match was played on the server: one travel per game.
++    const games = Object.values(p.games).flat();
++    expect(env.sim.travels).toHaveLength(games.length);
++    expect(p.mapHistory).toHaveLength(games.length);
++    expect(p.results.every((r) => r.outcome === 'played')).toBe(true);
++    // All humans checked in, every map comes from the pool.
++    expect(p.checkedIn.sort()).toEqual(['p1', 'p2', 'p3', 'p4', 'p5']);
++    for (const g of games) expect(env.file.settings.game.rules['mapPool']).toContain(g.map);
++    // Map votes were recorded with their method.
++    expect(events(env, 'match.mapSelected').every((e) => e.data.method === 'vote')).toBe(true);
++    // Humans voted themselves (no vote ran into the timeout and got filled randomly).
++    for (const e of events(env, 'match.mapSelected')) {
++      for (const b of e.data.details.ballots) {
++        if (b.entrantId.startsWith('p'))
++          expect(b.random, `${e.data.matchId} ${b.entrantId}`).toBe(false);
++      }
++    }
++    // Happy path: no warnings, no errors, no re-sent travels.
++    expect(env.log.lines.filter((l) => /^(warn|error):/.test(l))).toEqual([]);
++    // Bracket and standings reach the server after every result.
++    expect(env.sim.received.filter((m) => m.t === 'brh').length).toBeGreaterThan(p.results.length);
++  });
++
++  it('simulates bot vs bot matches when configured', async () => {
++    const file = tournamentFile(
++      { players: players.slice(0, 2) },
++      { format: 'single', botMatchMode: 'simulate' },
++    );
++    env = await setup({ file });
++    await env.run(finished(env));
++    const outcomes = env.director.projection.results.map((r) => r.outcome);
++    expect(outcomes).toContain('simulated');
++    expect(env.director.projection.results).toHaveLength(7);
++  });
++
++  it('random map mode needs no vote', async () => {
++    const file = tournamentFile(
++      { players: players.slice(0, 3) },
++      { format: 'single', rules: { mapMode: 'random' } },
++    );
++    env = await setup({ file });
++    await env.run(finished(env));
++    expect(events(env, 'match.mapSelected').every((e) => e.data.method === 'random')).toBe(true);
++  });
++
++  it('replaces players who do not check in with bots', async () => {
++    env = await setup({ behaviour: { absent: ['tim-token'] } });
++    await env.run(() => env!.director.projection.phase === 'running');
++    const replaced = events(env, 'entrant.replaced');
++    expect(replaced).toHaveLength(1);
++    expect(replaced[0].data.entrantId).toBe('p5');
++    expect(env.director.projection.entrants['p5']?.kind).toBe('bot');
++    await env.run(finished(env));
++  });
++
++  it('a player who never readies up forfeits (twice in double elimination)', async () => {
++    env = await setup({ behaviour: { neverReady: ['anna-token'] } });
++    await env.run(finished(env));
++    const forfeits = env.director.projection.results.filter((r) => r.outcome === 'forfeit');
++    expect(forfeits).toHaveLength(2);
++    expect(forfeits.every((r) => r.winnerId !== 'p2' && r.entrants.includes('p2'))).toBe(true);
++    const anna = env.director.projection.bracket?.standings.find((s) => s.entrantId === 'p2');
++    expect(anna?.losses).toBe(2);
++  });
++
++  it('a disconnected player who returns in time continues the game', async () => {
++    env = await setup({
++      behaviour: { dropDuringLive: { token: 'mario-token', returnAfterMs: 20_000 } },
++    });
++    await env.run(finished(env));
++    expect(env.director.projection.results.every((r) => r.outcome === 'played')).toBe(true);
++    expect(env.sim.received.some((m) => m.t === 'pause' && m.on)).toBe(true);
++    expect(env.sim.received.some((m) => m.t === 'pause' && !m.on)).toBe(true);
++  });
++
++  it('a disconnected player who does not return forfeits', async () => {
++    env = await setup({ behaviour: { dropDuringLive: { token: 'mario-token' } } });
++    await env.run(() => env!.director.projection.results.some((r) => r.outcome === 'forfeit'));
++    const f = env.director.projection.results.find((r) => r.outcome === 'forfeit');
++    expect(f?.entrants).toContain('p1');
++    expect(f?.winnerId).not.toBe('p1');
++    expect(env.sim.received.some((m) => m.t === 'abort')).toBe(true);
++  });
++
++  it('plays a best-of-3 grand final where the loser picks the next map', async () => {
++    const file = tournamentFile({}, { bestOf: { default: 1, grandFinal: 3 } });
++    env = await setup({ file });
++    await env.run(finished(env));
++    const gf = env.director.projection.results.find((r) => r.matchId === 'GF1');
++    expect(gf?.games?.length).toBeGreaterThanOrEqual(2);
++    const methods = events(env, 'match.mapSelected')
++      .filter((e) => e.data.matchId === 'GF1')
++      .map((e) => e.data.method);
++    expect(methods[0]).toBe('vote');
++    expect(methods.slice(1).every((m: string) => m === 'loserPick')).toBe(true);
++  });
++
++  it('survives a bridge restart in the middle of a live game', async () => {
++    env = await setup({});
++    await env.run(
++      () => env!.director.stageKind === 'live' && env!.director.projection.results.length >= 3,
++    );
++    const before = env.director.projection.results.length;
++    await env.restartDirector();
++    await env.run(finished(env));
++    expect(env.director.projection.results.length).toBeGreaterThan(before);
++    expect(env.director.projection.bracket?.issues).toEqual([]);
++  });
++
++  it('sends a consistent snapshot: access roles match the current match', async () => {
++    env = await setup({});
++    await env.run(() => env!.director.stageKind === 'readyCheck');
++    const cm = env.director.projection.currentMatch!;
++    const acl = env.sim.received.filter((m) => m.t === 'acle').slice(-6);
++    const roles = Object.fromEntries(acl.map((m) => (m.t === 'acle' ? [m.tk, m.r] : [])));
++    const tokenOf = (eid: string) => players[Number(eid.slice(1)) - 1]?.token;
++    for (const [i, eid] of cm.entrants.entries()) {
++      if (eid.startsWith('p')) expect(roles[tokenOf(eid)!]).toBe(i === 0 ? 'a' : 'b');
++    }
++    expect(roles['guest-token']).toBe('s');
++  });
++});
+diff --git a/apps/bridge/test/harness.ts b/apps/bridge/test/harness.ts
+new file mode 100644
+index 0000000..5e2cea9
+--- /dev/null
++++ b/apps/bridge/test/harness.ts
+@@ -0,0 +1,149 @@
++import { TournamentFileSchema, bootstrapFromFile, type TournamentFile } from '../src/bootstrap.js';
++import { FakeClock } from '../src/clock.js';
++import { MatchDirector, type DirectorTiming } from '../src/director.js';
++import { LocalEventStore } from '../src/event-store.js';
++import { memoryLogger } from '../src/log.js';
++import { ModServer } from '../src/mod-server.js';
++import { ModSimulator, type SimBehaviour } from '../src/sim/mod-simulator.js';
++
++export const KEY = 'test-shared-key';
++
++export const players = ['Mario', 'Anna', 'Jonas', 'Lea', 'Tim'].map((name) => ({
++  userId: name.toLowerCase(),
++  displayName: name,
++  token: `${name.toLowerCase()}-token`,
++}));
++
++export function tournamentFile(
++  over: Record<string, unknown> = {},
++  settings: Record<string, unknown> = {},
++) {
++  return TournamentFileSchema.parse({
++    tournamentId: 'test-cup',
++    name: 'Test Cup',
++    rngSeed: 'seed-1',
++    players,
++    spectators: [{ userId: 'guest', displayName: 'Guest', token: 'guest-token' }],
++    botPool: [
++      'Xan',
++      'Loque',
++      'Malcolm',
++      'Brock',
++      'Lauren',
++      'Visse',
++      'Tamika',
++      'Dominator',
++      'Rankin',
++    ].map((name, i) => ({ name, skill: 7 - (i % 7) })),
++    settings: {
++      format: 'double',
++      size: 8,
++      checkInWindowMin: 1,
++      noShowSec: 60,
++      reconnectGraceSec: 60,
++      postTournamentShutdownMin: 1,
++      ...settings,
++      game: {
++        adapter: 'ut99-dm',
++        rules: {
++          mapPool: ['DM-Deck16][', 'DM-Morpheus', 'DM-Phobos', 'DM-Codex'],
++          voteTimeoutSec: 15,
++          ...((settings['rules'] as object) ?? {}),
++        },
++      },
++    },
++    ...over,
++  });
++}
++
++export async function setup(opts: {
++  file?: TournamentFile;
++  behaviour?: Partial<SimBehaviour>;
++  timing?: Partial<DirectorTiming>;
++}) {
++  const clock = new FakeClock();
++  const log = memoryLogger();
++  const store = new LocalEventStore(clock);
++  const file = opts.file ?? tournamentFile();
++  const boot = await bootstrapFromFile(store, file);
++  const mod = new ModServer({
++    host: '127.0.0.1',
++    port: 0,
++    sharedKey: KEY,
++    log,
++    idleTimeoutMs: 600_000,
++  });
++  await mod.listen();
++  const makeDirector = () =>
++    new MatchDirector({
++      tournamentId: file.tournamentId,
++      agentId: 'test-agent',
++      store,
++      mod,
++      clock,
++      log,
++      access: boot.access,
++      botPool: boot.botPool,
++      timing: {
++        postGameDelayMs: 2_000,
++        simulateDelayMs: 1_000,
++        loadingTimeoutMs: 30_000,
++        ...opts.timing,
++      },
++    });
++  let director = makeDirector();
++  await director.start();
++  const sim = new ModSimulator({
++    host: '127.0.0.1',
++    port: mod.address!.port,
++    sharedKey: KEY,
++    players: [...file.players, ...file.spectators].map((p) => ({
++      token: p.token,
++      name: p.displayName,
++    })),
++    clock,
++    log,
++    behaviour: { gameDurationMs: 10_000, scoreIntervalMs: 3_000, ...opts.behaviour },
++  });
++  sim.start();
++
++  const settle = async () => {
++    for (let i = 0; i < 4; i++) await new Promise((r) => setImmediate(r));
++    await new Promise((r) => setTimeout(r, 1));
++    await director.idle();
++  };
++
++  return {
++    clock,
++    log,
++    store,
++    mod,
++    sim,
++    file,
++    get director() {
++      return director;
++    },
++    settle,
++    /** Advances fake time in 500 ms steps until `until` is true. */
++    async run(until: () => boolean, maxSteps = 6_000) {
++      for (let i = 0; i < maxSteps; i++) {
++        await settle();
++        if (until()) return;
++        clock.advance(500);
++      }
++      throw new Error(
++        `condition not reached; stage=${director.stageKind}\n${log.lines.slice(-30).join('\n')}`,
++      );
++    },
++    async restartDirector() {
++      await director.stop();
++      director = makeDirector();
++      await director.start();
++    },
++    async close() {
++      sim.stop();
++      await director.stop();
++      await mod.close();
++    },
++  };
++}
+diff --git a/apps/bridge/test/unit.test.ts b/apps/bridge/test/unit.test.ts
+new file mode 100644
+index 0000000..76c7e2e
+--- /dev/null
++++ b/apps/bridge/test/unit.test.ts
+@@ -0,0 +1,95 @@
++import net from 'node:net';
++import { describe, expect, it } from 'vitest';
++import { computeBracket, createRng } from '@tourney/bracket';
++import { encodeModLine, MAX_LINE_BYTES, projectTournament } from '@tourney/protocol';
++import { FakeClock } from '../src/clock.js';
++import { LocalEventStore } from '../src/event-store.js';
++import { memoryLogger } from '../src/log.js';
++import { ModServer } from '../src/mod-server.js';
++import { bracketLines, standingsLines } from '../src/snapshot.js';
++import { bootstrapFromFile } from '../src/bootstrap.js';
++import { tournamentFile } from './harness.js';
++
++describe('FakeClock', () => {
++  it('fires timers in order, including ones scheduled while advancing', () => {
++    const c = new FakeClock(0);
++    const out: string[] = [];
++    c.setTimeout(() => {
++      out.push('a');
++      c.setTimeout(() => out.push('c'), 5);
++    }, 10);
++    c.setTimeout(() => out.push('b'), 12);
++    const h = c.setTimeout(() => out.push('never'), 11);
++    c.clearTimeout(h);
++    c.advance(20);
++    expect(out).toEqual(['a', 'b', 'c']);
++    expect(c.now()).toBe(20);
++  });
++});
++
++describe('ModServer', () => {
++  const connect = (port: number) =>
++    new Promise<net.Socket>((resolve) => {
++      const s = net.connect(port, '127.0.0.1', () => resolve(s));
++    });
++
++  it('rejects a wrong shared key and accepts the right one', async () => {
++    const log = memoryLogger();
++    const server = new ModServer({ host: '127.0.0.1', port: 0, sharedKey: 'secret-key', log });
++    await server.listen();
++    const port = server.address!.port;
++    const hello = (key: string) =>
++      encodeModLine({ t: 'hello', key, pv: 1, mv: 't', eng: 469, lvl: 'DM-Deck16][', gm: false });
++
++    const bad = await connect(port);
++    const closed = new Promise((r) => bad.on('close', r));
++    bad.write(hello('wrong'));
++    await closed;
++    expect(server.connected).toBe(false);
++
++    const good = await connect(port);
++    const gotHello = new Promise((r) => server.once('hello', r));
++    good.write(hello('secret-key'));
++    await gotHello;
++    expect(server.connected).toBe(true);
++    const gotMsg = new Promise((r) => server.once('message', r));
++    good.write('garbage\n' + encodeModLine({ t: 'ready', pid: 2 }));
++    expect(await gotMsg).toEqual({ t: 'ready', pid: 2 });
++    expect(log.lines.some((l) => l.includes('bad line'))).toBe(true);
++    good.destroy();
++    await server.close();
++  });
++});
++
++describe('snapshot lines', () => {
++  it('a 32 player double elimination bracket with long unicode names fits the line limit', async () => {
++    const store = new LocalEventStore(new FakeClock());
++    const many = Array.from({ length: 32 }, (_, i) => ({
++      userId: `u${i}`,
++      displayName: `Ünïcødé Spieler Nummer ${i} mit sehr langem Namen`.slice(0, 32),
++      token: `token-${i}-xxxx`,
++    }));
++    const file = tournamentFile({ players: many }, { size: 32, format: 'double' });
++    await bootstrapFromFile(store, file);
++    const proj = projectTournament(await store.load(file.tournamentId));
++    // Play some random results so scores and winners are filled in.
++    const rng = createRng(1);
++    let state = proj.bracket!;
++    for (let i = 0; i < 40; i++) {
++      const m = state.matches.find((x) => x.status === 'ready');
++      if (!m) break;
++      const [a, b] = m.entrants as [string, string];
++      proj.results.push({
++        matchId: m.id,
++        entrants: [a, b],
++        winnerId: rng() < 0.5 ? a : b,
++        outcome: 'played',
++      });
++      state = computeBracket(state.definition, proj.results);
++    }
++    proj.bracket = state;
++    const lines = [...bracketLines(proj, 'W1-1', 1), ...standingsLines(proj, 1)];
++    expect(lines).toHaveLength(1 + 63 + 1 + 32);
++    for (const l of lines) expect(encodeModLine(l).length).toBeLessThanOrEqual(MAX_LINE_BYTES);
++  });
++});
+diff --git a/apps/bridge/tsconfig.json b/apps/bridge/tsconfig.json
+new file mode 100644
+index 0000000..912585e
+--- /dev/null
++++ b/apps/bridge/tsconfig.json
+@@ -0,0 +1,5 @@
++{
++  "extends": "../../tsconfig.base.json",
++  "compilerOptions": { "outDir": "dist", "rootDir": ".", "noEmit": true, "types": ["node"] },
++  "include": ["src", "test"]
++}
+diff --git a/apps/bridge/tsup.config.ts b/apps/bridge/tsup.config.ts
+new file mode 100644
+index 0000000..e3c87b1
+--- /dev/null
++++ b/apps/bridge/tsup.config.ts
+@@ -0,0 +1,18 @@
++import { defineConfig } from 'tsup';
++
++// Workspace packages are bundled in, so dist/ runs standalone on the game server (e.g. the Pi).
++export default defineConfig({
++  entry: ['src/cli.ts', 'src/sim-cli.ts', 'src/index.ts'],
++  format: ['esm'],
++  platform: 'node',
++  target: 'node22',
++  dts: { entry: 'src/index.ts' },
++  clean: true,
++  sourcemap: true,
++  noExternal: [/^@tourney\//],
++  // Bundle the workspace packages from source, never from a possibly stale dist/.
++  esbuildOptions(options) {
++    options.conditions = ['@tourney/source'];
++  },
++  banner: { js: '#!/usr/bin/env node' },
++});
+diff --git a/apps/bridge/vitest.config.ts b/apps/bridge/vitest.config.ts
+new file mode 100644
+index 0000000..9ede1ad
+--- /dev/null
++++ b/apps/bridge/vitest.config.ts
+@@ -0,0 +1,4 @@
++import { defineConfig, mergeConfig } from 'vitest/config';
++import shared from '../../vitest.shared';
++
++export default mergeConfig(shared, defineConfig({ test: { testTimeout: 60_000 } }));
+diff --git a/docs/decisions.md b/docs/decisions.md
+index 77462ba..78a4db8 100644
+--- a/docs/decisions.md
++++ b/docs/decisions.md
+@@ -19,3 +19,7 @@ Short decision records. Newest at the bottom.
+ | 13  | Mod package name carries a version suffix (`UTTourney_v1`)                                                                | UT99 clients cache packages by name; incompatible changes need a new name                                                  |
+ | 14  | Anti-cheat: none of our own; stay compatible with what the server already runs                                            | Requirement                                                                                                                |
+ | 15  | Bot vs bot default "watch live", optional "simulate" (skill-weighted)                                                     | Requirement                                                                                                                |
++| 16  | A tie at the time limit always goes to sudden death (UT overtime)                                                         | Simple and familiar; the earlier `suddenDeath` switch had no sensible "off"                                                |
++| 17  | Soft pause instead of `Level.Pauser`                                                                                      | A paused level stops ticking actors, which would also stop the bridge connection                                           |
++| 18  | Mod caches access list and match in its ini before every travel                                                           | Logins on the new level can arrive before the bridge connection is back                                                    |
++| 19  | Bridge bundles workspace packages from source                                                                             | `dist/` runs standalone on the Pi; never picks up a stale package build                                                    |
+diff --git a/docs/protocol.md b/docs/protocol.md
+index a3dc4ba..18ce85b 100644
+--- a/docs/protocol.md
++++ b/docs/protocol.md
+@@ -99,39 +99,39 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends
+ 
+ ### Mod → Bridge
+ 
+-| `t`      | Fields              | Meaning                                                                              |
+-| -------- | ------------------- | ------------------------------------------------------------------------------------ |
+-| `hello`  | `key pv mv eng lvl` | Shared secret, protocol version, mod version, engine version, current map            |
+-| `join`   | `pid tk name role`  | Player connected; role (`a`/`b`/`s`) already decided by the mod from the access list |
+-| `leave`  | `pid`               |                                                                                      |
+-| `reject` | `name why`          | Connection without a valid token was refused                                         |
+-| `ready`  | `pid`               | Match player is ready (UWindow button or `!ready`)                                   |
+-| `vote`   | `pid m1 m2 m3`      | Ranked map choices (`""` = none)                                                     |
+-| `live`   | `mid g`             | Countdown over, players spawned                                                      |
+-| `score`  | `mid g sa sb tl ot` | Periodic and on every frag                                                           |
+-| `end`    | `mid g sa sb w why` | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                            |
+-| `lost`   | `mid s`             | Match player disconnected during a live game; mod paused the game                    |
+-| `hb`     | `up`                | Heartbeat every 5 s                                                                  |
+-| `err`    | `msg`               |                                                                                      |
++| `t`      | Fields                 | Meaning                                                                                                                             |
++| -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
++| `hello`  | `key pv mv eng lvl gm` | Shared secret, protocol version, mod version, engine version, current map, a game was started on this level (running or just ended) |
++| `join`   | `pid tk name role`     | Player connected; role (`a`/`b`/`s`) already decided by the mod from the access list                                                |
++| `leave`  | `pid`                  |                                                                                                                                     |
++| `reject` | `name why`             | Connection without a valid token was refused                                                                                        |
++| `ready`  | `pid`                  | Match player is ready (UWindow button or `!ready`)                                                                                  |
++| `vote`   | `pid m1 m2 m3`         | Ranked map choices (`""` = none)                                                                                                    |
++| `live`   | `mid g`                | Countdown over, players spawned                                                                                                     |
++| `score`  | `mid g sa sb tl ot`    | Periodic and on every frag                                                                                                          |
++| `end`    | `mid g sa sb w why`    | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                                                                           |
++| `lost`   | `mid s`                | Match player disconnected during a live game; mod paused the game                                                                   |
++| `hb`     | `up`                   | Heartbeat every 5 s                                                                                                                 |
++| `err`    | `msg`                  |                                                                                                                                     |
+ 
+ ### Bridge → Mod
+ 
+-| `t`                                  | Meaning                                                                                       |
+-| ------------------------------------ | --------------------------------------------------------------------------------------------- |
+-| `welcome`                            | Handshake accepted                                                                            |
+-| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                             |
+-| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds |
+-| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit, sudden death   |
+-| `bot`                                | A side played by a bot (name, skill, class)                                                   |
+-| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                              |
+-| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                             |
+-| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`               |
+-| `cd`                                 | Start countdown                                                                               |
+-| `pause`                              | Pause / unpause                                                                               |
+-| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                      |
+-| `brh` / `brm`                        | Bracket for the HUD                                                                           |
+-| `sth` / `ste`                        | Standings for the HUD                                                                         |
+-| `say`                                | Message to all (`pid: -1`) or one player                                                      |
++| `t`                                  | Meaning                                                                                                           |
++| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
++| `welcome`                            | Handshake accepted                                                                                                |
++| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                                                 |
++| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds                     |
++| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit (a tie always goes to sudden death) |
++| `bot`                                | A side played by a bot (name, skill, class)                                                                       |
++| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                                                  |
++| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                                                 |
++| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                   |
++| `cd`                                 | Start countdown                                                                                                   |
++| `pause`                              | Pause / unpause                                                                                                   |
++| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                                          |
++| `brh` / `brm`                        | Bracket for the HUD                                                                                               |
++| `sth` / `ste`                        | Standings for the HUD                                                                                             |
++| `say`                                | Message to all (`pid: -1`) or one player                                                                          |
+ 
+ ### Typical match sequence
+ 
+diff --git a/mods/ut99-tournament/Classes/BridgeLink.uc b/mods/ut99-tournament/Classes/BridgeLink.uc
+new file mode 100644
+index 0000000..fdd24c0
+--- /dev/null
++++ b/mods/ut99-tournament/Classes/BridgeLink.uc
+@@ -0,0 +1,120 @@
++//=============================================================================
++// BridgeLink
++// TCP client to the bridge on the same machine. Lives for one level; the game
++// spawns a new one after every map change or when the connection drops.
++//=============================================================================
++class BridgeLink extends TcpLink;
++
++var TournamentDM Game;
++var TourneyMsg InMsg;
++var string Buffer;
++var bool bOpen;
++var float ConnectStarted;
++var int HeartbeatTicks;
++
++function Init(TournamentDM G)
++{
++	Game = G;
++	InMsg = Spawn(class'TourneyMsg');
++	LinkMode = MODE_Text;
++	ReceiveMode = RMODE_Event;
++	ConnectStarted = Level.TimeSeconds;
++	Resolve(class'TournamentConfig'.default.BridgeHost);
++	SetTimer(1.0, true);
++}
++
++event Resolved(IpAddr Addr)
++{
++	Addr.Port = class'TournamentConfig'.default.BridgePort;
++	if (BindPort() == 0)
++	{
++		Log("BindPort failed", 'UTTourney');
++		Destroy();
++		return;
++	}
++	Open(Addr);
++}
++
++event ResolveFailed()
++{
++	Log("cannot resolve bridge host" @ class'TournamentConfig'.default.BridgeHost, 'UTTourney');
++	Destroy();
++}
++
++event Opened()
++{
++	bOpen = true;
++	Log("connected to bridge", 'UTTourney');
++	Game.OnBridgeOpened();
++}
++
++event Closed()
++{
++	if (bOpen)
++		Log("bridge connection closed", 'UTTourney');
++	bOpen = false;
++	Destroy();
++}
++
++event Timer()
++{
++	// Give up a connection attempt that hangs; the game will spawn a new link.
++	if (!bOpen && Level.TimeSeconds - ConnectStarted > 5.0)
++	{
++		Destroy();
++		return;
++	}
++	// Heartbeat lives here, not in the game: this actor keeps ticking while the game is paused.
++	if (bOpen && ++HeartbeatTicks >= 5)
++	{
++		HeartbeatTicks = 0;
++		SendLine("{" $ Chr(34) $ "t" $ Chr(34) $ ":" $ Chr(34) $ "hb" $ Chr(34) $ "," $ Chr(34) $ "up" $ Chr(34) $ ":" $ int(Level.TimeSeconds) $ "}");
++	}
++}
++
++event ReceivedText(string Text)
++{
++	local int P;
++	local string Line;
++
++	Buffer = Buffer $ Text;
++	P = InStr(Buffer, Chr(10));
++	while (P >= 0)
++	{
++		Line = Left(Buffer, P);
++		Buffer = Mid(Buffer, P + 1);
++		if (Right(Line, 1) == Chr(13))
++			Line = Left(Line, Len(Line) - 1);
++		if (Line != "")
++		{
++			if (InMsg.Parse(Line))
++				Game.HandleBridgeMessage(InMsg);
++			else
++				Log("bad line from bridge:" @ Line, 'UTTourney');
++		}
++		P = InStr(Buffer, Chr(10));
++	}
++	if (Len(Buffer) > 4096)
++		Buffer = "";
++}
++
++function SendLine(string S)
++{
++	if (bOpen)
++		SendText(S $ Chr(10));
++}
++
++event Destroyed()
++{
++	if (InMsg != None)
++		InMsg.Destroy();
++	if (Game != None && Game.Link == self)
++		Game.Link = None;
++	Super.Destroyed();
++}
++
++defaultproperties
++{
++	// Keep receiving bridge messages (e.g. "unpause") while the level is paused.
++	bAlwaysTick=True
++}
+diff --git a/mods/ut99-tournament/Classes/TournamentConfig.uc b/mods/ut99-tournament/Classes/TournamentConfig.uc
+new file mode 100644
+index 0000000..8339f07
+--- /dev/null
++++ b/mods/ut99-tournament/Classes/TournamentConfig.uc
+@@ -0,0 +1,52 @@
++//=============================================================================
++// TournamentConfig
++// Server-side settings written by the bridge into Tourney.ini, plus a small
++// cache so the access list and match survive a map change (logins on the new
++// level can arrive before the bridge connection is re-established).
++// Access only through class'TournamentConfig'.default.* and StaticSaveConfig().
++//=============================================================================
++class TournamentConfig extends Info
++	config;
++
++// Connection to the bridge (same machine).
++var config string BridgeHost;
++var config int BridgePort;
++var config string SharedKey;
++
++// Cache: access list (token -> name, role a/b/s).
++var config int CachedAclCount;
++var config string CachedAclTok[64];
++var config string CachedAclName[64];
++var config string CachedAclRole[64];
++
++// Cache: current match.
++var config string CachedMatchId;
++var config int CachedGameNo;
++var config int CachedBestOf;
++var config string CachedNameA;
++var config string CachedNameB;
++var config int CachedFragLimit;
++var config int CachedTimeLimit;
++var config bool CachedBotA;
++var config bool CachedBotB;
++var config string CachedBotNameA;
++var config string CachedBotNameB;
++var config int CachedBotSkillA;
++var config int CachedBotSkillB;
++var config string CachedBotClsA;
++var config string CachedBotClsB;
++
++// Fallback when a client reconnects without ?tk= after a map change: address -> token.
++var config string KnownAddr[64];
++var config string KnownAddrTok[64];
++
++defaultproperties
++{
++	BridgeHost="127.0.0.1"
++	BridgePort=7790
++	SharedKey=""
++	CachedFragLimit=20
++	CachedTimeLimit=10
++	CachedBestOf=1
++	CachedGameNo=1
++}
+diff --git a/mods/ut99-tournament/Classes/TournamentDM.uc b/mods/ut99-tournament/Classes/TournamentDM.uc
+new file mode 100644
+index 0000000..ded8a75
+--- /dev/null
++++ b/mods/ut99-tournament/Classes/TournamentDM.uc
+@@ -0,0 +1,1208 @@
++//=============================================================================
++// TournamentDM
++// 1v1 tournament deathmatch driven by the bridge (see docs/protocol.md).
++//
++// The mod keeps no tournament logic of its own. It
++//   - admits only players with a token from the access list (?tk=...),
++//   - lets the two match players play and makes everybody else a spectator,
++//   - holds the match players until both are ready, runs the countdown,
++//   - spawns bots for bot sides, reports scores and the end of the game,
++//   - pauses when a match player drops and restores the score on return,
++//   - performs the map change the bridge asks for.
++//=============================================================================
++class TournamentDM extends DeathMatchPlus;
++
++const MOD_VERSION = "0.1.0";
++const PROTOCOL_VERSION = 1;
++const MAXACL = 64;
++const MAXTRACK = 64;
++
++var BridgeLink Link;
++var TourneyMsg OutMsg;
++var TourneyMutator TMut;
++var float NextConnectTime;
++var bool bJoinsSent;
++var bool bInSync;
++
++// State received from the bridge.
++var string Phase;
++var int PhaseSec;
++var string MatchId;
++var int GameNo, BestOf, WinsA, WinsB;
++var string NameA, NameB;
++var int MatchFragLimit, MatchTimeLimit;
++var bool bBotA, bBotB;
++var string BotNameA, BotNameB, BotClsA, BotClsB;
++var int BotSkillA, BotSkillB;
++var string AclTok[64], AclName[64], AclRole[64];
++var int AclCount;
++var string VoteMap[32];
++var int VoteCount;
++var string BracketText[64];
++var int BracketCount;
++var string StandingText[32];
++var int StandingCount;
++
++// Players on this level.
++var PlayerPawn TrackPawn[64];
++var string TrackTok[64];
++var string TrackRole[64];
++var bool TrackReadySent[64];
++var int TrackCount;
++
++// Match runtime.
++var Bot SideBot[2];
++var bool bBotsSpawned;
++var bool bGameLive;
++var bool bEndReported;
++var int CountdownLeft;
++var int LastSentA, LastSentB, ScoreTicks;
++var bool bTourneyPaused;
++var string SavedTok[2];
++var float SavedScore[2], SavedDeaths[2];
++var string PendingAddr;
++var string PendingEnd;
++var bool bTokenFromAddress;
++
++//=============================================================================
++// Startup
++//=============================================================================
++
++event InitGame(string Options, out string Error)
++{
++	bTournament = false;
++	Super.InitGame(Options, Error);
++	MinPlayers = 0;
++	MaxPlayers = Max(MaxPlayers, 4);
++	RemainingBots = 0;
++	// Hold everybody in the waiting state until the bridge starts the countdown.
++	bNetReady = false;
++	bRequireReady = true;
++	CountDown = 9999;
++	LoadCache();
++	ApplyMatchRules();
++}
++
++function PostBeginPlay()
++{
++	Super.PostBeginPlay();
++	OutMsg = Spawn(class'TourneyMsg');
++	TMut = Spawn(class'TourneyMutator');
++	TMut.Game = self;
++	BaseMutator.AddMutator(TMut);
++	RegisterMessageMutator(TMut);
++	ApplyMatchRules();
++	ConnectBridge();
++}
++
++function string CurrentMapName()
++{
++	local string S;
++	S = string(Level);
++	return Left(S, InStr(S, "."));
++}
++
++//=============================================================================
++// Bridge connection
++//=============================================================================
++
++function ConnectBridge()
++{
++	if (Link != None)
++		return;
++	Link = Spawn(class'BridgeLink');
++	Link.Init(self);
++	NextConnectTime = Level.TimeSeconds + 3.0;
++}
++
++function OnBridgeOpened()
++{
++	bJoinsSent = false;
++	OutMsg.Begin("hello");
++	OutMsg.AddStr("key", class'TournamentConfig'.default.SharedKey);
++	OutMsg.AddInt("pv", PROTOCOL_VERSION);
++	OutMsg.AddStr("mv", MOD_VERSION);
++	OutMsg.AddInt("eng", int(Level.EngineVersion));
++	OutMsg.AddStr("lvl", OutMsg.FitWire(CurrentMapName(), 64));
++	// gm: a game was started on this level (running or just ended); the bridge keeps its state.
++	OutMsg.AddBool("gm", bGameLive);
++	Send();
++	if (PendingEnd != "")
++		Link.SendLine(PendingEnd); // result reported while the bridge was unreachable
++}
++
++function Send()
++{
++	if (Link != None)
++		Link.SendLine(OutMsg.Finish());
++}
++
++function BridgeTick()
++{
++	if (Link == None && Level.TimeSeconds >= NextConnectTime)
++		ConnectBridge();
++}
++
++function HandleBridgeMessage(TourneyMsg M)
++{
++	local string T;
++	local int i;
++
++	T = M.Get("t");
++	switch (T)
++	{
++		case "welcome":
++			break;
++		case "sync":
++			bInSync = M.Get("st") == "begin";
++			if (!bInSync)
++			{
++				SaveCache();
++				if (!bJoinsSent)
++					SendAllJoins();
++				ApplyPhase();
++			}
++			break;
++		case "phase":
++			Phase = M.Get("p");
++			PhaseSec = M.GetInt("sec");
++			if (!bInSync)
++				ApplyPhase();
++			break;
++		case "match":
++			if (M.Get("mid") != MatchId || M.GetInt("g") != GameNo)
++				PendingEnd = "";
++			MatchId = M.Get("mid");
++			GameNo = M.GetInt("g");
++			BestOf = M.GetInt("bo");
++			WinsA = M.GetInt("wa");
++			WinsB = M.GetInt("wb");
++			NameA = M.Get("na");
++			NameB = M.Get("nb");
++			MatchFragLimit = M.GetInt("fl");
++			MatchTimeLimit = M.GetInt("tl");
++			bBotA = false;
++			bBotB = false;
++			if (!bGameLive)
++				ApplyMatchRules();
++			break;
++		case "bot":
++			if (M.Get("s") == "a")
++			{
++				bBotA = true;
++				BotNameA = M.Get("name");
++				BotSkillA = M.GetInt("sk");
++				BotClsA = M.Get("cls");
++			}
++			else
++			{
++				bBotB = true;
++				BotNameB = M.Get("name");
++				BotSkillB = M.GetInt("sk");
++				BotClsB = M.Get("cls");
++			}
++			break;
++		case "acl":
++			AclCount = 0;
++			break;
++		case "acle":
++		case "acladd":
++			// Saved at sync end or before travel; no ini write per entry.
++			SetAcl(M.Get("tk"), M.Get("name"), M.Get("r"));
++			break;
++		case "acldel":
++			i = FindAcl(M.Get("tk"));
++			if (i >= 0)
++			{
++				AclCount--;
++				AclTok[i] = AclTok[AclCount];
++				AclName[i] = AclName[AclCount];
++				AclRole[i] = AclRole[AclCount];
++			}
++			break;
++		case "vopen":
++			VoteCount = 0;
++			break;
++		case "vmap":
++			i = M.GetInt("i") - 1;
++			if (i >= 0 && i < 32)
++			{
++				VoteMap[i] = M.Get("map");
++				VoteCount = Max(VoteCount, i + 1);
++			}
++			break;
++		case "vclose":
++			BroadcastMessage("Next map:" @ M.Get("map"), true);
++			break;
++		case "travel":
++			DoTravel(M.Get("map"), M.Get("opt"));
++			break;
++		case "cd":
++			CountdownLeft = Max(1, M.GetInt("sec"));
++			Phase = "countdown";
++			break;
++		case "pause":
++			SetTourneyPause(M.GetBool("on"), M.Get("why"));
++			break;
++		case "abort":
++			AbortGame(M.Get("w"), M.Get("why"));
++			break;
++		case "brh":
++			BracketCount = 0;
++			break;
++		case "brm":
++			AddBracketLine(M);
++			break;
++		case "sth":
++			StandingCount = 0;
++			break;
++		case "ste":
++			AddStandingLine(M);
++			break;
++		case "say":
++			SayTo(M.GetInt("pid"), M.Get("msg"));
++			break;
++		default:
++			Log("unknown bridge message" @ T, 'UTTourney');
++	}
++}
++
++function ApplyPhase()
++{
++	if (Phase == "vote")
++		ShowVote();
++	else if (Phase == "ready")
++		SpawnBotsOnce();
++	else if (Phase == "finished")
++		BroadcastMessage("The tournament is over. Type !standings for the final placements.", true);
++}
++
++//=============================================================================
++// Access list and players
++//=============================================================================
++
++function int FindAcl(string Tok)
++{
++	local int i;
++	if (Tok == "")
++		return -1;
++	for (i = 0; i < AclCount; i++)
++		if (AclTok[i] == Tok)
++			return i;
++	return -1;
++}
++
++function SetAcl(string Tok, string PName, string SRole)
++{
++	local int i;
++	i = FindAcl(Tok);
++	if (i < 0)
++	{
++		if (AclCount >= MAXACL)
++			return;
++		i = AclCount++;
++	}
++	AclTok[i] = Tok;
++	AclName[i] = PName;
++	AclRole[i] = SRole;
++}
++
++// SRole in the *next/current* match according to the access list. Differs from TrackRole
++// (the role the player logged in with) while the next match is being voted on.
++function bool IsMatchPlayerToken(string Tok)
++{
++	local int i;
++	i = FindAcl(Tok);
++	return i >= 0 && (AclRole[i] == "a" || AclRole[i] == "b");
++}
++
++function string StripPort(string Addr)
++{
++	local int P;
++	P = InStr(Addr, ":");
++	if (P >= 0)
++		return Left(Addr, P);
++	return Addr;
++}
++
++function string TokenForAddress(string Addr)
++{
++	local int i;
++	Addr = StripPort(Addr);
++	if (Addr == "")
++		return "";
++	for (i = 0; i < 64; i++)
++		if (class'TournamentConfig'.default.KnownAddr[i] == Addr)
++			return class'TournamentConfig'.default.KnownAddrTok[i];
++	return "";
++}
++
++function RememberAddress(string Addr, string Tok)
++{
++	local int i, Free;
++	Addr = StripPort(Addr);
++	if (Addr == "" || Tok == "")
++		return;
++	Free = -1;
++	for (i = 0; i < 64; i++)
++	{
++		if (class'TournamentConfig'.default.KnownAddr[i] == Addr)
++		{
++			Free = i;
++			break;
++		}
++		if (Free < 0 && class'TournamentConfig'.default.KnownAddr[i] == "")
++			Free = i;
++	}
++	if (Free < 0)
++		Free = Rand(64);
++	class'TournamentConfig'.default.KnownAddr[Free] = Addr;
++	class'TournamentConfig'.default.KnownAddrTok[Free] = Tok;
++	class'TournamentConfig'.static.StaticSaveConfig();
++}
++
++function bool SideTaken(string SRole)
++{
++	local int t;
++	for (t = 0; t < TrackCount; t++)
++		if (TrackRole[t] == SRole && TrackPawn[t] != None && !TrackPawn[t].IsA('Spectator'))
++			return true;
++	return false;
++}
++
++event PreLogin(string Options, string Address, out string Error, out string FailCode)
++{
++	local string Tok;
++	Super.PreLogin(Options, Address, Error, FailCode);
++	if (Error != "")
++		return;
++	Tok = ParseOption(Options, "tk");
++	if (Tok == "")
++		Tok = TokenForAddress(Address);
++	if (FindAcl(Tok) < 0)
++	{
++		Error = "This server runs a tournament. Join with your personal link from the tournament website.";
++		FailCode = "NOTOKEN";
++		ReportReject(ParseOption(Options, "Name"), "no token");
++		return;
++	}
++	// Login() has no address; remember it for the token fallback (Login follows PreLogin).
++	PendingAddr = Address;
++}
++
++event playerpawn Login(string Portal, string Options, out string Error, class<playerpawn> SpawnClass)
++{
++	local string Tok, SRole;
++	local int i;
++	local PlayerPawn P;
++
++	Tok = ParseOption(Options, "tk");
++	bTokenFromAddress = false;
++	if (Tok == "")
++	{
++		Tok = TokenForAddress(PendingAddr);
++		bTokenFromAddress = Tok != "";
++	}
++	PendingAddr = "";
++	i = FindAcl(Tok);
++	if (i < 0)
++	{
++		Error = "No valid tournament token.";
++		return None;
++	}
++	SRole = AclRole[i];
++	if ((SRole != "a" && SRole != "b") || SideTaken(SRole))
++	{
++		SRole = "s";
++		SpawnClass = class'Botpack.CHSpectator';
++	}
++	P = Super.Login(Portal, Options, Error, SpawnClass);
++	if (P == None)
++		return None;
++	if (P.IsA('Spectator'))
++		SRole = "s"; // joined with the spectate option
++	ChangeName(P, AclName[i], false);
++	Track(P, Tok, SRole);
++	return P;
++}
++
++event PostLogin(PlayerPawn NewPlayer)
++{
++	local int t;
++
++	Super.PostLogin(NewPlayer);
++	t = FindTrack(NewPlayer);
++	if (t < 0)
++		return;
++	RememberAddress(NewPlayer.GetPlayerNetworkAddress(), TrackTok[t]);
++	if (TrackRole[t] == "a" || TrackRole[t] == "b")
++	{
++		if (!bGameLive)
++			HoldPlayer(NewPlayer);
++		else
++			RestoreScore(NewPlayer, TrackRole[t]);
++	}
++	if (bTokenFromAddress && TokenForAddress(NewPlayer.GetPlayerNetworkAddress()) != TrackTok[t])
++		Log("token fallback mismatch for" @ NewPlayer.PlayerReplicationInfo.PlayerName, 'UTTourney');
++	bTokenFromAddress = false;
++	SendJoin(t);
++	if (Phase == "vote" && IsMatchPlayerToken(TrackTok[t]))
++		ShowVoteTo(NewPlayer);
++}
++
++function SendLost(string SRole)
++{
++	OutMsg.Begin("lost");
++	OutMsg.AddStr("mid", MatchId);
++	OutMsg.AddStr("s", SRole);
++	Send();
++}
++
++function HoldPlayer(PlayerPawn P)
++{
++	P.PlayerRestartState = 'PlayerWaiting';
++	P.GotoState('PlayerWaiting');
++	P.ClientGotoState('PlayerWaiting', 'Begin');
++}
++
++function Logout(Pawn Exiting)
++{
++	local int t;
++	local string SRole;
++
++	t = FindTrack(PlayerPawn(Exiting));
++	if (t >= 0)
++	{
++		SRole = TrackRole[t];
++		if (bGameLive && !bGameEnded && (SRole == "a" || SRole == "b"))
++		{
++			SaveScore(Exiting, SRole);
++			Untrack(t);
++			t = -1;
++			SetTourneyPause(true, Exiting.PlayerReplicationInfo.PlayerName @ "disconnected");
++			SendLost(SRole);
++		}
++		else if (!bGameLive && Phase == "countdown" && (SRole == "a" || SRole == "b"))
++		{
++			// A match player left during the countdown: back to the ready check.
++			CountdownLeft = 0;
++			Phase = "ready";
++		}
++		OutMsg.Begin("leave");
++		OutMsg.AddInt("pid", Exiting.PlayerReplicationInfo.PlayerID);
++		Send();
++		if (t >= 0)
++			Untrack(t);
++	}
++	Super.Logout(Exiting);
++}
++
++function Track(PlayerPawn P, string Tok, string SRole)
++{
++	if (TrackCount >= MAXTRACK)
++		return;
++	TrackPawn[TrackCount] = P;
++	TrackTok[TrackCount] = Tok;
++	TrackRole[TrackCount] = SRole;
++	TrackReadySent[TrackCount] = false;
++	TrackCount++;
++}
++
++function Untrack(int t)
++{
++	TrackCount--;
++	TrackPawn[t] = TrackPawn[TrackCount];
++	TrackTok[t] = TrackTok[TrackCount];
++	TrackRole[t] = TrackRole[TrackCount];
++	TrackReadySent[t] = TrackReadySent[TrackCount];
++	TrackPawn[TrackCount] = None;
++}
++
++function int FindTrack(PlayerPawn P)
++{
++	local int t;
++	if (P == None)
++		return -1;
++	for (t = 0; t < TrackCount; t++)
++		if (TrackPawn[t] == P)
++			return t;
++	return -1;
++}
++
++function SendJoin(int t)
++{
++	OutMsg.Begin("join");
++	OutMsg.AddInt("pid", TrackPawn[t].PlayerReplicationInfo.PlayerID);
++	OutMsg.AddStr("tk", TrackTok[t]);
++	OutMsg.AddStr("name", OutMsg.FitWire(TrackPawn[t].PlayerReplicationInfo.PlayerName, 32));
++	OutMsg.AddStr("role", TrackRole[t]);
++	Send();
++}
++
++function SendAllJoins()
++{
++	local int t;
++	bJoinsSent = true;
++	for (t = 0; t < TrackCount; t++)
++		if (TrackPawn[t] != None)
++		{
++			SendJoin(t);
++			TrackReadySent[t] = false; // re-sent by PreMatchTick if still ready
++		}
++}
++
++function ReportReject(string PName, string Why)
++{
++	OutMsg.Begin("reject");
++	OutMsg.AddStr("name", OutMsg.FitWire(PName, 32));
++	OutMsg.AddStr("why", Why);
++	Send();
++}
++
++function PlayerPawn SidePlayer(string SRole)
++{
++	local int t;
++	for (t = 0; t < TrackCount; t++)
++		if (TrackRole[t] == SRole && TrackPawn[t] != None && !TrackPawn[t].IsA('Spectator'))
++			return TrackPawn[t];
++	return None;
++}
++
++function Pawn SidePawn(int Side)
++{
++	if (SideBot[Side] != None)
++		return SideBot[Side];
++	if (Side == 0)
++		return SidePlayer("a");
++	return SidePlayer("b");
++}
++
++//=============================================================================
++// Match flow
++//=============================================================================
++
++function ApplyMatchRules()
++{
++	FragLimit = MatchFragLimit;
++	TimeLimit = MatchTimeLimit;
++	if (!bGameLive)
++		RemainingTime = 60 * TimeLimit;
++	if (TournamentGameReplicationInfo(GameReplicationInfo) != None)
++	{
++		TournamentGameReplicationInfo(GameReplicationInfo).FragLimit = FragLimit;
++		TournamentGameReplicationInfo(GameReplicationInfo).TimeLimit = TimeLimit;
++	}
++	if (GameReplicationInfo != None)
++		GameReplicationInfo.RemainingTime = RemainingTime;
++}
++
++function SpawnBotsOnce()
++{
++	if (bBotsSpawned || MatchId == "")
++		return;
++	bBotsSpawned = true;
++	if (bBotA)
++		SideBot[0] = SpawnSideBot(BotNameA, BotSkillA, BotClsA);
++	if (bBotB)
++		SideBot[1] = SpawnSideBot(BotNameB, BotSkillB, BotClsB);
++}
++
++function int FindBotIndex(string BName)
++{
++	local int i;
++	for (i = 0; i < 32; i++)
++		if (BotConfig.GetBotName(i) ~= BName)
++			return i;
++	return -1;
++}
++
++// Spawns a specific configured bot (name, skill 0..7, optional class) waiting for the start.
++function Bot SpawnSideBot(string BName, int BSkill, string BClass)
++{
++	local NavigationPoint StartSpot;
++	local class<Bot> BC;
++	local Bot B;
++	local int N;
++
++	N = FindBotIndex(BName);
++	if (BClass != "")
++		BC = class<Bot>(DynamicLoadObject(BClass, class'Class'));
++	if (BC == None && N >= 0)
++		BC = BotConfig.CHGetBotClass(N);
++	if (BC == None)
++		BC = class'Botpack.TMale1Bot';
++
++	StartSpot = FindPlayerStart(None, 255);
++	if (StartSpot == None)
++	{
++		Log("no start spot for bot" @ BName, 'UTTourney');
++		return None;
++	}
++	B = Spawn(BC, , , StartSpot.Location, StartSpot.Rotation);
++	if (B == None)
++	{
++		Log("could not spawn bot" @ BName, 'UTTourney');
++		return None;
++	}
++	B.PlayerReplicationInfo.PlayerID = CurrentID++;
++	if (N >= 0)
++		BotConfig.CHIndividualize(B, N, NumBots);
++	ChangeName(B, BName, false);
++	// UT bot skill is 0..3 (plus a global novice flag); the tournament uses 0..7.
++	B.InitializeSkill(FClamp(BSkill * 3.0 / 7.0, 0.0, 3.0));
++	B.ViewRotation = StartSpot.Rotation;
++	BroadcastMessage(B.PlayerReplicationInfo.PlayerName $ EnteredMessage, false);
++	ModifyBehaviour(B);
++	AddDefaultInventory(B);
++	NumBots++;
++	B.GotoState('Dying', 'WaitingForStart');
++	return B;
++}
++
++function Timer()
++{
++	BridgeTick();
++	if (!bGameLive)
++	{
++		PreMatchTick();
++		Super(GameInfo).Timer();
++		return;
++	}
++	if (bTourneyPaused)
++	{
++		Super(GameInfo).Timer(); // game clock stands still
++		return;
++	}
++	Super.Timer();
++	LiveTick();
++}
++
++function PreMatchTick()
++{
++	local int t;
++	local PlayerPawn P;
++
++	if (Phase == "ready")
++	{
++		SpawnBotsOnce();
++		for (t = 0; t < TrackCount; t++)
++		{
++			P = TrackPawn[t];
++			if (P == None || (TrackRole[t] != "a" && TrackRole[t] != "b"))
++				continue;
++			if (P.bReadyToPlay && !TrackReadySent[t])
++			{
++				TrackReadySent[t] = true;
++				OutMsg.Begin("ready");
++				OutMsg.AddInt("pid", P.PlayerReplicationInfo.PlayerID);
++				Send();
++			}
++			P.ClearProgressMessages();
++			P.SetProgressTime(2);
++			P.SetProgressMessage(MatchTitle(), 0);
++			if (TrackReadySent[t])
++				P.SetProgressMessage("You are ready. Waiting for your opponent...", 1);
++			else
++				P.SetProgressMessage("Press FIRE or type !ready when you are ready", 1);
++		}
++	}
++	else if (Phase == "countdown" && CountdownLeft > 0)
++	{
++		AnnounceCountdown(CountdownLeft);
++		CountdownLeft--;
++	}
++	else if (Phase == "countdown" && CountdownLeft == 0)
++	{
++		CountdownLeft = -1;
++		StartTournamentMatch();
++	}
++}
++
++function string MatchTitle()
++{
++	local string S;
++	S = MatchId $ ":" @ NameA @ "vs" @ NameB;
++	if (BestOf > 1)
++		S = S @ "- game" @ GameNo @ "of up to" @ BestOf @ "(" $ WinsA $ ":" $ WinsB $ ")";
++	return S;
++}
++
++function AnnounceCountdown(int N)
++{
++	local Pawn P;
++	for (P = Level.PawnList; P != None; P = P.NextPawn)
++		if (P.IsA('PlayerPawn'))
++		{
++			PlayerPawn(P).ClearProgressMessages();
++			if (N <= 10 && P.IsA('TournamentPlayer'))
++				TournamentPlayer(P).TimeMessage(N);
++			else
++				PlayerPawn(P).SetProgressMessage(MatchTitle() @ "starts in" @ N, 0);
++		}
++}
++
++function StartTournamentMatch()
++{
++	bRequireReady = false;
++	CountDown = 0;
++	bNetReady = false;
++	ApplyMatchRules();
++	bGameLive = true;
++	bEndReported = false;
++	LastSentA = -1;
++	LastSentB = -1;
++	StartMatch();
++	OutMsg.Begin("live");
++	OutMsg.AddStr("mid", MatchId);
++	OutMsg.AddInt("g", GameNo);
++	Send();
++}
++
++function LiveTick()
++{
++	local int A, B;
++	if (bGameEnded)
++		return;
++	A = SideScore(0);
++	B = SideScore(1);
++	ScoreTicks++;
++	if (A != LastSentA || B != LastSentB || ScoreTicks >= 5)
++	{
++		ScoreTicks = 0;
++		LastSentA = A;
++		LastSentB = B;
++		OutMsg.Begin("score");
++		OutMsg.AddStr("mid", MatchId);
++		OutMsg.AddInt("g", GameNo);
++		OutMsg.AddInt("sa", A);
++		OutMsg.AddInt("sb", B);
++		if (TimeLimit > 0)
++			OutMsg.AddInt("tl", RemainingTime);
++		else
++			OutMsg.AddInt("tl", -1);
++		OutMsg.AddBool("ot", bOverTime);
++		Send();
++	}
++}
++
++function int SideScore(int Side)
++{
++	local Pawn P;
++	P = SidePawn(Side);
++	if (P != None && P.PlayerReplicationInfo != None)
++		return int(P.PlayerReplicationInfo.Score);
++	if (SavedTok[Side] != "")
++		return int(SavedScore[Side]);
++	return 0;
++}
++
++function EndGame(string Reason)
++{
++	local bool bWasOvertime;
++	bWasOvertime = bOverTime;
++	Super.EndGame(Reason);
++	if (bGameEnded && bGameLive && !bEndReported)
++		ReportEnd(Reason, bWasOvertime);
++}
++
++function ReportEnd(string Reason, bool bWasOvertime)
++{
++	local int A, B;
++	local string Why;
++
++	bEndReported = true;
++	A = SideScore(0);
++	B = SideScore(1);
++	if (bWasOvertime)
++		Why = "sd";
++	else if (Reason ~= "timelimit")
++		Why = "time";
++	else
++		Why = "frag";
++	OutMsg.Begin("end");
++	OutMsg.AddStr("mid", MatchId);
++	OutMsg.AddInt("g", GameNo);
++	OutMsg.AddInt("sa", A);
++	OutMsg.AddInt("sb", B);
++	if (A >= B)
++		OutMsg.AddStr("w", "a");
++	else
++		OutMsg.AddStr("w", "b");
++	OutMsg.AddStr("why", Why);
++	PendingEnd = OutMsg.Finish();
++	Send();
++}
++
++// The bridge decided the game (forfeit). End it without reporting a result.
++function AbortGame(string Winner, string Why)
++{
++	local Pawn P;
++
++	bEndReported = true;
++	bTourneyPaused = false;
++	if (!bGameEnded)
++	{
++		// SetEndCams refuses to end a tied game (it starts overtime), so end it directly.
++		bGameEnded = true;
++		for (P = Level.PawnList; P != None; P = P.NextPawn)
++		{
++			P.GotoState('GameEnded');
++			if (PlayerPawn(P) != None)
++				PlayerPawn(P).ClientGameEnded();
++		}
++	}
++	if (Winner == "a")
++		BroadcastMessage(NameA @ "wins by forfeit", true);
++	else
++		BroadcastMessage(NameB @ "wins by forfeit", true);
++}
++
++// Never restart or rotate maps on our own: the bridge sends the next map.
++function RestartGame()
++{
++}
++
++function DoTravel(string MapName, string Opt)
++{
++	local string URL;
++	SaveCache();
++	URL = MapName $ "?game=" $ string(Class) $ Opt;
++	Log("travel to" @ URL, 'UTTourney');
++	Level.ServerTravel(URL, false);
++}
++
++// Soft pause. Level.Pauser is not used on purpose: a paused level stops ticking actors, which
++// would also stop the bridge connection. Instead the match pawns are held out of play and the
++// game clock (DeathMatchPlus.Timer) is not advanced. On resume both sides respawn.
++function SetTourneyPause(bool bOn, string Why)
++{
++	local int Side;
++	local Pawn P;
++
++	if (bOn == bTourneyPaused)
++		return;
++	if (!bOn && bGameLive && !bGameEnded)
++	{
++		// Do not resume while a human side is still missing; tell the bridge again.
++		if (!bBotA && SidePlayer("a") == None)
++		{
++			SendLost("a");
++			return;
++		}
++		if (!bBotB && SidePlayer("b") == None)
++		{
++			SendLost("b");
++			return;
++		}
++	}
++	bTourneyPaused = bOn;
++	if (!bGameLive || bGameEnded)
++		return;
++	for (Side = 0; Side < 2; Side++)
++	{
++		P = SidePawn(Side);
++		if (P == None)
++			continue;
++		if (bOn)
++		{
++			if (P.IsA('Bot'))
++				P.GotoState('Dying', 'WaitingForStart');
++			else if (P.IsA('PlayerPawn'))
++				HoldPlayer(PlayerPawn(P));
++		}
++		else
++		{
++			if (P.IsA('PlayerPawn'))
++				PlayerPawn(P).PlayerRestartState = PlayerPawn(P).Default.PlayerRestartState;
++			RestartPlayer(P);
++			if (P.IsA('Bot'))
++				Bot(P).StartMatch();
++		}
++	}
++	if (bOn)
++		BroadcastMessage("Game paused:" @ Why, true);
++	else
++		BroadcastMessage("Game resumed", true);
++}
++
++function SaveScore(Pawn P, string SRole)
++{
++	local int Side;
++	Side = 0;
++	if (SRole == "b")
++		Side = 1;
++	SavedTok[Side] = SRole;
++	SavedScore[Side] = P.PlayerReplicationInfo.Score;
++	SavedDeaths[Side] = P.PlayerReplicationInfo.Deaths;
++}
++
++function RestoreScore(PlayerPawn P, string SRole)
++{
++	local int Side;
++	Side = 0;
++	if (SRole == "b")
++		Side = 1;
++	if (SavedTok[Side] == "")
++		return;
++	P.PlayerReplicationInfo.Score = SavedScore[Side];
++	P.PlayerReplicationInfo.Deaths = SavedDeaths[Side];
++	SavedTok[Side] = "";
++	// Still paused: wait in the hold until the bridge resumes the game.
++	if (bTourneyPaused)
++		HoldPlayer(P);
++}
++
++//=============================================================================
++// Map vote, commands, messages
++//=============================================================================
++
++function ShowVote()
++{
++	local int t;
++	for (t = 0; t < TrackCount; t++)
++		if (TrackPawn[t] != None && IsMatchPlayerToken(TrackTok[t]))
++			ShowVoteTo(TrackPawn[t]);
++}
++
++function ShowVoteTo(PlayerPawn P)
++{
++	local int i;
++	local string Line;
++	P.ClientMessage("Map vote for" @ MatchId $ ": type !vote followed by up to 3 numbers, best first (e.g. !vote 2 4 1)");
++	Line = "";
++	for (i = 0; i < VoteCount; i++)
++	{
++		Line = Line $ (i + 1) $ ")" @ VoteMap[i] $ "   ";
++		if (Len(Line) > 80)
++		{
++			P.ClientMessage(Line);
++			Line = "";
++		}
++	}
++	if (Line != "")
++		P.ClientMessage(Line);
++}
++
++function HandleCommand(PlayerPawn P, string Cmd)
++{
++	local string Word, Rest;
++	local int Sp, t;
++
++	Cmd = TrimSpaces(Cmd);
++	Sp = InStr(Cmd, " ");
++	if (Sp >= 0)
++	{
++		Word = Left(Cmd, Sp);
++		Rest = TrimSpaces(Mid(Cmd, Sp + 1));
++	}
++	else
++		Word = Cmd;
++
++	if (Word ~= "ready")
++	{
++		t = FindTrack(P);
++		if (t >= 0 && (TrackRole[t] == "a" || TrackRole[t] == "b") && Phase == "ready")
++			P.bReadyToPlay = true;
++	}
++	else if (Word ~= "vote")
++		HandleVote(P, Rest);
++	else if (Word ~= "bracket")
++		ShowBracket(P);
++	else if (Word ~= "standings")
++		ShowStandings(P);
++	else if (Word ~= "help")
++		P.ClientMessage("Commands: !ready  !vote 3 1 5  !bracket  !standings");
++}
++
++function HandleVote(PlayerPawn P, string Args)
++{
++	local string Pick[3], Word;
++	local int n, Sp, Num;
++
++	if (Phase != "vote" || FindTrack(P) < 0)
++		return;
++	n = 0;
++	while (Args != "" && n < 3)
++	{
++		Sp = InStr(Args, " ");
++		if (Sp >= 0)
++		{
++			Word = Left(Args, Sp);
++			Args = TrimSpaces(Mid(Args, Sp + 1));
++		}
++		else
++		{
++			Word = Args;
++			Args = "";
++		}
++		Num = int(Word);
++		if (Num >= 1 && Num <= VoteCount)
++			Pick[n++] = VoteMap[Num - 1];
++		else if (Word != "")
++			Pick[n++] = Word; // map name typed directly
++	}
++	if (n == 0)
++	{
++		ShowVoteTo(P);
++		return;
++	}
++	OutMsg.Begin("vote");
++	OutMsg.AddInt("pid", P.PlayerReplicationInfo.PlayerID);
++	OutMsg.AddStr("m1", OutMsg.FitWire(Pick[0], 64));
++	OutMsg.AddStr("m2", OutMsg.FitWire(Pick[1], 64));
++	OutMsg.AddStr("m3", OutMsg.FitWire(Pick[2], 64));
++	Send();
++	P.ClientMessage("Vote received:" @ Pick[0] @ Pick[1] @ Pick[2]);
++}
++
++function string TrimSpaces(string S)
++{
++	while (Left(S, 1) == " ")
++		S = Mid(S, 1);
++	while (Right(S, 1) == " ")
++		S = Left(S, Len(S) - 1);
++	return S;
++}
++
++function AddBracketLine(TourneyMsg M)
++{
++	local string S, St;
++	if (BracketCount >= 64)
++		return;
++	St = M.Get("st");
++	S = M.Get("id") $ ":" @ NameOr(M.Get("na"));
++	if (M.GetInt("sa") >= 0)
++		S = S @ M.Get("sa") $ ":" $ M.Get("sb");
++	else
++		S = S @ "vs";
++	S = S @ NameOr(M.Get("nb"));
++	if (St == "l")
++		S = S @ "(live)";
++	else if (St == "c" && M.Get("w") == "a")
++		S = S @ "- winner" @ M.Get("na");
++	else if (St == "c" && M.Get("w") == "b")
++		S = S @ "- winner" @ M.Get("nb");
++	else if (St == "v")
++		S = S @ "(not needed)";
++	BracketText[BracketCount++] = S;
++}
++
++function string NameOr(string N)
++{
++	if (N == "")
++		return "TBD";
++	return N;
++}
++
++function AddStandingLine(TourneyMsg M)
++{
++	local string S;
++	if (StandingCount >= 32)
++		return;
++	if (M.GetInt("pl") > 0)
++		S = M.Get("pl") $ "." @ M.Get("name");
++	else
++		S = "-" @ M.Get("name") @ "(still in)";
++	S = S @ "  W" $ M.Get("w") @ "L" $ M.Get("l");
++	StandingText[StandingCount++] = S;
++}
++
++// Text version until the HUD overlay exists (milestone 6).
++function ShowBracket(PlayerPawn P)
++{
++	local int i;
++	for (i = 0; i < BracketCount; i++)
++		P.ClientMessage(BracketText[i]);
++}
++
++function ShowStandings(PlayerPawn P)
++{
++	local int i;
++	for (i = 0; i < StandingCount; i++)
++		P.ClientMessage(StandingText[i]);
++}
++
++function SayTo(int Pid, string Msg)
++{
++	local Pawn P;
++	if (Pid < 0)
++	{
++		BroadcastMessage(Msg, true);
++		return;
++	}
++	for (P = Level.PawnList; P != None; P = P.NextPawn)
++		if (P.IsA('PlayerPawn') && P.PlayerReplicationInfo != None && P.PlayerReplicationInfo.PlayerID == Pid)
++			P.ClientMessage(Msg);
++}
++
++//=============================================================================
++// Cache (survives map changes)
++//=============================================================================
++
++function SaveCache()
++{
++	local int i;
++	class'TournamentConfig'.default.CachedAclCount = AclCount;
++	for (i = 0; i < MAXACL; i++)
++	{
++		class'TournamentConfig'.default.CachedAclTok[i] = AclTok[i];
++		class'TournamentConfig'.default.CachedAclName[i] = AclName[i];
++		class'TournamentConfig'.default.CachedAclRole[i] = AclRole[i];
++	}
++	class'TournamentConfig'.default.CachedMatchId = MatchId;
++	class'TournamentConfig'.default.CachedGameNo = GameNo;
++	class'TournamentConfig'.default.CachedBestOf = BestOf;
++	class'TournamentConfig'.default.CachedNameA = NameA;
++	class'TournamentConfig'.default.CachedNameB = NameB;
++	class'TournamentConfig'.default.CachedFragLimit = MatchFragLimit;
++	class'TournamentConfig'.default.CachedTimeLimit = MatchTimeLimit;
++	class'TournamentConfig'.default.CachedBotA = bBotA;
++	class'TournamentConfig'.default.CachedBotB = bBotB;
++	class'TournamentConfig'.default.CachedBotNameA = BotNameA;
++	class'TournamentConfig'.default.CachedBotNameB = BotNameB;
++	class'TournamentConfig'.default.CachedBotSkillA = BotSkillA;
++	class'TournamentConfig'.default.CachedBotSkillB = BotSkillB;
++	class'TournamentConfig'.default.CachedBotClsA = BotClsA;
++	class'TournamentConfig'.default.CachedBotClsB = BotClsB;
++	class'TournamentConfig'.static.StaticSaveConfig();
++}
++
++function LoadCache()
++{
++	local int i;
++	AclCount = Min(class'TournamentConfig'.default.CachedAclCount, MAXACL);
++	for (i = 0; i < AclCount; i++)
++	{
++		AclTok[i] = class'TournamentConfig'.default.CachedAclTok[i];
++		AclName[i] = class'TournamentConfig'.default.CachedAclName[i];
++		AclRole[i] = class'TournamentConfig'.default.CachedAclRole[i];
++	}
++	MatchId = class'TournamentConfig'.default.CachedMatchId;
++	GameNo = class'TournamentConfig'.default.CachedGameNo;
++	BestOf = class'TournamentConfig'.default.CachedBestOf;
++	NameA = class'TournamentConfig'.default.CachedNameA;
++	NameB = class'TournamentConfig'.default.CachedNameB;
++	MatchFragLimit = class'TournamentConfig'.default.CachedFragLimit;
++	MatchTimeLimit = class'TournamentConfig'.default.CachedTimeLimit;
++	bBotA = class'TournamentConfig'.default.CachedBotA;
++	bBotB = class'TournamentConfig'.default.CachedBotB;
++	BotNameA = class'TournamentConfig'.default.CachedBotNameA;
++	BotNameB = class'TournamentConfig'.default.CachedBotNameB;
++	BotSkillA = class'TournamentConfig'.default.CachedBotSkillA;
++	BotSkillB = class'TournamentConfig'.default.CachedBotSkillB;
++	BotClsA = class'TournamentConfig'.default.CachedBotClsA;
++	BotClsB = class'TournamentConfig'.default.CachedBotClsB;
++	Phase = "lobby";
++}
++
++defaultproperties
++{
++	GameName="Tournament 1v1 DM"
++	MapPrefix="DM"
++	BeaconName="TDM1v1"
++	bTournament=False
++	MinPlayers=0
++	MaxPlayers=4
++	FragLimit=20
++	TimeLimit=10
++}
+diff --git a/mods/ut99-tournament/Classes/TourneyMsg.uc b/mods/ut99-tournament/Classes/TourneyMsg.uc
+new file mode 100644
+index 0000000..7c9f2e8
+--- /dev/null
++++ b/mods/ut99-tournament/Classes/TourneyMsg.uc
+@@ -0,0 +1,261 @@
++//=============================================================================
++// TourneyMsg
++// Parser and writer for the bridge line protocol: one flat JSON object per
++// line, values are strings, integers or booleans, ASCII only (\uXXXX escapes).
++// See docs/protocol.md.
++//=============================================================================
++class TourneyMsg extends Info;
++
++const MAXFIELDS = 24;
++
++var string Keys[24];
++var string Vals[24];
++var int Count;
++
++var string OutText;
++
++//-----------------------------------------------------------------------------
++// Reading
++//-----------------------------------------------------------------------------
++
++function bool Parse(string S)
++{
++	local int i, L;
++	local string C, K, V;
++
++	Count = 0;
++	L = Len(S);
++	i = SkipWs(S, 0);
++	if (Mid(S, i, 1) != "{")
++		return false;
++	i++;
++	while (i < L)
++	{
++		i = SkipWs(S, i);
++		C = Mid(S, i, 1);
++		if (C == "}")
++			return true;
++		if (C == ",")
++		{
++			i++;
++			continue;
++		}
++		if (C != Chr(34))
++			return false;
++		if (!ReadString(S, i, K))
++			return false;
++		i = SkipWs(S, i);
++		if (Mid(S, i, 1) != ":")
++			return false;
++		i = SkipWs(S, i + 1);
++		if (Mid(S, i, 1) == Chr(34))
++		{
++			if (!ReadString(S, i, V))
++				return false;
++		}
++		else
++		{
++			// number, true, false
++			V = "";
++			while (i < L)
++			{
++				C = Mid(S, i, 1);
++				if (C == "," || C == "}" || C == " ")
++					break;
++				V = V $ C;
++				i++;
++			}
++		}
++		if (Count < MAXFIELDS)
++		{
++			Keys[Count] = K;
++			Vals[Count] = V;
++			Count++;
++		}
++	}
++	return false;
++}
++
++function int SkipWs(string S, int i)
++{
++	while (i < Len(S) && (Mid(S, i, 1) == " " || Mid(S, i, 1) == Chr(9)))
++		i++;
++	return i;
++}
++
++// i points at the opening quote; on return it points behind the closing quote.
++function bool ReadString(string S, out int i, out string Result)
++{
++	local string C;
++	local int L;
++
++	Result = "";
++	L = Len(S);
++	i++;
++	while (i < L)
++	{
++		C = Mid(S, i, 1);
++		if (C == Chr(34))
++		{
++			i++;
++			return true;
++		}
++		if (C == Chr(92))
++		{
++			i++;
++			C = Mid(S, i, 1);
++			if (C == "n")
++				Result = Result $ " ";
++			else if (C == "t")
++				Result = Result $ " ";
++			else if (C == "r" || C == "b" || C == "f")
++				Result = Result;
++			else if (C == "u")
++			{
++				Result = Result $ Chr(HexToInt(Mid(S, i + 1, 4)));
++				i += 4;
++			}
++			else
++				Result = Result $ C; // \" \\ \/
++		}
++		else
++			Result = Result $ C;
++		i++;
++	}
++	return false;
++}
++
++function int HexToInt(string H)
++{
++	local int i, N, D;
++
++	N = 0;
++	for (i = 0; i < Len(H); i++)
++	{
++		D = InStr("0123456789ABCDEF", Caps(Mid(H, i, 1)));
++		if (D < 0)
++			return 63; // '?'
++		N = N * 16 + D;
++	}
++	return N;
++}
++
++function bool Has(string K)
++{
++	local int i;
++	for (i = 0; i < Count; i++)
++		if (Keys[i] == K)
++			return true;
++	return false;
++}
++
++function string Get(string K)
++{
++	local int i;
++	for (i = 0; i < Count; i++)
++		if (Keys[i] == K)
++			return Vals[i];
++	return "";
++}
++
++function int GetInt(string K)
++{
++	return int(Get(K));
++}
++
++function bool GetBool(string K)
++{
++	return Get(K) == "true";
++}
++
++//-----------------------------------------------------------------------------
++// Writing: Begin("join"); AddInt("pid", 3); AddStr("tk", Tok); Line = Finish();
++//-----------------------------------------------------------------------------
++
++function Begin(string T)
++{
++	OutText = "{" $ Quote("t") $ ":" $ Quote(T);
++}
++
++function AddStr(string K, string V)
++{
++	OutText = OutText $ "," $ Quote(K) $ ":" $ Quote(V);
++}
++
++function AddInt(string K, int V)
++{
++	OutText = OutText $ "," $ Quote(K) $ ":" $ string(V);
++}
++
++function AddBool(string K, bool V)
++{
++	if (V)
++		OutText = OutText $ "," $ Quote(K) $ ":true";
++	else
++		OutText = OutText $ "," $ Quote(K) $ ":false";
++}
++
++function string Finish()
++{
++	return OutText $ "}";
++}
++
++function string Quote(string S)
++{
++	local int i, A;
++	local string C, R;
++
++	R = Chr(34);
++	for (i = 0; i < Len(S); i++)
++	{
++		C = Mid(S, i, 1);
++		A = Asc(C);
++		if (A == 34 || A == 92)
++			R = R $ Chr(92) $ C;
++		else if (A < 32 || A > 126)
++			R = R $ Chr(92) $ "u" $ Hex4(A);
++		else
++			R = R $ C;
++	}
++	return R $ Chr(34);
++}
++
++function string Hex4(int N)
++{
++	local string R;
++	local int i;
++
++	for (i = 0; i < 4; i++)
++	{
++		R = Mid("0123456789abcdef", N % 16, 1) $ R;
++		N = N / 16;
++	}
++	return R;
++}
++
++// Cuts a string to at most MaxBytes after escaping (non-ASCII = 6 bytes, quote/backslash = 2).
++function string FitWire(string S, int MaxBytes)
++{
++	local int i, A, Cost, Used;
++	Used = 0;
++	for (i = 0; i < Len(S); i++)
++	{
++		A = Asc(Mid(S, i, 1));
++		if (A < 32 || A > 126)
++			Cost = 6;
++		else if (A == 34 || A == 92)
++			Cost = 2;
++		else
++			Cost = 1;
++		if (Used + Cost > MaxBytes)
++			return Left(S, i);
++		Used += Cost;
++	}
++	return S;
++}
++
++defaultproperties
++{
++	bHidden=True
++	RemoteRole=ROLE_None
++}
+diff --git a/mods/ut99-tournament/Classes/TourneyMutator.uc b/mods/ut99-tournament/Classes/TourneyMutator.uc
+new file mode 100644
+index 0000000..e199840
+--- /dev/null
++++ b/mods/ut99-tournament/Classes/TourneyMutator.uc
+@@ -0,0 +1,30 @@
++//=============================================================================
++// TourneyMutator
++// Chat and console commands:  !ready  !vote 3 1 5  !bracket  !standings  !help
++// Console alternative:        mutate tourney ready   (bindable to a key)
++//=============================================================================
++class TourneyMutator extends Mutator;
++
++var TournamentDM Game;
++
++function bool MutatorTeamMessage(Actor Sender, Pawn Receiver, PlayerReplicationInfo PRI, coerce string S, name Type, optional bool bBeep)
++{
++	// Say is delivered once per receiver; react only to the copy for the sender itself.
++	if (Sender == Receiver && PlayerPawn(Sender) != None && Left(S, 1) == "!" && Game != None)
++		Game.HandleCommand(PlayerPawn(Sender), Mid(S, 1));
++	if (NextMessageMutator != None)
++		return NextMessageMutator.MutatorTeamMessage(Sender, Receiver, PRI, S, Type, bBeep);
++	return true;
++}
++
++function Mutate(string MutateString, PlayerPawn Sender)
++{
++	if (Game != None && Left(MutateString, 8) ~= "tourney ")
++		Game.HandleCommand(Sender, Mid(MutateString, 8));
++	if (NextMutator != None)
++		NextMutator.Mutate(MutateString, Sender);
++}
++
++defaultproperties
++{
++}
+diff --git a/mods/ut99-tournament/README.md b/mods/ut99-tournament/README.md
+index 9ab0955..7e81c0b 100644
+--- a/mods/ut99-tournament/README.md
++++ b/mods/ut99-tournament/README.md
+@@ -1,17 +1,104 @@
+ # UT99 Tournament Mod (`UTTourney_v1`)
+ 
+-UnrealScript package for UT99 469f. Planned classes:
++UnrealScript package for UT99 469f. It turns a dedicated server into a tournament server driven by the bridge
++(see [`docs/protocol.md`](../../docs/protocol.md)).
++
++> **Status (milestone 3): written, not yet compiled.** The code was reviewed against the UT 436 UnrealScript
++> API but could not be compiled in the development environment. The first real build and server test happen
++> on a real installation, using the checklist below.
++
++## Classes
+ 
+ | Class | Role |
+ |---|---|
+-| `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`): token login, roles, ready check, countdown, bots |
+-| `TournamentConfig` | Ini config: bridge host/port, shared key |
+-| `BridgeLink` | `TcpLink` client, flat JSON line parser/writer, reconnect |
+-| `TournamentRI` | Replicated bracket, standings and phase for clients |
+-| `TournamentHUD` | HUD mutator: bracket and standings overlay |
+-| `VoteWindow` / `ReadyWindow` | UWindow dialogs for map vote and ready |
++| `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`): token login, roles, ready check, countdown, bots, score, end of game, travel, soft pause, score restore |
++| `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
++| `TourneyMsg` | Flat JSON line parser/writer |
++| `TourneyMutator` | Chat commands `!ready !vote !bracket !standings !help`, console `mutate tourney <cmd>` |
++| `TournamentConfig` | Ini settings (bridge host/port/key) and a cache that survives map changes |
++
++Planned for milestone 6: HUD overlay for the bracket, UWindow dialogs for vote and ready.
++Until then the bracket is shown as text (`!bracket`) and players vote by chat.
++
++## Build
++
++```sh
++./build.sh /path/to/UnrealTournament          # Linux
++.\build.ps1 -UT "C:\UnrealTournament"         # Windows (PowerShell)
++```
++
++The script copies `Classes/` to `<UT>/UTTourney_v1/Classes`, creates `TourneyMake.ini` (a copy of your
++`UnrealTournament.ini` with `EditPackages=UTTourney_v1` added) and runs `ucc make` with it. Your own ini is not
++changed. Result: `UTTourney_v1.u` next to the ucc binary.
++
++If `ucc make ini=TourneyMake.ini` is not accepted by your build, add `EditPackages=UTTourney_v1` to the
++`[Editor.EditorEngine]` section of `UnrealTournament.ini` by hand and run `ucc make`.
++
++## Manual server setup (until the bridge starts the server itself, milestone 4)
++
++1. Add to the server ini (`UnrealTournament.ini` or the ini you start the server with):
++
++   ```ini
++   [UTTourney_v1.TournamentConfig]
++   BridgeHost=127.0.0.1
++   BridgePort=7790
++   SharedKey=change-me-please      ; same value as mod.sharedKey in bridge.json
++
++   [UTTourney_v1.TournamentDM]
++   MaxPlayers=4
++   ```
++
++   Do **not** add the package to `ServerPackages` yet: nothing in it runs on clients so far, so clients do not
++   need to download it.
++
++2. Start the bridge (see `apps/bridge/README.md`):
++
++   ```sh
++   node apps/bridge/dist/cli.js run -c bridge.json -t tournament.json
++   ```
++
++3. Start the server on any DM map with the tournament game type:
++
++   ```sh
++   cd <UT>/System && ./ucc-bin-amd64 server "DM-Deck16][?game=UTTourney_v1.TournamentDM" -log
++   ```
++
++4. Players join from the console with their token from `tournament.json`:
++
++   ```
++   open <server-ip>:7777?tk=mario-token-1
++   ```
++
++Log lines of the mod are tagged `UTTourney`.
++
++## First test checklist
++
++Work through these in order and note what happens. Each item names what to look for.
++
++| # | Check | Expected |
++|---|---|---|
++| 1 | `ucc make` | `UTTourney_v1.u` is built without errors (please send the full output if not) |
++| 2 | Server start | Log shows `connected to bridge`, bridge log shows `mod connected ... level DM-...` |
++| 3 | Join without token | Rejected with the tournament message |
++| 4 | Join with token | Bridge logs `<name> checked in`; you are a spectator in the lobby |
++| 5 | All players checked in | Bridge: `The tournament starts now!`, match players get the vote list |
++| 6 | `!vote 2 1 3` | `Vote received`; after both votes the server changes map |
++| 7 | **Token after map change** | Players come back automatically after the travel. Does `?tk=` survive the travel? If players are rejected, report it (the address fallback should catch it) |
++| 8 | Ready check | Match players are held (invisible, cannot move), see "Press FIRE or type !ready" |
++| 9 | Ready | FIRE or `!ready` → countdown with announcer, both spawn together |
++| 10 | Bot side | Bot spawns with the configured name and plays |
++| 11 | Spectators | Everybody else is a spectator and can watch |
++| 12 | Frag limit / time limit | Bridge logs `wins game 1 (20:13)`, next match is called |
++| 13 | Tie at time limit | Overtime, next frag wins, bridge records `suddenDeath` |
++| 14 | **Disconnect during a game** | Game holds both players, clock stops; on return the score is restored and both respawn. Without return the bridge forfeits after the grace period |
++| 15 | Long names / umlauts | Names show correctly; no `line too long` warnings in the bridge log |
++| 16 | `!bracket`, `!standings` | Text bracket and standings |
+ 
+-Protocol: see [`docs/protocol.md`](../../docs/protocol.md).
++## Known limitations
+ 
+-Build scripts (`build.sh` / `build.ps1`) copy `Classes/` into a UT installation and run `ucc make`.
+-The package name carries a version suffix; bump it for every network-incompatible release.
++- Bot skill is mapped from 0–7 to UT's 0–3 bot skill; the global novice flag of DeathMatchPlus is not
++  changed per bot.
++- A tournament pause from the bridge holds the game only while a match is live; during the ready check
++  the countdown still runs.
++- Players can rename themselves with the `name` command; the bridge identifies them by token anyway.
++- The token fallback after a map change (by IP address) cannot tell apart two players behind the same IP.
+diff --git a/mods/ut99-tournament/build.ps1 b/mods/ut99-tournament/build.ps1
+new file mode 100644
+index 0000000..31cd746
+--- /dev/null
++++ b/mods/ut99-tournament/build.ps1
+@@ -0,0 +1,38 @@
++# Builds the UTTourney package with ucc make (Windows, UT99 469).
++# Usage: .\build.ps1 -UT "C:\UnrealTournament"
++# Result: <UT>\System\UTTourney_v1.u   (does not modify your UnrealTournament.ini)
++param([Parameter(Mandatory = $true)][string]$UT)
++$ErrorActionPreference = 'Stop'
++$Pkg = 'UTTourney_v1'
++
++$ucc = @('System64\UCC.exe', 'System\UCC64.exe', 'System\UCC.exe') |
++  ForEach-Object { Join-Path $UT $_ } | Where-Object { Test-Path $_ } | Select-Object -First 1
++if (-not $ucc) { throw "no UCC.exe found under $UT" }
++$sysDir = Split-Path $ucc
++Write-Host "using $ucc"
++
++$pkgDir = Join-Path $UT $Pkg
++if (Test-Path $pkgDir) { Remove-Item $pkgDir -Recurse -Force }
++New-Item -ItemType Directory -Path (Join-Path $pkgDir 'Classes') | Out-Null
++Copy-Item (Join-Path $PSScriptRoot 'Classes\*.uc') (Join-Path $pkgDir 'Classes')
++Remove-Item (Join-Path $sysDir "$Pkg.u") -ErrorAction SilentlyContinue
++
++$src = Join-Path $sysDir 'UnrealTournament.ini'
++if (-not (Test-Path $src)) { $src = Join-Path $UT 'System\UnrealTournament.ini' }
++$out = New-Object System.Collections.Generic.List[string]
++$inSec = $false; $done = $false
++foreach ($line in Get-Content $src) {
++  if ($line.StartsWith('[')) {
++    if ($inSec -and -not $done) { $out.Add("EditPackages=$Pkg"); $done = $true }
++    $inSec = ($line -eq '[Editor.EditorEngine]')
++  }
++  if (-not ($inSec -and $line -eq "EditPackages=$Pkg")) { $out.Add($line) }
++}
++if ($inSec -and -not $done) { $out.Add("EditPackages=$Pkg") }
++Set-Content -Path (Join-Path $sysDir 'TourneyMake.ini') -Value $out -Encoding ASCII
++
++Push-Location $sysDir
++try { & $ucc make ini=TourneyMake.ini } finally { Pop-Location }
++
++if (Test-Path (Join-Path $sysDir "$Pkg.u")) { Write-Host "built $(Join-Path $sysDir "$Pkg.u")" }
++else { throw 'build failed, see output above' }
+diff --git a/mods/ut99-tournament/build.sh b/mods/ut99-tournament/build.sh
+new file mode 100755
+index 0000000..864bf54
+--- /dev/null
++++ b/mods/ut99-tournament/build.sh
+@@ -0,0 +1,41 @@
++#!/usr/bin/env bash
++# Builds the UTTourney package with ucc make (Linux, UT99 469).
++# Usage: ./build.sh /path/to/UnrealTournament
++# Result: <UT>/System/UTTourney_v1.u   (does not modify your UnrealTournament.ini)
++set -euo pipefail
++
++PKG="UTTourney_v1"
++UT="${1:?usage: ./build.sh /path/to/UnrealTournament}"
++HERE="$(cd "$(dirname "$0")" && pwd)"
++
++UCC=""
++for c in System/ucc-bin-amd64 System/ucc-bin-arm64 System/ucc-bin-x86 System64/ucc-bin SystemARM64/ucc-bin System/ucc-bin; do
++  if [ -x "$UT/$c" ]; then UCC="$UT/$c"; break; fi
++done
++[ -n "$UCC" ] || { echo "no ucc binary found under $UT" >&2; exit 1; }
++SYSDIR="$(dirname "$UCC")"
++echo "using $UCC"
++
++rm -rf "${UT:?}/$PKG"
++mkdir -p "$UT/$PKG/Classes"
++cp "$HERE"/Classes/*.uc "$UT/$PKG/Classes/"
++rm -f "$SYSDIR/$PKG.u" "$UT/System/$PKG.u"
++
++# Build ini = UnrealTournament.ini + EditPackages=$PKG at the end of [Editor.EditorEngine].
++SRCINI="$SYSDIR/UnrealTournament.ini"
++[ -f "$SRCINI" ] || SRCINI="$UT/System/UnrealTournament.ini"
++awk -v pkg="$PKG" '
++  { sub(/\r$/, "") }
++  /^\[/ { if (insec && !done) { print "EditPackages=" pkg; done = 1 } insec = ($0 == "[Editor.EditorEngine]") }
++  { if (!(insec && $0 == "EditPackages=" pkg)) print }
++  END { if (insec && !done) print "EditPackages=" pkg }
++' "$SRCINI" > "$SYSDIR/TourneyMake.ini"
++
++(cd "$SYSDIR" && "$UCC" make ini=TourneyMake.ini)
++
++if [ -f "$SYSDIR/$PKG.u" ]; then
++  echo "built $SYSDIR/$PKG.u"
++else
++  echo "build failed, see output above" >&2
++  exit 1
++fi
+diff --git a/package.json b/package.json
+index b75ae43..73f0af1 100644
+--- a/package.json
++++ b/package.json
+@@ -8,7 +8,7 @@
+     "node": ">=22.12"
+   },
+   "scripts": {
+-    "build": "pnpm -r --filter \"./packages/**\" build",
++    "build": "pnpm -r build",
+     "typecheck": "pnpm -r typecheck",
+     "test": "pnpm -r test",
+     "lint": "eslint .",
+diff --git a/packages/adapter-ut99/src/launch.ts b/packages/adapter-ut99/src/launch.ts
+index 2a8da04..02914ca 100644
+--- a/packages/adapter-ut99/src/launch.ts
++++ b/packages/adapter-ut99/src/launch.ts
+@@ -101,11 +101,14 @@ export function iniChanges(
+     ...(profile.serverName
+       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]
+       : []),
+-    { section: dm, key: 'bMultiWeaponStay', value: bool(rules.weaponStay) },
+-    { section: dm, key: 'bHardCoreMode', value: bool(rules.hardcore) },
++    // Per-class config: written for DeathMatchPlus and for our subclass, which reads its own section.
++    ...[dm, MOD_GAME_CLASS].flatMap((section) => [
++      { section, key: 'bMultiWeaponStay', value: bool(rules.weaponStay) },
++      { section, key: 'bHardCoreMode', value: bool(rules.hardcore) },
++    ]),
+     { section: dm, key: 'bTournament', value: 'False' }, // our own ready check replaces it
+     { section: dm, key: 'MinPlayers', value: '0' }, // bots are spawned by the mod only
+-    { section: dm, key: 'MaxPlayers', value: '2' },
++    { section: dm, key: 'MaxPlayers', value: '4' }, // 2 match players + room for a reconnect
+     { section: 'Engine.GameInfo', key: 'GameSpeed', value: (rules.gameSpeedPct / 100).toFixed(2) },
+     { section: 'Engine.GameInfo', key: 'MaxSpectators', value: String(profile.maxSpectators) },
+     { section: `${MOD_PACKAGE}.TournamentConfig`, key: 'BridgeHost', value: mod.bridgeHost },
+diff --git a/packages/adapter-ut99/src/rules.ts b/packages/adapter-ut99/src/rules.ts
+index 1fbe8ef..3d8b3bf 100644
+--- a/packages/adapter-ut99/src/rules.ts
++++ b/packages/adapter-ut99/src/rules.ts
+@@ -14,10 +14,11 @@ export const Ut99DmRulesSchema = z
+   .object({
+     /** 0 = no frag limit. */
+     fragLimit: z.number().int().min(0).max(200).default(20),
+-    /** Minutes, 0 = no time limit. Frag limit and time limit cannot both be 0. */
++    /**
++     * Minutes, 0 = no time limit. Frag limit and time limit cannot both be 0.
++     * A tie at the time limit always goes to sudden death (UT overtime: next frag wins).
++     */
+     timeLimitMin: z.number().int().min(0).max(60).default(10),
+-    /** On a tie at time limit the next frag wins (UT overtime). */
+-    suddenDeath: z.boolean().default(true),
+ 
+     mapMode: z.enum(['random', 'vote']).default('vote'),
+     /** Map ids (package names) available for this tournament. Validated against the server inventory. */
+diff --git a/packages/adapter-ut99/test/adapter.test.ts b/packages/adapter-ut99/test/adapter.test.ts
+index 15d00d3..8d0cdce 100644
+--- a/packages/adapter-ut99/test/adapter.test.ts
++++ b/packages/adapter-ut99/test/adapter.test.ts
+@@ -34,7 +34,6 @@ describe('rules', () => {
+     expect(r).toMatchObject({
+       fragLimit: 20,
+       timeLimitMin: 10,
+-      suddenDeath: true,
+       mapMode: 'vote',
+       countdownSec: 5,
+       voteTimeoutSec: 30,
+diff --git a/packages/protocol/src/mod.ts b/packages/protocol/src/mod.ts
+index b71dd38..9572568 100644
+--- a/packages/protocol/src/mod.ts
++++ b/packages/protocol/src/mod.ts
+@@ -45,6 +45,7 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
+     mv: str(16), // mod version
+     eng: int, // engine version, e.g. 469
+     lvl: str(64), // current map name
++    gm: z.boolean(), // a match game was started on this level (running or just ended): keep the bridge state
+   }),
+   /** A player connected. `tk` is the token from the URL; the mod already decided the role from the access list. */
+   z.object({
+@@ -123,7 +124,6 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
+     nb: str(MAX_NAME_CHARS),
+     fl: int.nonnegative(), // frag limit, 0 = none
+     tl: int.nonnegative(), // time limit minutes, 0 = none
+-    sd: z.boolean(), // sudden death on tie
+   }),
+   /** A match side played by a bot. */
+   z.object({
+diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml
+index 722bdbe..aa1abb7 100644
+--- a/pnpm-lock.yaml
++++ b/pnpm-lock.yaml
+@@ -33,6 +33,21 @@ importers:
+         specifier: ^5.0.3
+         version: 5.0.3(@types/node@22.20.5)(vite@7.3.7(@types/node@22.20.5))
+ 
++  apps/bridge:
++    dependencies:
++      '@tourney/adapter-ut99':
++        specifier: workspace:*
++        version: link:../../packages/adapter-ut99
++      '@tourney/bracket':
++        specifier: workspace:*
++        version: link:../../packages/bracket
++      '@tourney/protocol':
++        specifier: workspace:*
++        version: link:../../packages/protocol
++      zod:
++        specifier: ^4.6.5
++        version: 4.6.5
++
+   packages/adapter-ut99:
+     dependencies:
+       '@tourney/bracket':
+-- 
+2.43.0
+
