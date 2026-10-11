@@ -51,12 +51,15 @@ export interface DirectorTiming {
   simulateDelayMs: number;
   /** Re-send the travel command if the mod has not come back on the new map after this long. */
   loadingTimeoutMs: number;
+  /** While the tournament waits for someone, tell the server who and why this often (0 = off). */
+  reminderIntervalMs: number;
 }
 
 const DEFAULT_TIMING: DirectorTiming = {
   postGameDelayMs: 10_000,
   simulateDelayMs: 3_000,
   loadingTimeoutMs: 90_000,
+  reminderIntervalMs: 30_000,
 };
 
 export interface DirectorOptions {
@@ -171,10 +174,12 @@ export class MatchDirector extends EventEmitter {
   private readonly onMessageListener = (m: Exclude<ModToBridge, ModHello>) =>
     void this.enqueue(() => this.onMessage(m));
   private stopped = false;
+  private reminder?: TimerHandle;
 
   start(): Promise<void> {
     this.o.mod.on('hello', this.onHelloListener);
     this.o.mod.on('message', this.onMessageListener);
+    this.scheduleReminder();
     return this.enqueue(async () => {
       await this.reload();
       await this.resumeFromProjection();
@@ -188,6 +193,69 @@ export class MatchDirector extends EventEmitter {
     this.o.mod.off('message', this.onMessageListener);
     await this.queue;
     this.clearTimer();
+    if (this.reminder) this.o.clock.clearTimeout(this.reminder);
+  }
+
+  /**
+   * What the tournament is waiting for right now, as one line for the players, or undefined
+   * if nothing is blocking (e.g. a game is running normally).
+   */
+  waitingFor(): string | undefined {
+    const now = this.o.clock.now();
+    const left = (deadline: number | undefined) => {
+      if (deadline === undefined) return '';
+      const s = Math.max(0, Math.round((deadline - now) / 1000));
+      return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    };
+    const names = (ids: string[]) => {
+      const shown = ids.slice(0, 5).map((id) => this.name(id));
+      return ids.length > 5 ? `${shown.join(', ')} +${ids.length - 5} more` : shown.join(', ');
+    };
+    if (this.proj.phase === 'paused') {
+      return `Tournament paused by the organizer: ${this.proj.pausedReason ?? ''}`.trim();
+    }
+    const s = this.stage;
+    switch (s.kind) {
+      case 'checkIn': {
+        const missing = this.humans().filter((id) => !this.proj.checkedIn.includes(id));
+        if (!missing.length) return undefined;
+        const total = this.humans().length;
+        return `Waiting for check-in (${total - missing.length}/${total}): ${names(missing)}. Start in ${left(s.deadline)}, missing players are replaced by bots.`;
+      }
+      case 'voting': {
+        const open = s.voters.filter((v) => !s.ballots.has(v));
+        if (!open.length) return undefined;
+        return `Map vote ${s.matchId}: waiting for ${names(open)}. Type !vote 2 1 3 (${left(s.deadline)} left).`;
+      }
+      case 'readyCheck': {
+        const { entrants } = this.current();
+        const open = entrants.filter((e) => !this.isBot(e) && !s.ready.has(e));
+        if (!open.length) return undefined;
+        const who = open
+          .map(
+            (e) =>
+              `${this.name(e)} (${s.present.has(e) ? 'press FIRE or !ready' : 'not connected'})`,
+          )
+          .join(', ');
+        return `${s.matchId} waits for READY: ${who}. Forfeit in ${left(s.deadline)}.`;
+      }
+      case 'live':
+        if (!s.lost) return undefined;
+        return `Game paused: ${this.name(s.lost)} disconnected. Forfeit in ${left(this.timer?.due)} unless they reconnect.`;
+      default:
+        return undefined;
+    }
+  }
+
+  private scheduleReminder(): void {
+    if (this.stopped || this.timing.reminderIntervalMs <= 0) return;
+    this.reminder = this.o.clock.setTimeout(() => {
+      void this.enqueue(() => {
+        const msg = this.waitingFor();
+        if (msg) this.say(msg);
+        this.scheduleReminder();
+      });
+    }, this.timing.reminderIntervalMs);
   }
 
   /** Resolves when all queued work is done (tests). */
@@ -303,6 +371,7 @@ export class MatchDirector extends EventEmitter {
   }
 
   private say(msg: string, pid = -1): void {
+    this.o.log.info(`say: ${msg}`);
     this.send([{ t: 'say', pid, msg: msg.slice(0, 160) }]);
   }
 
@@ -924,6 +993,9 @@ export class MatchDirector extends EventEmitter {
       this.o.log.warn(`unknown token joined as ${name} (pid ${pid})`);
       return;
     }
+    this.o.log.info(
+      `${entry.displayName} joined the server${entrantId ? ` (entrant ${entrantId})` : ' (spectator)'}`,
+    );
     this.players.set(pid, {
       pid,
       token,
@@ -953,6 +1025,7 @@ export class MatchDirector extends EventEmitter {
   private async onLeave(pid: number): Promise<void> {
     const p = this.players.get(pid);
     this.players.delete(pid);
+    if (p) this.o.log.info(`${p.name} left the server`);
     if (!p?.entrantId) return;
     const s = this.stage;
     if (s.kind === 'readyCheck') {

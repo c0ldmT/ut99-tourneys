@@ -40,6 +40,7 @@ export interface ModServerOptions {
 export class ModServer extends EventEmitter implements ModLink {
   private server?: net.Server;
   private active?: net.Socket;
+  private lastRejectLog = 0;
 
   constructor(private readonly opts: ModServerOptions) {
     super();
@@ -94,6 +95,13 @@ export class ModServer extends EventEmitter implements ModLink {
     const peer = `${socket.remoteAddress}:${socket.remotePort}`;
     const splitter = new LineSplitter();
     let authed = false;
+    const rejectHint = (why: string) => {
+      // The mod retries every few seconds; do not flood the log with the same message.
+      const now = Date.now();
+      if (now - this.lastRejectLog < 60_000) return this.opts.log.debug(`mod ${peer}: ${why}`);
+      this.lastRejectLog = now;
+      this.opts.log.warn(`mod ${peer} rejected: ${why} (repeats are logged once per minute)`);
+    };
     socket.setEncoding('latin1');
     socket.setNoDelay(true);
     socket.setTimeout(this.opts.idleTimeoutMs ?? 20_000);
@@ -121,8 +129,17 @@ export class ModServer extends EventEmitter implements ModLink {
           continue;
         }
         if (!authed) {
-          if (msg.t !== 'hello' || msg.key !== this.opts.sharedKey) {
-            this.opts.log.warn(`mod ${peer}: rejected (bad handshake)`);
+          if (msg.t !== 'hello') {
+            rejectHint(`expected hello, got ${msg.t}`);
+            socket.destroy();
+            return;
+          }
+          if (msg.key !== this.opts.sharedKey) {
+            rejectHint(
+              msg.key === ''
+                ? 'SharedKey is empty. Set it in [UTTourney_v1.TournamentConfig] of the server ini'
+                : 'wrong shared key. SharedKey in the server ini must equal mod.sharedKey in bridge.json',
+            );
             socket.destroy();
             return;
           }

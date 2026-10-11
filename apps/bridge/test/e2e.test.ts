@@ -146,4 +146,28 @@ describe('end to end against the simulated UT server', () => {
     }
     expect(roles['guest-token']).toBe('s');
   });
+
+  it('reminds every 30 s who the tournament is waiting for', async () => {
+    env = await setup({ behaviour: { absent: ['tim-token'], neverReady: ['anna-token'] } });
+    const says = () => env!.sim.received.flatMap((m) => (m.t === 'say' ? [m.msg] : []));
+    await env.run(() => says().some((m) => m.startsWith('Waiting for check-in')));
+    const checkIn = says().find((m) => m.startsWith('Waiting for check-in'))!;
+    expect(checkIn).toContain('(4/5): Tim');
+    expect(checkIn).toMatch(/Start in 0:\d\d/);
+    // After the check-in window Tim is replaced; Anna never readies up in her first match.
+    await env.run(() => says().some((m) => m.includes('waits for READY: Anna')));
+    expect(says().find((m) => m.includes('waits for READY'))).toMatch(
+      /Anna \(press FIRE or !ready\)\. Forfeit in \d:\d\d/,
+    );
+  });
+
+  it('says nothing while games run normally', async () => {
+    env = await setup({});
+    await env.run(() => env!.director.projection.results.length >= 3);
+    const reminders = env.sim.received.filter(
+      (m) =>
+        m.t === 'say' && /^(Waiting|Map vote .*waiting|.* waits for READY|Game paused)/.test(m.msg),
+    );
+    expect(reminders).toEqual([]);
+  });
 });
