@@ -12,7 +12,7 @@
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.1.3";
+const MOD_VERSION = "0.1.4";
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -1384,7 +1384,26 @@ event Tick(float DeltaTime)
 		if (P.IsA('Spectator'))
 			P.GotoState('CheatFlying');
 		else
+		{
+			StripInventory(P); // no weapon floating in front of the camera while waiting
 			HoldPlayer(P);
+		}
+	}
+}
+
+// Only used after a game has ended: every game is played on a freshly loaded level, so the
+// player gets a new pawn with a new inventory anyway. Nothing is dropped as a pickup.
+function StripInventory(Pawn P)
+{
+	local Inventory Inv, Next;
+
+	P.Weapon = None;
+	P.PendingWeapon = None;
+	P.SelectedItem = None;
+	for (Inv = P.Inventory; Inv != None; Inv = Next)
+	{
+		Next = Inv.Inventory;
+		Inv.Destroy();
 	}
 }
 
