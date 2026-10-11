@@ -159,6 +159,8 @@ export class MatchDirector extends EventEmitter {
   private timer?: { handle: TimerHandle; due: number; fn: () => Promise<void> | void };
   private suspended?: { remaining: number; fn: () => Promise<void> | void };
   private cooldownUntil = 0;
+  /** Disconnects per match and entrant during live games (for maxReconnects). */
+  private disconnects = new Map<string, Map<string, number>>();
   private readonly timing: DirectorTiming;
 
   constructor(private readonly o: DirectorOptions) {
@@ -651,7 +653,11 @@ export class MatchDirector extends EventEmitter {
 
   private async onVote(entrantId: string, picks: string[]): Promise<void> {
     const s = this.stage;
-    if (s.kind !== 'voting' || !s.voters.includes(entrantId)) return;
+    if (s.kind !== 'voting' || !s.voters.includes(entrantId)) {
+      this.o.log.info(`vote from ${this.name(entrantId)} ignored (not a voter right now)`);
+      return;
+    }
+    this.o.log.info(`vote from ${this.name(entrantId)}: ${picks.join(', ') || '(empty)'}`);
     s.ballots.set(entrantId, picks);
     if (s.voters.every((v) => s.ballots.has(v))) await this.closeVote();
   }
@@ -1018,6 +1024,14 @@ export class MatchDirector extends EventEmitter {
       this.clearTimer();
       this.send([{ t: 'pause', on: false, why: '' }]);
       this.say(`${this.name(entrantId)} is back, the game continues`);
+      const left = this.proj.settings.maxReconnects - this.disconnectCount(s.matchId, entrantId);
+      if (left <= 0) {
+        this.send([
+          { t: 'warn', pid, msg: 'LAST WARNING: one more disconnect in this match is a FORFEIT' },
+        ]);
+      } else {
+        this.say(`Reconnects left in this match: ${left}`, pid);
+      }
       this.telemetry('live');
     }
   }
@@ -1039,9 +1053,26 @@ export class MatchDirector extends EventEmitter {
     }
   }
 
+  private disconnectCount(matchId: string, entrantId: string): number {
+    return this.disconnects.get(matchId)?.get(entrantId) ?? 0;
+  }
+
   private async onMatchPlayerLost(entrantId: string | undefined): Promise<void> {
     const s = this.stage;
     if (s.kind !== 'live' || !entrantId || s.lost || this.isBot(entrantId)) return;
+    const perMatch = this.disconnects.get(s.matchId) ?? new Map<string, number>();
+    this.disconnects.set(s.matchId, perMatch);
+    const count = (perMatch.get(entrantId) ?? 0) + 1;
+    perMatch.set(entrantId, count);
+    const max = this.proj.settings.maxReconnects;
+    if (count > max) {
+      const winnerSide: Side = this.sideOf(entrantId) === 'a' ? 'b' : 'a';
+      this.send([{ t: 'abort', mid: s.matchId, w: winnerSide, why: 'forfeit' }]);
+      this.say(
+        `${this.name(entrantId)} disconnected ${count} times (max ${max} reconnects) and forfeits`,
+      );
+      return this.forfeit(s.matchId, entrantId);
+    }
     s.lost = entrantId;
     const grace = this.proj.settings.reconnectGraceSec;
     this.send([{ t: 'pause', on: true, why: `${this.name(entrantId)} disconnected` }]);

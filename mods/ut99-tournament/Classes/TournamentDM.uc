@@ -12,7 +12,7 @@
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.1.1";
+const MOD_VERSION = "0.1.2";
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -20,6 +20,7 @@ const MAXTRACK = 64;
 var BridgeLink Link;
 var TourneyMsg OutMsg;
 var TourneyMutator TMut;
+var TourneyChatListener ChatListener;
 var float NextConnectTime;
 var bool bJoinsSent;
 var bool bInSync;
@@ -93,6 +94,19 @@ function PostBeginPlay()
 	TMut.Game = self;
 	BaseMutator.AddMutator(TMut);
 	RegisterMessageMutator(TMut);
+	// Chat commands come from the listener (it also hears spectators); the mutator only handles "mutate".
+	ChatListener = Spawn(class'TourneyChatListener');
+	if (ChatListener != None)
+	{
+		ChatListener.Game = self;
+		if (ChatListener.PlayerReplicationInfo != None)
+		{
+			ChatListener.PlayerReplicationInfo.PlayerName = "Tournament";
+			ChatListener.PlayerReplicationInfo.bIsSpectator = true;
+		}
+	}
+	else
+		Log("could not spawn chat listener, chat commands only work via mutate", 'UTTourney');
 	ApplyMatchRules();
 	ConnectBridge();
 }
@@ -269,6 +283,9 @@ function HandleBridgeMessage(TourneyMsg M)
 			break;
 		case "say":
 			SayTo(M.GetInt("pid"), M.Get("msg"));
+			break;
+		case "warn":
+			WarnPlayer(M.GetInt("pid"), M.Get("msg"));
 			break;
 		default:
 			Log("unknown bridge message" @ T, 'UTTourney');
@@ -977,8 +994,18 @@ function RespawnMatchPawn(Pawn P)
 
 	if (P.IsA('Bot'))
 	{
+		// Held bots wait in Dying (hidden, ignoring damage). RestartPlayer only moves them;
+		// the AI runs again once the bot is back in its normal state.
 		if (RestartPlayer(P))
-			Bot(P).StartMatch();
+		{
+			P.bHidden = false;
+			P.Velocity = vect(0, 0, 0);
+			P.Acceleration = vect(0, 0, 0);
+			P.SetPhysics(PHYS_Falling);
+			P.GotoState('Roaming');
+		}
+		else
+			Log("could not respawn bot" @ P.PlayerReplicationInfo.PlayerName, 'UTTourney');
 		return;
 	}
 	PP = PlayerPawn(P);
@@ -1238,6 +1265,32 @@ function ShowStandings(PlayerPawn P)
 	local int i;
 	for (i = 0; i < StandCount; i++)
 		P.ClientMessage(StandingText[i]);
+}
+
+// Chat line "!cmd ..." from any player or spectator (via TourneyChatListener).
+function HandleChatCommand(PlayerReplicationInfo PRI, string Cmd)
+{
+	local PlayerPawn P;
+	P = PlayerPawn(PRI.Owner);
+	if (P != None && FindTrack(P) >= 0)
+		HandleCommand(P, Cmd);
+}
+
+// Big warning in the middle of one player's screen for about 10 seconds.
+function WarnPlayer(int Pid, string Msg)
+{
+	local int t;
+	local PlayerPawn P;
+	for (t = 0; t < TrackCount; t++)
+	{
+		P = TrackPawn[t];
+		if (P == None || P.PlayerReplicationInfo == None || P.PlayerReplicationInfo.PlayerID != Pid)
+			continue;
+		P.ClientMessage(Msg, 'CriticalEvent', true);
+		P.ClearProgressMessages();
+		P.SetProgressTime(10);
+		P.SetProgressMessage(Msg, 0);
+	}
 }
 
 function SayTo(int Pid, string Msg)

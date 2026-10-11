@@ -1,16 +1,16 @@
 //=============================================================================
 // TourneyMutator
-// Chat and console commands:  !ready  !vote 3 1 5  !bracket  !standings  !help
-// Console alternative:        mutate tourney ready   (bindable to a key)
+// Console commands: mutate tourney ready | vote 3 1 5 | bracket | standings
+// (bindable to a key). Chat commands (!ready, !vote ...) arrive via TourneyChatListener.
 //=============================================================================
 class TourneyMutator extends Mutator;
 
 var TournamentDM Game;
 
+// Fallback only: used when the chat listener could not be spawned (players only, no spectators).
 function bool MutatorTeamMessage(Actor Sender, Pawn Receiver, PlayerReplicationInfo PRI, coerce string S, name Type, optional bool bBeep)
 {
-	// Say is delivered once per receiver; react only to the copy for the sender itself.
-	if (Sender == Receiver && PlayerPawn(Sender) != None && Left(S, 1) == "!" && Game != None)
+	if (Game != None && Game.ChatListener == None && Sender == Receiver && PlayerPawn(Sender) != None && Left(S, 1) == "!")
 		Game.HandleCommand(PlayerPawn(Sender), Mid(S, 1));
 	if (NextMessageMutator != None)
 		return NextMessageMutator.MutatorTeamMessage(Sender, Receiver, PRI, S, Type, bBeep);

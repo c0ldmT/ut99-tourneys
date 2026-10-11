@@ -170,4 +170,31 @@ describe('end to end against the simulated UT server', () => {
     );
     expect(reminders).toEqual([]);
   });
+
+  it('allows maxReconnects returns and warns before the last one', async () => {
+    env = await setup({
+      behaviour: { dropDuringLive: { token: 'mario-token', returnAfterMs: 3_000, times: 2 } },
+    });
+    await env.run(() => env!.sim.received.some((m) => m.t === 'warn'));
+    const warn = env.sim.received.find((m) => m.t === 'warn');
+    expect(warn).toMatchObject({ msg: expect.stringContaining('FORFEIT') });
+    expect(
+      env.sim.received.some((m) => m.t === 'say' && m.msg === 'Reconnects left in this match: 1'),
+    ).toBe(true);
+    await env.run(finished(env));
+    expect(env.director.projection.results.every((r) => r.outcome === 'played')).toBe(true);
+  });
+
+  it('forfeits on the disconnect after the last allowed reconnect', async () => {
+    env = await setup({
+      behaviour: { dropDuringLive: { token: 'mario-token', returnAfterMs: 3_000, times: 3 } },
+    });
+    await env.run(() => env!.director.projection.results.some((r) => r.outcome === 'forfeit'));
+    const f = env.director.projection.results.find((r) => r.outcome === 'forfeit')!;
+    expect(f.entrants).toContain('p1');
+    expect(f.winnerId).not.toBe('p1');
+    expect(
+      env.sim.received.some((m) => m.t === 'say' && /disconnected 3 times .* forfeits/.test(m.msg)),
+    ).toBe(true);
+  });
 });

@@ -94,6 +94,8 @@ export const TournamentSettingsSchema = z.object({
   noShowSec: z.number().int().min(30).max(1800).default(180),
   /** Seconds a match player may be disconnected during a live match before forfeiting. */
   reconnectGraceSec: z.number().int().min(30).max(1800).default(180),
+  /** Disconnects a match player may come back from per match; the next one is a forfeit. */
+  maxReconnects: z.number().int().min(0).max(10).default(2),
   /** Bot vs bot matches: play them live (spectatable) or simulate the result. */
   botMatchMode: z.enum(['watch', 'simulate']).default('watch'),
   /** How bots fill empty slots when seeding automatically. */

@@ -27,7 +27,7 @@ export interface SimBehaviour {
   /** Players that connect but never ready up. */
   neverReady: string[];
   /** One player that disconnects during its next live game; optionally returns after ms. */
-  dropDuringLive?: { token: string; returnAfterMs?: number };
+  dropDuringLive?: { token: string; returnAfterMs?: number; times?: number };
   readyDelayMs: number;
   voteDelayMs: number;
   /** Players that skip voting (their ballot is filled randomly by the bridge). */
@@ -311,29 +311,36 @@ export class ModSimulator {
     this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
     this.armEnd(this.b.gameDurationMs);
 
+    this.scheduleDrop();
+  }
+
+  /** Disconnects the configured player during the running game (and brings them back). */
+  private scheduleDrop(): void {
+    const m = this.match;
     const drop = this.b.dropDuringLive;
     const dropper = drop && this.matchPlayers().find((j) => j.token === drop.token);
-    if (drop && dropper && !this.dropped.has(drop.token)) {
-      this.gameTimers.push(
-        this.later(this.b.gameDurationMs / 3, () => {
-          this.dropped.add(drop.token);
-          this.joined.delete(drop.token);
-          this.send({ t: 'leave', pid: dropper.pid });
-          this.send({ t: 'lost', mid: m.mid, s: dropper.role === 'a' ? 'a' : 'b' });
-          this.setPaused(true);
-          if (drop.returnAfterMs !== undefined) {
-            this.gameTimers.push(
-              this.later(drop.returnAfterMs, () => {
-                const p = this.o.players.find((x) => x.token === drop.token);
-                if (p) this.join(p, dropper.role);
-                this.b.dropDuringLive = undefined;
-                this.dropped.delete(drop.token);
-              }),
-            );
-          }
-        }),
-      );
-    }
+    if (!m || !drop || !dropper || this.dropped.has(drop.token)) return;
+    this.gameTimers.push(
+      this.later(this.b.gameDurationMs / 4, () => {
+        if (!this.inGame) return;
+        this.dropped.add(drop.token);
+        this.joined.delete(drop.token);
+        this.send({ t: 'leave', pid: dropper.pid });
+        this.send({ t: 'lost', mid: m.mid, s: dropper.role === 'a' ? 'a' : 'b' });
+        this.setPaused(true);
+        if (drop.returnAfterMs === undefined) return;
+        this.gameTimers.push(
+          this.later(drop.returnAfterMs, () => {
+            const p = this.o.players.find((x) => x.token === drop.token);
+            this.dropped.delete(drop.token);
+            const times = (drop.times ?? 1) - 1;
+            this.b.dropDuringLive = times > 0 ? { ...drop, times } : undefined;
+            if (p) this.join(p, dropper.role);
+            if (times > 0) this.scheduleDrop();
+          }),
+        );
+      }),
+    );
   }
 
   private armEnd(ms: number): void {

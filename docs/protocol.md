@@ -132,6 +132,7 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends 
 | `brh` / `brm`                        | Bracket for the HUD                                                                                               |
 | `sth` / `ste`                        | Standings for the HUD                                                                                             |
 | `say`                                | Message to all (`pid: -1`) or one player                                                                          |
+| `warn`                               | Big centered warning for one player (e.g. last reconnect before a forfeit)                                        |
 
 ### Typical match sequence
 

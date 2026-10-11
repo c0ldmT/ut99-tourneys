@@ -3,9 +3,8 @@
 UnrealScript package for UT99 469f. It turns a dedicated server into a tournament server driven by the bridge
 (see [`docs/protocol.md`](../../docs/protocol.md)).
 
-> **Status (milestone 3): written, not yet compiled.** The code was reviewed against the UT 436 UnrealScript
-> API but could not be compiled in the development environment. The first real build and server test happen
-> on a real installation, using the checklist below.
+> **Status (milestone 4):** compiles with 469f and was tested against a real server (token login, check-in,
+> map vote, ready check, bots, reconnect). The checklist below is the regression test after changes.
 
 ## Classes
 
@@ -14,7 +13,8 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 | `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`): token login, roles, ready check, countdown, bots, score, end of game, travel, soft pause, score restore |
 | `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
 | `TourneyMsg` | Flat JSON line parser/writer |
-| `TourneyMutator` | Chat commands `!ready !vote !bracket !standings !help`, console `mutate tourney <cmd>` |
+| `TourneyMutator` | Console `mutate tourney <cmd>` (fallback for chat commands) |
+| `TourneyChatListener` | Server-only listener for chat commands `!ready !vote !bracket !standings !help` (also from spectators) |
 | `TournamentConfig` | Ini settings (bridge host/port/key) and a cache that survives map changes |
 
 Planned for milestone 6: HUD overlay for the bracket, UWindow dialogs for vote and ready.
@@ -82,7 +82,7 @@ Work through these in order and note what happens. Each item names what to look 
 | 3 | Join without token | Rejected with the tournament message |
 | 4 | Join with token | Bridge logs `<name> checked in`; you are a spectator in the lobby |
 | 5 | All players checked in | Bridge: `The tournament starts now!`, match players get the vote list |
-| 6 | Map vote | A vote panel in the middle of the screen (maps, seconds left, your vote). `!vote 2 1 3` or `!v 2 1 3`; after both votes the server changes map |
+| 6 | Map vote | A vote panel in the middle of the screen (maps, seconds left, your vote). `!vote 2 1 3` or `!v 2 1 3` (console fallback: `mutate tourney vote 2 1 3`); the bridge log shows `vote from <name>`; after both votes the server changes map |
 | 7 | **Token after map change** | Players come back automatically after the travel. Does `?tk=` survive the travel? If players are rejected, report it (the address fallback should catch it) |
 | 8 | Ready check | Match players are held (invisible, cannot move), see "Press FIRE or type !ready" |
 | 9 | Ready | FIRE or `!ready` → countdown with announcer, both spawn together |
@@ -90,7 +90,8 @@ Work through these in order and note what happens. Each item names what to look 
 | 11 | Spectators | Everybody else is a spectator and can watch |
 | 12 | Frag limit / time limit | Bridge logs `wins game 1 (20:13)`, next match is called |
 | 13 | Tie at time limit | Overtime, next frag wins, bridge records `suddenDeath` |
-| 14 | **Disconnect during a game** | Game holds both players, clock stops; on return the score is restored and both respawn normally (HUD, weapons, can shoot). Without return the bridge forfeits after the grace period |
+| 14 | **Disconnect during a game** | Game holds both players, clock stops; on return the score is restored and both respawn normally (HUD, weapons, can shoot). The bot keeps playing after the resume. Without return the bridge forfeits after the grace period |
+| 14b | **Reconnect limit** | With `maxReconnects` 2 (default): after the 2nd return a big warning "LAST WARNING" appears; the 3rd disconnect forfeits the match immediately |
 | 15 | Long names / umlauts | Names show correctly; no `line too long` warnings in the bridge log |
 | 16 | `!bracket`, `!standings` | Text bracket and standings |
 

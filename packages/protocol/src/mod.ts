@@ -199,6 +199,8 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     l: int.nonnegative(),
     bot: z.boolean(),
   }),
+  /** Big warning in the middle of one player's screen (e.g. last reconnect before a forfeit). */
+  z.object({ t: z.literal('warn'), pid: int, msg: str(160) }),
   /** Message to everyone (pid = -1) or one player. */
   z.object({ t: z.literal('say'), pid: int, msg: str(160) }),
 ]);
