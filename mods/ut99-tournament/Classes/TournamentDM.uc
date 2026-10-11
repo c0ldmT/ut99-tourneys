@@ -460,9 +460,10 @@ function SendLost(string SRole)
 
 function HoldPlayer(PlayerPawn P)
 {
+	// Server-side only: UE1 sends the state name to the owning client with every movement
+	// correction (ClientAdjustPosition), so the client follows on its own.
 	P.PlayerRestartState = 'PlayerWaiting';
 	P.GotoState('PlayerWaiting');
-	P.ClientGotoState('PlayerWaiting', 'Begin');
 }
 
 function Logout(Pawn Exiting)
