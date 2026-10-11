@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.uc text eol=crlf
+*.int text eol=crlf
+*.u binary
+*.utx binary
+*.unr binary

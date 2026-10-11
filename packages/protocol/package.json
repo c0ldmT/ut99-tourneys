@@ -1,0 +1,31 @@
+{
+  "name": "@tourney/protocol",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared message schemas: website <-> bridge <-> game mod.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "@tourney/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tourney/bracket": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

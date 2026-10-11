@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+*.sqlite
+*.sqlite-journal
+.angular/
+# UnrealScript build output
+mods/**/System/*.u
+mods/**/build/
