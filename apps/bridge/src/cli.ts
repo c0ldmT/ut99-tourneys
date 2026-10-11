@@ -141,17 +141,21 @@ async function main(): Promise<void> {
     log.info('server.manage is false: start the UT server yourself');
   }
 
-  director.on('shutdown', () => {
-    log.info('post-tournament time is over');
-    void server?.stop();
-  });
-
   const shutdown = async () => {
     log.info('shutting down');
     await server?.stop();
     await mod.close();
     process.exit(0);
   };
+
+  director.on('shutdown', () => {
+    if (server) {
+      log.info('post-tournament time is over, stopping the game server and the bridge');
+      void shutdown();
+    } else {
+      log.info('post-tournament time is over (server not managed by the bridge: stop it yourself)');
+    }
+  });
   process.on('SIGINT', () => void shutdown());
   process.on('SIGTERM', () => void shutdown());
 

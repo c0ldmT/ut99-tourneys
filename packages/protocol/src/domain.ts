@@ -100,8 +100,8 @@ export const TournamentSettingsSchema = z.object({
   botMatchMode: z.enum(['watch', 'simulate']).default('watch'),
   /** How bots fill empty slots when seeding automatically. */
   botPlacement: z.enum(['byes', 'random']).default('byes'),
-  /** Minutes the server keeps running after the final, showing the final bracket. */
-  postTournamentShutdownMin: z.number().int().min(0).max(120).default(5),
+  /** Seconds the server keeps running after the final (standings on screen), then it is stopped. */
+  postTournamentShutdownSec: z.number().int().min(0).max(7200).default(30),
   game: z.object({
     /** Adapter id, e.g. "ut99-dm". */
     adapter: z.string().min(1),

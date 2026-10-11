@@ -1,8 +1,8 @@
 //=============================================================================
 // TourneyChatListener
 // Invisible, server-only spectator that receives every chat line (like the
-// WebAdmin spectator). Needed because spectators' Say does not go through the
-// game's message mutator, and during map votes all players are spectators.
+// WebAdmin spectator). Players' Say arrives as TeamMessage; spectators' Say
+// arrives as a broadcast "Name:text" (Spectator.Say -> BroadcastMessage).
 //=============================================================================
 class TourneyChatListener extends MessagingSpectator;
 
@@ -16,6 +16,12 @@ event TeamMessage(PlayerReplicationInfo PRI, coerce string S, name Type, optiona
 
 function ClientMessage(coerce string S, optional name Type, optional bool bBeep)
 {
+	local int i;
+	if (Game == None || Type != 'Event')
+		return;
+	i = InStr(S, ":!");
+	if (i > 0)
+		Game.HandleSpectatorChat(Left(S, i), Mid(S, i + 2));
 }
 
 defaultproperties

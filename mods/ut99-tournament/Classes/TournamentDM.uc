@@ -12,7 +12,7 @@
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.1.2";
+const MOD_VERSION = "0.1.3";
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -51,6 +51,7 @@ var PlayerPawn TrackPawn[64];
 var string TrackTok[64];
 var string TrackRole[64];
 var byte TrackReady[64]; // 0/1 - UE1 has no bool arrays
+var float TrackPanelUntil[64]; // a panel (standings) owns the middle of the screen until then
 var int TrackCount;
 
 // Match runtime.
@@ -66,6 +67,7 @@ var float SavedScore[2], SavedDeaths[2];
 var string PendingAddr;
 var string PendingEnd;
 var bool bTokenFromAddress;
+var float ReleaseAt; // see ReleaseScoreboards
 
 //=============================================================================
 // Startup
@@ -78,6 +80,7 @@ event InitGame(string Options, out string Error)
 	MinPlayers = 0;
 	MaxPlayers = Max(MaxPlayers, 4);
 	RemainingBots = 0;
+	bMuteSpectators = false; // spectators must be able to type !vote and !standings
 	// Hold everybody in the waiting state until the bridge starts the countdown.
 	bNetReady = false;
 	bRequireReady = true;
@@ -295,11 +298,17 @@ function HandleBridgeMessage(TourneyMsg M)
 function ApplyPhase()
 {
 	if (Phase == "vote")
+	{
+		ReleaseScoreboards();
 		ShowVote();
+	}
 	else if (Phase == "ready")
 		SpawnBotsOnce();
 	else if (Phase == "finished")
-		BroadcastMessage("The tournament is over. Type !standings for the final placements.", true);
+	{
+		ReleaseScoreboards();
+		ShowFinalStandings(true);
+	}
 }
 
 //=============================================================================
@@ -473,6 +482,11 @@ event PostLogin(PlayerPawn NewPlayer)
 	SendJoin(t);
 	if (Phase == "vote" && IsMatchPlayerToken(TrackTok[t]))
 		ShowVoteTo(NewPlayer);
+	else if (Phase == "finished")
+	{
+		ShowStandings(NewPlayer);
+		ShowStandingsPanel(NewPlayer, 30, ShutdownText());
+	}
 }
 
 function SendLost(string SRole)
@@ -532,6 +546,7 @@ function Track(PlayerPawn P, string Tok, string SRole)
 	TrackRole[TrackCount] = SRole;
 	TrackReady[TrackCount] = 0;
 	TrackVote[TrackCount] = "";
+	TrackPanelUntil[TrackCount] = 0;
 	TrackCount++;
 }
 
@@ -543,6 +558,7 @@ function Untrack(int t)
 	TrackRole[t] = TrackRole[TrackCount];
 	TrackReady[t] = TrackReady[TrackCount];
 	TrackVote[t] = TrackVote[TrackCount];
+	TrackPanelUntil[t] = TrackPanelUntil[TrackCount];
 	TrackPawn[TrackCount] = None;
 }
 
@@ -726,6 +742,12 @@ function Timer()
 		if (VoteSecLeft > 0)
 			VoteSecLeft--;
 	}
+	if (Phase == "finished")
+	{
+		if (PhaseSec > 0)
+			PhaseSec--;
+		ShowFinalStandings(false);
+	}
 	if (Phase == "ready" || bGameLive)
 		EnsureBots();
 	if (!bGameLive)
@@ -763,6 +785,8 @@ function PreMatchTick()
 				OutMsg.AddInt("pid", P.PlayerReplicationInfo.PlayerID);
 				Send();
 			}
+			if (PanelActive(t))
+				continue;
 			P.ClearProgressMessages();
 			P.SetProgressTime(2);
 			P.SetProgressMessage(MatchTitle(), 0);
@@ -1070,7 +1094,7 @@ function VoteTick()
 	for (t = 0; t < TrackCount; t++)
 	{
 		P = TrackPawn[t];
-		if (P == None)
+		if (P == None || PanelActive(t))
 			continue;
 		P.ClearProgressMessages();
 		P.SetProgressTime(2);
@@ -1150,7 +1174,11 @@ function HandleCommand(PlayerPawn P, string Cmd)
 	else if (Word ~= "bracket")
 		ShowBracket(P);
 	else if (Word ~= "standings")
+	{
 		ShowStandings(P);
+		if (Phase != "finished")
+			ShowStandingsPanel(P, 10, "");
+	}
 	else if (Word ~= "help")
 		P.ClientMessage("Commands: !ready  !vote 3 1 5 (or !v)  !bracket  !standings");
 }
@@ -1267,13 +1295,123 @@ function ShowStandings(PlayerPawn P)
 		P.ClientMessage(StandingText[i]);
 }
 
-// Chat line "!cmd ..." from any player or spectator (via TourneyChatListener).
+function bool PanelActive(int t)
+{
+	return TrackPanelUntil[t] > Level.TimeSeconds;
+}
+
+// Standings in the middle of the screen (the 8 progress message lines).
+function ShowStandingsPanel(PlayerPawn P, int Secs, string Footer)
+{
+	local int i, Line, t;
+
+	P.ClearProgressMessages();
+	P.SetProgressTime(Secs);
+	if (Phase == "finished")
+		P.SetProgressMessage("FINAL STANDINGS", 0);
+	else
+		P.SetProgressMessage("STANDINGS", 0);
+	Line = 1;
+	for (i = 0; i < StandCount && Line < 7; i++)
+		P.SetProgressMessage(StandingText[i], Line++);
+	if (StandCount == 0)
+		P.SetProgressMessage("No results yet.", 1);
+	if (Footer != "")
+		P.SetProgressMessage(Footer, 7);
+	else if (StandCount > 6)
+		P.SetProgressMessage("Full list in the console", 7);
+	t = FindTrack(P);
+	if (t >= 0)
+		TrackPanelUntil[t] = Level.TimeSeconds + Secs;
+}
+
+function string ShutdownText()
+{
+	if (PhaseSec > 0)
+		return "The tournament is over. Server shuts down in" @ PhaseSec @ "s";
+	return "The tournament is over.";
+}
+
+// End of the tournament: final standings for everybody, refreshed every second (countdown).
+function ShowFinalStandings(bool bFirst)
+{
+	local int t;
+	for (t = 0; t < TrackCount; t++)
+	{
+		if (TrackPawn[t] == None)
+			continue;
+		if (bFirst)
+			ShowStandings(TrackPawn[t]);
+		ShowStandingsPanel(TrackPawn[t], 3, ShutdownText());
+	}
+}
+
+// The end-of-game scoreboard covers the middle of the screen, so the vote panel or the standings
+// would only show after F1. UT clears the scoreboard only when a player leaves the Dying state
+// (PlayerPawn.Dying.EndState), and the client follows the server's state with every movement
+// correction (ClientAdjustPosition, at least every 0.1 s). So the pawns go GameEnded -> Dying ->
+// holding state on the server, with a short stop in Dying for the clients to catch up.
+function ReleaseScoreboards()
+{
+	local int t;
+	local PlayerPawn P;
+
+	for (t = 0; t < TrackCount; t++)
+	{
+		P = TrackPawn[t];
+		if (P == None || !P.IsInState('GameEnded'))
+			continue;
+		P.bHidden = true; // no carcass from Dying
+		P.GotoState('Dying');
+		P.SetTimer(5.0, false); // keeps bFrozen: FIRE in Dying must not respawn the player
+		ReleaseAt = Level.TimeSeconds + 0.8;
+	}
+}
+
+event Tick(float DeltaTime)
+{
+	local int t;
+	local PlayerPawn P;
+
+	if (ReleaseAt <= 0 || Level.TimeSeconds < ReleaseAt)
+		return;
+	ReleaseAt = 0;
+	for (t = 0; t < TrackCount; t++)
+	{
+		P = TrackPawn[t];
+		if (P == None || !P.IsInState('Dying'))
+			continue;
+		if (P.IsA('Spectator'))
+			P.GotoState('CheatFlying');
+		else
+			HoldPlayer(P);
+	}
+}
+
+// Chat line "!cmd ..." from a player (via TourneyChatListener.TeamMessage).
 function HandleChatCommand(PlayerReplicationInfo PRI, string Cmd)
 {
 	local PlayerPawn P;
 	P = PlayerPawn(PRI.Owner);
 	if (P != None && FindTrack(P) >= 0)
 		HandleCommand(P, Cmd);
+}
+
+// Chat line "!cmd ..." from a spectator. Spectator.Say does not send a team message but a
+// broadcast "Name:text", so the sender is found by name (names are set from the access list).
+function HandleSpectatorChat(string PName, string Cmd)
+{
+	local int t;
+	local PlayerPawn P;
+	for (t = 0; t < TrackCount; t++)
+	{
+		P = TrackPawn[t];
+		if (P != None && P.IsA('Spectator') && P.PlayerReplicationInfo != None && P.PlayerReplicationInfo.PlayerName == PName)
+		{
+			HandleCommand(P, Cmd);
+			return;
+		}
+	}
 }
 
 // Big warning in the middle of one player's screen for about 10 seconds.

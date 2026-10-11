@@ -30,7 +30,7 @@ tournament.run ─► bridge writes Tourney.ini, starts ucc on the lobby map ─
    players connect with  open host:7777?tk=<personal token>
 all checked in / admin force / window over (missing -> bots) ─► tournament.started
 loop:  match.called ─► vote (during post-game) ─► ServerTravel ─► ready check ─► countdown ─► live ─► result
-final ─► server keeps running N minutes with the final bracket ─► shutdown
+final ─► final standings on screen for `postTournamentShutdownSec` (30 s) ─► server and bridge stop
 ```
 
 The server process stays up for the whole tournament; matches only change the map. A restart happens only

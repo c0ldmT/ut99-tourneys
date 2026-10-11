@@ -41,7 +41,7 @@ export function tournamentFile(
       checkInWindowMin: 1,
       noShowSec: 60,
       reconnectGraceSec: 60,
-      postTournamentShutdownMin: 1,
+      postTournamentShutdownSec: 30,
       ...settings,
       game: {
         adapter: 'ut99-dm',

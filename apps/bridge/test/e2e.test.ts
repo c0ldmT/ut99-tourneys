@@ -48,6 +48,25 @@ describe('end to end against the simulated UT server', () => {
     expect(env.sim.received.filter((m) => m.t === 'brh').length).toBeGreaterThan(p.results.length);
   });
 
+  it('announces the shutdown and emits it after postTournamentShutdownSec', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'single', botMatchMode: 'simulate', postTournamentShutdownSec: 30 },
+    );
+    env = await setup({ file });
+    let shutdownAt: number | undefined;
+    env.director.on('shutdown', () => (shutdownAt = env!.clock.now()));
+    await env.run(finished(env));
+    const t0 = env.clock.now();
+    const phase = env.sim.received.filter((m) => m.t === 'phase').at(-1);
+    expect(phase).toMatchObject({ p: 'finished', sec: 30 });
+    await env.run(() => shutdownAt !== undefined);
+    expect(shutdownAt! - t0).toBeGreaterThanOrEqual(29_000);
+    expect(shutdownAt! - t0).toBeLessThanOrEqual(31_000);
+    expect(env.log.lines.some((l) => l.includes('shuts down in 30 seconds'))).toBe(true);
+    expect(env.log.lines.some((l) => l.includes('shuts down in 10 seconds'))).toBe(true);
+  });
+
   it('simulates bot vs bot matches when configured', async () => {
     const file = tournamentFile(
       { players: players.slice(0, 2) },

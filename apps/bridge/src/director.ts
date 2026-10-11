@@ -130,7 +130,7 @@ type Stage =
       lost?: string;
     }
   | { kind: 'simulating'; matchId: string }
-  | { kind: 'finished' };
+  | { kind: 'finished'; deadline: number };
 
 interface ConnectedPlayer {
   pid: number;
@@ -500,7 +500,7 @@ export class MatchDirector extends EventEmitter {
         this.send(this.snapshot());
         return;
       case 'finished':
-        this.stage = { kind: 'finished' };
+        this.stage = { kind: 'finished', deadline: this.o.clock.now() };
         this.send(this.snapshot());
         return;
       case 'checkIn':
@@ -856,13 +856,21 @@ export class MatchDirector extends EventEmitter {
       if (!(await this.append({ type: 'tournament.finished', data: { championId: champion } })))
         return;
     }
-    this.stage = { kind: 'finished' };
+    const delayMs = this.proj.settings.postTournamentShutdownSec * 1000;
+    this.stage = { kind: 'finished', deadline: this.o.clock.now() + delayMs };
     this.send([...this.bracketUpdate(), this.phase()]);
     this.say(`${this.name(champion)} wins the tournament!`);
+    this.say(`The server shuts down in ${delayMs / 1000} seconds.`);
     this.emit('finished', champion);
-    this.setTimer(this.proj.settings.postTournamentShutdownMin * 60_000, () => {
+    const shutdown = () => {
       this.emit('shutdown');
-    });
+    };
+    if (delayMs > 10_000) {
+      this.setTimer(delayMs - 10_000, () => {
+        this.say('The server shuts down in 10 seconds.');
+        this.setTimer(10_000, shutdown);
+      });
+    } else this.setTimer(delayMs, shutdown);
   }
 
   private async simulate(
