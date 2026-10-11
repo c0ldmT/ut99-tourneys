@@ -82,15 +82,15 @@ Work through these in order and note what happens. Each item names what to look 
 | 3 | Join without token | Rejected with the tournament message |
 | 4 | Join with token | Bridge logs `<name> checked in`; you are a spectator in the lobby |
 | 5 | All players checked in | Bridge: `The tournament starts now!`, match players get the vote list |
-| 6 | `!vote 2 1 3` | `Vote received`; after both votes the server changes map |
+| 6 | Map vote | A vote panel in the middle of the screen (maps, seconds left, your vote). `!vote 2 1 3` or `!v 2 1 3`; after both votes the server changes map |
 | 7 | **Token after map change** | Players come back automatically after the travel. Does `?tk=` survive the travel? If players are rejected, report it (the address fallback should catch it) |
 | 8 | Ready check | Match players are held (invisible, cannot move), see "Press FIRE or type !ready" |
 | 9 | Ready | FIRE or `!ready` → countdown with announcer, both spawn together |
-| 10 | Bot side | Bot spawns with the configured name and plays |
+| 10 | Bot side | Bot spawns with the configured name and plays. Server log: `UTTourney: spawned bot <name> ...`; if it vanishes: `bot for side ... is missing, spawning it again` |
 | 11 | Spectators | Everybody else is a spectator and can watch |
 | 12 | Frag limit / time limit | Bridge logs `wins game 1 (20:13)`, next match is called |
 | 13 | Tie at time limit | Overtime, next frag wins, bridge records `suddenDeath` |
-| 14 | **Disconnect during a game** | Game holds both players, clock stops; on return the score is restored and both respawn. Without return the bridge forfeits after the grace period |
+| 14 | **Disconnect during a game** | Game holds both players, clock stops; on return the score is restored and both respawn normally (HUD, weapons, can shoot). Without return the bridge forfeits after the grace period |
 | 15 | Long names / umlauts | Names show correctly; no `line too long` warnings in the bridge log |
 | 16 | `!bracket`, `!standings` | Text bracket and standings |
 

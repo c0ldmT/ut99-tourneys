@@ -12,7 +12,7 @@
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.1.0";
+const MOD_VERSION = "0.1.1";
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -38,6 +38,8 @@ var string AclTok[64], AclName[64], AclRole[64];
 var int AclCount;
 var string VoteMap[32];
 var int VoteCount;
+var int VoteSecLeft;
+var string TrackVote[64]; // what each player voted, shown in the vote panel
 var string BracketText[64];
 var int BracketCount;
 var string StandingText[32];
@@ -166,6 +168,8 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "phase":
 			Phase = M.Get("p");
 			PhaseSec = M.GetInt("sec");
+			if (Phase == "vote")
+				VoteSecLeft = PhaseSec;
 			if (!bInSync)
 				ApplyPhase();
 			break;
@@ -222,6 +226,9 @@ function HandleBridgeMessage(TourneyMsg M)
 			break;
 		case "vopen":
 			VoteCount = 0;
+			VoteSecLeft = M.GetInt("sec");
+			for (i = 0; i < 64; i++)
+				TrackVote[i] = "";
 			break;
 		case "vmap":
 			i = M.GetInt("i") - 1;
@@ -232,7 +239,8 @@ function HandleBridgeMessage(TourneyMsg M)
 			}
 			break;
 		case "vclose":
-			BroadcastMessage("Next map:" @ M.Get("map"), true);
+			ClearAllProgress();
+			BroadcastMessage("Next map:" @ M.Get("map"), true, 'CriticalEvent');
 			break;
 		case "travel":
 			DoTravel(M.Get("map"), M.Get("opt"));
@@ -506,6 +514,7 @@ function Track(PlayerPawn P, string Tok, string SRole)
 	TrackTok[TrackCount] = Tok;
 	TrackRole[TrackCount] = SRole;
 	TrackReady[TrackCount] = 0;
+	TrackVote[TrackCount] = "";
 	TrackCount++;
 }
 
@@ -516,6 +525,7 @@ function Untrack(int t)
 	TrackTok[t] = TrackTok[TrackCount];
 	TrackRole[t] = TrackRole[TrackCount];
 	TrackReady[t] = TrackReady[TrackCount];
+	TrackVote[t] = TrackVote[TrackCount];
 	TrackPawn[TrackCount] = None;
 }
 
@@ -608,6 +618,35 @@ function SpawnBotsOnce()
 		SideBot[1] = SpawnSideBot(BotNameB, BotSkillB, BotClsB);
 }
 
+// Bots are spawned by the tournament only. DeathMatchPlus would remove every bot above MinPlayers
+// (which is 0 here) as soon as it respawns, so tell it there are never too many.
+function bool TooManyBots()
+{
+	return false;
+}
+
+// Spawns a bot side again if it vanished (destroyed, kicked, failed spawn).
+function EnsureBots()
+{
+	if (!bBotsSpawned || bGameEnded)
+		return;
+	if (bBotA && (SideBot[0] == None || SideBot[0].bDeleteMe))
+		RespawnBotSide(0);
+	if (bBotB && (SideBot[1] == None || SideBot[1].bDeleteMe))
+		RespawnBotSide(1);
+}
+
+function RespawnBotSide(int Side)
+{
+	Log("bot for side" @ Side @ "is missing, spawning it again", 'UTTourney');
+	if (Side == 0)
+		SideBot[0] = SpawnSideBot(BotNameA, BotSkillA, BotClsA);
+	else
+		SideBot[1] = SpawnSideBot(BotNameB, BotSkillB, BotClsB);
+	if (SideBot[Side] != None && bGameLive && !bTourneyPaused)
+		RespawnMatchPawn(SideBot[Side]);
+}
+
 function int FindBotIndex(string BName)
 {
 	local int i;
@@ -657,12 +696,21 @@ function Bot SpawnSideBot(string BName, int BSkill, string BClass)
 	AddDefaultInventory(B);
 	NumBots++;
 	B.GotoState('Dying', 'WaitingForStart');
+	Log("spawned bot" @ BName @ "class" @ BC @ "skill" @ BSkill @ "config index" @ N, 'UTTourney');
 	return B;
 }
 
 function Timer()
 {
 	BridgeTick();
+	if (Phase == "vote")
+	{
+		VoteTick();
+		if (VoteSecLeft > 0)
+			VoteSecLeft--;
+	}
+	if (Phase == "ready" || bGameLive)
+		EnsureBots();
 	if (!bGameLive)
 	{
 		PreMatchTick();
@@ -912,18 +960,36 @@ function SetTourneyPause(bool bOn, string Why)
 				HoldPlayer(PlayerPawn(P));
 		}
 		else
-		{
-			if (P.IsA('PlayerPawn'))
-				PlayerPawn(P).PlayerRestartState = PlayerPawn(P).Default.PlayerRestartState;
-			RestartPlayer(P);
-			if (P.IsA('Bot'))
-				Bot(P).StartMatch();
-		}
+			RespawnMatchPawn(P);
 	}
 	if (bOn)
 		BroadcastMessage("Game paused:" @ Why, true);
 	else
 		BroadcastMessage("Game resumed", true);
+}
+
+// Brings a held match pawn back into play like a normal respawn: leave the waiting state
+// (restores mesh, collision and the player flag for the HUD), move to a start spot with the
+// default inventory, and tell the client to restart.
+function RespawnMatchPawn(Pawn P)
+{
+	local PlayerPawn PP;
+
+	if (P.IsA('Bot'))
+	{
+		if (RestartPlayer(P))
+			Bot(P).StartMatch();
+		return;
+	}
+	PP = PlayerPawn(P);
+	if (PP == None)
+		return;
+	PP.PlayerRestartState = PP.Default.PlayerRestartState;
+	PP.GotoState(PP.PlayerRestartState);
+	if (RestartPlayer(PP))
+		PP.ClientReStart();
+	else
+		Log("could not respawn" @ PP.PlayerReplicationInfo.PlayerName, 'UTTourney');
 }
 
 function SaveScore(Pawn P, string SRole)
@@ -963,6 +1029,53 @@ function ShowVote()
 	for (t = 0; t < TrackCount; t++)
 		if (TrackPawn[t] != None && IsMatchPlayerToken(TrackTok[t]))
 			ShowVoteTo(TrackPawn[t]);
+	VoteTick();
+}
+
+// Big vote panel in the middle of the screen, refreshed every second while the vote runs.
+function VoteTick()
+{
+	local int t, i, Line;
+	local string Row, Title;
+	local PlayerPawn P;
+
+	Title = "MAP VOTE" @ MatchId $ ":" @ NameA @ "vs" @ NameB @ "-" @ Max(VoteSecLeft, 0) $ "s";
+	for (t = 0; t < TrackCount; t++)
+	{
+		P = TrackPawn[t];
+		if (P == None)
+			continue;
+		P.ClearProgressMessages();
+		P.SetProgressTime(2);
+		P.SetProgressMessage(Title, 0);
+		Line = 1;
+		Row = "";
+		for (i = 0; i < VoteCount && Line < 6; i++)
+		{
+			Row = Row $ (i + 1) $ ")" @ VoteMap[i] $ "     ";
+			if ((i + 1) % 3 == 0)
+			{
+				P.SetProgressMessage(Row, Line++);
+				Row = "";
+			}
+		}
+		if (Row != "" && Line < 6)
+			P.SetProgressMessage(Row, Line++);
+		if (!IsMatchPlayerToken(TrackTok[t]))
+			P.SetProgressMessage("The players are choosing the map.", 7);
+		else if (TrackVote[t] != "")
+			P.SetProgressMessage("Your vote:" @ TrackVote[t] $ "   (vote again to change)", 7);
+		else
+			P.SetProgressMessage("Press T and type  !vote 2 1 3  - up to 3 numbers, best first", 7);
+	}
+}
+
+function ClearAllProgress()
+{
+	local int t;
+	for (t = 0; t < TrackCount; t++)
+		if (TrackPawn[t] != None)
+			TrackPawn[t].ClearProgressMessages();
 }
 
 function ShowVoteTo(PlayerPawn P)
@@ -1005,20 +1118,20 @@ function HandleCommand(PlayerPawn P, string Cmd)
 		if (t >= 0 && (TrackRole[t] == "a" || TrackRole[t] == "b") && Phase == "ready")
 			P.bReadyToPlay = true;
 	}
-	else if (Word ~= "vote")
+	else if (Word ~= "vote" || Word ~= "v")
 		HandleVote(P, Rest);
 	else if (Word ~= "bracket")
 		ShowBracket(P);
 	else if (Word ~= "standings")
 		ShowStandings(P);
 	else if (Word ~= "help")
-		P.ClientMessage("Commands: !ready  !vote 3 1 5  !bracket  !standings");
+		P.ClientMessage("Commands: !ready  !vote 3 1 5 (or !v)  !bracket  !standings");
 }
 
 function HandleVote(PlayerPawn P, string Args)
 {
 	local string Pick[3], Word;
-	local int n, Sp, Num;
+	local int n, Sp, Num, t;
 
 	if (Phase != "vote" || FindTrack(P) < 0)
 		return;
@@ -1053,7 +1166,11 @@ function HandleVote(PlayerPawn P, string Args)
 	OutMsg.AddStr("m2", OutMsg.FitWire(Pick[1], 64));
 	OutMsg.AddStr("m3", OutMsg.FitWire(Pick[2], 64));
 	Send();
+	t = FindTrack(P);
+	if (t >= 0)
+		TrackVote[t] = TrimSpaces(Pick[0] @ Pick[1] @ Pick[2]);
 	P.ClientMessage("Vote received:" @ Pick[0] @ Pick[1] @ Pick[2]);
+	VoteTick();
 }
 
 function string TrimSpaces(string S)

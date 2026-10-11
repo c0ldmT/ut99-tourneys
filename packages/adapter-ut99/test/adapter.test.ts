@@ -36,7 +36,7 @@ describe('rules', () => {
       timeLimitMin: 10,
       mapMode: 'vote',
       countdownSec: 5,
-      voteTimeoutSec: 30,
+      voteTimeoutSec: 45,
     });
   });
 

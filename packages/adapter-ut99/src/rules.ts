@@ -25,7 +25,7 @@ export const Ut99DmRulesSchema = z
     mapPool: z.array(z.string().min(1).max(64)).min(1),
     /** How many ranked picks each player gets in a vote. */
     picksPerPlayer: z.number().int().min(1).max(3).default(3),
-    voteTimeoutSec: z.number().int().min(10).max(120).default(30),
+    voteTimeoutSec: z.number().int().min(10).max(120).default(45),
     /** Maps played in the last N games of the tournament get a penalty / are avoided in random mode. */
     avoidRecentMaps: z.number().int().min(0).max(10).default(3),
 

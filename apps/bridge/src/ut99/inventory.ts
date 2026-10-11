@@ -32,6 +32,13 @@ const STOCK_DM = new Set(
     'DM-SpaceNoxx',
     'DM-Stalwart',
     'DM-StalwartXL',
+    // GOTY bonus maps
+    'DM-ArcaneTemple',
+    'DM-Crane',
+    'DM-Cybrosis][',
+    'DM-Malevolence',
+    'DM-Mojo][',
+    'DM-Tutorial',
     'DM-Tempest',
     'DM-Turbine',
     'DM-Zeto',
