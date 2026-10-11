@@ -7,7 +7,7 @@ class BridgeLink extends TcpLink;
 
 var TournamentDM Game;
 var TourneyMsg InMsg;
-var string Buffer;
+var string LineBuffer;
 var bool bOpen;
 var float ConnectStarted;
 var int HeartbeatTicks;
@@ -77,12 +77,12 @@ event ReceivedText(string Text)
 	local int P;
 	local string Line;
 
-	Buffer = Buffer $ Text;
-	P = InStr(Buffer, Chr(10));
+	LineBuffer = LineBuffer $ Text;
+	P = InStr(LineBuffer, Chr(10));
 	while (P >= 0)
 	{
-		Line = Left(Buffer, P);
-		Buffer = Mid(Buffer, P + 1);
+		Line = Left(LineBuffer, P);
+		LineBuffer = Mid(LineBuffer, P + 1);
 		if (Right(Line, 1) == Chr(13))
 			Line = Left(Line, Len(Line) - 1);
 		if (Line != "")
@@ -92,10 +92,10 @@ event ReceivedText(string Text)
 			else
 				Log("bad line from bridge:" @ Line, 'UTTourney');
 		}
-		P = InStr(Buffer, Chr(10));
+		P = InStr(LineBuffer, Chr(10));
 	}
-	if (Len(Buffer) > 4096)
-		Buffer = "";
+	if (Len(LineBuffer) > 4096)
+		LineBuffer = "";
 }
 
 function SendLine(string S)

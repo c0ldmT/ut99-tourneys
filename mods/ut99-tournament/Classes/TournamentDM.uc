@@ -41,13 +41,13 @@ var int VoteCount;
 var string BracketText[64];
 var int BracketCount;
 var string StandingText[32];
-var int StandingCount;
+var int StandCount;
 
 // Players on this level.
 var PlayerPawn TrackPawn[64];
 var string TrackTok[64];
 var string TrackRole[64];
-var bool TrackReadySent[64];
+var byte TrackReady[64]; // 0/1 - UE1 has no bool arrays
 var int TrackCount;
 
 // Match runtime.
@@ -254,7 +254,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			AddBracketLine(M);
 			break;
 		case "sth":
-			StandingCount = 0;
+			StandCount = 0;
 			break;
 		case "ste":
 			AddStandingLine(M);
@@ -504,7 +504,7 @@ function Track(PlayerPawn P, string Tok, string SRole)
 	TrackPawn[TrackCount] = P;
 	TrackTok[TrackCount] = Tok;
 	TrackRole[TrackCount] = SRole;
-	TrackReadySent[TrackCount] = false;
+	TrackReady[TrackCount] = 0;
 	TrackCount++;
 }
 
@@ -514,7 +514,7 @@ function Untrack(int t)
 	TrackPawn[t] = TrackPawn[TrackCount];
 	TrackTok[t] = TrackTok[TrackCount];
 	TrackRole[t] = TrackRole[TrackCount];
-	TrackReadySent[t] = TrackReadySent[TrackCount];
+	TrackReady[t] = TrackReady[TrackCount];
 	TrackPawn[TrackCount] = None;
 }
 
@@ -547,7 +547,7 @@ function SendAllJoins()
 		if (TrackPawn[t] != None)
 		{
 			SendJoin(t);
-			TrackReadySent[t] = false; // re-sent by PreMatchTick if still ready
+			TrackReady[t] = 0; // re-sent by PreMatchTick if still ready
 		}
 }
 
@@ -690,9 +690,9 @@ function PreMatchTick()
 			P = TrackPawn[t];
 			if (P == None || (TrackRole[t] != "a" && TrackRole[t] != "b"))
 				continue;
-			if (P.bReadyToPlay && !TrackReadySent[t])
+			if (P.bReadyToPlay && TrackReady[t] == 0)
 			{
-				TrackReadySent[t] = true;
+				TrackReady[t] = 1;
 				OutMsg.Begin("ready");
 				OutMsg.AddInt("pid", P.PlayerReplicationInfo.PlayerID);
 				Send();
@@ -700,7 +700,7 @@ function PreMatchTick()
 			P.ClearProgressMessages();
 			P.SetProgressTime(2);
 			P.SetProgressMessage(MatchTitle(), 0);
-			if (TrackReadySent[t])
+			if (TrackReady[t] != 0)
 				P.SetProgressMessage("You are ready. Waiting for your opponent...", 1);
 			else
 				P.SetProgressMessage("Press FIRE or type !ready when you are ready", 1);
@@ -1097,14 +1097,14 @@ function string NameOr(string N)
 function AddStandingLine(TourneyMsg M)
 {
 	local string S;
-	if (StandingCount >= 32)
+	if (StandCount >= 32)
 		return;
 	if (M.GetInt("pl") > 0)
 		S = M.Get("pl") $ "." @ M.Get("name");
 	else
 		S = "-" @ M.Get("name") @ "(still in)";
 	S = S @ "  W" $ M.Get("w") @ "L" $ M.Get("l");
-	StandingText[StandingCount++] = S;
+	StandingText[StandCount++] = S;
 }
 
 // Text version until the HUD overlay exists (milestone 6).
@@ -1118,7 +1118,7 @@ function ShowBracket(PlayerPawn P)
 function ShowStandings(PlayerPawn P)
 {
 	local int i;
-	for (i = 0; i < StandingCount; i++)
+	for (i = 0; i < StandCount; i++)
 		P.ClientMessage(StandingText[i]);
 }
 

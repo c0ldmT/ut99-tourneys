@@ -10,7 +10,7 @@ const MAXFIELDS = 24;
 
 var string Keys[24];
 var string Vals[24];
-var int Count;
+var int FieldCount;
 
 var string OutText;
 
@@ -23,7 +23,7 @@ function bool Parse(string S)
 	local int i, L;
 	local string C, K, V;
 
-	Count = 0;
+	FieldCount = 0;
 	L = Len(S);
 	i = SkipWs(S, 0);
 	if (Mid(S, i, 1) != "{")
@@ -66,11 +66,11 @@ function bool Parse(string S)
 				i++;
 			}
 		}
-		if (Count < MAXFIELDS)
+		if (FieldCount < MAXFIELDS)
 		{
-			Keys[Count] = K;
-			Vals[Count] = V;
-			Count++;
+			Keys[FieldCount] = K;
+			Vals[FieldCount] = V;
+			FieldCount++;
 		}
 	}
 	return false;
@@ -143,7 +143,7 @@ function int HexToInt(string H)
 function bool Has(string K)
 {
 	local int i;
-	for (i = 0; i < Count; i++)
+	for (i = 0; i < FieldCount; i++)
 		if (Keys[i] == K)
 			return true;
 	return false;
@@ -152,7 +152,7 @@ function bool Has(string K)
 function string Get(string K)
 {
 	local int i;
-	for (i = 0; i < Count; i++)
+	for (i = 0; i < FieldCount; i++)
 		if (Keys[i] == K)
 			return Vals[i];
 	return "";
