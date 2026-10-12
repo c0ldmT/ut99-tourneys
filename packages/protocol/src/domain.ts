@@ -125,6 +125,10 @@ export type TeamEntrant = Extract<Entrant, { kind: 'team' }>;
 export const teamStarters = (team: TeamEntrant, teamSize: number) =>
   team.members.filter((m) => !m.sub).slice(0, teamSize);
 
+/** A bot, or a team without players (made of bots only). */
+export const isBotEntrant = (e: Entrant | undefined): boolean =>
+  e?.kind === 'bot' || (e?.kind === 'team' && e.members.length === 0);
+
 /** Website user ids that belong to an entrant (the player, or every team member). */
 export function entrantUserIds(e: Entrant): string[] {
   if (e.kind === 'human') return [e.userId];

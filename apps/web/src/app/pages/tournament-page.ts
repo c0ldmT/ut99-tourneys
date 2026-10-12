@@ -710,6 +710,15 @@ export class TournamentPage {
         return d['userId']
           ? `${this.name(d['entrantId'] as string)}: ${this.memberName(d['entrantId'] as string, d['userId'] as string)}`
           : this.name(d['entrantId'] as string);
+      case 'match.started': {
+        const lineups = d['lineups'] as Record<string, { name: string }[]> | undefined;
+        const who = lineups
+          ? Object.entries(lineups)
+              .map(([id, l]) => `${this.name(id)}: ${l.map((x) => x.name).join(', ')}`)
+              .join(' | ')
+          : '';
+        return `${d['matchId']} G${d['game']}${who ? ` – ${who}` : ''}`;
+      }
       case 'team.lineupSet':
         return `${this.name(d['entrantId'] as string)}: ${(d['starters'] as string[])
           .map((u) => this.memberName(d['entrantId'] as string, u))

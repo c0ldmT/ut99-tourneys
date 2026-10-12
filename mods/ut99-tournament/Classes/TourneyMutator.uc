@@ -7,10 +7,11 @@ class TourneyMutator extends Mutator;
 
 var TournamentDM Game;
 
-// Fallback only: used when the chat listener could not be spawned (players only, no spectators).
+// Team chat ("TeamSay" in team games only reaches the team, not the chat listener), and the
+// fallback for all chat when the chat listener could not be spawned (players only).
 function bool MutatorTeamMessage(Actor Sender, Pawn Receiver, PlayerReplicationInfo PRI, coerce string S, name Type, optional bool bBeep)
 {
-	if (Game != None && Game.ChatListener == None && Sender == Receiver && PlayerPawn(Sender) != None && Left(S, 1) == "!")
+	if (Game != None && (Game.ChatListener == None || Type == 'TeamSay') && Sender == Receiver && PlayerPawn(Sender) != None && Left(S, 1) == "!")
 		Game.HandleCommand(PlayerPawn(Sender), Mid(S, 1));
 	if (NextMessageMutator != None)
 		return NextMessageMutator.MutatorTeamMessage(Sender, Receiver, PRI, S, Type, bBeep);

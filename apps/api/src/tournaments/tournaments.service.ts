@@ -608,6 +608,17 @@ export class TournamentsService {
       .catch((e: Error) => this.logger.warn(`access.upsert for ${t.id}: ${e.message}`));
   }
 
+  /**
+   * A new match was called: when more people have access than the mod's list holds, the list
+   * changes with the match (its players come first), so the bridge gets it again.
+   */
+  async refreshAccessForMatch(id: string): Promise<void> {
+    const t = this.get(id);
+    if (!t) return;
+    if (this.registered(id).length + this.watching(id).length <= MAX_ACCESS) return;
+    await this.pushAccess(t);
+  }
+
   /** A user changed their token or name: refresh running tournaments they belong to. */
   async userChanged(userId: string): Promise<void> {
     const active = this.db

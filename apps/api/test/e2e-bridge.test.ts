@@ -24,7 +24,9 @@ async function until(cond: () => boolean | Promise<boolean>, ms = 10_000) {
   throw new Error('timeout');
 }
 
-async function setup(opts: { players?: string[]; size?: number } = {}) {
+async function setup(
+  opts: { players?: string[]; size?: number; settings?: Record<string, unknown> } = {},
+) {
   const clock = new FakeClock();
   const { api } = await startApi({}, { clock });
   cleanups.push(() => api.close());
@@ -72,11 +74,12 @@ async function setup(opts: { players?: string[]; size?: number } = {}) {
   const players = await Promise.all(names.map((n) => Client.login(api, n)));
   const created = await admin.post(
     '/tournaments',
-    tournamentBody({}, opts.size ? { size: opts.size } : {}),
+    tournamentBody({}, { ...(opts.size ? { size: opts.size } : {}), ...opts.settings }),
   );
   expect(created.status).toBe(201);
   const id: string = created.body.id;
-  for (const p of players) await p.post(`/tournaments/${id}/registration`);
+  if (!opts.settings?.['teamSize'])
+    for (const p of players) await p.post(`/tournaments/${id}/registration`);
   const tokens = await Promise.all(players.map(async (p) => (await p.get('/me')).body));
 
   const startSim = (absent: string[] = []) => {
@@ -115,6 +118,52 @@ async function setup(opts: { players?: string[]; size?: number } = {}) {
 }
 
 describe('website + bridge + simulated UT server', () => {
+  it('runs a 2on2 team tournament with a line-up change during a game', async () => {
+    const env = await setup({
+      players: ['Mario', 'Anna', 'Jonas', 'Lea', 'Tim'],
+      settings: { size: 4, teamSize: 2, format: 'single' },
+    });
+    const { admin, id, players } = env;
+    const [mario, anna, jonas, lea, tim] = players;
+    const team = (await mario!.post(`/tournaments/${id}/teams`, { name: 'Red' })).body.teams[0];
+    await anna!.post(`/tournaments/${id}/teams/join`, { code: team.inviteCode });
+    await jonas!.post(`/tournaments/${id}/teams/join`, { code: team.inviteCode }); // substitute
+    for (const p of [lea, tim]) await p!.post(`/tournaments/${id}/registration`);
+    expect(
+      (await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 't' })).status,
+    ).toBe(200);
+    expect((await admin.post(`/tournaments/${id}/run`)).status).toBe(204);
+    await until(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'checkIn');
+    env.startSim();
+
+    let changed = false;
+    await env.run(async () => {
+      const d = (await admin.get(`/tournaments/${id}`)).body;
+      if (!changed && d.live?.phase === 'live') {
+        // Mario puts Jonas in for Anna; applies from Red's next game.
+        const ids = d.teams[0].members.map((m: { userId: string }) => m.userId);
+        const res = await mario!.req('PUT', `/tournaments/${id}/teams/${team.id}/lineup`, {
+          starters: [ids[0], ids[2]],
+        });
+        expect(res.status).toBe(204);
+        changed = true;
+      }
+      return d.phase === 'finished';
+    });
+    const d = (await admin.get(`/tournaments/${id}`)).body;
+    expect(changed).toBe(true);
+    expect(d.projection.results).toHaveLength(3);
+    expect(d.projection.results.every((r: { outcome: string }) => r.outcome === 'played')).toBe(
+      true,
+    );
+    const events = (await admin.get(`/tournaments/${id}/events`)).body as any[];
+    expect(events.some((e) => e.type === 'team.lineupSet' && e.actor.kind === 'player')).toBe(true);
+    expect(events.filter((e) => e.type === 'match.started').every((e) => e.data.lineups)).toBe(
+      true,
+    );
+    expect(env.blog.lines.some((l) => l.includes('re-planning'))).toBe(false);
+  });
+
   it('runs a whole tournament started from the website', async () => {
     const env = await setup();
     const { admin, id } = env;

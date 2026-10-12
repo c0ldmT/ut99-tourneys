@@ -3,6 +3,7 @@ import { ServerProfileSchema } from '@tourney/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   defaultLimits,
+  teamBallot,
   iniChanges,
   loserPickMap,
   parseRules,
@@ -60,6 +61,23 @@ describe('rules', () => {
     expect(validateAgainstInventory(r, { maps: [{ id: 'dm-deck16][' }] })).toEqual([
       'map DM-Missing is not installed on the server',
     ]);
+  });
+});
+
+describe('team ballots', () => {
+  it('adds up Borda points per team and keeps the first-named order on ties', () => {
+    const b = teamBallot(
+      [
+        ['DM-Phobos', 'DM-Codex', 'DM-Deck16]['],
+        ['DM-Codex', 'dm-phobos'],
+        ['DM-Morpheus', 'DM-Nowhere'],
+      ],
+      pool,
+      3,
+    );
+    // Phobos 3+2, Codex 2+3, Morpheus 3, Deck 1: Phobos and Codex tie, Phobos was named first.
+    expect(b).toEqual(['DM-Phobos', 'DM-Codex', 'DM-Morpheus']);
+    expect(teamBallot([], pool, 3)).toEqual([]);
   });
 });
 
@@ -195,6 +213,23 @@ describe('server launch', () => {
       'userini=TourneyUser.ini',
       'log=Tourney.log',
     ]);
+  });
+
+  it('runs the team game class with room for both teams', () => {
+    expect(serverArgs(rules, profile, 3)[1]).toBe(
+      'DM-Deck16][?game=UTTourney_v1.TournamentTDM?mutator=BotPack.InstaGibDM?MaxSpectators=32',
+    );
+    const mod = { bridgeHost: '127.0.0.1', bridgePort: 7790, sharedKey: 'secret' };
+    expect(iniChanges(rules, profile, mod, 5)).toContainEqual({
+      section: 'UTTourney_v1.TournamentTDM',
+      key: 'MaxPlayers',
+      value: '12',
+    });
+    expect(iniChanges(rules, profile, mod)).toContainEqual({
+      section: 'UTTourney_v1.TournamentDM',
+      key: 'MaxPlayers',
+      value: '4',
+    });
   });
 
   it('prefers 469f binary names and has fallbacks per OS/arch', () => {

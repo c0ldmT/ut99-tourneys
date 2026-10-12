@@ -18,6 +18,7 @@ var string MyRole;         // a, b or s (role on this level)
 var string MyVote;         // what this player voted (shown in the panel)
 var bool bVoter;           // this player votes in the current map vote
 var bool bFirstPerson;     // spectators: watch through the player's eyes
+var bool bReadyMe;         // this player is ready (ready check)
 
 // --- client side ------------------------------------------------------------
 var bool bRegistered;
@@ -49,7 +50,7 @@ var font BracketFont;
 replication
 {
 	reliable if (Role == ROLE_Authority && bNetOwner)
-		MyRole, MyVote, bVoter, bFirstPerson;
+		MyRole, MyVote, bVoter, bFirstPerson, bReadyMe;
 	reliable if (Role == ROLE_Authority)
 		ClientShowBracket, ClientShowStandings, ClientOpenVote, ClientCloseVote, ClientViewMode;
 	reliable if (Role < ROLE_Authority)
@@ -414,10 +415,64 @@ simulated function DrawBanner(Canvas C)
 	DrawCentered(C, Info, 6 + YL + 16, 160, 170, 185, SmallFont(C));
 }
 
+// Team games: "READY", or how many of the team are ready / here.
+simulated function string TeamReadyText(byte bTeamReady, byte NReady, byte NHere)
+{
+	if (bTeamReady != 0)
+		return "READY";
+	if (NHere < GRI.TeamSize)
+		return NReady $ "/" $ GRI.TeamSize @ "ready," @ (GRI.TeamSize - NHere) @ "missing";
+	return NReady $ "/" $ GRI.TeamSize @ "ready";
+}
+
+simulated function DrawTeamReadyPanel(Canvas C)
+{
+	local float W, H, X, Y, XL, YL;
+	local string Hint;
+
+	C.Font = MediumFont(C);
+	C.StrLen("Ag", XL, YL);
+	W = C.ClipX * 0.56;
+	H = YL * 4.6;
+	X = (C.ClipX - W) / 2;
+	Y = C.ClipY * 0.62;
+	Panel(C, X, Y, W, H);
+	PutText(C, GRI.NameA, X + 16, Y + YL * 0.4, 255, 96, 96);
+	TextRight(C, GRI.NameB, X + W - 16, Y + YL * 0.4, 110, 150, 255);
+	if (GRI.TeamReadyA != 0)
+		PutText(C, TeamReadyText(GRI.TeamReadyA, GRI.ReadyA, GRI.PresentA), X + 16, Y + YL * 1.5, 63, 185, 80);
+	else
+		PutText(C, TeamReadyText(GRI.TeamReadyA, GRI.ReadyA, GRI.PresentA), X + 16, Y + YL * 1.5, 139, 152, 168);
+	if (GRI.TeamReadyB != 0)
+		TextRight(C, TeamReadyText(GRI.TeamReadyB, GRI.ReadyB, GRI.PresentB), X + W - 16, Y + YL * 1.5, 63, 185, 80);
+	else
+		TextRight(C, TeamReadyText(GRI.TeamReadyB, GRI.ReadyB, GRI.PresentB), X + W - 16, Y + YL * 1.5, 139, 152, 168);
+	C.Font = SmallFont(C);
+	if ((MyRole == "a" || MyRole == "b") && !bReadyMe)
+		Hint = "Press FIRE or type !ready when you are ready";
+	else if (MyRole == "a" || MyRole == "b")
+		Hint = "You are ready. Waiting for the others...";
+	else
+		Hint = "Waiting for both teams to get ready";
+	if (GRI.PhaseSec > 0)
+		Hint = Hint @ "(" $ GRI.PhaseSec $ "s)";
+	C.StrLen(Hint, XL, YL);
+	PutText(C, Hint, X + (W - XL) / 2, Y + H - YL * 2 - 10, 240, 163, 43);
+	Hint = "Captains: !start plays with bots for missing players (after a short wait)";
+	C.StrLen(Hint, XL, YL);
+	PutText(C, Hint, X + (W - XL) / 2, Y + H - YL - 6, 139, 152, 168);
+}
+
 simulated function DrawReadyPanel(Canvas C)
 {
 	local float W, H, X, Y, XL, YL;
 	local string A, B, Hint;
+
+	if (GRI.TeamSize > 1)
+	{
+		DrawTeamReadyPanel(C);
+		return;
+	}
 
 	C.Font = MediumFont(C);
 	C.StrLen("Ag", XL, YL);

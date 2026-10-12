@@ -76,6 +76,33 @@ function cleanPicks(picks: readonly string[], pool: readonly string[], max: numb
   return out;
 }
 
+/**
+ * Team games: the ballots of one team's players become one team ballot, so every team weighs
+ * the same no matter how many of its players vote. Borda points (first pick = `picks` points)
+ * are added up per map; the best `picks` maps form the team ballot. Ties keep the order in
+ * which the maps were first named (first ballot first). No valid picks = empty ballot.
+ */
+export function teamBallot(
+  ballots: readonly (readonly string[])[],
+  pool: readonly string[],
+  picks: number,
+): string[] {
+  const points = new Map<string, number>();
+  for (const b of ballots) {
+    cleanPicks(b, pool, picks).forEach((map, rank) => {
+      points.set(map, (points.get(map) ?? 0) + picks - rank);
+    });
+  }
+  const order = [...points.keys()];
+  return [...order]
+    .sort(
+      (a, b) =>
+        (points.get(b) as number) - (points.get(a) as number) ||
+        order.indexOf(a) - order.indexOf(b),
+    )
+    .slice(0, picks);
+}
+
 export function resolveMapVote(input: MapVoteInput): MapVoteOutcome {
   const { pool, entrants, history, picksPerPlayer, rng } = input;
   if (pool.length === 0) throw new Error('map pool is empty');

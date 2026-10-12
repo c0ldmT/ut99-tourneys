@@ -1,18 +1,22 @@
 //=============================================================================
 // TournamentDM
-// 1v1 tournament deathmatch driven by the bridge (see docs/protocol.md).
+// 1v1 tournament deathmatch driven by the bridge (see docs/protocol.md), and
+// the base of TournamentTDM (team deathmatch, a side is a team of up to 5).
 //
 // The mod keeps no tournament logic of its own. It
 //   - admits only players with a token from the access list (?tk=...),
-//   - lets the two match players play and makes everybody else a spectator,
-//   - holds the match players until both are ready, runs the countdown,
-//   - spawns bots for bot sides, reports scores and the end of the game,
-//   - pauses when a match player drops and restores the score on return,
+//   - lets the match players play and makes everybody else a spectator,
+//   - holds the match players until they are ready, runs the countdown,
+//   - spawns the bots the bridge names, reports scores and the end of the game,
+//   - 1v1: pauses when a match player drops and restores the score on return
+//     (team games go on; the bridge sends a stand-in bot),
 //   - performs the map change the bridge asks for.
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.2.2";
+const MOD_VERSION = "0.3.0";
+const MAXBOTS = 10;
+const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -33,9 +37,23 @@ var string MatchId;
 var int GameNo, BestOf, WinsA, WinsB;
 var string NameA, NameB;
 var int MatchFragLimit, MatchTimeLimit;
-var bool bBotA, bBotB;
-var string BotNameA, BotNameB, BotClsA, BotClsB;
-var int BotSkillA, BotSkillB;
+var int TeamSize;                  // players per side: 1 = one on one, else team deathmatch
+var int MatchFF;                   // team games: friendly fire in percent
+// Bots of the match: 1v1 the bot side, team games the bots of both teams (also stand-ins).
+var string BotName[10];
+var int BotSkill[10];
+var string BotCls[10];
+var byte BotSide[10];              // 0 = side a, 1 = side b
+var Bot BotPawn[10];
+var int BotCount;
+// The list before the last "match" line: its bots are taken over by the new list.
+var string OldBotName[10];
+var Bot OldBotPawn[10];
+var byte OldBotSide[10];
+var int OldBotCount;
+var bool bTeamReadyA, bTeamReadyB; // team games: the bridge declared the side ready
+var bool bInLogin;                 // set around Super.Login, see TournamentTDM.ChangeTeam
+var byte LoginTeam;                // team of the player logging in (255 = spectator)
 var string AclTok[64], AclName[64], AclRole[64];
 var int AclCount;
 var string VoteMap[32];
@@ -59,15 +77,14 @@ var string VoteKey;                // match and game of the current vote (a resy
 var int TrackCount;
 
 // Match runtime.
-var Bot SideBot[2];
 var bool bBotsSpawned;
 var bool bGameLive;
 var bool bEndReported;
 var int CountdownLeft;
 var int LastSentA, LastSentB, ScoreTicks;
 var bool bTourneyPaused;
-var string SavedTok[2];
-var float SavedScore[2], SavedDeaths[2];
+var string SavedKey[16];           // 1v1: the side (a/b), team games: the player's token
+var float SavedScore[16], SavedDeaths[16];
 var string PendingAddr;
 var string PendingEnd;
 var bool bTokenFromAddress;
@@ -183,11 +200,18 @@ function HandleBridgeMessage(TourneyMsg M)
 			break;
 		case "sync":
 			bInSync = M.Get("st") == "begin";
-			if (!bInSync)
+			if (bInSync)
+			{
+				// The snapshot repeats "tready" for teams that are still ready.
+				bTeamReadyA = false;
+				bTeamReadyB = false;
+			}
+			else
 			{
 				SaveCache();
 				if (!bJoinsSent)
 					SendAllJoins();
+				PruneBots();
 				ApplyPhase();
 			}
 			break;
@@ -203,7 +227,11 @@ function HandleBridgeMessage(TourneyMsg M)
 			break;
 		case "match":
 			if (M.Get("mid") != MatchId || M.GetInt("g") != GameNo)
+			{
 				PendingEnd = "";
+				bTeamReadyA = false;
+				bTeamReadyB = false;
+			}
 			MatchId = M.Get("mid");
 			GameNo = M.GetInt("g");
 			BestOf = M.GetInt("bo");
@@ -213,8 +241,12 @@ function HandleBridgeMessage(TourneyMsg M)
 			NameB = M.Get("nb");
 			MatchFragLimit = M.GetInt("fl");
 			MatchTimeLimit = M.GetInt("tl");
-			bBotA = false;
-			bBotB = false;
+			TeamSize = Max(1, M.GetInt("ts"));
+			MatchFF = M.GetInt("ff");
+			// The bot lines follow; bots already in the level are taken over (see AddBotSpec).
+			KeepOldBots();
+			BotCount = 0;
+			TGRI.TeamSize = TeamSize;
 			TGRI.MatchId = MatchId;
 			TGRI.GameNo = GameNo;
 			TGRI.BestOf = BestOf;
@@ -228,22 +260,27 @@ function HandleBridgeMessage(TourneyMsg M)
 				ApplyMatchRules();
 			break;
 		case "bot":
+			AddBotSpec(SideIndex(M.Get("s")), M.Get("name"), M.GetInt("sk"), M.Get("cls"));
+			if (TeamSize <= 1)
+			{
+				TGRI.bBotA = SideHasBot(0);
+				TGRI.bBotB = SideHasBot(1);
+			}
+			break;
+		case "botadd":
+			// Team games: a stand-in joins the running game right away.
+			AddBotSpec(SideIndex(M.Get("s")), M.Get("name"), M.GetInt("sk"), M.Get("cls"));
+			if (bBotsSpawned)
+				SpawnBots();
+			break;
+		case "botdel":
+			RemoveBot(M.Get("name"));
+			break;
+		case "tready":
 			if (M.Get("s") == "a")
-			{
-				bBotA = true;
-				TGRI.bBotA = true;
-				BotNameA = M.Get("name");
-				BotSkillA = M.GetInt("sk");
-				BotClsA = M.Get("cls");
-			}
+				bTeamReadyA = true;
 			else
-			{
-				bBotB = true;
-				TGRI.bBotB = true;
-				BotNameB = M.Get("name");
-				BotSkillB = M.GetInt("sk");
-				BotClsB = M.Get("cls");
-			}
+				bTeamReadyB = true;
 			break;
 		case "acl":
 			AclCount = 0;
@@ -306,6 +343,10 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "cd":
 			CountdownLeft = Max(1, M.GetInt("sec"));
 			Phase = "countdown";
+			// Team games: the bots of this game came with the countdown.
+			bBotsSpawned = true;
+			SpawnBots();
+			PruneBots();
 			AutoFollowAll();
 			break;
 		case "pause":
@@ -442,13 +483,43 @@ function RememberAddress(string Addr, string Tok)
 	class'TournamentConfig'.static.StaticSaveConfig();
 }
 
-function bool SideTaken(string SRole)
+// Number of players on a side (not counting spectators).
+function int SideCount(string SRole)
 {
-	local int t;
+	local int t, n;
 	for (t = 0; t < TrackCount; t++)
 		if (TrackRole[t] == SRole && TrackPawn[t] != None && !TrackPawn[t].IsA('Spectator'))
-			return true;
-	return false;
+			n++;
+	return n;
+}
+
+// Players of a side who pressed FIRE / typed !ready.
+function int SideReadyCount(string SRole)
+{
+	local int t, n;
+	for (t = 0; t < TrackCount; t++)
+		if (TrackRole[t] == SRole && TrackPawn[t] != None && !TrackPawn[t].IsA('Spectator') && TrackReady[t] != 0)
+			n++;
+	return n;
+}
+
+function bool SideTaken(string SRole)
+{
+	return SideCount(SRole) >= Max(1, TeamSize);
+}
+
+function int SideIndex(string SRole)
+{
+	if (SRole == "b")
+		return 1;
+	return 0;
+}
+
+function string SideRole(int Side)
+{
+	if (Side == 1)
+		return "b";
+	return "a";
 }
 
 event PreLogin(string Options, string Address, out string Error, out string FailCode)
@@ -497,14 +568,29 @@ event playerpawn Login(string Portal, string Options, out string Error, class<pl
 		SRole = "s";
 		SpawnClass = class'Botpack.CHSpectator';
 	}
+	// TournamentTDM.ChangeTeam (called by Super.Login) puts the player into this team.
+	if (SRole == "a")
+		LoginTeam = 0;
+	else if (SRole == "b")
+		LoginTeam = 1;
+	else
+		LoginTeam = 255;
+	bInLogin = true;
 	P = Super.Login(Portal, Options, Error, SpawnClass);
+	bInLogin = false;
 	if (P == None)
 		return None;
 	if (P.IsA('Spectator'))
 		SRole = "s"; // joined with the spectate option
 	ChangeName(P, AclName[i], false);
+	AnnounceTeam(P);
 	Track(P, Tok, SRole);
 	return P;
+}
+
+// Team games: "X is on the red team", after the player got the name from the access list.
+function AnnounceTeam(Pawn P)
+{
 }
 
 event PostLogin(PlayerPawn NewPlayer)
@@ -521,7 +607,7 @@ event PostLogin(PlayerPawn NewPlayer)
 		if (!bGameLive)
 			HoldPlayer(NewPlayer);
 		else
-			RestoreScore(NewPlayer, TrackRole[t]);
+			RestoreScore(NewPlayer, ScoreKey(t));
 	}
 	if (bTokenFromAddress && TokenForAddress(NewPlayer.GetPlayerNetworkAddress()) != TrackTok[t])
 		Log("token fallback mismatch for" @ NewPlayer.PlayerReplicationInfo.PlayerName, 'UTTourney');
@@ -558,7 +644,12 @@ function Logout(Pawn Exiting)
 	if (t >= 0)
 	{
 		SRole = TrackRole[t];
-		if (bGameLive && !bGameEnded && (SRole == "a" || SRole == "b"))
+		if (bGameLive && !bGameEnded && (SRole == "a" || SRole == "b") && TeamSize > 1)
+		{
+			// Team games go on; the bridge sends a stand-in bot after a while.
+			SaveScore(Exiting, TrackTok[t]);
+		}
+		else if (bGameLive && !bGameEnded && (SRole == "a" || SRole == "b"))
 		{
 			SaveScore(Exiting, SRole);
 			Untrack(t);
@@ -668,13 +759,44 @@ function PlayerPawn SidePlayer(string SRole)
 	return None;
 }
 
+// Key under which a player's score is kept while they are away.
+function string ScoreKey(int t)
+{
+	if (TeamSize > 1)
+		return TrackTok[t];
+	return TrackRole[t];
+}
+
+// A pawn playing for a side: its (first) player, else its first bot.
 function Pawn SidePawn(int Side)
 {
-	if (SideBot[Side] != None)
-		return SideBot[Side];
-	if (Side == 0)
-		return SidePlayer("a");
-	return SidePlayer("b");
+	local Pawn P;
+	local int i;
+	P = SidePlayer(SideRole(Side));
+	if (P != None)
+		return P;
+	for (i = 0; i < BotCount; i++)
+		if (BotSide[i] == Side && BotPawn[i] != None && !BotPawn[i].bDeleteMe)
+			return BotPawn[i];
+	// Between a "match" line and its "bot" lines the old list still knows the bots.
+	for (i = 0; i < OldBotCount; i++)
+		if (OldBotSide[i] == Side && OldBotPawn[i] != None && !OldBotPawn[i].bDeleteMe)
+			return OldBotPawn[i];
+	return None;
+}
+
+function bool SideHasBot(int Side)
+{
+	local int i;
+	for (i = 0; i < BotCount; i++)
+		if (BotSide[i] == Side)
+			return true;
+	return false;
+}
+
+// Team games: puts a pawn into the team of a side. Nothing to do in 1v1.
+function AssignTeam(Pawn P, int Side)
+{
 }
 
 //=============================================================================
@@ -696,15 +818,148 @@ function ApplyMatchRules()
 		GameReplicationInfo.RemainingTime = RemainingTime;
 }
 
+// 1v1: the bot side waits from the ready check on (team games get their bots with the countdown).
 function SpawnBotsOnce()
 {
-	if (bBotsSpawned || MatchId == "")
+	if (MatchId == "")
 		return;
 	bBotsSpawned = true;
-	if (bBotA)
-		SideBot[0] = SpawnSideBot(BotNameA, BotSkillA, BotClsA);
-	if (bBotB)
-		SideBot[1] = SpawnSideBot(BotNameB, BotSkillB, BotClsB);
+	SpawnBots();
+}
+
+// UT cuts player names to 24 characters (DeathMatchPlus.ChangeName).
+function bool SameBotName(string A, string B)
+{
+	return Left(A, 24) ~= Left(B, 24);
+}
+
+// Remembers the current list before a "match" line replaces it.
+function KeepOldBots()
+{
+	local int i;
+	for (i = 0; i < BotCount; i++)
+	{
+		OldBotName[i] = BotName[i];
+		OldBotPawn[i] = BotPawn[i];
+		OldBotSide[i] = BotSide[i];
+	}
+	OldBotCount = BotCount;
+}
+
+// Adds a bot to the list (or updates it). A bot of the previous list, or of that name in the
+// level, is taken over instead of spawning a second one.
+function AddBotSpec(int Side, string BName, int BSkill, string BClass)
+{
+	local int i, j;
+	if (BName == "")
+		return;
+	for (i = 0; i < BotCount; i++)
+		if (SameBotName(BotName[i], BName))
+			break;
+	if (i == BotCount)
+	{
+		if (BotCount >= MAXBOTS)
+			return;
+		BotCount++;
+		BotPawn[i] = None;
+		for (j = 0; j < OldBotCount; j++)
+			if (SameBotName(OldBotName[j], BName) && OldBotPawn[j] != None && !OldBotPawn[j].bDeleteMe)
+			{
+				BotPawn[i] = OldBotPawn[j];
+				break;
+			}
+		if (BotPawn[i] == None)
+			BotPawn[i] = FindBotPawn(BName);
+	}
+	BotName[i] = BName;
+	BotSkill[i] = BSkill;
+	BotCls[i] = BClass;
+	BotSide[i] = Side;
+}
+
+function Bot FindBotPawn(string BName)
+{
+	local Pawn P;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (Bot(P) != None && !P.bDeleteMe && P.PlayerReplicationInfo != None && SameBotName(P.PlayerReplicationInfo.PlayerName, BName))
+			return Bot(P);
+	return None;
+}
+
+// Removes bots that are not on the list any more (team games: the fill bots of a countdown that
+// was interrupted). Not after the end of a game: the scoreboard keeps showing them.
+function PruneBots()
+{
+	local Pawn P, Next;
+	local int i;
+	local bool bListed;
+
+	if (bGameEnded)
+		return;
+	for (P = Level.PawnList; P != None; P = Next)
+	{
+		Next = P.NextPawn;
+		if (Bot(P) == None || P.bDeleteMe)
+			continue;
+		bListed = false;
+		for (i = 0; i < BotCount; i++)
+			if (BotPawn[i] == P)
+				bListed = true;
+		if (!bListed)
+		{
+			Log("removing bot" @ P.PlayerReplicationInfo.PlayerName @ "(not in the match any more)", 'UTTourney');
+			P.Destroy();
+		}
+	}
+	OldBotCount = 0;
+}
+
+// Team games: a stand-in leaves because the player is back.
+function RemoveBot(string BName)
+{
+	local int i, j;
+	local Bot B;
+	for (i = 0; i < BotCount; i++)
+		if (SameBotName(BotName[i], BName))
+			break;
+	if (i == BotCount)
+		return;
+	B = BotPawn[i];
+	if (B == None)
+		B = FindBotPawn(BName);
+	for (j = i; j < BotCount - 1; j++)
+	{
+		BotName[j] = BotName[j + 1];
+		BotSkill[j] = BotSkill[j + 1];
+		BotCls[j] = BotCls[j + 1];
+		BotSide[j] = BotSide[j + 1];
+		BotPawn[j] = BotPawn[j + 1];
+	}
+	BotCount--;
+	BotPawn[BotCount] = None;
+	if (B != None)
+	{
+		Log("removing stand-in bot" @ BName, 'UTTourney');
+		B.Destroy();
+	}
+}
+
+// Spawns every listed bot that is not in the level (yet or any more). While the game runs a new
+// bot joins right away: a stand-in, or a bot that vanished (destroyed, kicked, failed spawn).
+function SpawnBots()
+{
+	local int i;
+	for (i = 0; i < BotCount; i++)
+	{
+		if (BotPawn[i] != None && !BotPawn[i].bDeleteMe)
+			continue;
+		BotPawn[i] = FindBotPawn(BotName[i]);
+		if (BotPawn[i] != None || bGameEnded)
+			continue;
+		BotPawn[i] = SpawnSideBot(BotName[i], BotSkill[i], BotCls[i], BotSide[i]);
+		if (BotPawn[i] != None && bGameLive && !bTourneyPaused)
+			RespawnMatchPawn(BotPawn[i]);
+	}
 }
 
 // Bots are held (hidden, in Dying) before the countdown, during a pause and after the end.
@@ -724,26 +979,12 @@ function bool TooManyBots()
 	return false;
 }
 
-// Spawns a bot side again if it vanished (destroyed, kicked, failed spawn).
+// Spawns listed bots again if they vanished.
 function EnsureBots()
 {
 	if (!bBotsSpawned || bGameEnded)
 		return;
-	if (bBotA && (SideBot[0] == None || SideBot[0].bDeleteMe))
-		RespawnBotSide(0);
-	if (bBotB && (SideBot[1] == None || SideBot[1].bDeleteMe))
-		RespawnBotSide(1);
-}
-
-function RespawnBotSide(int Side)
-{
-	Log("bot for side" @ Side @ "is missing, spawning it again", 'UTTourney');
-	if (Side == 0)
-		SideBot[0] = SpawnSideBot(BotNameA, BotSkillA, BotClsA);
-	else
-		SideBot[1] = SpawnSideBot(BotNameB, BotSkillB, BotClsB);
-	if (SideBot[Side] != None && bGameLive && !bTourneyPaused)
-		RespawnMatchPawn(SideBot[Side]);
+	SpawnBots();
 }
 
 function int FindBotIndex(string BName)
@@ -755,8 +996,9 @@ function int FindBotIndex(string BName)
 	return -1;
 }
 
-// Spawns a specific configured bot (name, skill 0..7, optional class) waiting for the start.
-function Bot SpawnSideBot(string BName, int BSkill, string BClass)
+// Spawns a specific configured bot (name, skill 0..7, optional class) for a side, waiting for
+// the start.
+function Bot SpawnSideBot(string BName, int BSkill, string BClass, int Side)
 {
 	local NavigationPoint StartSpot;
 	local class<Bot> BC;
@@ -794,6 +1036,7 @@ function Bot SpawnSideBot(string BName, int BSkill, string BClass)
 	ModifyBehaviour(B);
 	AddDefaultInventory(B);
 	NumBots++;
+	AssignTeam(B, Side);
 	B.GotoState('Dying', 'WaitingForStart');
 	Log("spawned bot" @ BName @ "class" @ BC @ "skill" @ BSkill @ "config index" @ N, 'UTTourney');
 	return B;
@@ -852,12 +1095,33 @@ function UpdateGRI()
 		TGRI.PhaseSec = -1;
 	TGRI.ScoreA = SideScore(0);
 	TGRI.ScoreB = SideScore(1);
-	TGRI.ReadyA = ReadyFlag("a", bBotA);
-	TGRI.ReadyB = ReadyFlag("b", bBotB);
+	TGRI.TeamSize = Max(1, TeamSize);
+	if (TeamSize > 1)
+	{
+		// Team games: how many are here and ready; the bridge decides when a team is ready.
+		TGRI.ReadyA = SideReadyCount("a");
+		TGRI.ReadyB = SideReadyCount("b");
+		TGRI.PresentA = SideCount("a");
+		TGRI.PresentB = SideCount("b");
+		TGRI.TeamReadyA = 0;
+		TGRI.TeamReadyB = 0;
+		if (bTeamReadyA)
+			TGRI.TeamReadyA = 1;
+		if (bTeamReadyB)
+			TGRI.TeamReadyB = 1;
+	}
+	else
+	{
+		TGRI.ReadyA = ReadyFlag("a", SideHasBot(0));
+		TGRI.ReadyB = ReadyFlag("b", SideHasBot(1));
+	}
 	TGRI.bPaused = bTourneyPaused || Phase == "paused";
 	for (t = 0; t < TrackCount; t++)
 		if (TrackClient[t] != None)
+		{
 			TrackClient[t].bVoter = Phase == "vote" && IsMatchPlayerToken(TrackTok[t]);
+			TrackClient[t].bReadyMe = TrackReady[t] != 0;
+		}
 }
 
 function byte ReadyFlag(string SRole, bool bBot)
@@ -908,7 +1172,9 @@ function PreMatchTick()
 			P.ClearProgressMessages();
 			P.SetProgressTime(2);
 			P.SetProgressMessage(MatchTitle(), 0);
-			if (TrackReady[t] != 0)
+			if (TrackReady[t] != 0 && TeamSize > 1)
+				P.SetProgressMessage("You are ready. Waiting for the others...", 1);
+			else if (TrackReady[t] != 0)
 				P.SetProgressMessage("You are ready. Waiting for your opponent...", 1);
 			else
 				P.SetProgressMessage("Press FIRE or type !ready when you are ready", 1);
@@ -997,11 +1263,13 @@ function LiveTick()
 function int SideScore(int Side)
 {
 	local Pawn P;
+	local int i;
 	P = SidePawn(Side);
 	if (P != None && P.PlayerReplicationInfo != None)
 		return int(P.PlayerReplicationInfo.Score);
-	if (SavedTok[Side] != "")
-		return int(SavedScore[Side]);
+	i = FindSaved(SideRole(Side));
+	if (i >= 0)
+		return int(SavedScore[i]);
 	return 0;
 }
 
@@ -1085,20 +1353,20 @@ function DoTravel(string MapName, string Opt)
 // game clock (DeathMatchPlus.Timer) is not advanced. On resume both sides respawn.
 function SetTourneyPause(bool bOn, string Why)
 {
-	local int Side;
+	local int t, i;
 	local Pawn P;
 
 	if (bOn == bTourneyPaused)
 		return;
-	if (!bOn && bGameLive && !bGameEnded)
+	if (!bOn && bGameLive && !bGameEnded && TeamSize <= 1)
 	{
-		// Do not resume while a human side is still missing; tell the bridge again.
-		if (!bBotA && SidePlayer("a") == None)
+		// 1v1: do not resume while a human side is still missing; tell the bridge again.
+		if (!SideHasBot(0) && SidePlayer("a") == None)
 		{
 			SendLost("a");
 			return;
 		}
-		if (!bBotB && SidePlayer("b") == None)
+		if (!SideHasBot(1) && SidePlayer("b") == None)
 		{
 			SendLost("b");
 			return;
@@ -1109,18 +1377,24 @@ function SetTourneyPause(bool bOn, string Why)
 		TGRI.PauseReason = Why;
 	if (!bGameLive || bGameEnded)
 		return;
-	for (Side = 0; Side < 2; Side++)
+	// Everybody playing: the players of both sides and all bots.
+	for (t = 0; t < TrackCount; t++)
 	{
-		P = SidePawn(Side);
-		if (P == None)
+		P = TrackPawn[t];
+		if (P == None || P.IsA('Spectator') || (TrackRole[t] != "a" && TrackRole[t] != "b"))
 			continue;
 		if (bOn)
-		{
-			if (P.IsA('Bot'))
-				P.GotoState('Dying', 'WaitingForStart');
-			else if (P.IsA('PlayerPawn'))
-				HoldPlayer(PlayerPawn(P));
-		}
+			HoldPlayer(PlayerPawn(P));
+		else
+			RespawnMatchPawn(P);
+	}
+	for (i = 0; i < BotCount; i++)
+	{
+		P = BotPawn[i];
+		if (P == None || P.bDeleteMe)
+			continue;
+		if (bOn)
+			P.GotoState('Dying', 'WaitingForStart');
 		else
 			RespawnMatchPawn(P);
 	}
@@ -1164,28 +1438,42 @@ function RespawnMatchPawn(Pawn P)
 		Log("could not respawn" @ PP.PlayerReplicationInfo.PlayerName, 'UTTourney');
 }
 
-function SaveScore(Pawn P, string SRole)
+function int FindSaved(string Key)
 {
-	local int Side;
-	Side = 0;
-	if (SRole == "b")
-		Side = 1;
-	SavedTok[Side] = SRole;
-	SavedScore[Side] = P.PlayerReplicationInfo.Score;
-	SavedDeaths[Side] = P.PlayerReplicationInfo.Deaths;
+	local int i;
+	for (i = 0; i < MAXSAVED; i++)
+		if (SavedKey[i] == Key)
+			return i;
+	return -1;
 }
 
-function RestoreScore(PlayerPawn P, string SRole)
+// Keeps the score of a player who dropped (Key: side in 1v1, token in team games).
+function SaveScore(Pawn P, string Key)
 {
-	local int Side;
-	Side = 0;
-	if (SRole == "b")
-		Side = 1;
-	if (SavedTok[Side] == "")
+	local int i;
+	if (Key == "")
 		return;
-	P.PlayerReplicationInfo.Score = SavedScore[Side];
-	P.PlayerReplicationInfo.Deaths = SavedDeaths[Side];
-	SavedTok[Side] = "";
+	i = FindSaved(Key);
+	if (i < 0)
+		i = FindSaved("");
+	if (i < 0)
+		i = 0;
+	SavedKey[i] = Key;
+	SavedScore[i] = P.PlayerReplicationInfo.Score;
+	SavedDeaths[i] = P.PlayerReplicationInfo.Deaths;
+}
+
+function RestoreScore(PlayerPawn P, string Key)
+{
+	local int i;
+	if (Key == "")
+		return;
+	i = FindSaved(Key);
+	if (i < 0)
+		return;
+	P.PlayerReplicationInfo.Score = SavedScore[i];
+	P.PlayerReplicationInfo.Deaths = SavedDeaths[i];
+	SavedKey[i] = "";
 	// Still paused: wait in the hold until the bridge resumes the game.
 	if (bTourneyPaused)
 		HoldPlayer(P);
@@ -1322,8 +1610,22 @@ function HandleCommand(PlayerPawn P, string Cmd)
 		FollowCommand(P, Rest);
 	else if (Word ~= "fp")
 		ToggleFirstPerson(P);
+	else if (Word ~= "start")
+		SendCmd(P, "start"); // team captain: play now, bots fill missing places (the bridge decides)
 	else if (Word ~= "help")
+	{
 		P.ClientMessage("Commands: !ready  !vote 3 1 5 (or !v, !vote alone opens the window)  !bracket  !standings  !follow [name|off]  !fp");
+		if (TeamSize > 1)
+			P.ClientMessage("Team captains: !start begins the game with bots for missing players (after a short wait)");
+	}
+}
+
+function SendCmd(PlayerPawn P, string C)
+{
+	OutMsg.Begin("cmd");
+	OutMsg.AddInt("pid", P.PlayerReplicationInfo.PlayerID);
+	OutMsg.AddStr("c", C);
+	Send();
 }
 
 function HandleVote(PlayerPawn P, string Args)
@@ -1794,14 +2096,16 @@ function SaveCache()
 	class'TournamentConfig'.default.CachedNameB = NameB;
 	class'TournamentConfig'.default.CachedFragLimit = MatchFragLimit;
 	class'TournamentConfig'.default.CachedTimeLimit = MatchTimeLimit;
-	class'TournamentConfig'.default.CachedBotA = bBotA;
-	class'TournamentConfig'.default.CachedBotB = bBotB;
-	class'TournamentConfig'.default.CachedBotNameA = BotNameA;
-	class'TournamentConfig'.default.CachedBotNameB = BotNameB;
-	class'TournamentConfig'.default.CachedBotSkillA = BotSkillA;
-	class'TournamentConfig'.default.CachedBotSkillB = BotSkillB;
-	class'TournamentConfig'.default.CachedBotClsA = BotClsA;
-	class'TournamentConfig'.default.CachedBotClsB = BotClsB;
+	class'TournamentConfig'.default.CachedTeamSize = TeamSize;
+	class'TournamentConfig'.default.CachedFF = MatchFF;
+	class'TournamentConfig'.default.CachedBotCount = BotCount;
+	for (i = 0; i < MAXBOTS; i++)
+	{
+		class'TournamentConfig'.default.CachedBotName[i] = BotName[i];
+		class'TournamentConfig'.default.CachedBotSkill[i] = BotSkill[i];
+		class'TournamentConfig'.default.CachedBotCls[i] = BotCls[i];
+		class'TournamentConfig'.default.CachedBotSide[i] = BotSide[i];
+	}
 	class'TournamentConfig'.static.StaticSaveConfig();
 }
 
@@ -1822,14 +2126,16 @@ function LoadCache()
 	NameB = class'TournamentConfig'.default.CachedNameB;
 	MatchFragLimit = class'TournamentConfig'.default.CachedFragLimit;
 	MatchTimeLimit = class'TournamentConfig'.default.CachedTimeLimit;
-	bBotA = class'TournamentConfig'.default.CachedBotA;
-	bBotB = class'TournamentConfig'.default.CachedBotB;
-	BotNameA = class'TournamentConfig'.default.CachedBotNameA;
-	BotNameB = class'TournamentConfig'.default.CachedBotNameB;
-	BotSkillA = class'TournamentConfig'.default.CachedBotSkillA;
-	BotSkillB = class'TournamentConfig'.default.CachedBotSkillB;
-	BotClsA = class'TournamentConfig'.default.CachedBotClsA;
-	BotClsB = class'TournamentConfig'.default.CachedBotClsB;
+	TeamSize = Max(1, class'TournamentConfig'.default.CachedTeamSize);
+	MatchFF = class'TournamentConfig'.default.CachedFF;
+	BotCount = Clamp(class'TournamentConfig'.default.CachedBotCount, 0, MAXBOTS);
+	for (i = 0; i < BotCount; i++)
+	{
+		BotName[i] = class'TournamentConfig'.default.CachedBotName[i];
+		BotSkill[i] = class'TournamentConfig'.default.CachedBotSkill[i];
+		BotCls[i] = class'TournamentConfig'.default.CachedBotCls[i];
+		BotSide[i] = class'TournamentConfig'.default.CachedBotSide[i];
+	}
 	Phase = "lobby";
 }
 

@@ -83,8 +83,10 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     w: side,
     why: z.enum(['frag', 'time', 'sd', 'forfeit']),
   }),
-  /** A match player disconnected during a live game (the mod paused the game). */
+  /** A match player disconnected during a live game (the mod paused the game). 1v1 only. */
   z.object({ t: z.literal('lost'), mid: str(16), s: side }),
+  /** A chat command the bridge decides on, e.g. "start" (team captain starts with bots). */
+  z.object({ t: z.literal('cmd'), pid, c: str(16) }),
   z.object({ t: z.literal('hb'), up: int.nonnegative() }), // heartbeat, uptime in seconds
   z.object({ t: z.literal('err'), msg: str(200) }),
 ]);
@@ -124,10 +126,15 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     wb: int.nonnegative(),
     na: str(MAX_NAME_CHARS), // display name side a
     nb: str(MAX_NAME_CHARS),
-    fl: int.nonnegative(), // frag limit, 0 = none
+    fl: int.nonnegative(), // frag limit (team score in team games), 0 = none
     tl: int.nonnegative(), // time limit minutes, 0 = none
+    ts: int.min(1).max(5), // players per side: 1 = one on one, else team deathmatch
+    ff: int.min(0).max(100), // team games: friendly fire in percent
   }),
-  /** A match side played by a bot. */
+  /**
+   * A bot playing for a side. 1v1: the side is a bot (sent with the match). Team games: the bots
+   * that fill a team, sent with the countdown, and bots standing in for disconnected players.
+   */
   z.object({
     t: z.literal('bot'),
     s: side,
@@ -135,6 +142,18 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     sk: int.min(0).max(7),
     cls: str(128),
   }),
+  /** Team games: a bot joins the running game for a side (stands in for a disconnected player). */
+  z.object({
+    t: z.literal('botadd'),
+    s: side,
+    name: str(MAX_NAME_CHARS),
+    sk: int.min(0).max(7),
+    cls: str(128),
+  }),
+  /** Team games: a stand-in bot leaves (the player is back). */
+  z.object({ t: z.literal('botdel'), name: str(MAX_NAME_CHARS) }),
+  /** Team games: the bridge declared a side ready (all ready, captain start, bot team). */
+  z.object({ t: z.literal('tready'), s: side }),
   /** Access list header + entries. Role a/b = match player of the current match, s = spectator. */
   z.object({ t: z.literal('acl'), n: int.nonnegative(), rev: int }),
   z.object({

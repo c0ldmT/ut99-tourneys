@@ -102,9 +102,6 @@ async function main(): Promise<void> {
   const log = consoleLogger(config.logLevel);
   checkServerOs(config, log);
   const rules = parseRules(tournament.settings.game.rules);
-  if (tournament.settings.teamSize > 1) {
-    throw new Error('team tournaments are not supported by this bridge version yet');
-  }
 
   // Fail before anything starts if the map pool does not match the installation.
   if (config.server) {
@@ -145,11 +142,17 @@ async function main(): Promise<void> {
 
   let server: ServerProcess | undefined;
   if (config.server?.manage && director.projection.phase !== 'finished') {
-    const prepared = prepareServer(config.server, rules, {
-      bridgeHost: config.mod.host,
-      bridgePort: config.mod.port,
-      sharedKey: config.mod.sharedKey,
-    });
+    const prepared = prepareServer(
+      config.server,
+      rules,
+      {
+        bridgeHost: config.mod.host,
+        bridgePort: config.mod.port,
+        sharedKey: config.mod.sharedKey,
+      },
+      undefined,
+      director.projection.settings.teamSize,
+    );
     log.info(`wrote ${prepared.iniPath}`);
     server = new ServerProcess({ log, clock: realClock });
     mod.on('hello', () => server?.markRunning());

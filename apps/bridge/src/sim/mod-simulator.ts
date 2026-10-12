@@ -37,6 +37,9 @@ export interface SimBehaviour {
   scoreIntervalMs: number;
   /** Chance that side a wins a game. */
   winChanceA: number;
+  /** Team games: players who type !start during the ready check (after captainStartAfterMs). */
+  captains: string[];
+  captainStartAfterMs: number;
 }
 
 export interface SimOptions {
@@ -61,6 +64,8 @@ const DEFAULT_BEHAVIOUR: SimBehaviour = {
   levelLoadMs: 1_000,
   scoreIntervalMs: 5_000,
   winChanceA: 0.5,
+  captains: [],
+  captainStartAfterMs: 61_000,
 };
 
 interface Joined {
@@ -79,7 +84,7 @@ export class ModSimulator {
   private acl = new Map<string, { name: string; r: 'a' | 'b' | 's' }>();
   private joined = new Map<string, Joined>();
   private voteOptions: string[] = [];
-  private match?: { mid: string; g: number };
+  private match?: { mid: string; g: number; ts: number };
   private phase = 'lobby';
   private inSync = false;
   private gameTimers: TimerHandle[] = [];
@@ -93,6 +98,9 @@ export class ModSimulator {
   readonly receivedAt: number[] = [];
   /** Travels performed, in order. */
   readonly travels: string[] = [];
+  /** Team games: bots that joined running games as stand-ins, and those that left again. */
+  readonly botsAdded: string[] = [];
+  readonly botsRemoved: string[] = [];
 
   constructor(private readonly o: SimOptions) {
     this.b = { ...DEFAULT_BEHAVIOUR, ...o.behaviour };
@@ -186,7 +194,13 @@ export class ModSimulator {
         this.acl.delete(msg.tk);
         return;
       case 'match':
-        this.match = { mid: msg.mid, g: msg.g };
+        this.match = { mid: msg.mid, g: msg.g, ts: msg.ts };
+        return;
+      case 'botadd':
+        this.botsAdded.push(msg.name);
+        return;
+      case 'botdel':
+        this.botsRemoved.push(msg.name);
         return;
       case 'sync':
         this.inSync = msg.st === 'begin';
@@ -261,6 +275,12 @@ export class ModSimulator {
 
   private scheduleReady(): void {
     for (const j of this.matchPlayers()) {
+      if (this.b.captains.includes(j.token)) {
+        this.later(this.b.captainStartAfterMs, () => {
+          if (this.joined.get(j.token) === j && this.phase === 'ready')
+            this.send({ t: 'cmd', pid: j.pid, c: 'start' });
+        });
+      }
       if (this.b.neverReady.includes(j.token)) continue;
       this.later(this.b.readyDelayMs, () => {
         if (this.joined.get(j.token) === j) this.send({ t: 'ready', pid: j.pid });
@@ -326,8 +346,11 @@ export class ModSimulator {
         this.dropped.add(drop.token);
         this.joined.delete(drop.token);
         this.send({ t: 'leave', pid: dropper.pid });
-        this.send({ t: 'lost', mid: m.mid, s: dropper.role === 'a' ? 'a' : 'b' });
-        this.setPaused(true);
+        // 1v1: the mod pauses the game; team games go on (the bridge sends a stand-in bot).
+        if (m.ts <= 1) {
+          this.send({ t: 'lost', mid: m.mid, s: dropper.role === 'a' ? 'a' : 'b' });
+          this.setPaused(true);
+        }
         if (drop.returnAfterMs === undefined) return;
         this.gameTimers.push(
           this.later(drop.returnAfterMs, () => {

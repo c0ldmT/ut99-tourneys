@@ -85,7 +85,26 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
       details: z.record(z.string(), z.unknown()).optional(),
     }),
   ),
-  event('match.started', z.object({ matchId: Id, game: z.number().int().positive() })),
+  event(
+    'match.started',
+    z.object({
+      matchId: Id,
+      game: z.number().int().positive(),
+      /** Team games: who played for each entrant (humans first, then bots). */
+      lineups: z
+        .record(
+          Id,
+          z.array(
+            z.object({
+              name: z.string().min(1).max(32),
+              userId: Id.optional(),
+              bot: z.boolean().optional(),
+            }),
+          ),
+        )
+        .optional(),
+    }),
+  ),
   event(
     'match.gameFinished',
     z.object({

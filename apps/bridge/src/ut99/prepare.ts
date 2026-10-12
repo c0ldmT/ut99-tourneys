@@ -68,6 +68,7 @@ export function prepareServer(
   rules: Ut99DmRules,
   mod: ModConnectionConfig,
   arch: CpuArch = currentArch(),
+  teamSize = 1,
 ): PreparedServer {
   const binary = resolveBinary(profile, arch);
   const systemDir = path.dirname(binary);
@@ -88,7 +89,7 @@ export function prepareServer(
   ]);
 
   const ini = IniFile.parse(fs.readFileSync(baseIni, 'latin1'));
-  ini.apply(iniChanges(rules, profile, mod));
+  ini.apply(iniChanges(rules, profile, mod, teamSize));
   const iniPath = path.join(systemDir, GENERATED_FILES.ini);
   const userIniPath = path.join(systemDir, GENERATED_FILES.userIni);
   try {
@@ -104,5 +105,5 @@ export function prepareServer(
       { cause: e },
     );
   }
-  return { binary, systemDir, args: serverArgs(rules, profile), iniPath, userIniPath };
+  return { binary, systemDir, args: serverArgs(rules, profile, teamSize), iniPath, userIniPath };
 }

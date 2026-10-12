@@ -20,7 +20,7 @@ import { ServerProcess } from '../ut99/server-process.js';
 import { WebsiteLink } from './link.js';
 import { RemoteEventStore } from './remote-store.js';
 
-export const AGENT_VERSION = '0.2.0';
+export const AGENT_VERSION = '0.3.0';
 
 export interface WebsiteAgentOptions {
   config: BridgeConfig & { website: NonNullable<BridgeConfig['website']> };
@@ -246,10 +246,6 @@ export class WebsiteAgent {
     const created = events[0];
     if (!created || created.type !== 'tournament.created')
       throw new Error(`no event log for ${tournamentId}`);
-    if (created.data.settings.teamSize > 1) {
-      // Team deathmatch arrives with the next bridge and mod version (milestone 7, step 3).
-      throw new Error('team tournaments are not supported by this bridge version yet');
-    }
     const rules = parseRules(created.data.settings.game.rules);
 
     let server: ServerProcess | undefined;
@@ -258,11 +254,17 @@ export class WebsiteAgent {
       const inv = scanInventory(profile, { readMeta: false });
       const problems = inv.maps.length ? validateAgainstInventory(rules, inv) : [];
       if (problems.length) throw new Error(`tournament cannot run: ${problems.join('; ')}`);
-      const prepared = prepareServer(profile, rules, {
-        bridgeHost: this.o.config.mod.host,
-        bridgePort: this.o.config.mod.port,
-        sharedKey: this.o.config.mod.sharedKey,
-      });
+      const prepared = prepareServer(
+        profile,
+        rules,
+        {
+          bridgeHost: this.o.config.mod.host,
+          bridgePort: this.o.config.mod.port,
+          sharedKey: this.o.config.mod.sharedKey,
+        },
+        undefined,
+        created.data.settings.teamSize,
+      );
       this.o.log.info(`wrote ${prepared.iniPath}`);
       server = new ServerProcess({ log: this.o.log, clock: this.o.clock });
       const markRunning = () => server?.markRunning();

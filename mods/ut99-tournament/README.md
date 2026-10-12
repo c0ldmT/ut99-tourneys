@@ -3,14 +3,16 @@
 UnrealScript package for UT99 469f. It turns a dedicated server into a tournament server driven by the bridge
 (see [`docs/protocol.md`](../../docs/protocol.md)).
 
-> **Status:** the server part (milestone 4) is tested on 469f. **Milestone 6 (HUD, vote window, spectator
-> follow) is written but not compiled yet**: please run `build` and the checklist items 18–25 below.
+> **Status:** 1v1 (milestones 4–6, mod 0.2.2) is tested on 469f. **Team deathmatch (mod 0.3.0,
+> `TournamentTDM`) is written but not compiled yet**: please run `build`, check that 1v1 still works and then
+> go through the team checklist (items 27–35) below.
 
 ## Classes
 
 | Class | Role |
 |---|---|
-| `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`): token login, roles, ready check, countdown, bots, score, end of game, travel, soft pause, score restore |
+| `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`): token login, roles, ready check, countdown, bots, score, end of game, travel, soft pause, score restore. A side can have several players and bots (base of the team game) |
+| `TournamentTDM` | Team deathmatch (extends `TournamentDM`): red = side a, blue = side b; team scores, friendly fire, team skins, end of game and bot attitude taken over from `TeamGamePlus`; teams come from the access list |
 | `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
 | `TourneyMsg` | Flat JSON line parser/writer |
 | `TourneyMutator` | Console `mutate tourney <cmd>` (fallback for chat commands) |
@@ -34,6 +36,7 @@ the scoreboard (F1) is closed; with `togglehud` hidden it is not drawn at all.
 | `!standings` | everybody | show/hide the standings |
 | `!follow`, `!follow <name>`, `!follow off` | spectators | follow side A/B (toggle), a player by name prefix, or free camera |
 | `!fp` | spectators | switch between first and third person while following |
+| `!start` | team captains | during the ready check (after 60 s): play now, bots fill missing places; also in team chat |
 | `!help` | everybody | list of commands |
 
 All of them also work from the console as `mutate tourney <command>` (e.g. `mutate tourney bracket`, bindable to
@@ -129,6 +132,24 @@ Work through these in order and note what happens. Each item names what to look 
 | 25 | **Map change** | After several games and map changes no `Failed to garbage collect` or `Accessed None` in the client log (`UnrealTournament.log`) |
 | 26 | **SmartStockBots** (optional, see below) | Server log at start: SmartStockBots loaded; bots dodge, translocate and combo visibly better; before the countdown and during a pause the bot stays invisible and does not move |
 
+### Team deathmatch (2on2, 3on3, 5on5)
+
+Create a team tournament on the website (mode "2 on 2", bracket of 4), make two teams with at least one human
+each; empty places and bracket slots are filled with bots. With two clients a 2on2 of "you + bot vs. friend +
+bot" is enough to see everything.
+
+| # | Check | Expected |
+|---|---|---|
+| 27 | Server start | Server log: `game=UTTourney_v1.TournamentTDM`, no errors from `TournamentTDM` |
+| 28 | Check-in | Bridge: `<name> (<team>) checked in`; check-in ends as soon as every team has its starters here (or after the check-in time; a team with nobody here becomes a bot team) |
+| 29 | Map vote | Every member of both teams gets the vote window; the vote closes when all have voted |
+| 30 | Line-up | After the travel the players of the line-up are held as players, substitutes join as spectators. Bridge log: `line-up <team>: ...` |
+| 31 | Ready panel | Team names in red/blue, "x/y ready" per team, READY when a team is ready; your own hint |
+| 32 | Captain start | With a team mate missing: after 60 s the captain gets "type !start"; `!start` (also in team chat, Y) → countdown, a bot takes the free place |
+| 33 | Game | Red/blue skins, team HUD and team scoreboard (F1), score at the top = team score; the game ends at the frag limit as team score; with friendly fire 0 % team mates take no damage |
+| 34 | Disconnect | No pause. After 20 s a bot joins your team (`... plays for <name>`); when you reconnect the bot leaves and you play again with your score |
+| 35 | Tie / end | Tie at the time limit → overtime, next frag wins; the bridge records the team scores |
+
 ## SmartStockBots (optional)
 
 SmartStockBots makes the stock bots play much better. It runs on the server only; clients need nothing.
@@ -151,3 +172,8 @@ SmartStockBots makes the stock bots play much better. It runs on the server only
 - Players can rename themselves with the `name` command; the bridge identifies them by token anyway.
 - The token fallback after a map change (by IP address) cannot tell apart two players behind the same IP.
 - The HUD is only drawn while the scoreboard is closed (UT draws HUD mutators after the scoreboard check).
+- Team games: `TournamentTDM` is not a `TeamGamePlus` subclass. If a human gives a bot the order "Follow me"
+  (orders menu), the server log shows `Accessed None` warnings from `Bot.CloseToPointMan`; the bot keeps
+  playing. Mods that check `IsA('TeamGamePlus')` may treat the game as a non-team game.
+- Team games: players on the bench (substitutes not in the line-up) are spectators for the whole game; line-up
+  changes apply from the next game.

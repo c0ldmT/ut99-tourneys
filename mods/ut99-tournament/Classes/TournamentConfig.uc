@@ -27,14 +27,14 @@ var config string CachedNameA;
 var config string CachedNameB;
 var config int CachedFragLimit;
 var config int CachedTimeLimit;
-var config bool CachedBotA;
-var config bool CachedBotB;
-var config string CachedBotNameA;
-var config string CachedBotNameB;
-var config int CachedBotSkillA;
-var config int CachedBotSkillB;
-var config string CachedBotClsA;
-var config string CachedBotClsB;
+var config int CachedTeamSize;
+var config int CachedFF;
+// Bots of the match (1v1: the bot side; team games: the bots of both teams).
+var config int CachedBotCount;
+var config string CachedBotName[10];
+var config int CachedBotSkill[10];
+var config string CachedBotCls[10];
+var config byte CachedBotSide[10];
 
 // Fallback when a client reconnects without ?tk= after a map change: address -> token.
 var config string KnownAddr[64];
@@ -49,4 +49,5 @@ defaultproperties
 	CachedTimeLimit=10
 	CachedBestOf=1
 	CachedGameNo=1
+	CachedTeamSize=1
 }

@@ -124,30 +124,53 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends 
 | `live`   | `mid g`                | Countdown over, players spawned                                                                                                     |
 | `score`  | `mid g sa sb tl ot`    | Periodic and on every frag                                                                                                          |
 | `end`    | `mid g sa sb w why`    | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                                                                           |
-| `lost`   | `mid s`                | Match player disconnected during a live game; mod paused the game                                                                   |
+| `lost`   | `mid s`                | 1v1: match player disconnected during a live game; mod paused the game                                                              |
+| `cmd`    | `pid c`                | Chat command the bridge decides on: `start` (team captain starts with bots for missing players)                                     |
 | `hb`     | `up`                   | Heartbeat every 5 s                                                                                                                 |
 | `err`    | `msg`                  |                                                                                                                                     |
 
 ### Bridge → Mod
 
-| `t`                                  | Meaning                                                                                                           |
-| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `welcome`                            | Handshake accepted                                                                                                |
-| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                                                 |
-| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds                     |
-| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit (a tie always goes to sudden death) |
-| `bot`                                | A side played by a bot (name, skill, class)                                                                       |
-| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                                                  |
-| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                                                 |
-| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                   |
-| `cd`                                 | Start countdown                                                                                                   |
-| `pause`                              | Pause / unpause                                                                                                   |
-| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                                          |
-| `brh` / `brm`                        | Bracket for the HUD                                                                                               |
-| `sth` / `ste`                        | Standings for the HUD                                                                                             |
-| `say`                                | Message to all (`pid: -1`) or one player                                                                          |
-| `title`                              | Tournament name (HUD), part of the snapshot                                                                       |
-| `warn`                               | Big centered warning for one player (e.g. last reconnect before a forfeit)                                        |
+| `t`                                  | Meaning                                                                                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `welcome`                            | Handshake accepted                                                                                                                                                       |
+| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                                                                                                        |
+| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds                                                                            |
+| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit (a tie always goes to sudden death), `ts` players per side (1 = 1v1), `ff` friendly fire % |
+| `bot`                                | A bot playing for a side (name, skill, class). 1v1: the bot side. Team games: the bots of the game, with the countdown, and stand-ins                                    |
+| `botadd` / `botdel`                  | Team games: a stand-in bot joins the running game for a disconnected player / leaves when the player is back                                                             |
+| `tready`                             | Team games: the bridge declared a side ready (all ready, captain `!start`, bot team, time up)                                                                            |
+| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                                                                                                         |
+| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                                                                                                        |
+| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                                                                          |
+| `cd`                                 | Start countdown                                                                                                                                                          |
+| `pause`                              | Pause / unpause                                                                                                                                                          |
+| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                                                                                                 |
+| `brh` / `brm`                        | Bracket for the HUD                                                                                                                                                      |
+| `sth` / `ste`                        | Standings for the HUD                                                                                                                                                    |
+| `say`                                | Message to all (`pid: -1`) or one player                                                                                                                                 |
+| `title`                              | Tournament name (HUD), part of the snapshot                                                                                                                              |
+| `warn`                               | Big centered warning for one player (e.g. last reconnect before a forfeit)                                                                                               |
+
+### Team games (2on2, 3on3, 5on5)
+
+The server runs `TournamentTDM` (red = side a, blue = side b); the frag limit is the team score.
+
+- **Roles.** While the map is voted every member of both teams has role `a`/`b` and votes; the bridge adds one
+  ballot per team (Borda points of its players). Before the travel the bridge fixes the **line-up**: members on
+  the server first (starters, then substitutes), then absent starters; at most `teamSize`. Only the line-up keeps
+  role `a`/`b` on the new map, everybody else joins as spectator (UT cannot switch a connection from player to
+  spectator).
+- **Ready.** A team is ready when its line-up is here and ready, or when its captain types `!start` (allowed
+  `captainStartMs` = 60 s after the ready check began; the captain is the first member on the server if the
+  captain is not), or when the ready check times out (a team with nobody on the server forfeits).
+- **Countdown.** The bridge sends `match` + one `bot` line per bot that fills a place, then `cd`; the line-ups go
+  into `match.started` (`lineups`).
+- **Disconnects.** The game goes on. After `standInDelayMs` (20 s) the bridge sends `botadd`; when the player is
+  back, `botdel`. A player with more than `maxReconnects` disconnects in a match gets role `s` (`acladd`) and is
+  out of that match; the stand-in stays.
+- **Line-up changes** from the website (`team.lineupSet`) are passive events: the bridge applies them from the
+  next game and never re-plans for them.
 
 ### Typical match sequence
 

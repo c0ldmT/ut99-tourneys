@@ -164,6 +164,10 @@ export class AgentGateway {
         if (res.accepted && res.events.some((e) => e.type === 'match.result')) {
           this.hub.clearLive(tournamentId);
         }
+        if (res.accepted && res.events.some((e) => e.type === 'match.called')) {
+          // The access list puts the players of the current match first (64 entries at most).
+          void this.tournaments.refreshAccessForMatch(tournamentId);
+        }
         return;
       }
       case 'command.ack':

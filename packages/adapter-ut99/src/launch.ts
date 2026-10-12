@@ -1,5 +1,12 @@
 import type { ServerOs, ServerProfile } from '@tourney/protocol';
-import { MOD_GAME_CLASS, MOD_PACKAGE, SMART_STOCK_BOTS_ACTOR, type Ut99DmRules } from './rules.js';
+import {
+  MOD_GAME_CLASS,
+  MOD_PACKAGE,
+  MOD_TEAM_GAME_CLASS,
+  SMART_STOCK_BOTS_ACTOR,
+  gameClassFor,
+  type Ut99DmRules,
+} from './rules.js';
 
 /**
  * How to start a UT99 469f dedicated server for a tournament.
@@ -52,8 +59,9 @@ export const GENERATED_FILES = {
 export function urlOptions(
   rules: Ut99DmRules,
   profile: Pick<ServerProfile, 'maxSpectators'>,
+  teamSize = 1,
 ): string {
-  let opts = `?game=${MOD_GAME_CLASS}`;
+  let opts = `?game=${gameClassFor(teamSize)}`;
   if (rules.mutators.length) opts += `?mutator=${rules.mutators.join(',')}`;
   opts += `?MaxSpectators=${profile.maxSpectators}`;
   return opts;
@@ -65,10 +73,10 @@ export function travelOptions(rules: Ut99DmRules): string {
 }
 
 /** Command line arguments for `ucc server`. */
-export function serverArgs(rules: Ut99DmRules, profile: ServerProfile): string[] {
+export function serverArgs(rules: Ut99DmRules, profile: ServerProfile, teamSize = 1): string[] {
   const args = [
     'server',
-    `${profile.lobbyMap}${urlOptions(rules, profile)}`,
+    `${profile.lobbyMap}${urlOptions(rules, profile, teamSize)}`,
     `port=${profile.port}`,
     `ini=${GENERATED_FILES.ini}`,
     `userini=${GENERATED_FILES.userIni}`,
@@ -95,8 +103,11 @@ export function iniChanges(
   rules: Ut99DmRules,
   profile: ServerProfile,
   mod: ModConnectionConfig,
+  teamSize = 1,
 ): IniChange[] {
   const dm = 'Botpack.DeathMatchPlus';
+  // Match players plus room for reconnects; bots do not count.
+  const maxPlayers = String(Math.max(4, 2 * teamSize + 2));
   return [
     // Clients download the mod for the HUD, the vote window and spectator follow (milestone 6).
     { section: 'Engine.GameEngine', key: 'ServerPackages', ensure: MOD_PACKAGE },
@@ -108,14 +119,15 @@ export function iniChanges(
     ...(profile.serverName
       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]
       : []),
-    // Per-class config: written for DeathMatchPlus and for our subclass, which reads its own section.
-    ...[dm, MOD_GAME_CLASS].flatMap((section) => [
+    // Per-class config: written for DeathMatchPlus and for our subclasses, which read their own
+    // sections.
+    ...[dm, MOD_GAME_CLASS, MOD_TEAM_GAME_CLASS].flatMap((section) => [
       { section, key: 'bMultiWeaponStay', value: bool(rules.weaponStay) },
       { section, key: 'bHardCoreMode', value: bool(rules.hardcore) },
+      { section, key: 'MaxPlayers', value: maxPlayers },
     ]),
     { section: dm, key: 'bTournament', value: 'False' }, // our own ready check replaces it
     { section: dm, key: 'MinPlayers', value: '0' }, // bots are spawned by the mod only
-    { section: dm, key: 'MaxPlayers', value: '4' }, // 2 match players + room for a reconnect
     { section: 'Engine.GameInfo', key: 'GameSpeed', value: (rules.gameSpeedPct / 100).toFixed(2) },
     { section: 'Engine.GameInfo', key: 'MaxSpectators', value: String(profile.maxSpectators) },
     { section: `${MOD_PACKAGE}.TournamentConfig`, key: 'BridgeHost', value: mod.bridgeHost },

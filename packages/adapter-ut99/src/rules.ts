@@ -8,6 +8,12 @@ export const ADAPTER_ID = 'ut99-dm';
  */
 export const MOD_PACKAGE = 'UTTourney_v1';
 export const MOD_GAME_CLASS = `${MOD_PACKAGE}.TournamentDM`;
+/** Team deathmatch (2on2, 3on3, 5on5): a subclass of TournamentDM with teams. */
+export const MOD_TEAM_GAME_CLASS = `${MOD_PACKAGE}.TournamentTDM`;
+
+/** Game class the server runs for a tournament with this team size. */
+export const gameClassFor = (teamSize: number) =>
+  teamSize > 1 ? MOD_TEAM_GAME_CLASS : MOD_GAME_CLASS;
 
 /** https://ut99.org – "SmartStockBots" by Buggie: server-side mutator, no client download. */
 export const SMART_STOCK_BOTS_PACKAGE = 'SmartStockBots';

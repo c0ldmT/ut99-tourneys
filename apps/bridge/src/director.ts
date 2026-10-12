@@ -6,6 +6,7 @@ import {
   type Rng,
 } from '@tourney/bracket';
 import {
+  isBotEntrant,
   projectTournament,
   type AccessEntry,
   type BotSpec,
@@ -14,6 +15,7 @@ import {
   type ModPhase,
   type ModToBridge,
   type NewTournamentEvent,
+  type TeamEntrant,
   type TournamentEvent,
   type TournamentProjection,
   wireName,
@@ -25,6 +27,7 @@ import {
   randomMap,
   resolveMapVote,
   simulateSeries,
+  teamBallot,
   type Ut99DmRules,
 } from '@tourney/adapter-ut99';
 import { botEntrant } from './bootstrap.js';
@@ -42,8 +45,18 @@ import {
   standingsLines,
   travelLine,
   voteLines,
+  type RoleContext,
   type Side,
 } from './snapshot.js';
+import {
+  actingCaptain,
+  botSkill,
+  isMember,
+  isTeam,
+  lineupFor,
+  memberName,
+  pickBots,
+} from './teams.js';
 
 export interface DirectorTiming {
   /** Minimum time between the end of a game and the next map change (scoreboard time). */
@@ -54,6 +67,10 @@ export interface DirectorTiming {
   loadingTimeoutMs: number;
   /** While the tournament waits for someone, tell the server who and why this often (0 = off). */
   reminderIntervalMs: number;
+  /** Team games: a bot takes the place of a disconnected player after this long. */
+  standInDelayMs: number;
+  /** Team games: captains may start with bots for missing players after this long in the ready check. */
+  captainStartMs: number;
 }
 
 const DEFAULT_TIMING: DirectorTiming = {
@@ -61,7 +78,12 @@ const DEFAULT_TIMING: DirectorTiming = {
   simulateDelayMs: 3_000,
   loadingTimeoutMs: 90_000,
   reminderIntervalMs: 30_000,
+  standInDelayMs: 20_000,
+  captainStartMs: 60_000,
 };
+
+/** Events from the website that do not change the course of the tournament (applied in passing). */
+const PASSIVE_EVENTS = new Set<string>(['team.lineupSet']);
 
 export interface DirectorOptions {
   tournamentId: string;
@@ -112,16 +134,14 @@ type Stage =
       deadline: number;
     }
   | { kind: 'loading'; matchId: string; game: number; map: string }
-  | {
+  | ({
       kind: 'readyCheck';
       matchId: string;
       game: number;
       map: string;
-      ready: Set<string>;
-      present: Set<string>;
       deadline: number;
-    }
-  | { kind: 'countdown'; matchId: string; game: number; map: string }
+    } & ReadyState)
+  | ({ kind: 'countdown'; matchId: string; game: number; map: string } & ReadyState)
   | {
       kind: 'live';
       matchId: string;
@@ -132,6 +152,20 @@ type Stage =
     }
   | { kind: 'simulating'; matchId: string }
   | { kind: 'finished'; deadline: number };
+
+/**
+ * Who is on the server and ready. Keys are entrant ids in 1v1 and user ids in team games.
+ * Kept from the ready check into the countdown, so a player leaving the countdown does not
+ * reset everybody else.
+ */
+interface ReadyState {
+  ready: Set<string>;
+  present: Set<string>;
+  /** Team games: teams the bridge declared ready (all ready, captain start, time up). */
+  teamReady: Set<string>;
+  /** Start of the ready check (captains may start with bots some time after). */
+  since: number;
+}
 
 interface ConnectedPlayer {
   pid: number;
@@ -165,6 +199,18 @@ export class MatchDirector extends EventEmitter {
   private readonly timing: DirectorTiming;
   /** Who may join the server; replaced by the website while the tournament runs. */
   private access: AccessEntry[];
+  /** Team games: line-up of the current game (user ids per entrant), fixed before the map loads. */
+  private lineup?: { matchId: string; game: number; sides: Record<string, string[]> };
+  /** Team games: bots playing the current game per entrant (from the countdown on). */
+  private gameBots: Record<string, BotSpec[]> = {};
+  /** Team games: who played the current game, for match.started. */
+  private startLineups?: Record<string, { name: string; userId?: string; bot?: boolean }[]>;
+  /** Team games: bots standing in for disconnected players (user id -> bot) and pending timers. */
+  private standIns = new Map<string, { entrantId: string; bot: BotSpec }>();
+  private standInTimers = new Map<string, TimerHandle>();
+  /** Team games: players out for the rest of a match (too many disconnects), per match id. */
+  private benched = new Map<string, Set<string>>();
+  private captainTimer?: TimerHandle;
 
   constructor(private readonly o: DirectorOptions) {
     super();
@@ -223,6 +269,17 @@ export class MatchDirector extends EventEmitter {
     const s = this.stage;
     switch (s.kind) {
       case 'checkIn': {
+        if (this.teamMode) {
+          const short = this.humans().filter(
+            (id) => this.checkedInCount(id) < this.checkInTarget(id),
+          );
+          if (!short.length) return undefined;
+          const list = short
+            .slice(0, 5)
+            .map((id) => `${this.name(id)} ${this.checkedInCount(id)}/${this.checkInTarget(id)}`)
+            .join(', ');
+          return `Waiting for check-in: ${list}${short.length > 5 ? ` +${short.length - 5} more` : ''}. Start in ${left(s.deadline)}; teams with nobody here play with bots.`;
+        }
         const missing = this.humans().filter((id) => !this.proj.checkedIn.includes(id));
         if (!missing.length) return undefined;
         const total = this.humans().length;
@@ -231,10 +288,29 @@ export class MatchDirector extends EventEmitter {
       case 'voting': {
         const open = s.voters.filter((v) => !s.ballots.has(v));
         if (!open.length) return undefined;
-        return `Map vote ${s.matchId}: waiting for ${names(open)}. Type !vote 2 1 3 (${left(s.deadline)} left).`;
+        const shown = open.slice(0, 5).map((v) => this.voterName(v));
+        const who =
+          open.length > 5 ? `${shown.join(', ')} +${open.length - 5} more` : shown.join(', ');
+        return `Map vote ${s.matchId}: waiting for ${who}. Type !vote 2 1 3 (${left(s.deadline)} left).`;
       }
       case 'readyCheck': {
         const { entrants } = this.current();
+        if (this.teamMode) {
+          const open = entrants.filter((e) => !this.teamIsReady(s, e));
+          if (!open.length) return undefined;
+          const parts = open.map((e) => {
+            const lineup = this.lineupOf(e);
+            const here = lineup.filter((u) => s.present.has(u)).length;
+            const ready = lineup.filter((u) => s.ready.has(u)).length;
+            return `${this.name(e)} ${ready}/${lineup.length} ready${here < lineup.length ? `, ${lineup.length - here} not here` : ''}`;
+          });
+          const startIn = s.since + this.timing.captainStartMs - now;
+          const hint =
+            startIn > 0
+              ? `Captains can !start with bots in ${left(s.since + this.timing.captainStartMs)}`
+              : 'Captains can !start now, bots fill missing places';
+          return `${s.matchId} waits for READY (FIRE or !ready): ${parts.join('; ')}. ${hint}. Time up in ${left(s.deadline)}.`;
+        }
         const open = entrants.filter((e) => !this.isBot(e) && !s.ready.has(e));
         if (!open.length) return undefined;
         const who = open
@@ -324,7 +400,7 @@ export class MatchDirector extends EventEmitter {
   setAccess(entries: readonly AccessEntry[]): Promise<void> {
     return this.enqueue(() => {
       this.access = [...entries];
-      this.send(aclLines(this.proj, this.access, this.proj.currentMatch?.entrants, ++this.rev));
+      this.send(this.aclFor(this.proj.currentMatch?.entrants));
     });
   }
 
@@ -337,6 +413,12 @@ export class MatchDirector extends EventEmitter {
       const before = this.proj.headSeq;
       await this.reload();
       if (this.proj.headSeq === before) return;
+      const fresh = this.events.slice(before);
+      if (fresh.every((e) => PASSIVE_EVENTS.has(e.type))) {
+        // A captain changed the line-up: it applies to the next game, nothing to re-plan.
+        this.o.log.info(`applied ${fresh.map((e) => e.type).join(', ')} from the website`);
+        return;
+      }
       await this.resumeFromProjection();
       if (this.proj.phase === 'aborted') this.emit('aborted', this.proj.abortedReason ?? '');
     });
@@ -382,18 +464,30 @@ export class MatchDirector extends EventEmitter {
     this.rules = parseRules(this.proj.settings.game.rules);
   }
 
-  /** Appends events. On a concurrency conflict it reloads, re-plans and returns false. */
+  /**
+   * Appends events. On a concurrency conflict it reloads; if only passive events came in
+   * between (a line-up change), it appends again on top of them, otherwise it re-plans and
+   * returns false.
+   */
   private async append(...events: EventDraft[]): Promise<boolean> {
     const actor = { kind: 'bridge' as const, id: this.o.agentId };
     const full = events.map((e) => ({ ...e, actor })) as NewTournamentEvent[];
-    const res = await this.o.store.append(this.o.tournamentId, this.proj.headSeq, full);
-    if (res.accepted) {
-      this.events.push(...res.events);
-      this.proj = projectTournament(this.events);
-      return true;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const res = await this.o.store.append(this.o.tournamentId, this.proj.headSeq, full);
+      if (res.accepted) {
+        this.events.push(...res.events);
+        this.proj = projectTournament(this.events);
+        return true;
+      }
+      const before = this.proj.headSeq;
+      await this.reload();
+      const fresh = this.events.slice(before);
+      if (fresh.length && fresh.every((e) => PASSIVE_EVENTS.has(e.type))) continue;
+      this.o.log.warn(`event append rejected (${res.reason}), re-planning`);
+      await this.resumeFromProjection();
+      return false;
     }
-    this.o.log.warn(`event append rejected (${res.reason}), re-planning`);
-    await this.reload();
+    this.o.log.warn('event append kept being rejected, re-planning');
     await this.resumeFromProjection();
     return false;
   }
@@ -455,7 +549,125 @@ export class MatchDirector extends EventEmitter {
   }
 
   private isBot(entrantId: string): boolean {
-    return this.proj.entrants[entrantId]?.kind === 'bot';
+    return isBotEntrant(this.proj.entrants[entrantId]);
+  }
+
+  private get teamMode(): boolean {
+    return this.proj.settings.teamSize > 1;
+  }
+
+  private get teamSize(): number {
+    return this.proj.settings.teamSize;
+  }
+
+  private team(entrantId: string | undefined): TeamEntrant | undefined {
+    const e = entrantId ? this.proj.entrants[entrantId] : undefined;
+    return isTeam(e) ? e : undefined;
+  }
+
+  /** Website users on the server right now. */
+  private connectedUsers(): Set<string> {
+    const out = new Set<string>();
+    for (const p of this.players.values()) if (p.userId) out.add(p.userId);
+    return out;
+  }
+
+  private pidOf(userId: string): number | undefined {
+    for (const p of this.players.values()) if (p.userId === userId) return p.pid;
+    return undefined;
+  }
+
+  private userName(userId: string): string {
+    for (const e of Object.values(this.proj.entrants)) {
+      if (isMember(e, userId)) return memberName(e as TeamEntrant, userId);
+    }
+    return this.access.find((a) => a.userId === userId)?.displayName ?? userId;
+  }
+
+  /** Names voters: entrants in 1v1, players in team games. */
+  private voterName(key: string): string {
+    return this.teamMode ? this.userName(key) : this.name(key);
+  }
+
+  /** Team games: the line-up of an entrant for the current game (empty for bot teams). */
+  private lineupOf(entrantId: string): string[] {
+    const cm = this.proj.currentMatch;
+    if (!this.lineup || !cm || this.lineup.matchId !== cm.matchId) return [];
+    return this.lineup.sides[entrantId] ?? [];
+  }
+
+  private benchedIn(matchId: string): Set<string> {
+    let set = this.benched.get(matchId);
+    if (!set) {
+      set = new Set();
+      this.benched.set(matchId, set);
+    }
+    return set;
+  }
+
+  private roleContext(): RoleContext {
+    const cm = this.proj.currentMatch;
+    const ctx: RoleContext = {};
+    if (!cm || !this.teamMode) return ctx;
+    if (this.lineup?.matchId === cm.matchId) ctx.lineup = this.lineup.sides;
+    const benched = this.benched.get(cm.matchId);
+    if (benched) ctx.excluded = benched;
+    return ctx;
+  }
+
+  private aclFor(entrants: readonly [string, string] | undefined): BridgeToMod[] {
+    return aclLines(this.proj, this.access, entrants, ++this.rev, this.roleContext());
+  }
+
+  /** Team games: bots of the current game per entrant, including stand-ins. */
+  private teamBots(): Record<string, BotSpec[]> {
+    const out: Record<string, BotSpec[]> = {};
+    for (const [id, bots] of Object.entries(this.gameBots)) out[id] = [...bots];
+    for (const s of this.standIns.values()) (out[s.entrantId] ??= []).push(s.bot);
+    return out;
+  }
+
+  private matchLinesFor(
+    matchId: string,
+    game: number,
+    entrants: readonly [string, string],
+  ): BridgeToMod[] {
+    return matchLines(
+      this.proj,
+      this.rules,
+      matchId,
+      game,
+      entrants,
+      this.teamMode ? this.teamBots() : undefined,
+    );
+  }
+
+  /** Team games: a team is ready when it is made of bots, was declared ready, or its line-up is. */
+  private teamIsReady(s: ReadyState, entrantId: string): boolean {
+    if (this.isBot(entrantId) || s.teamReady.has(entrantId)) return true;
+    const lineup = this.lineupOf(entrantId);
+    return lineup.every((u) => s.present.has(u) && s.ready.has(u));
+  }
+
+  private treadyLines(s: ReadyState): BridgeToMod[] {
+    const cm = this.proj.currentMatch;
+    if (!this.teamMode || !cm) return [];
+    return cm.entrants
+      .map((e, i): BridgeToMod | undefined =>
+        this.teamIsReady(s, e) ? { t: 'tready', s: i === 0 ? 'a' : 'b' } : undefined,
+      )
+      .filter((l): l is BridgeToMod => l !== undefined);
+  }
+
+  /** Clears what belongs to one game on the server (bots, stand-ins, timers). */
+  private resetGame(): void {
+    for (const t of this.standInTimers.values()) this.o.clock.clearTimeout(t);
+    this.standInTimers.clear();
+    this.standIns.clear();
+    this.gameBots = {};
+    this.startLineups = undefined;
+    if (this.captainTimer) this.o.clock.clearTimeout(this.captainTimer);
+    this.captainTimer = undefined;
   }
 
   private current(): { matchId: string; entrants: [string, string] } {
@@ -518,8 +730,8 @@ export class MatchDirector extends EventEmitter {
       { t: 'sync', st: 'begin', rev: this.rev },
       { t: 'title', name: wireName(this.proj.name) },
     ];
-    if (cm) lines.push(...matchLines(this.proj, this.rules, cm.matchId, cm.game, cm.entrants));
-    lines.push(...aclLines(this.proj, this.access, cm?.entrants, this.rev));
+    if (cm) lines.push(...this.matchLinesFor(cm.matchId, cm.game, cm.entrants));
+    lines.push(...aclLines(this.proj, this.access, cm?.entrants, this.rev, this.roleContext()));
     lines.push(...this.bracketUpdate());
     if (this.stage.kind === 'voting') {
       lines.push(
@@ -532,6 +744,9 @@ export class MatchDirector extends EventEmitter {
     }
     if (this.stage.kind === 'live' && this.stage.lost) {
       lines.push({ t: 'pause', on: true, why: `${this.name(this.stage.lost)} disconnected` });
+    }
+    if (this.stage.kind === 'readyCheck' || this.stage.kind === 'countdown') {
+      lines.push(...this.treadyLines(this.stage));
     }
     lines.push(this.phase(), { t: 'sync', st: 'end', rev: this.rev });
     return lines;
@@ -591,17 +806,33 @@ export class MatchDirector extends EventEmitter {
     await this.maybeCompleteCheckIn();
   }
 
+  /** Entrants with people: players in 1v1, teams with members in team games. */
   private humans(): string[] {
     return Object.values(this.proj.entrants)
-      .filter((e) => e.kind === 'human')
+      .filter((e) => !isBotEntrant(e))
       .map((e) => e.id);
+  }
+
+  /** Team games: members who have to be here before the check-in can finish early. */
+  private checkInTarget(entrantId: string): number {
+    const team = this.team(entrantId);
+    return team ? Math.min(this.teamSize, team.members.length) : 1;
+  }
+
+  private checkedInCount(entrantId: string): number {
+    const team = this.team(entrantId);
+    if (!team) return this.proj.checkedIn.includes(entrantId) ? 1 : 0;
+    return team.members.filter((m) => this.proj.checkedInUsers.includes(m.userId)).length;
   }
 
   private async maybeCompleteCheckIn(): Promise<void> {
     if (this.stage.kind !== 'checkIn') return;
-    const missing = this.humans().filter((id) => !this.proj.checkedIn.includes(id));
+    const missing = this.humans().filter((id) => this.checkedInCount(id) < this.checkInTarget(id));
     if (missing.length === 0) {
       await this.startTournament();
+    } else if (this.teamMode) {
+      const done = this.humans().length - missing.length;
+      this.say(`Check-in: ${done}/${this.humans().length} teams complete`);
     } else {
       this.say(
         `Check-in: ${this.humans().length - missing.length}/${this.humans().length} players. Waiting for ${missing.map((m) => this.name(m)).join(', ')}`,
@@ -612,13 +843,31 @@ export class MatchDirector extends EventEmitter {
   private async startTournament(): Promise<void> {
     if (this.stage.kind !== 'checkIn') return;
     this.clearTimer();
-    const missing = this.humans().filter((id) => !this.proj.checkedIn.includes(id));
+    // Team games: a team plays as long as one member is here; gaps are filled per game.
+    const missing = this.humans().filter((id) => this.checkedInCount(id) === 0);
     const usedNames = new Set(
       Object.values(this.proj.entrants)
         .filter((e) => e.kind === 'bot')
         .map((e) => (e.kind === 'bot' ? e.bot.name : '')),
     );
     const replacements: EventDraft[] = missing.map((entrantId, i) => {
+      const team = this.team(entrantId);
+      if (team) {
+        const bots = pickBots(team.bots, this.o.botPool, new Set(), this.teamSize);
+        this.say(`Nobody of ${team.displayName} checked in: bots play for the team`);
+        const replacement: TeamEntrant = {
+          id: team.id,
+          kind: 'team',
+          displayName: team.displayName,
+          ...(team.tag ? { tag: team.tag } : {}),
+          members: [],
+          bots,
+        };
+        return {
+          type: 'entrant.replaced',
+          data: { entrantId, replacement, reason: 'noShowCheckIn' },
+        };
+      }
       let spec = this.o.botPool.find((b) => !usedNames.has(b.name));
       if (!spec) {
         const base = this.o.botPool[i % this.o.botPool.length] as BotSpec;
@@ -634,7 +883,7 @@ export class MatchDirector extends EventEmitter {
     if (!(await this.append(...replacements, { type: 'tournament.started', data: {} }))) return;
     this.say('The tournament starts now!');
     // Roles changed for replaced players: refresh the access list on the server.
-    this.send(aclLines(this.proj, this.access, undefined, ++this.rev));
+    this.send(this.aclFor(undefined));
     await this.nextMatch();
   }
 
@@ -652,11 +901,10 @@ export class MatchDirector extends EventEmitter {
     }
     const entrants = m.entrants as [string, string];
     if (!(await this.append({ type: 'match.called', data: { matchId: m.id, entrants } }))) return;
+    this.lineup = undefined;
+    this.resetGame();
     // Tell the server who plays next, so it can show vote/ready UI to the right players.
-    this.send([
-      ...matchLines(this.proj, this.rules, m.id, 1, entrants),
-      ...aclLines(this.proj, this.access, entrants, ++this.rev),
-    ]);
+    this.send([...this.matchLinesFor(m.id, 1, entrants), ...this.aclFor(entrants)]);
     this.say(`Next match (${m.id}): ${this.name(entrants[0])} vs ${this.name(entrants[1])}`);
     if (
       this.isBot(entrants[0]) &&
@@ -672,12 +920,7 @@ export class MatchDirector extends EventEmitter {
     const { entrants } = this.current();
     if (game === 1) {
       if (this.rules.mapMode === 'vote') {
-        return this.openVote(
-          matchId,
-          game,
-          'vote',
-          entrants.filter((e) => !this.isBot(e)),
-        );
+        return this.openVote(matchId, game, 'vote', this.votersOf(entrants));
       }
       const map = randomMap({
         pool: this.pool,
@@ -689,10 +932,28 @@ export class MatchDirector extends EventEmitter {
       return this.selectMap(matchId, game, map, 'random');
     }
     // Game 2+: the loser of the previous game picks.
+    return this.openVote(matchId, game, 'loserPick', this.votersOf([this.lastLoser(matchId)]));
+  }
+
+  private lastLoser(matchId: string): string {
+    const { entrants } = this.current();
     const games = this.proj.games[matchId] ?? [];
     const last = games[games.length - 1];
-    const loser = entrants.find((e) => e !== last?.winnerId) as string;
-    return this.openVote(matchId, game, 'loserPick', this.isBot(loser) ? [] : [loser]);
+    return entrants.find((e) => e !== last?.winnerId) as string;
+  }
+
+  /**
+   * Who votes for these entrants: the human entrants in 1v1, the members on the server in team
+   * games (members who arrive during the vote are added).
+   */
+  private votersOf(entrants: readonly string[]): string[] {
+    if (!this.teamMode) return entrants.filter((e) => !this.isBot(e));
+    const out: string[] = [];
+    for (const p of this.players.values()) {
+      if (p.userId && p.entrantId && entrants.includes(p.entrantId) && !out.includes(p.userId))
+        out.push(p.userId);
+    }
+    return out;
   }
 
   private async openVote(
@@ -702,10 +963,19 @@ export class MatchDirector extends EventEmitter {
     voters: string[],
   ): Promise<void> {
     const deadline = this.o.clock.now() + this.rules.voteTimeoutSec * 1000;
+    if (this.lineup) {
+      // Back to voting: every team member is a match player (and votes) until the next line-up.
+      this.lineup = undefined;
+      this.send(this.aclFor(this.current().entrants));
+    }
     this.stage = { kind: 'voting', matchId, game, method, voters, ballots: new Map(), deadline };
     if (voters.length === 0) return this.closeVote();
     this.send([...voteLines(matchId, this.voteOptions(), this.rules.voteTimeoutSec), this.phase()]);
-    const who = voters.map((v) => this.name(v)).join(' and ');
+    const who = this.teamMode
+      ? (method === 'vote' ? this.current().entrants : [this.lastLoser(matchId)])
+          .map((e) => this.name(e))
+          .join(' and ')
+      : voters.map((v) => this.name(v)).join(' and ');
     this.say(
       method === 'vote'
         ? `Map vote for ${who}: pick up to ${this.rules.picksPerPlayer} maps (!vote 3 1 5)`
@@ -715,15 +985,22 @@ export class MatchDirector extends EventEmitter {
     this.telemetry('voting', { deadline });
   }
 
-  private async onVote(entrantId: string, picks: string[]): Promise<void> {
+  /** `key` is the entrant id in 1v1 and the user id in team games. */
+  private async onVote(key: string, picks: string[]): Promise<void> {
     const s = this.stage;
-    if (s.kind !== 'voting' || !s.voters.includes(entrantId)) {
-      this.o.log.info(`vote from ${this.name(entrantId)} ignored (not a voter right now)`);
+    if (s.kind !== 'voting' || !s.voters.includes(key)) {
+      this.o.log.info(`vote from ${this.voterName(key)} ignored (not a voter right now)`);
       return;
     }
-    this.o.log.info(`vote from ${this.name(entrantId)}: ${picks.join(', ') || '(empty)'}`);
-    s.ballots.set(entrantId, picks);
+    this.o.log.info(`vote from ${this.voterName(key)}: ${picks.join(', ') || '(empty)'}`);
+    s.ballots.set(key, picks);
     if (s.voters.every((v) => s.ballots.has(v))) await this.closeVote();
+  }
+
+  /** Team games: the ballots of one team's players. */
+  private memberBallots(s: Extract<Stage, { kind: 'voting' }>, entrantId: string): string[][] {
+    const team = this.team(entrantId);
+    return [...s.ballots].filter(([userId]) => isMember(team, userId)).map(([, picks]) => picks);
   }
 
   private async closeVote(): Promise<void> {
@@ -733,10 +1010,21 @@ export class MatchDirector extends EventEmitter {
     const { entrants } = this.current();
     const rng = this.rng(s.matchId, s.game, s.method);
     if (s.method === 'vote') {
+      // Team games: one ballot per team, so a team weighs the same however many players vote.
+      const ballots = this.teamMode
+        ? entrants.map((entrantId) => ({
+            entrantId,
+            picks: teamBallot(
+              this.memberBallots(s, entrantId),
+              this.pool,
+              this.rules.picksPerPlayer,
+            ),
+          }))
+        : [...s.ballots].map(([entrantId, picks]) => ({ entrantId, picks }));
       const out = resolveMapVote({
         pool: this.pool,
         entrants,
-        ballots: [...s.ballots].map(([entrantId, picks]) => ({ entrantId, picks })),
+        ballots,
         history: this.proj.mapHistory,
         picksPerPlayer: this.rules.picksPerPlayer,
         avoidRecentMaps: this.rules.avoidRecentMaps,
@@ -746,11 +1034,22 @@ export class MatchDirector extends EventEmitter {
         ballots: out.ballots,
         scores: out.scores,
         tiedFor: out.tiedFor,
+        ...(this.teamMode
+          ? { players: [...s.ballots].map(([userId, picks]) => ({ userId, picks })) }
+          : {}),
       });
     }
     const games = this.proj.games[s.matchId] ?? [];
     const loser = s.voters[0];
-    const picks = (loser && s.ballots.get(loser)) || randomBallot(this.pool, 3, rng);
+    const teamPicks = this.teamMode
+      ? teamBallot(this.memberBallots(s, this.lastLoser(s.matchId)), this.pool, this.pool.length)
+      : [];
+    const picks =
+      (this.teamMode
+        ? teamPicks.length
+          ? teamPicks
+          : undefined
+        : loser && s.ballots.get(loser)) || randomBallot(this.pool, 3, rng);
     const r = loserPickMap({
       pool: this.pool,
       loserPicks: picks,
@@ -781,6 +1080,8 @@ export class MatchDirector extends EventEmitter {
   }
 
   private async travel(matchId: string, game: number, map: string): Promise<void> {
+    this.resetGame();
+    this.fixLineup(matchId, game);
     this.stage = { kind: 'loading', matchId, game, map };
     const wait = this.cooldownUntil - this.o.clock.now();
     if (wait > 0) {
@@ -798,8 +1099,8 @@ export class MatchDirector extends EventEmitter {
     // The mod caches match and access list before travelling, so logins on the new level work
     // before the bridge connection is re-established.
     this.send([
-      ...matchLines(this.proj, this.rules, s.matchId, s.game, entrants),
-      ...aclLines(this.proj, this.access, entrants, ++this.rev),
+      ...this.matchLinesFor(s.matchId, s.game, entrants),
+      ...this.aclFor(entrants),
       this.phase(),
       travelLine(this.rules, s.map, s.matchId, s.game),
     ]);
@@ -808,6 +1109,28 @@ export class MatchDirector extends EventEmitter {
       this.o.log.warn(`no mod connection on ${s.map} after travel, sending travel again`);
       this.sendTravel();
     });
+  }
+
+  /**
+   * Team games: who plays the next game, decided before the map loads (see lineupFor). Players
+   * of the line-up log in as players, everybody else as spectators.
+   */
+  private fixLineup(matchId: string, game: number): void {
+    if (!this.teamMode) return;
+    if (this.lineup?.matchId === matchId && this.lineup.game === game) return;
+    const { entrants } = this.current();
+    const connected = this.connectedUsers();
+    const benched = this.benched.get(matchId) ?? new Set<string>();
+    const sides: Record<string, string[]> = {};
+    for (const e of entrants) {
+      const team = this.team(e);
+      sides[e] = team ? lineupFor(team, connected, this.teamSize, benched) : [];
+    }
+    this.lineup = { matchId, game, sides };
+    for (const e of entrants) {
+      const names = (sides[e] ?? []).map((u) => this.userName(u));
+      this.o.log.info(`line-up ${this.name(e)}: ${names.join(', ') || '(bots)'}`);
+    }
   }
 
   private async onHello(hello: ModHello): Promise<void> {
@@ -838,40 +1161,124 @@ export class MatchDirector extends EventEmitter {
     }
   }
 
-  private async enterReadyCheck(matchId: string, game: number, map: string): Promise<void> {
-    const deadline = this.o.clock.now() + this.proj.settings.noShowSec * 1000;
+  /**
+   * Ready check on a freshly loaded map. `keep` carries who is here and ready when a player left
+   * the countdown (everybody else stays ready).
+   */
+  private async enterReadyCheck(
+    matchId: string,
+    game: number,
+    map: string,
+    keep?: ReadyState,
+  ): Promise<void> {
+    const now = this.o.clock.now();
+    const deadline = now + this.proj.settings.noShowSec * 1000;
     this.stage = {
       kind: 'readyCheck',
       matchId,
       game,
       map,
-      ready: new Set(),
-      present: new Set(),
+      ready: keep?.ready ?? new Set(),
+      present: keep?.present ?? new Set(),
+      teamReady: keep?.teamReady ?? new Set(),
+      since: keep?.since ?? now,
       deadline,
     };
+    this.gameBots = {};
     this.send(this.snapshot());
     this.setTimer(this.proj.settings.noShowSec * 1000, () => this.onNoShow());
     this.telemetry('readyCheck', { deadline });
+    this.armCaptainHint();
     await this.checkAllReady();
+  }
+
+  /** Team games: tells waiting captains when they may start with bots. */
+  private armCaptainHint(): void {
+    if (this.captainTimer) this.o.clock.clearTimeout(this.captainTimer);
+    this.captainTimer = undefined;
+    const s = this.stage;
+    if (!this.teamMode || s.kind !== 'readyCheck') return;
+    const wait = s.since + this.timing.captainStartMs - this.o.clock.now();
+    if (wait <= 0) return;
+    this.captainTimer = this.o.clock.setTimeout(() => {
+      void this.enqueue(() => {
+        const cur = this.stage;
+        if (cur !== s) return;
+        const connected = this.connectedUsers();
+        for (const e of this.current().entrants) {
+          const team = this.team(e);
+          if (!team || this.teamIsReady(cur, e)) continue;
+          const captain = actingCaptain(team, connected);
+          const pid = captain ? this.pidOf(captain) : undefined;
+          if (pid !== undefined)
+            this.say(
+              `Captain of ${team.displayName}: type !start to play now, bots fill missing places`,
+              pid,
+            );
+        }
+      });
+    }, wait);
   }
 
   private async checkAllReady(): Promise<void> {
     const s = this.stage;
     if (s.kind !== 'readyCheck') return;
     const { entrants } = this.current();
-    const ready = Object.fromEntries(entrants.map((e) => [e, this.isBot(e) || s.ready.has(e)]));
+    const ready = Object.fromEntries(
+      entrants.map((e) => [
+        e,
+        this.teamMode ? this.teamIsReady(s, e) : this.isBot(e) || s.ready.has(e),
+      ]),
+    );
     this.telemetry('readyCheck', { ready, deadline: s.deadline });
     if (!entrants.every((e) => ready[e])) return;
     this.clearTimer();
-    this.stage = { kind: 'countdown', matchId: s.matchId, game: s.game, map: s.map };
-    this.send([{ t: 'cd', sec: this.rules.countdownSec }, this.phase()]);
+    if (this.captainTimer) this.o.clock.clearTimeout(this.captainTimer);
+    this.captainTimer = undefined;
+    this.stage = {
+      kind: 'countdown',
+      matchId: s.matchId,
+      game: s.game,
+      map: s.map,
+      ready: s.ready,
+      present: s.present,
+      teamReady: s.teamReady,
+      since: s.since,
+    };
+    const lines: BridgeToMod[] = [];
+    if (this.teamMode) {
+      this.fillWithBots(s);
+      // The bots of this game go to the server with the countdown.
+      lines.push(...this.matchLinesFor(s.matchId, s.game, entrants));
+    }
+    this.send([...lines, { t: 'cd', sec: this.rules.countdownSec }, this.phase()]);
     this.telemetry('countdown');
+  }
+
+  /** Team games: the players of the line-up who are here, bots for every other place. */
+  private fillWithBots(s: ReadyState): void {
+    const { entrants } = this.current();
+    const used = new Set<string>();
+    this.gameBots = {};
+    this.startLineups = {};
+    for (const e of entrants) {
+      const team = this.team(e);
+      if (!team) continue;
+      const humans = this.lineupOf(e).filter((u) => s.present.has(u));
+      const bots = pickBots(team.bots, this.o.botPool, used, this.teamSize - humans.length);
+      this.gameBots[e] = bots;
+      this.startLineups[e] = [
+        ...humans.map((userId) => ({ name: memberName(team, userId), userId })),
+        ...bots.map((b) => ({ name: b.name, bot: true })),
+      ];
+    }
   }
 
   private async onNoShow(): Promise<void> {
     const s = this.stage;
     if (s.kind !== 'readyCheck') return;
     const { entrants } = this.current();
+    if (this.teamMode) return this.onTeamTimeUp(s);
     const notReady = entrants.filter((e) => !this.isBot(e) && !s.ready.has(e));
     if (notReady.length === 0) return this.checkAllReady();
     let loser: string;
@@ -885,8 +1292,37 @@ export class MatchDirector extends EventEmitter {
     await this.forfeit(s.matchId, loser);
   }
 
+  /**
+   * Team games, ready check over: a team with at least one member on the server plays (bots fill
+   * the gaps, players who are not ready yet play anyway); a team with nobody here forfeits.
+   */
+  private async onTeamTimeUp(s: Extract<Stage, { kind: 'readyCheck' }>): Promise<void> {
+    const { entrants } = this.current();
+    const connected = this.connectedUsers();
+    const absent = entrants.filter((e) => {
+      const team = this.team(e);
+      return (
+        !!team && team.members.length > 0 && !team.members.some((m) => connected.has(m.userId))
+      );
+    });
+    if (absent.length === 0) {
+      for (const e of entrants) s.teamReady.add(e);
+      this.say('Time is up: the game starts, bots fill missing places');
+      return this.checkAllReady();
+    }
+    const loser =
+      absent.length === 1
+        ? (absent[0] as string)
+        : (absent[Math.floor(this.rng(s.matchId, 'noshow')() * absent.length)] as string);
+    this.say(
+      `Nobody of ${this.name(loser)} is on the server: ${this.name(loser)} forfeits ${s.matchId}`,
+    );
+    await this.forfeit(s.matchId, loser);
+  }
+
   private async forfeit(matchId: string, loser: string): Promise<void> {
     this.clearTimer();
+    this.resetGame();
     const { entrants } = this.current();
     const winnerId = entrants.find((e) => e !== loser) as string;
     const result: MatchResult = {
@@ -945,10 +1381,7 @@ export class MatchDirector extends EventEmitter {
     this.stage = { kind: 'simulating', matchId };
     this.send([this.phase()]);
     this.setTimer(this.timing.simulateDelayMs, async () => {
-      const skills = entrants.map((e) => {
-        const ent = this.proj.entrants[e];
-        return ent?.kind === 'bot' ? ent.bot.skill : 3;
-      }) as [number, number];
+      const skills = entrants.map((e) => botSkill(this.proj.entrants[e])) as [number, number];
       const series = simulateSeries({
         skills,
         bestOf,
@@ -992,7 +1425,8 @@ export class MatchDirector extends EventEmitter {
     const entry = this.access.find((a) => a.token === token);
     if (!entry?.entrantId) return entry ? { entry } : {};
     const ent = this.proj.entrants[entry.entrantId];
-    const isTheirs = ent?.kind === 'human' && ent.userId === entry.userId;
+    const isTheirs =
+      (ent?.kind === 'human' && ent.userId === entry.userId) || isMember(ent, entry.userId);
     return isTheirs ? { entry, entrantId: entry.entrantId } : { entry };
   }
 
@@ -1015,6 +1449,13 @@ export class MatchDirector extends EventEmitter {
         const p = this.players.get(msg.pid);
         const s = this.stage;
         if (s.kind !== 'readyCheck' || !p?.entrantId || !this.sideOf(p.entrantId)) return;
+        if (this.teamMode) {
+          if (!p.userId || !this.lineupOf(p.entrantId).includes(p.userId)) return;
+          const wasReady = this.teamIsReady(s, p.entrantId);
+          s.ready.add(p.userId);
+          if (!wasReady && this.teamIsReady(s, p.entrantId)) this.announceTeamReady(p.entrantId);
+          return this.checkAllReady();
+        }
         if (!s.ready.has(p.entrantId)) {
           s.ready.add(p.entrantId);
           this.say(`${this.name(p.entrantId)} is ready`);
@@ -1024,16 +1465,22 @@ export class MatchDirector extends EventEmitter {
       case 'vote': {
         const p = this.players.get(msg.pid);
         if (!p?.entrantId) return;
-        return this.onVote(p.entrantId, [msg.m1, msg.m2, msg.m3].filter(Boolean));
+        const key = this.teamMode ? p.userId : p.entrantId;
+        if (!key) return;
+        return this.onVote(key, [msg.m1, msg.m2, msg.m3].filter(Boolean));
       }
+      case 'cmd':
+        if (msg.c === 'start') return this.captainStart(msg.pid);
+        return;
       case 'live': {
         const s = this.stage;
         if (s.kind !== 'countdown' || s.matchId !== msg.mid) return;
         this.stage = { kind: 'live', matchId: s.matchId, game: s.game, map: s.map, scores: [0, 0] };
+        const lineups = this.startLineups;
         if (
           !(await this.append({
             type: 'match.started',
-            data: { matchId: s.matchId, game: s.game },
+            data: { matchId: s.matchId, game: s.game, ...(lineups ? { lineups } : {}) },
           }))
         )
           return;
@@ -1051,7 +1498,7 @@ export class MatchDirector extends EventEmitter {
       }
       case 'lost': {
         const s = this.stage;
-        if (s.kind !== 'live' || s.matchId !== msg.mid) return;
+        if (this.teamMode || s.kind !== 'live' || s.matchId !== msg.mid) return;
         const { entrants } = this.current();
         return this.onMatchPlayerLost(entrants[msg.s === 'a' ? 0 : 1]);
       }
@@ -1082,6 +1529,7 @@ export class MatchDirector extends EventEmitter {
       ...(entrantId ? { entrantId } : {}),
     });
     const s = this.stage;
+    if (this.teamMode && entrantId) return this.onTeamJoin(pid, entry.userId, entrantId);
     if (s.kind === 'checkIn' && entrantId && !this.proj.checkedIn.includes(entrantId)) {
       if (!(await this.append({ type: 'entrant.checkedIn', data: { entrantId } }))) return;
       this.say(`${this.name(entrantId)} checked in`);
@@ -1113,16 +1561,205 @@ export class MatchDirector extends EventEmitter {
     this.players.delete(pid);
     if (p) this.o.log.info(`${p.name} left the server`);
     if (!p?.entrantId) return;
+    if (this.teamMode && p.userId) return this.onTeamLeave(p.userId, p.entrantId);
     const s = this.stage;
     if (s.kind === 'readyCheck') {
       s.present.delete(p.entrantId);
       s.ready.delete(p.entrantId);
     } else if (s.kind === 'countdown' && this.sideOf(p.entrantId)) {
       this.say(`${this.name(p.entrantId)} left during the countdown, back to the ready check`);
-      await this.enterReadyCheck(s.matchId, s.game, s.map);
+      s.ready.delete(p.entrantId);
+      s.present.delete(p.entrantId);
+      await this.enterReadyCheck(s.matchId, s.game, s.map, s);
     } else if (s.kind === 'live' && this.sideOf(p.entrantId)) {
       await this.onMatchPlayerLost(p.entrantId);
     }
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // Team games: players joining and leaving, captains, stand-in bots
+  // -------------------------------------------------------------------------------------------
+
+  private async onTeamJoin(pid: number, userId: string, entrantId: string): Promise<void> {
+    const s = this.stage;
+    const team = this.team(entrantId);
+    if (!team) return;
+    switch (s.kind) {
+      case 'checkIn':
+        if (this.proj.checkedInUsers.includes(userId)) return;
+        if (!(await this.append({ type: 'entrant.checkedIn', data: { entrantId, userId } })))
+          return;
+        this.say(`${memberName(team, userId)} (${team.displayName}) checked in`);
+        return this.maybeCompleteCheckIn();
+      case 'voting':
+        // Late arrivals of the two teams vote too (game 1: both teams, later: the loser).
+        if (
+          !s.voters.includes(userId) &&
+          (s.method === 'vote' ? !!this.sideOf(entrantId) : entrantId === this.lastLoser(s.matchId))
+        ) {
+          s.voters.push(userId);
+        }
+        return;
+      case 'readyCheck':
+        if (this.lineupOf(entrantId).includes(userId)) s.present.add(userId);
+        return this.checkAllReady();
+      case 'live': {
+        if (!this.lineupOf(entrantId).includes(userId)) return;
+        if (this.benchedIn(s.matchId).has(userId)) return;
+        const timer = this.standInTimers.get(userId);
+        if (timer) this.o.clock.clearTimeout(timer);
+        this.standInTimers.delete(userId);
+        const standIn = this.standIns.get(userId);
+        if (standIn) {
+          this.standIns.delete(userId);
+          this.send([{ t: 'botdel', name: wireName(standIn.bot.name) }]);
+          this.say(`${memberName(team, userId)} is back, ${standIn.bot.name} leaves the game`);
+        } else this.say(`${memberName(team, userId)} is back`);
+        const left = this.proj.settings.maxReconnects - this.disconnectCount(s.matchId, userId);
+        if (left <= 0) {
+          this.send([
+            {
+              t: 'warn',
+              pid,
+              msg: 'LAST WARNING: one more disconnect and you are out of this match (a bot takes over)',
+            },
+          ]);
+        } else this.say(`Reconnects left in this match: ${left}`, pid);
+        return;
+      }
+      default:
+        return;
+    }
+  }
+
+  private async onTeamLeave(userId: string, entrantId: string): Promise<void> {
+    const s = this.stage;
+    switch (s.kind) {
+      case 'voting':
+        // Do not wait for somebody who left without voting.
+        if (!s.ballots.has(userId)) {
+          s.voters = s.voters.filter((v) => v !== userId);
+          if (s.voters.length && s.voters.every((v) => s.ballots.has(v))) await this.closeVote();
+        }
+        return;
+      case 'readyCheck':
+        s.present.delete(userId);
+        s.ready.delete(userId);
+        return;
+      case 'countdown':
+        if (!this.lineupOf(entrantId).includes(userId)) return;
+        this.say(`${this.userName(userId)} left during the countdown, back to the ready check`);
+        s.present.delete(userId);
+        s.ready.delete(userId);
+        return this.enterReadyCheck(s.matchId, s.game, s.map, s);
+      case 'live':
+        if (!this.lineupOf(entrantId).includes(userId)) return;
+        if (this.benchedIn(s.matchId).has(userId) || this.standIns.has(userId)) return;
+        return this.onTeamPlayerLost(userId, entrantId);
+      default:
+        return;
+    }
+  }
+
+  /** A player of the line-up dropped during the game: a bot takes over after a short wait. */
+  private onTeamPlayerLost(userId: string, entrantId: string): void {
+    const s = this.stage;
+    if (s.kind !== 'live') return;
+    const count = this.countDisconnect(s.matchId, userId);
+    const max = this.proj.settings.maxReconnects;
+    const name = this.userName(userId);
+    if (count > max) {
+      this.benchedIn(s.matchId).add(userId);
+      const entry = this.access.find((a) => a.userId === userId);
+      if (entry) {
+        this.send([{ t: 'acladd', tk: entry.token, name: wireName(entry.displayName), r: 's' }]);
+      }
+      this.say(
+        `${name} disconnected ${count} times (max ${max} reconnects) and is out of this match`,
+      );
+      this.bringStandIn(userId, entrantId);
+      return;
+    }
+    const delay = this.timing.standInDelayMs;
+    this.say(
+      `${name} disconnected. A bot takes over in ${Math.round(delay / 1000)}s unless they come back`,
+    );
+    const handle = this.o.clock.setTimeout(() => {
+      void this.enqueue(() => {
+        if (this.standInTimers.get(userId) !== handle) return;
+        this.standInTimers.delete(userId);
+        const cur = this.stage;
+        if (cur.kind !== 'live' || cur.matchId !== s.matchId || cur.game !== s.game) return;
+        if (this.connectedUsers().has(userId)) return;
+        this.bringStandIn(userId, entrantId);
+      });
+    }, delay);
+    this.standInTimers.set(userId, handle);
+  }
+
+  private bringStandIn(userId: string, entrantId: string): void {
+    const team = this.team(entrantId);
+    const side = this.sideOf(entrantId);
+    if (!team || !side || this.standIns.has(userId)) return;
+    const used = new Set<string>();
+    for (const bots of Object.values(this.teamBots()))
+      for (const b of bots) used.add(b.name.toLowerCase());
+    const bot = pickBots(team.bots, this.o.botPool, used, 1)[0];
+    if (!bot) return;
+    this.standIns.set(userId, { entrantId, bot });
+    this.send([
+      {
+        t: 'botadd',
+        s: side,
+        name: wireName(bot.name),
+        sk: Math.max(0, Math.min(7, Math.round(bot.skill))),
+        cls: bot.botClass ?? '',
+      },
+    ]);
+    this.say(`${bot.name} plays for ${this.userName(userId)} (${team.displayName})`);
+  }
+
+  private announceTeamReady(entrantId: string): void {
+    const side = this.sideOf(entrantId);
+    if (side) this.send([{ t: 'tready', s: side }]);
+    this.say(`${this.name(entrantId)} is ready`);
+  }
+
+  /** "!start" from a captain: the team plays now, bots take the places of missing players. */
+  private async captainStart(pid: number): Promise<void> {
+    const p = this.players.get(pid);
+    const s = this.stage;
+    if (!this.teamMode || s.kind !== 'readyCheck' || !p?.userId) return;
+    const team = this.team(p.entrantId);
+    if (!team || !this.sideOf(team.id) || this.teamIsReady(s, team.id)) return;
+    const captain = actingCaptain(team, this.connectedUsers());
+    if (captain !== p.userId) {
+      const who = captain ? memberName(team, captain) : 'the captain';
+      this.say(`Only ${who} can start for ${team.displayName}`, pid);
+      return;
+    }
+    const wait = s.since + this.timing.captainStartMs - this.o.clock.now();
+    if (wait > 0) {
+      this.say(
+        `You can start with bots in ${Math.ceil(wait / 1000)} s (or when your team is ready)`,
+        pid,
+      );
+      return;
+    }
+    s.teamReady.add(team.id);
+    this.say(
+      `${memberName(team, p.userId)} starts for ${team.displayName}: bots fill missing places`,
+    );
+    this.announceTeamReady(team.id);
+    await this.checkAllReady();
+  }
+
+  private countDisconnect(matchId: string, key: string): number {
+    const perMatch = this.disconnects.get(matchId) ?? new Map<string, number>();
+    this.disconnects.set(matchId, perMatch);
+    const count = (perMatch.get(key) ?? 0) + 1;
+    perMatch.set(key, count);
+    return count;
   }
 
   private disconnectCount(matchId: string, entrantId: string): number {
@@ -1164,6 +1801,7 @@ export class MatchDirector extends EventEmitter {
     const s = this.stage;
     if (s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g) return;
     this.clearTimer();
+    this.resetGame();
     const { entrants } = this.current();
     const winnerId = entrants[msg.w === 'a' ? 0 : 1];
     const endReason = (

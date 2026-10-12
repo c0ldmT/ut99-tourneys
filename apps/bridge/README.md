@@ -79,6 +79,16 @@ node apps/bridge/dist/cli.js run -c bridge.json -t tournament.json
 Console commands while running: `start` (force start, missing players are replaced by bots), `pause [reason]`,
 `resume`, `status` (incl. what the tournament is waiting for), `quit` (also stops a managed server).
 
+Team tournaments in standalone mode: set `"teamSize": 2` (3, 5) in the settings and list the teams; the first
+`teamSize` members start, the rest are substitutes, every player has to be in a team:
+
+```json
+"teams": [
+  { "name": "Red Devils", "tag": "[RD]", "members": ["mario", "anna", "jonas"], "captain": "mario" },
+  { "name": "Blue Steel", "members": ["lea", "tim"] }
+]
+```
+
 Restarting the bridge with the same files resumes the tournament from the event log. Delete the `.jsonl` file
 to start over.
 
@@ -96,6 +106,7 @@ node apps/bridge/dist/sim-cli.js -c bridge.json -t tournament.json --game 5   # 
 | File                          | Role                                                                                                            |
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `src/director.ts`             | Match director: check-in, scheduling, map vote, travel, ready check, countdown, live, forfeits, best-of, finish |
+| `src/teams.ts`                | Team games: line-up, acting captain, bots for free places                                                       |
 | `src/mod-server.ts`           | TCP server for the mod (handshake, line protocol)                                                               |
 | `src/event-store.ts`          | Event log with optimistic concurrency (local JSONL, standalone mode)                                            |
 | `src/website/link.ts`         | WebSocket client to the website (hello, reconnect, request/answer)                                              |

@@ -1,6 +1,8 @@
 import {
+  isBotEntrant,
   wireName,
   type AccessEntry,
+  type BotSpec,
   type BridgeToMod,
   type Entrant,
   type ModPhase,
@@ -17,16 +19,37 @@ export function entrantName(proj: TournamentProjection, id: string | null | unde
   return wireName(proj.entrants[id]?.displayName ?? id);
 }
 
-/** Role of a website user on the game server: match player a/b of the current match, else spectator. */
+/** Team games: who plays in the current game, and who is out for the rest of the match. */
+export interface RoleContext {
+  /** User ids per entrant id playing the current game; undefined while the map is voted. */
+  lineup?: Readonly<Record<string, readonly string[]>>;
+  /** Users who may only watch (too many disconnects in this match). */
+  excluded?: ReadonlySet<string>;
+}
+
+/**
+ * Role of a website user on the game server: match player a/b of the current match, else
+ * spectator. In team games every member is a/b while the map is voted (they all vote); once the
+ * line-up is fixed, only the players of the line-up are, the substitutes on the bench watch.
+ */
 export function roleOf(
   proj: TournamentProjection,
   entry: AccessEntry,
   matchEntrants: readonly [string, string] | undefined,
+  ctx: RoleContext = {},
 ): 'a' | 'b' | 's' {
   if (!entry.entrantId || !matchEntrants) return 's';
   const entrant = proj.entrants[entry.entrantId];
   // A user replaced by a bot is a spectator from then on.
-  if (!entrant || entrant.kind !== 'human' || entrant.userId !== entry.userId) return 's';
+  if (!entrant) return 's';
+  if (entrant.kind === 'human') {
+    if (entrant.userId !== entry.userId) return 's';
+  } else if (entrant.kind === 'team') {
+    if (!entrant.members.some((m) => m.userId === entry.userId)) return 's';
+    if (ctx.excluded?.has(entry.userId)) return 's';
+    const lineup = ctx.lineup?.[entrant.id];
+    if (ctx.lineup && !lineup?.includes(entry.userId)) return 's';
+  } else return 's';
   if (matchEntrants[0] === entry.entrantId) return 'a';
   if (matchEntrants[1] === entry.entrantId) return 'b';
   return 's';
@@ -37,6 +60,7 @@ export function aclLines(
   access: readonly AccessEntry[],
   matchEntrants: readonly [string, string] | undefined,
   rev: number,
+  ctx: RoleContext = {},
 ): BridgeToMod[] {
   return [
     { t: 'acl', n: access.length, rev },
@@ -44,7 +68,7 @@ export function aclLines(
       t: 'acle',
       tk: e.token,
       name: wireName(e.displayName),
-      r: roleOf(proj, e, matchEntrants),
+      r: roleOf(proj, e, matchEntrants, ctx),
     })),
   ];
 }
@@ -61,12 +85,25 @@ export function seriesWins(
   ] as [number, number];
 }
 
+const botLine = (s: Side, b: BotSpec): BridgeToMod => ({
+  t: 'bot',
+  s,
+  name: wireName(b.name),
+  sk: Math.max(0, Math.min(7, Math.round(b.skill))),
+  cls: b.botClass ?? '',
+});
+
+/**
+ * Match header for the mod, plus the bots: in 1v1 the bot side, in team games the bots playing
+ * this game per entrant (`teamBots`, known from the countdown on).
+ */
 export function matchLines(
   proj: TournamentProjection,
   rules: Ut99DmRules,
   matchId: string,
   game: number,
   entrants: readonly [string, string],
+  teamBots?: Readonly<Record<string, readonly BotSpec[]>>,
 ): BridgeToMod[] {
   const node = proj.bracket?.byId[matchId];
   const [wa, wb] = seriesWins(proj, matchId, entrants);
@@ -82,19 +119,15 @@ export function matchLines(
       nb: entrantName(proj, entrants[1]),
       fl: rules.fragLimit,
       tl: rules.timeLimitMin,
+      ts: proj.settings.teamSize,
+      ff: rules.friendlyFirePct,
     },
   ];
   entrants.forEach((id, i) => {
+    const side: Side = i === 0 ? 'a' : 'b';
     const e: Entrant | undefined = proj.entrants[id];
-    if (e?.kind === 'bot') {
-      lines.push({
-        t: 'bot',
-        s: i === 0 ? 'a' : 'b',
-        name: wireName(e.bot.name),
-        sk: Math.max(0, Math.min(7, Math.round(e.bot.skill))),
-        cls: e.bot.botClass ?? '',
-      });
-    }
+    if (e?.kind === 'bot') lines.push(botLine(side, e.bot));
+    for (const b of teamBots?.[id] ?? []) lines.push(botLine(side, b));
   });
   return lines;
 }
@@ -153,7 +186,7 @@ export function standingsLines(proj: TournamentProjection, rev: number): BridgeT
       pl: x.placement ?? 0,
       w: x.wins,
       l: x.losses,
-      bot: proj.entrants[x.entrantId]?.kind === 'bot',
+      bot: isBotEntrant(proj.entrants[x.entrantId]),
     })),
   ];
 }

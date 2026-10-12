@@ -12,8 +12,10 @@ var int PhaseSec;          // seconds left in the current phase (-1 = none)
 var string MatchId, NameA, NameB, MapName;
 var byte GameNo, BestOf, WinsA, WinsB;
 var int ScoreA, ScoreB;
-var byte ReadyA, ReadyB;   // 1 = ready (bots are always ready)
+var byte ReadyA, ReadyB;   // 1v1: 1 = ready (bots are always ready); team games: players ready
 var bool bBotA, bBotB, bPaused;
+// Team games (TeamSize > 1): players per side, players here, team declared ready by the bridge.
+var byte TeamSize, PresentA, PresentB, TeamReadyA, TeamReadyB;
 var string PauseReason;
 
 // Bracket: one line per match "side|round|index|id|nameA|nameB|scoreA|scoreB|status|winner"
@@ -36,11 +38,13 @@ replication
 	reliable if (Role == ROLE_Authority)
 		TName, Phase, PhaseSec, MatchId, NameA, NameB, MapName, GameNo, BestOf, WinsA, WinsB,
 		ScoreA, ScoreB, ReadyA, ReadyB, bBotA, bBotB, bPaused, PauseReason,
+		TeamSize, PresentA, PresentB, TeamReadyA, TeamReadyB,
 		Lines, LineCount, BracketRev, Fmt, Stand, StandCount, StandRev, VoteMaps, VoteCount;
 }
 
 defaultproperties
 {
+	TeamSize=1
 	bAlwaysRelevant=True
 	RemoteRole=ROLE_SimulatedProxy
 	NetUpdateFrequency=4
