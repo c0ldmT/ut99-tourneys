@@ -17,6 +17,11 @@ var bool bBotA, bBotB, bPaused;
 // Team games (TeamSize > 1): players per side, players here, team declared ready by the bridge.
 var byte TeamSize, PresentA, PresentB, TeamReadyA, TeamReadyB;
 var string PauseReason;
+// Monster Hunt time race (TourneyCoreMH): running side (1 = a, 2 = b, 0 = no race), run 1/2,
+// run time in ms, deaths, seconds per death, time limit in seconds, the other team's finished run.
+var byte RaceSide, RaceRun;
+var int RaceMs, RaceDeaths, RacePen, RaceLimit, PrevMs, PrevDeaths;
+var bool bPrevDone;
 
 // Bracket: one line per match "side|round|index|id|nameA|nameB|scoreA|scoreB|status|winner"
 var string Lines[64];
@@ -39,12 +44,14 @@ replication
 		TName, Phase, PhaseSec, MatchId, NameA, NameB, MapName, GameNo, BestOf, WinsA, WinsB,
 		ScoreA, ScoreB, ReadyA, ReadyB, bBotA, bBotB, bPaused, PauseReason,
 		TeamSize, PresentA, PresentB, TeamReadyA, TeamReadyB,
+		RaceSide, RaceRun, RaceMs, RaceDeaths, RacePen, RaceLimit, PrevMs, PrevDeaths, bPrevDone,
 		Lines, LineCount, BracketRev, Fmt, Stand, StandCount, StandRev, VoteMaps, VoteCount;
 }
 
 defaultproperties
 {
 	TeamSize=1
+	PrevMs=-1
 	bAlwaysRelevant=True
 	RemoteRole=ROLE_SimulatedProxy
 	NetUpdateFrequency=4

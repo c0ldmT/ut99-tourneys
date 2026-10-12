@@ -3,9 +3,9 @@
 UnrealScript package for UT99 469f. It turns a dedicated server into a tournament server driven by the bridge
 (see [`docs/protocol.md`](../../docs/protocol.md)).
 
-> **Status:** 1v1 and team deathmatch are tested on 469f (mod 0.3.0). **Mod 0.4.0 moves the tournament logic into
-> `TourneyCore` (preparation for Monster Hunt) and is not compiled yet**: please run `build` and play a short 1v1
-> and a short 2on2 with bots; everything should behave exactly as with 0.3.0.
+> **Status:** 1v1 and team deathmatch are tested on 469f (mod 0.3.0). Mod 0.4.0 moved the tournament logic into
+> `TourneyCore`. **Mod 0.5.0 adds Monster Hunt (package `UTTourneyMH_v1`) and is not compiled yet**: run `build`,
+> play a short 1v1 and 2on2 (should behave as before), then the Monster Hunt checklist below.
 
 ## Classes
 
@@ -15,6 +15,8 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 | `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`), 1v1: spawns the core and forwards the engine events (login, logout, timer, end of game) |
 | `TourneyCoreTDM` | Core for team games: puts players and bots into the red/blue team, team scores |
 | `TournamentTDM` | Team deathmatch (extends `TournamentDM`): red = side a, blue = side b; team scores, friendly fire, team skins, end of game and bot attitude taken over from `TeamGamePlus`; teams come from the access list |
+| `TourneyCoreMH` (package `UTTourneyMH_v1`) | Core for the Monster Hunt time race: the running team are the hunters, run clock without pauses, deaths of the team (bots included), time limit, `rp`/`runend` to the bridge, race state for the HUD |
+| `TournamentMH` (package `UTTourneyMH_v1`) | Game type (extends `MonsterHunt.MonsterHunt`, Monster Hunt 613): spawns the core and forwards the engine events like `TournamentDM`; hunters only, counts deaths (`Killed`) |
 | `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
 | `TourneyMsg` | Flat JSON line parser/writer |
 | `TourneyMutator` | Console `mutate tourney <cmd>` (fallback for chat commands) |
@@ -55,6 +57,11 @@ in first person by default.
 The script copies `Classes/` to `<UT>/UTTourney_v1/Classes`, creates `TourneyMake.ini` (a copy of your
 `UnrealTournament.ini` with `EditPackages=UTTourney_v1` added) and runs `ucc make` with it. Your own ini is not
 changed. Result: `UTTourney_v1.u` next to the ucc binary.
+
+If `MonsterHunt.u` (Monster Hunt 613) is in the `System` folder, the script also builds the Monster Hunt package
+from `MH/Classes/` (`EditPackages=MonsterHunt` and `EditPackages=UTTourneyMH_v1` are added after
+`UTTourney_v1`). Result: `UTTourneyMH_v1.u`. It runs on the server only: clients do not download it (they need
+`UTTourney_v1` and `MonsterHunt`, which the bridge puts into `ServerPackages`).
 
 If `ucc make ini=TourneyMake.ini` is not accepted by your build, add `EditPackages=UTTourney_v1` to the
 `[Editor.EditorEngine]` section of `UnrealTournament.ini` by hand and run `ucc make`.
@@ -152,6 +159,25 @@ bot" is enough to see everything.
 | 34 | Disconnect | No pause. After 20 s a bot joins your team (`... plays for <name>`); when you reconnect the bot leaves and you play again with your score |
 | 35 | Tie / end | Tie at the time limit → overtime, next frag wins; the bridge records the team scores |
 
+### Monster Hunt time race (mod 0.5.0)
+
+Needs Monster Hunt 613 and `UTTourneyMH_v1.u` on the server. Create a tournament with game "Monster Hunt (time
+race)", mode 2on2, a bracket of 4 and two or three `MH-` maps; a short time limit per run (e.g. 3 minutes) makes
+the test quicker. "You + bot" against a bot team is enough.
+
+| # | Check | Expected |
+|---|---|---|
+| 36 | Server start | Server log: `game=UTTourneyMH_v1.TournamentMH`, no errors from `TournamentMH`/`TourneyCoreMH`; the bridge's ini check accepts `MonsterHunt.u` and `UTTourneyMH_v1.u` |
+| 37 | Map vote | As in team games; the bridge says `Map: MH-... <team> runs first, then <team>` |
+| 38 | Run 1 | Only the running team plays (Monster Hunt hunters), the other team joins as spectators and follows the runners. Ready panel: the watching team shows "watching" |
+| 39 | HUD | Top: `Run 1/2: <team>  m:ss.t` (with penalty), below raw time, deaths x penalty, limit; Monster Hunt's own HUD and scoreboard otherwise |
+| 40 | Deaths | Every death (yours and the bot's) adds the penalty to the time in the banner; monsters dying do not |
+| 41 | Exit | At the exit: `Exit reached: ...` and the end screen; the website shows the run in "Run times" |
+| 42 | Run 2 | The same map loads again for the other team; the banner shows "Time to beat: <team> m:ss.t" |
+| 43 | Time limit | A run that does not reach the exit ends at the limit (`Run over: ...`); the website shows it as not finished; a team at the exit beats it |
+| 44 | Pause | `pause` from the website during a run: the run clock stops and continues on resume |
+| 45 | Lives | Unlimited lives (`Lives=0` in `[UTTourneyMH_v1.TournamentMH]` of `Tourney.ini`); if Monster Hunt still eliminates players, please tell me |
+
 ## SmartStockBots (optional)
 
 SmartStockBots makes the stock bots play much better. It runs on the server only; clients need nothing.
@@ -179,3 +205,7 @@ SmartStockBots makes the stock bots play much better. It runs on the server only
   playing. Mods that check `IsA('TeamGamePlus')` may treat the game as a non-team game.
 - Team games: players on the bench (substitutes not in the line-up) are spectators for the whole game; line-up
   changes apply from the next game.
+- Monster Hunt: `TournamentMH` switches Monster Hunt's own time limit off and measures the run itself (game
+  seconds, pauses excluded). Monster Hunt's HUD therefore shows no remaining time; the tournament banner does.
+- Monster Hunt: the run counts as "exit reached" for every end of game except the time limit and "no hunters
+  left". Map scripts that end the game in another way count as reaching the exit.

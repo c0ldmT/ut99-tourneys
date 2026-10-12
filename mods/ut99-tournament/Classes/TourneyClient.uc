@@ -404,6 +404,11 @@ simulated function DrawBanner(Canvas C)
 	local string S, Info;
 	local float XL, YL;
 
+	if (GRI.RaceSide != 0)
+	{
+		DrawRaceBanner(C);
+		return;
+	}
 	S = GRI.NameA $ "   " $ GRI.ScoreA @ ":" @ GRI.ScoreB $ "   " $ GRI.NameB;
 	Info = GRI.MatchId;
 	if (GRI.BestOf > 1)
@@ -415,9 +420,67 @@ simulated function DrawBanner(Canvas C)
 	DrawCentered(C, Info, 6 + YL + 16, 160, 170, 185, SmallFont(C));
 }
 
-// Team games: "READY", or how many of the team are ready / here.
-simulated function string TeamReadyText(byte bTeamReady, byte NReady, byte NHere)
+// "4:07.3"
+static function string RaceTime(int Ms)
 {
+	local int T, M, S, D;
+	T = Max(0, Ms) / 100;
+	M = T / 600;
+	S = (T - M * 600) / 10;
+	D = T - (T / 10) * 10;
+	if (S < 10)
+		return M $ ":0" $ S $ "." $ D;
+	return M $ ":" $ S $ "." $ D;
+}
+
+// Monster Hunt: who runs, the running time with the penalty, and the time to beat.
+simulated function DrawRaceBanner(Canvas C)
+{
+	local string Runner, Other, S, Info, Beat;
+	local float XL, YL, Y2;
+	local int Pen;
+
+	if (GRI.RaceSide == 2)
+	{
+		Runner = GRI.NameB;
+		Other = GRI.NameA;
+	}
+	else
+	{
+		Runner = GRI.NameA;
+		Other = GRI.NameB;
+	}
+	Pen = GRI.RaceDeaths * GRI.RacePen * 1000;
+	S = "Run" @ GRI.RaceRun $ "/2:" @ Runner $ "   " $ RaceTime(GRI.RaceMs + Pen);
+	Info = RaceTime(GRI.RaceMs) @ "+" @ GRI.RaceDeaths @ "deaths x" @ GRI.RacePen $ "s";
+	if (GRI.RaceLimit > 0)
+		Info = Info @ "- limit" @ RaceTime(GRI.RaceLimit * 1000);
+	Info = Info @ "-" @ GRI.MatchId;
+	if (GRI.BestOf > 1)
+		Info = Info @ "game" @ GRI.GameNo @ "(" $ GRI.WinsA $ ":" $ GRI.WinsB $ ")";
+	if (GRI.PrevMs >= 0 && GRI.bPrevDone)
+		Beat = "Time to beat:" @ Other @ RaceTime(GRI.PrevMs);
+	else if (GRI.PrevMs >= 0)
+		Beat = Other @ "did not reach the exit: reach it to win";
+	DrawCentered(C, S, 6, 240, 163, 43, MediumFont(C));
+	C.Font = MediumFont(C);
+	C.StrLen(S, XL, YL);
+	Y2 = 6 + YL + 16;
+	DrawCentered(C, Info, Y2, 160, 170, 185, SmallFont(C));
+	if (Beat != "")
+	{
+		C.Font = SmallFont(C);
+		C.StrLen(Info, XL, YL);
+		DrawCentered(C, Beat, Y2 + YL + 12, 230, 237, 243, SmallFont(C));
+	}
+}
+
+// Team games: "READY", or how many of the team are ready / here.
+simulated function string TeamReadyText(byte bTeamReady, byte NReady, byte NHere, optional int Side)
+{
+	// Monster Hunt: the other team watches this run.
+	if (GRI.RaceSide != 0 && Side != 0 && Side != GRI.RaceSide)
+		return "watching";
 	if (bTeamReady != 0)
 		return "READY";
 	if (NHere < GRI.TeamSize)
@@ -440,13 +503,13 @@ simulated function DrawTeamReadyPanel(Canvas C)
 	PutText(C, GRI.NameA, X + 16, Y + YL * 0.4, 255, 96, 96);
 	TextRight(C, GRI.NameB, X + W - 16, Y + YL * 0.4, 110, 150, 255);
 	if (GRI.TeamReadyA != 0)
-		PutText(C, TeamReadyText(GRI.TeamReadyA, GRI.ReadyA, GRI.PresentA), X + 16, Y + YL * 1.5, 63, 185, 80);
+		PutText(C, TeamReadyText(GRI.TeamReadyA, GRI.ReadyA, GRI.PresentA, 1), X + 16, Y + YL * 1.5, 63, 185, 80);
 	else
-		PutText(C, TeamReadyText(GRI.TeamReadyA, GRI.ReadyA, GRI.PresentA), X + 16, Y + YL * 1.5, 139, 152, 168);
+		PutText(C, TeamReadyText(GRI.TeamReadyA, GRI.ReadyA, GRI.PresentA, 1), X + 16, Y + YL * 1.5, 139, 152, 168);
 	if (GRI.TeamReadyB != 0)
-		TextRight(C, TeamReadyText(GRI.TeamReadyB, GRI.ReadyB, GRI.PresentB), X + W - 16, Y + YL * 1.5, 63, 185, 80);
+		TextRight(C, TeamReadyText(GRI.TeamReadyB, GRI.ReadyB, GRI.PresentB, 2), X + W - 16, Y + YL * 1.5, 63, 185, 80);
 	else
-		TextRight(C, TeamReadyText(GRI.TeamReadyB, GRI.ReadyB, GRI.PresentB), X + W - 16, Y + YL * 1.5, 139, 152, 168);
+		TextRight(C, TeamReadyText(GRI.TeamReadyB, GRI.ReadyB, GRI.PresentB, 2), X + W - 16, Y + YL * 1.5, 139, 152, 168);
 	C.Font = SmallFont(C);
 	if ((MyRole == "a" || MyRole == "b") && !bReadyMe)
 		Hint = "Press FIRE or type !ready when you are ready";
