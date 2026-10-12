@@ -1,0 +1,24 @@
+# Website (API + frontend). Install: copy to /etc/systemd/system/, adjust paths and user,
+# put the settings into /etc/tourney/api.env (see apps/api/.env.example), then
+#   sudo systemctl daemon-reload && sudo systemctl enable --now tourney-api
+[Unit]
+Description=UT99 tournament website
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=tourney
+WorkingDirectory=/opt/tourney
+EnvironmentFile=/etc/tourney/api.env
+Environment=DATA_DIR=/var/lib/tourney
+ExecStart=/usr/bin/node apps/api/dist/main.js
+Restart=on-failure
+RestartSec=5
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/tourney
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

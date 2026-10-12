@@ -11,3 +11,4 @@ coverage/
 # UnrealScript build output
 mods/**/System/*.u
 mods/**/build/
+out-tsc/

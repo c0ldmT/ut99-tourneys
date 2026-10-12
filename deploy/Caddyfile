@@ -1,0 +1,6 @@
+# HTTPS in front of the website (certificates are fetched automatically).
+# The bridge then uses  wss://cup.example.com/api/agent
+cup.example.com {
+	encode gzip
+	reverse_proxy 127.0.0.1:8080
+}

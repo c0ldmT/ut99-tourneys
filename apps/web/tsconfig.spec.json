@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "outDir": "./out-tsc/spec", "types": ["node"], "noEmit": true },
+  "include": ["test/**/*.ts", "src/app/core/i18n-dict.ts", "src/app/bracket/layout.ts"]
+}

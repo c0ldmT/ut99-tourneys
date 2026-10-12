@@ -1,0 +1,32 @@
+{
+  "name": "@tourney/web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Website frontend (Angular): tournaments, live bracket, registration, admin.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve --proxy-config proxy.conf.json",
+    "build": "ng build",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.spec.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@angular/common": "~21.2.25",
+    "@angular/compiler": "~21.2.25",
+    "@angular/core": "~21.2.25",
+    "@angular/forms": "~21.2.25",
+    "@angular/platform-browser": "~21.2.25",
+    "@angular/router": "~21.2.25",
+    "rxjs": "~7.8.2",
+    "tslib": "^2.8.1"
+  },
+  "devDependencies": {
+    "@angular/build": "~21.2.26",
+    "@angular/cli": "~21.2.26",
+    "@angular/compiler-cli": "~21.2.25",
+    "@tourney/bracket": "workspace:*",
+    "@tourney/protocol": "workspace:*"
+  }
+}

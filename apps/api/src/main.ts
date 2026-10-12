@@ -1,8 +1,16 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createApi } from './app.js';
 import { consoleLogger } from './common/logger.js';
 import { loadConfig } from './config.js';
 
 const config = loadConfig();
+if (!config.webDist) {
+  // Monorepo layout: apps/api/dist/main.js -> apps/web/dist
+  const sibling = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+  if (fs.existsSync(path.join(sibling, 'index.html'))) config.webDist = sibling;
+}
 const log = consoleLogger(config.logLevel);
 if (config.devLogin) log.warn('DEV_LOGIN is enabled: anybody can log in with any name');
 if (!config.discord.enabled && !config.devLogin) {

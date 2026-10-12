@@ -1,11 +1,41 @@
 # Bridge
 
-Runs on the game server machine. Drives the tournament on the UT server and (from milestone 5) syncs with the
-website.
+Runs on the game server machine. Drives the tournament on the UT server. Two modes:
 
-Current state (milestone 4): **standalone mode**. The tournament is defined in a JSON file, the event log is
-stored in `dataDir/tournaments/<id>.jsonl`. With a `server` section in `bridge.json` the bridge starts the UT
-server itself, restarts it after a crash and stops it when the tournament is over.
+- **Website mode** (`run -c bridge.json` with a `website` section): connects to the website, reports its server
+  profile, maps and bots, and runs the tournaments an admin starts there. Keeps running between tournaments.
+- **Standalone mode** (`run -c bridge.json -t tournament.json`): the tournament comes from a JSON file, the
+  event log is stored in `dataDir/tournaments/<id>.jsonl`. Handy for LAN parties without a website.
+
+With a `server` section in `bridge.json` the bridge starts the UT server itself, restarts it after a crash and
+stops it when the tournament is over.
+
+## Website mode
+
+1. On the website: **Servers → Add a game server**. Copy the shown snippet (agent id + token) into
+   `bridge.json`.
+2. Add `publicAddress` to the `server` section (what players type after `open`, e.g. `ut.example.com:7777`).
+3. Start: `node apps/bridge/dist/cli.js run -c bridge.json`. The website shows the server as online; scan maps
+   and bots there.
+
+```json
+{
+  "agentId": "pi-bridge",
+  "mod": { "host": "127.0.0.1", "port": 7790, "sharedKey": "change-me-please" },
+  "server": {
+    "os": "linux",
+    "installDir": "/opt/ut99",
+    "lobbyMap": "DM-Deck16][",
+    "publicAddress": "ut.example.com:7777",
+    "manage": true
+  },
+  "website": { "url": "wss://cup.example.com/api/agent", "token": "agt_..." }
+}
+```
+
+The bridge keeps a copy of each tournament log in `dataDir/website/`. If the website is unreachable during a
+tournament, the current game goes on and the result is stored as soon as the connection is back. After a
+bridge restart the website tells it to resume the running tournament.
 
 ## Server section (`bridge.json`)
 
@@ -63,15 +93,18 @@ node apps/bridge/dist/sim-cli.js -c bridge.json -t tournament.json --game 5   # 
 
 ## Code map
 
-| File                         | Role                                                                                                            |
-| ---------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `src/director.ts`            | Match director: check-in, scheduling, map vote, travel, ready check, countdown, live, forfeits, best-of, finish |
-| `src/mod-server.ts`          | TCP server for the mod (handshake, line protocol)                                                               |
-| `src/event-store.ts`         | Event log with optimistic concurrency (local JSONL now, website later)                                          |
-| `src/snapshot.ts`            | Builds the lines sent to the mod from the tournament projection                                                 |
-| `src/bootstrap.ts`           | Standalone tournament file → initial events                                                                     |
-| `src/sim/mod-simulator.ts`   | Simulated UT server for tests and demos                                                                         |
-| `src/ut99/prepare.ts`        | Finds the binary, writes Tourney.ini / TourneyUser.ini, builds the command line                                 |
-| `src/ut99/server-process.ts` | Starts, supervises and restarts the UT server process                                                           |
-| `src/ut99/inventory.ts`      | Maps (with title/author from the package) and bots of the installation                                          |
-| `src/ut99/ini.ts`            | Unreal ini reader/writer                                                                                        |
+| File                          | Role                                                                                                            |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `src/director.ts`             | Match director: check-in, scheduling, map vote, travel, ready check, countdown, live, forfeits, best-of, finish |
+| `src/mod-server.ts`           | TCP server for the mod (handshake, line protocol)                                                               |
+| `src/event-store.ts`          | Event log with optimistic concurrency (local JSONL, standalone mode)                                            |
+| `src/website/link.ts`         | WebSocket client to the website (hello, reconnect, request/answer)                                              |
+| `src/website/remote-store.ts` | Event store backed by the website, with a local mirror                                                          |
+| `src/website/agent.ts`        | Website mode: commands, one tournament runtime at a time, status/inventory/live reports                         |
+| `src/snapshot.ts`             | Builds the lines sent to the mod from the tournament projection                                                 |
+| `src/bootstrap.ts`            | Standalone tournament file → initial events                                                                     |
+| `src/sim/mod-simulator.ts`    | Simulated UT server for tests and demos                                                                         |
+| `src/ut99/prepare.ts`         | Finds the binary, writes Tourney.ini / TourneyUser.ini, builds the command line                                 |
+| `src/ut99/server-process.ts`  | Starts, supervises and restarts the UT server process                                                           |
+| `src/ut99/inventory.ts`       | Maps (with title/author from the package) and bots of the installation                                          |
+| `src/ut99/ini.ts`             | Unreal ini reader/writer                                                                                        |

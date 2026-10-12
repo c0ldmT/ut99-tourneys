@@ -12,15 +12,15 @@ Angular SPA ──HTTP/WS──> API (NestJS, SQLite)  <──WSS──  Bridge 
 
 ## Repository layout
 
-| Path                    | What                                                                                   | Status                                  |
-| ----------------------- | -------------------------------------------------------------------------------------- | --------------------------------------- |
-| `packages/bracket`      | Deterministic SE/DE bracket engine, seeding, scheduler                                 | done                                    |
-| `packages/protocol`     | Schemas: event log, website↔bridge, bridge↔mod lines; tournament projection            | done                                    |
-| `packages/adapter-ut99` | UT99 rules, map vote, bot simulation, server launch config                             | done                                    |
-| `apps/bridge`           | Agent: match director, mod TCP server, event log, simulator, server process, inventory | done (M4)                               |
-| `mods/ut99-tournament`  | UnrealScript game type, bridge link, chat commands                                     | written, first real-server test pending |
-| `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                              | planned                                 |
-| `apps/web`              | Angular frontend                                                                       | planned                                 |
+| Path                    | What                                                                                   | Status              |
+| ----------------------- | -------------------------------------------------------------------------------------- | ------------------- |
+| `packages/bracket`      | Deterministic SE/DE bracket engine, seeding, scheduler                                 | done                |
+| `packages/protocol`     | Schemas: event log, website↔bridge, bridge↔mod lines; tournament projection            | done                |
+| `packages/adapter-ut99` | UT99 rules, map vote, bot simulation, server launch config                             | done                |
+| `apps/bridge`           | Agent: match director, mod TCP server, event log, simulator, server process, inventory | done (M4)           |
+| `mods/ut99-tournament`  | UnrealScript game type, bridge link, chat commands                                     | tested on 469f (M4) |
+| `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                              | done (M5)           |
+| `apps/web`              | Angular frontend: tournaments, live bracket, registration, admin                       | done (M5)           |
 
 ## Development
 
@@ -34,6 +34,17 @@ pnpm verify      # format check, lint, typecheck, test, build (what CI runs)
 
 Workspace packages resolve to their TypeScript sources during tests (custom export condition
 `@tourney/source`), so no build is needed before testing.
+
+### Website locally
+
+```sh
+cp apps/api/.env.example apps/api/.env      # DEV_LOGIN=true for a first look
+pnpm build
+node --env-file=apps/api/.env apps/api/dist/main.js   # http://localhost:8080 (serves apps/web/dist)
+```
+
+For frontend work: `pnpm --filter @tourney/api dev` (API with tsx) and `pnpm --filter @tourney/web start`
+(Angular dev server on :4200, proxies `/api` to :8080). Setup and deployment: [apps/api/README.md](apps/api/README.md).
 
 ## Docs
 

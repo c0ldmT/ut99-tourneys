@@ -62,7 +62,7 @@ token (`Authorization: Bearer …`). Every frame is an envelope:
 
 | Direction | Type                                 | Purpose                                                                                                                                                                 |
 | --------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B → W     | `agent.hello`                        | Agent id, version, OS/arch, supported adapters, last known seq per tournament                                                                                           |
+| B → W     | `agent.hello`                        | Agent id, version, OS/arch, supported adapters, last known seq per tournament, server profiles, active tournament                                                       |
 | W → B     | `agent.welcome`                      | Accepted, server time                                                                                                                                                   |
 | W → B     | `tournament.sync`                    | Full log (`fromSeq: 0`) or delta, plus the access list (tokens)                                                                                                         |
 | B → W     | `events.append` / W → B `events.ack` | See concurrency above                                                                                                                                                   |
@@ -73,9 +73,18 @@ token (`Authorization: Bearer …`). Every frame is an envelope:
 | B → W     | `match.live`                         | Non-persistent telemetry: phase, scores, ready flags, deadlines                                                                                                         |
 | B → W     | `agent.log`                          | Forwarded log lines for the admin console                                                                                                                               |
 
-The **server profile** (part of `tournament.run` and `inventory.rescan`) carries the OS chosen on the
-website (`linux` / `windows`), install directory, optional binary override (e.g. ARM64), port, lobby map and
-spectator slots. The bridge derives binary paths, ini handling and command line from it.
+**Server profiles are configured on the bridge machine only** (`server` in `bridge.json`: install directory,
+binary, port, lobby map, public address). The bridge reports them in `agent.hello` (without anything
+executable), and `tournament.run` / `inventory.rescan` only name a `profileId`. So a compromised website
+cannot make the bridge run arbitrary programs.
+
+`tournament.run` also carries the bot pool. The website sends the log with `tournament.sync` right before it,
+and re-sends `tournament.run` after every reconnect of an agent whose tournament is still active (the bridge
+ignores it if it already runs that tournament). A `tournament.sync` with events the bridge did not write itself
+(an admin action while the bridge was offline) makes the director reload and continue from the new state.
+
+While the website is unreachable the bridge keeps the game running; `events.append` waits and is retried after
+the reconnect (a stale `baseSeq` is answered with the missing events, as usual).
 
 **Access control (closed system).** Every website user who may join the server (players and spectators) has a
 personal token. The website pushes the list with `tournament.sync` and incremental `access.upsert` /

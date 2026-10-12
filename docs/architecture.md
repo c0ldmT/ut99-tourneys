@@ -47,6 +47,19 @@ after a crash (the bridge restarts it and restores the current match from the lo
 | Live                   | mod reports score/end              | disconnect: pause, `reconnectGraceSec` → forfeit, score restored on return |
 | Result                 | bridge appends events              |                                                                            |
 
+## Website
+
+- **API** (`apps/api`): NestJS 12 on Express, SQLite via Drizzle and better-sqlite3. Everything needs a login
+  (closed system); Discord OAuth2 with an optional guild restriction, `DEV_LOGIN` for local tests. Sessions
+  are random cookie values stored as hashes; state-changing requests need the `x-tourney: 1` header (CSRF).
+- **Event log**: canonical in the `events` table; the API validates every batch by folding the projection
+  before it stores it. Draft tournaments (registration open) have no events yet; seeding writes
+  `tournament.created` + `seeding.set`.
+- **Browsers** get updates through server-sent events (`/api/tournaments/:id/stream`: `change` = refetch,
+  `live` = match telemetry). Bridges use the WebSocket at `/api/agent`.
+- **Frontend** (`apps/web`): Angular 21, standalone components, signals, zoneless, runtime EN/DE switch, SVG
+  bracket. The API serves the built files (`apps/web/dist`) with a fallback to `index.html`.
+
 ## Deployment
 
 - **Default:** systemd services + install script (no Docker; the Pi 3B+ has 1 GB RAM).

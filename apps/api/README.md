@@ -1,0 +1,81 @@
+# Website API
+
+NestJS backend of the website: Discord login, tournaments, the canonical event log and the WebSocket gateway
+for bridge agents. It also serves the built Angular app (`apps/web/dist`).
+
+## Quick start (local, without Discord)
+
+```sh
+pnpm install && pnpm build
+cp apps/api/.env.example apps/api/.env       # set DEV_LOGIN=true
+node --env-file=apps/api/.env apps/api/dist/main.js
+```
+
+Open http://localhost:8080, log in with any name ("as admin" for the first user), add a game server under
+**Servers** and put the shown agent id and token into the bridge's `bridge.json` (see
+[apps/bridge/README.md](../bridge/README.md#website-mode)).
+
+## Discord login
+
+1. https://discord.com/developers/applications → **New Application**.
+2. **OAuth2** → copy _Client ID_ and _Client Secret_ → `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`.
+3. **OAuth2 → Redirects** → add `<PUBLIC_URL>/api/auth/discord/callback`
+   (e.g. `https://cup.example.com/api/auth/discord/callback`, or `http://localhost:8080/...` for testing).
+4. Optional: only members of your Discord server may log in → `DISCORD_GUILD_ID` (server id; enable the
+   developer mode in Discord to copy ids).
+5. `ADMIN_DISCORD_IDS` = your Discord user id (comma separated for several). Admins can promote other users
+   on the **Users** page.
+6. Set `DEV_LOGIN=false`.
+
+The app only asks for the `identify` scope (plus `guilds` with a guild restriction); it never sees e-mail
+addresses or messages.
+
+## Configuration
+
+All settings are environment variables, see [.env.example](.env.example).
+
+| Variable                                      | Default                    | Meaning                                          |
+| --------------------------------------------- | -------------------------- | ------------------------------------------------ |
+| `PUBLIC_URL`                                  | `http://localhost:8080`    | URL in the browser; https enables secure cookies |
+| `HOST` / `PORT`                               | `0.0.0.0` / `8080`         | Listen address                                   |
+| `DATA_DIR`                                    | `./data`                   | SQLite database `tourney.db`                     |
+| `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` |                            | Discord login (both needed)                      |
+| `DISCORD_GUILD_ID`                            |                            | Restrict login to members of one Discord server  |
+| `ADMIN_DISCORD_IDS`                           |                            | Admins                                           |
+| `DEV_LOGIN`                                   | `false`                    | Name-only login for local tests                  |
+| `WEB_DIST`                                    | `apps/web/dist` if present | Built frontend                                   |
+| `SESSION_DAYS`                                | `30`                       | Login lifetime                                   |
+
+## Running it for real
+
+Everything on one Raspberry Pi (64-bit OS) or the website on a separate host — both work, the bridge connects
+outbound to the website.
+
+- **systemd:** [deploy/systemd](../../deploy/systemd) has units for the API and the bridge.
+- **HTTPS:** Discord requires https for public redirect URLs. A reverse proxy such as Caddy does it in two
+  lines ([deploy/Caddyfile](../../deploy/Caddyfile)); it passes WebSockets (`/api/agent`) and server-sent events
+  (`/api/tournaments/*/stream`) through without extra settings. With nginx, disable buffering for the stream
+  and forward the `Upgrade` header for `/api/agent`.
+- **Backup:** the whole state is `DATA_DIR/tourney.db` (SQLite in WAL mode; copy it with
+  `sqlite3 tourney.db ".backup backup.db"` while the API runs).
+
+## API overview
+
+| Endpoint                                                  | Who      | Purpose                                     |
+| --------------------------------------------------------- | -------- | ------------------------------------------- |
+| `GET /api/config`                                         | everyone | Site name, available login methods          |
+| `GET /api/auth/discord`, `/api/auth/discord/callback`     | everyone | Discord OAuth2                              |
+| `POST /api/auth/dev-login`, `POST /api/auth/logout`       |          | Development login, logout                   |
+| `GET/PATCH /api/me`, `POST /api/me/token`                 | user     | Profile, in-game name, join token           |
+| `GET /api/tournaments`, `GET /api/tournaments/:id`        | user     | List, detail (incl. projection and bracket) |
+| `GET /api/tournaments/:id/stream`                         | user     | Server-sent events                          |
+| `POST/DELETE /api/tournaments/:id/registration`, `/watch` | user     | Take part, watch on the server              |
+| `POST /api/tournaments`, `PATCH`, `DELETE`                | admin    | Drafts                                      |
+| `POST /api/tournaments/:id/seed`, `/reset`, `/run`        | admin    | Seeding (auto/manual), back to draft, start |
+| `POST /api/tournaments/:id/command`                       | admin    | forceStart, pause, resume, abort, announce  |
+| `GET /api/tournaments/:id/events`                         | admin    | Event log                                   |
+| `GET/POST /api/agents`, `POST /api/agents/:id/token`, ... | admin    | Game servers (bridges), inventory scan      |
+| `GET /api/users`, `PATCH /api/users/:id`                  | admin    | Users, admin rights                         |
+| `WS /api/agent`                                           | bridges  | Agent protocol (see docs/protocol.md)       |
+
+State-changing requests need the header `x-tourney: 1`.

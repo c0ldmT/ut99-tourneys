@@ -1,7 +1,5 @@
 # Apps
 
-- `bridge/` – agent next to the UT server (next milestone)
-- `api/` – NestJS backend
-- `web/` – Angular frontend
-
-Each app gets its own `package.json` when it is scaffolded.
+- `bridge/` – agent next to the UT server (website mode or standalone)
+- `api/` – NestJS backend of the website
+- `web/` – Angular frontend of the website

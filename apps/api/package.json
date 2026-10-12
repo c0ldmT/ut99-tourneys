@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "start": "node dist/main.js",
-    "dev": "node --env-file-if-exists=.env --import tsx src/main.ts"
+    "dev": "node --conditions=@tourney/source --env-file-if-exists=.env --import tsx src/main.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
