@@ -106,7 +106,11 @@ export async function createApi(
     url: `http://${host}:${port}`,
     async close() {
       gateway.close();
-      await app.close();
+      // Open browser tabs keep their event stream (and keep-alive sockets) open forever, and
+      // server.close() waits for every connection: cut them, then wait for Nest to finish.
+      const closing = app.close();
+      server.closeAllConnections();
+      await closing;
       app.get<Db>(DB).$client.close();
     },
   };

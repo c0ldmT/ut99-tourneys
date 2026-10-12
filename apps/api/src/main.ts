@@ -21,9 +21,25 @@ if (!config.discord.enabled && !config.devLogin) {
 const api = await createApi(config, { logger: log });
 log.info(`listening on ${config.host}:${config.port} (public URL ${config.publicUrl})`);
 
+let stopping = false;
 const stop = async () => {
+  if (stopping) {
+    // Second Ctrl+C: do not wait any longer.
+    log.warn('forced exit');
+    process.exit(1);
+  }
+  stopping = true;
   log.info('shutting down');
-  await api.close();
+  // Never hang on shutdown (a connection that does not close, a stuck request).
+  setTimeout(() => {
+    log.warn('shutdown took longer than 5 s, exiting');
+    process.exit(1);
+  }, 5_000).unref();
+  try {
+    await api.close();
+  } catch (e) {
+    log.error(`shutdown: ${(e as Error).message}`);
+  }
   process.exit(0);
 };
 process.on('SIGINT', () => void stop());
