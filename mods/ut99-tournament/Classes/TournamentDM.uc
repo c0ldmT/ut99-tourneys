@@ -267,7 +267,8 @@ function HandleBridgeMessage(TourneyMsg M)
 			VoteCount = 0;
 			VoteSecLeft = M.GetInt("sec");
 			TGRI.VoteCount = 0;
-			if (Phase == "vote" && M.Get("mid") $ "/" $ GameNo == VoteKey)
+			// "$" binds weaker than "==" and "&&" in UnrealScript: parenthesize.
+			if (Phase == "vote" && (M.Get("mid") $ "/" $ GameNo) == VoteKey)
 				break; // same vote again (bridge resync): keep votes and the window state
 			VoteKey = M.Get("mid") $ "/" $ GameNo;
 			for (i = 0; i < 64; i++)
