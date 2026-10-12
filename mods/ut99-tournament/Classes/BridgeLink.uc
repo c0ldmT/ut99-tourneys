@@ -5,14 +5,14 @@
 //=============================================================================
 class BridgeLink extends TcpLink;
 
-var TournamentDM Game;
+var TourneyCore Game;
 var TourneyMsg InMsg;
 var string LineBuffer;
 var bool bOpen;
 var float ConnectStarted;
 var int HeartbeatTicks;
 
-function Init(TournamentDM G)
+function Init(TourneyCore G)
 {
 	Game = G;
 	InMsg = Spawn(class'TourneyMsg');

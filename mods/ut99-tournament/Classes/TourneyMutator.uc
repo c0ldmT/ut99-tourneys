@@ -5,7 +5,7 @@
 //=============================================================================
 class TourneyMutator extends Mutator;
 
-var TournamentDM Game;
+var TourneyCore Game;
 
 // Team chat ("TeamSay" in team games only reaches the team, not the chat listener), and the
 // fallback for all chat when the chat listener could not be spawned (players only).

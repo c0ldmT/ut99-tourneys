@@ -1,7 +1,7 @@
 //=============================================================================
 // TourneyGRI
 // Tournament state for the clients (HUD, vote window). Spawned once per level
-// by TournamentDM, replicated to everybody. The server only copies what the
+// by TourneyCore, replicated to everybody. The server only copies what the
 // bridge sent; there is no logic in here.
 //=============================================================================
 class TourneyGRI extends ReplicationInfo;

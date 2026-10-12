@@ -6,7 +6,7 @@
 //=============================================================================
 class TourneyChatListener extends MessagingSpectator;
 
-var TournamentDM Game;
+var TourneyCore Game;
 
 event TeamMessage(PlayerReplicationInfo PRI, coerce string S, name Type, optional bool bBeep)
 {

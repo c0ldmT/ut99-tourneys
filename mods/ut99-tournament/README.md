@@ -3,15 +3,17 @@
 UnrealScript package for UT99 469f. It turns a dedicated server into a tournament server driven by the bridge
 (see [`docs/protocol.md`](../../docs/protocol.md)).
 
-> **Status:** 1v1 (milestones 4–6, mod 0.2.2) is tested on 469f. **Team deathmatch (mod 0.3.0,
-> `TournamentTDM`) is written but not compiled yet**: please run `build`, check that 1v1 still works and then
-> go through the team checklist (items 27–35) below.
+> **Status:** 1v1 and team deathmatch are tested on 469f (mod 0.3.0). **Mod 0.4.0 moves the tournament logic into
+> `TourneyCore` (preparation for Monster Hunt) and is not compiled yet**: please run `build` and play a short 1v1
+> and a short 2on2 with bots; everything should behave exactly as with 0.3.0.
 
 ## Classes
 
 | Class | Role |
 |---|---|
-| `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`): token login, roles, ready check, countdown, bots, score, end of game, travel, soft pause, score restore. A side can have several players and bots (base of the team game) |
+| `TourneyCore` | The tournament logic (server only, one per level): bridge messages, token login, roles, ready check, countdown, bots, score, end of game, travel, soft pause, score restore, votes, commands, HUD state. A side can have several players and bots |
+| `TournamentDM` | Game type (extends `Botpack.DeathMatchPlus`), 1v1: spawns the core and forwards the engine events (login, logout, timer, end of game) |
+| `TourneyCoreTDM` | Core for team games: puts players and bots into the red/blue team, team scores |
 | `TournamentTDM` | Team deathmatch (extends `TournamentDM`): red = side a, blue = side b; team scores, friendly fire, team skins, end of game and bot attitude taken over from `TeamGamePlus`; teams come from the access list |
 | `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
 | `TourneyMsg` | Flat JSON line parser/writer |

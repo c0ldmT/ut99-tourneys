@@ -2,7 +2,8 @@
 // TournamentTDM
 // Team deathmatch for the tournament (2on2, 3on3, 5on5): side a is the red
 // team, side b the blue team. Tokens, roles, ready check, bots, votes and
-// travel all come from TournamentDM.
+// travel all come from TourneyCore (via TournamentDM); TourneyCoreTDM puts
+// pawns into the teams.
 //
 // TournamentDM extends DeathMatchPlus, so the team rules are taken over from
 // Botpack.TeamGamePlus here: team scores, friendly fire, team skins, the end
@@ -41,19 +42,6 @@ function PostBeginPlay()
 	Super.PostBeginPlay();
 }
 
-function ApplyMatchRules()
-{
-	Super.ApplyMatchRules();
-	GoalTeamScore = MatchFragLimit;
-	FragLimit = 0; // single players' frags never end a team game
-	FriendlyFireScale = FClamp(MatchFF / 100.0, 0.0, 1.0);
-	if (TournamentGameReplicationInfo(GameReplicationInfo) != None)
-	{
-		TournamentGameReplicationInfo(GameReplicationInfo).FragLimit = 0;
-		TournamentGameReplicationInfo(GameReplicationInfo).GoalTeamScore = GoalTeamScore;
-	}
-}
-
 //=============================================================================
 // Teams
 //=============================================================================
@@ -78,14 +66,6 @@ function bool ChangeTeam(Pawn Other, int NewTeam)
 	}
 	AddToTeam(LoginTeam, Other);
 	return true;
-}
-
-// Bots spawned for a side.
-function AssignTeam(Pawn P, int Side)
-{
-	if (P == None || P.PlayerReplicationInfo == None || Side < 0 || Side > 1)
-		return;
-	AddToTeam(Side, P);
 }
 
 // From TeamGamePlus.AddToTeam (without team balancing).
@@ -164,13 +144,6 @@ function Logout(Pawn Exiting)
 // Rules (from TeamGamePlus)
 //=============================================================================
 
-function int SideScore(int Side)
-{
-	if (Side >= 0 && Side < 2 && Teams[Side] != None)
-		return int(Teams[Side].Score);
-	return 0;
-}
-
 function int ReduceDamage(int Damage, name DamageType, Pawn Injured, Pawn InstigatedBy)
 {
 	Damage = Super.ReduceDamage(Damage, DamageType, Injured, InstigatedBy);
@@ -245,9 +218,9 @@ function bool SetEndCams(string Reason)
 	if (Teams[1].Score > Teams[0].Score)
 		BestTeam = Teams[1];
 	if (BestTeam == Teams[0])
-		GameReplicationInfo.GameEndedComments = NameA @ GameEndedMessage;
+		GameReplicationInfo.GameEndedComments = Core.NameA @ GameEndedMessage;
 	else
-		GameReplicationInfo.GameEndedComments = NameB @ GameEndedMessage;
+		GameReplicationInfo.GameEndedComments = Core.NameB @ GameEndedMessage;
 
 	EndTime = Level.TimeSeconds + 3.0;
 	for (P = Level.PawnList; P != None; P = P.NextPawn)
@@ -281,6 +254,7 @@ function byte AssessBotAttitude(Bot aBot, Pawn Other)
 
 defaultproperties
 {
+	CoreClass=Class'TourneyCoreTDM'
 	TeamColor(0)="Red"
 	TeamColor(1)="Blue"
 	bTeamGame=True

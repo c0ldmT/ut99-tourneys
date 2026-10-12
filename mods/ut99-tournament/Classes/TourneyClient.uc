@@ -8,7 +8,7 @@
 class TourneyClient extends Mutator;
 
 // --- server side ------------------------------------------------------------
-var TournamentDM Game;
+var TourneyCore Game;
 var bool bHasHud;          // the client registered its HUD (server skips the text fallbacks)
 var bool bAutoFollow;      // spectators: follow the match players automatically
 var bool bVoteOpened;      // the vote window was opened for the current vote
