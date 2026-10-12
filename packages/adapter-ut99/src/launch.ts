@@ -1,5 +1,5 @@
 import type { ServerOs, ServerProfile } from '@tourney/protocol';
-import { MOD_GAME_CLASS, MOD_PACKAGE, type Ut99DmRules } from './rules.js';
+import { MOD_GAME_CLASS, MOD_PACKAGE, SMART_STOCK_BOTS_ACTOR, type Ut99DmRules } from './rules.js';
 
 /**
  * How to start a UT99 469f dedicated server for a tournament.
@@ -81,7 +81,9 @@ export function serverArgs(rules: Ut99DmRules, profile: ServerProfile): string[]
 export type IniChange =
   | { section: string; key: string; value: string }
   /** Ensures `value` is present in an array-like key (multiple `Key=` lines), e.g. ServerPackages. */
-  | { section: string; key: string; ensure: string };
+  | { section: string; key: string; ensure: string }
+  /** Removes `value` from an array-like key if present. */
+  | { section: string; key: string; remove: string };
 
 const bool = (b: boolean) => (b ? 'True' : 'False');
 
@@ -98,6 +100,10 @@ export function iniChanges(
   return [
     // Clients download the mod for the HUD, the vote window and spectator follow (milestone 6).
     { section: 'Engine.GameEngine', key: 'ServerPackages', ensure: MOD_PACKAGE },
+    // SmartStockBots runs as a server actor (its recommended setup) on every map, or not at all.
+    rules.smartStockBots
+      ? { section: 'Engine.GameEngine', key: 'ServerActors', ensure: SMART_STOCK_BOTS_ACTOR }
+      : { section: 'Engine.GameEngine', key: 'ServerActors', remove: SMART_STOCK_BOTS_ACTOR },
     { section: 'URL', key: 'Port', value: String(profile.port) },
     ...(profile.serverName
       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]

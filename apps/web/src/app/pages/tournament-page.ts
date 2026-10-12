@@ -560,8 +560,13 @@ export class TournamentPage {
   }
 
   protected rulesText(t: TournamentDetail): string {
-    const r = t.settings.game.rules as { fragLimit?: number; timeLimitMin?: number };
-    return this.i18n.t('tp.rules', { frags: r.fragLimit ?? 20, min: r.timeLimitMin ?? 10 });
+    const r = t.settings.game.rules as {
+      fragLimit?: number;
+      timeLimitMin?: number;
+      smartStockBots?: boolean;
+    };
+    const text = this.i18n.t('tp.rules', { frags: r.fragLimit ?? 20, min: r.timeLimitMin ?? 10 });
+    return r.smartStockBots ? `${text} · SmartStockBots` : text;
   }
 
   protected connectCommand(t: TournamentDetail): string {

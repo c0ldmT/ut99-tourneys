@@ -12,7 +12,7 @@
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.2.1";
+const MOD_VERSION = "0.2.2";
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -705,6 +705,16 @@ function SpawnBotsOnce()
 		SideBot[0] = SpawnSideBot(BotNameA, BotSkillA, BotClsA);
 	if (bBotB)
 		SideBot[1] = SpawnSideBot(BotNameB, BotSkillB, BotClsB);
+}
+
+// Bots are held (hidden, in Dying) before the countdown, during a pause and after the end.
+// Nobody may bring them back early: SmartStockBots' FastRespawn, for example, respawns every
+// bot that has been "dead" for a moment. Our own respawns happen while the game is live.
+function bool RestartPlayer(Pawn aPlayer)
+{
+	if (Bot(aPlayer) != None && (!bGameLive || bTourneyPaused || bGameEnded))
+		return false;
+	return Super.RestartPlayer(aPlayer);
 }
 
 // Bots are spawned by the tournament only. DeathMatchPlus would remove every bot above MinPlayers

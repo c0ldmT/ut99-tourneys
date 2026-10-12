@@ -93,9 +93,23 @@ export class IniFile {
     this.insert(section, { raw: `${key}=${value}`, section, key, value });
   }
 
+  /** Removes every `key=value` line with exactly this value (case-insensitive). */
+  remove(section: string, key: string, value: string): void {
+    this.lines = this.lines.filter(
+      (l) =>
+        !(
+          l.key !== undefined &&
+          eq(l.section ?? '', section) &&
+          eq(l.key, key) &&
+          eq((l.value ?? '').trim(), value)
+        ),
+    );
+  }
+
   apply(changes: readonly IniChange[]): void {
     for (const c of changes) {
       if ('ensure' in c) this.ensure(c.section, c.key, c.ensure);
+      else if ('remove' in c) this.remove(c.section, c.key, c.remove);
       else this.set(c.section, c.key, c.value);
     }
   }

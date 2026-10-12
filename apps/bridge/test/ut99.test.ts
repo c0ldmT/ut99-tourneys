@@ -146,6 +146,9 @@ describe('IniFile', () => {
   it('set replaces, ensure adds once, missing sections are appended', () => {
     const ini = IniFile.parse(text);
     ini.set('URL', 'Port', '7790');
+    ini.ensure('Engine.GameEngine', 'ServerActors', 'SmartStockBots.SmartStockBots');
+    ini.remove('Engine.GameEngine', 'ServerActors', 'smartstockbots.SmartStockBots');
+    expect(ini.getAll('Engine.GameEngine', 'ServerActors')).toEqual([]);
     ini.ensure('Engine.GameEngine', 'ServerPackages', 'UTTourney_v1');
     ini.ensure('Engine.GameEngine', 'ServerPackages', 'botpack');
     ini.set('UTTourney_v1.TournamentConfig', 'SharedKey', 'secret');
@@ -195,7 +198,10 @@ describe('inventory', () => {
       path.join(root, 'System', 'User.ini'),
       '[Botpack.ChallengeBotInfo]\r\nDifficulty=3\r\nBotNames[0]=Xan\r\nBotSkills[0]=2.0\r\nBotClasses[0]=BotPack.TBossBot\r\nBotNames[1]=Loque\r\nBotSkills[1]=-1\r\nBotNames[2]=\r\n',
     );
+    fs.writeFileSync(path.join(root, 'System', 'SmartStockBots.u'), 'x');
+    fs.writeFileSync(path.join(root, 'System', 'Botpack.u'), 'x');
     const inv = scanInventory({ installDir: root });
+    expect(inv.packages).toEqual(['Botpack', 'SmartStockBots']);
     expect(inv.maps.map((m) => m.id)).toEqual(['DM-Custom', 'DM-Deck16][']);
     expect(inv.maps[0]).toMatchObject({ title: 'Custom Arena', author: 'Me', stock: false });
     expect(inv.maps[1]).toMatchObject({ id: 'DM-Deck16][', stock: true });

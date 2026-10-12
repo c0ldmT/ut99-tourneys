@@ -147,6 +147,12 @@ const en = {
   'form.mapRandom': 'Random',
   'form.voteTimeout': 'Vote time (s)',
   'form.countdown': 'Countdown (s)',
+  'form.smartStockBots': 'SmartStockBots (smarter bots)',
+  'form.smartStockBotsHint':
+    'Server-side bot mod; players need nothing. Needs SmartStockBots.u in the System folder of the server:',
+  'form.ssbInstalled': 'installed',
+  'form.ssbMissing': 'not found on this server',
+  'form.ssbUnknown': 'unknown (scan the server first)',
   'form.mapPool': 'Map pool ({n})',
   'form.addMap': 'Add',
   'form.noInventory':
@@ -404,6 +410,12 @@ const de: Record<TKey, string> = {
   'form.mapRandom': 'Zufällig',
   'form.voteTimeout': 'Abstimmungszeit (s)',
   'form.countdown': 'Countdown (s)',
+  'form.smartStockBots': 'SmartStockBots (schlauere Bots)',
+  'form.smartStockBotsHint':
+    'Bot-Mod nur auf dem Server; die Spieler brauchen nichts. Benötigt SmartStockBots.u im System-Ordner des Servers:',
+  'form.ssbInstalled': 'installiert',
+  'form.ssbMissing': 'auf diesem Server nicht gefunden',
+  'form.ssbUnknown': 'unbekannt (Server zuerst einlesen)',
   'form.mapPool': 'Map-Pool ({n})',
   'form.addMap': 'Hinzufügen',
   'form.noInventory':

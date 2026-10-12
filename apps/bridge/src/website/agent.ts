@@ -232,6 +232,7 @@ export class WebsiteAgent {
       adapter: 'ut99-dm',
       maps: inv.maps,
       bots: inv.bots,
+      packages: inv.packages,
       scannedAt: new Date(this.o.clock.now()).toISOString(),
       warnings: inv.warnings,
     });

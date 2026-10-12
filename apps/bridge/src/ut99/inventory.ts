@@ -48,6 +48,8 @@ const STOCK_DM = new Set(
 export interface Inventory {
   maps: MapInfo[];
   bots: BotSpec[];
+  /** UnrealScript packages (*.u) in the System folder, without extension, e.g. "SmartStockBots". */
+  packages: string[];
   warnings: string[];
 }
 
@@ -88,7 +90,26 @@ export function scanInventory(
     maps.sort((a, b) => a.id.localeCompare(b.id, 'en', { sensitivity: 'base' }));
   }
 
-  return { maps, bots: readBots(profile.installDir, warnings), warnings };
+  return {
+    maps,
+    bots: readBots(profile.installDir, warnings),
+    packages: listPackages(profile.installDir),
+    warnings,
+  };
+}
+
+function listPackages(installDir: string): string[] {
+  const system = findDir(installDir, 'System');
+  if (!system) return [];
+  try {
+    return fs
+      .readdirSync(system)
+      .filter((f) => f.toLowerCase().endsWith('.u'))
+      .map((f) => f.slice(0, -2))
+      .sort((a, b) => a.localeCompare(b, 'en', { sensitivity: 'base' }));
+  } catch {
+    return [];
+  }
 }
 
 function findDir(root: string, name: string): string | undefined {

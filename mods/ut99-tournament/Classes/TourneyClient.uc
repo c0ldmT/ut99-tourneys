@@ -171,15 +171,16 @@ simulated function TryOpenVote()
 	}
 	if (WC.bTyping)
 		return; // Tick tries again
+	// No check of GRI.Phase here: the reliable call arrives before the replicated phase.
+	// The server closes the window (ClientCloseVote) when the vote ends.
 	bPendingVote = false;
-	if (GRI != None && GRI.Phase != "vote")
-		return; // the vote is already over
 	if (!WC.bCreatedRoot || WC.Root == None)
 		WC.CreateRootWindow(None);
 	if (WC.Root == None)
 		return;
 	WC.bQuickKeyEnable = false;
 	WC.LaunchUWindow();
+	WC.bNoDrawWorld = false; // keep the game visible even with ShowDesktop=True (menu background)
 	if (UMenuRootWindow(WC.Root) != None && UMenuRootWindow(WC.Root).MenuBar != None)
 		UMenuRootWindow(WC.Root).MenuBar.HideWindow();
 	WC.Root.CreateWindow(class'TourneyVoteWindow', 100, 100, 380, 320, None, true);

@@ -9,6 +9,10 @@ export const ADAPTER_ID = 'ut99-dm';
 export const MOD_PACKAGE = 'UTTourney_v1';
 export const MOD_GAME_CLASS = `${MOD_PACKAGE}.TournamentDM`;
 
+/** https://ut99.org – "SmartStockBots" by Buggie: server-side mutator, no client download. */
+export const SMART_STOCK_BOTS_PACKAGE = 'SmartStockBots';
+export const SMART_STOCK_BOTS_ACTOR = `${SMART_STOCK_BOTS_PACKAGE}.SmartStockBots`;
+
 /** Match rules for 1v1 Deathmatch, editable per tournament on the website. */
 export const Ut99DmRulesSchema = z
   .object({
@@ -36,6 +40,11 @@ export const Ut99DmRulesSchema = z
     hardcore: z.boolean().default(true),
     /** Game speed in percent, 100 = normal. */
     gameSpeedPct: z.number().int().min(50).max(200).default(100),
+    /**
+     * Load the SmartStockBots mutator (smarter stock bots) as a server actor. Needs
+     * SmartStockBots.u in the server's System folder; clients need nothing.
+     */
+    smartStockBots: z.boolean().default(false),
     /** Mutator classes, e.g. "BotPack.InstaGibDM". Must exist on the server. */
     mutators: z
       .array(z.string().regex(/^[A-Za-z0-9_]+\.[A-Za-z0-9_]+$/))
@@ -57,10 +66,19 @@ export function parseRules(input: unknown): Ut99DmRules {
 /** Checks rules against what the server actually has installed. Returns human-readable problems. */
 export function validateAgainstInventory(
   rules: Ut99DmRules,
-  inventory: { maps: readonly { id: string }[] },
+  inventory: { maps: readonly { id: string }[]; packages?: readonly string[] },
 ): string[] {
   const available = new Set(inventory.maps.map((m) => m.id.toLowerCase()));
-  return rules.mapPool
+  const problems = rules.mapPool
     .filter((m) => !available.has(m.toLowerCase()))
     .map((m) => `map ${m} is not installed on the server`);
+  const packages = new Set((inventory.packages ?? []).map((p) => p.toLowerCase()));
+  if (
+    rules.smartStockBots &&
+    inventory.packages &&
+    !packages.has(SMART_STOCK_BOTS_PACKAGE.toLowerCase())
+  ) {
+    problems.push(`${SMART_STOCK_BOTS_PACKAGE}.u is not installed on the server (System folder)`);
+  }
+  return problems;
 }

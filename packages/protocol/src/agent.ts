@@ -168,6 +168,8 @@ export const AgentInventory = envelope(
     adapter: z.string(),
     maps: z.array(MapInfoSchema),
     bots: z.array(BotSpecSchema),
+    /** UnrealScript packages in System (e.g. "SmartStockBots"), to check optional server mods. */
+    packages: z.array(z.string().max(64)).max(1000).default([]),
     scannedAt: z.iso.datetime(),
     warnings: z.array(z.string()).default([]),
   }),

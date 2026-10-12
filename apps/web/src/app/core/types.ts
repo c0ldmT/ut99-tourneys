@@ -97,6 +97,7 @@ export interface Inventory {
   profileId: string;
   maps: MapInfo[];
   bots: BotSpec[];
+  packages?: string[];
   scannedAt: string;
   warnings: string[];
 }

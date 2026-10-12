@@ -193,6 +193,28 @@ describe('server launch', () => {
     expect(serverBinaryCandidates('windows', 'x64')).toContain('System/UCC.exe');
   });
 
+  it('loads SmartStockBots as a server actor only when enabled, and checks it is installed', () => {
+    const mod = { bridgeHost: '127.0.0.1', bridgePort: 7790, sharedKey: 'secret' };
+    const actor = 'SmartStockBots.SmartStockBots';
+    const on = parseRules({ ...rules, smartStockBots: true });
+    expect(iniChanges(on, profile, mod)).toContainEqual({
+      section: 'Engine.GameEngine',
+      key: 'ServerActors',
+      ensure: actor,
+    });
+    expect(iniChanges(rules, profile, mod)).toContainEqual({
+      section: 'Engine.GameEngine',
+      key: 'ServerActors',
+      remove: actor,
+    });
+    const maps = on.mapPool.map((id) => ({ id }));
+    expect(validateAgainstInventory(on, { maps, packages: ['Botpack'] })).toEqual([
+      'SmartStockBots.u is not installed on the server (System folder)',
+    ]);
+    expect(validateAgainstInventory(on, { maps, packages: ['SmartStockBots'] })).toEqual([]);
+    expect(validateAgainstInventory(on, { maps })).toEqual([]); // unknown: no complaint
+  });
+
   it('registers the mod package and the bridge connection in the ini', () => {
     const changes = iniChanges(rules, profile, {
       bridgeHost: '127.0.0.1',

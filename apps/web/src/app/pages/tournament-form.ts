@@ -51,6 +51,7 @@ interface Model {
   mapMode: 'vote' | 'random';
   voteTimeoutSec: number;
   countdownSec: number;
+  smartStockBots: boolean;
   mapPool: string[];
   botPool: BotSpec[];
 }
@@ -210,6 +211,24 @@ function toLocalInput(iso: string | null): string {
               ><input type="number" name="cd" min="3" max="30" [(ngModel)]="f.countdownSec" />
             </div>
           </div>
+          <label class="row"
+            ><input type="checkbox" name="ssb" [(ngModel)]="f.smartStockBots" />
+            {{ 'form.smartStockBots' | t }}</label
+          >
+          <p class="muted small">
+            {{ 'form.smartStockBotsHint' | t }}
+            @switch (ssbInstalled()) {
+              @case (true) {
+                <span class="ok">{{ 'form.ssbInstalled' | t }}</span>
+              }
+              @case (false) {
+                <span class="error-text">{{ 'form.ssbMissing' | t }}</span>
+              }
+              @default {
+                {{ 'form.ssbUnknown' | t }}
+              }
+            }
+          </p>
           <label>{{ 'form.mapPool' | t: { n: f.mapPool.length } }}</label>
           <div class="chips">
             @for (map of mapChoices(); track map.id) {
@@ -377,6 +396,12 @@ function toLocalInput(iso: string | null): string {
     td.skill {
       width: 220px;
     }
+    .ok {
+      color: var(--live);
+    }
+    .error-text {
+      color: var(--danger);
+    }
   `,
 })
 export class TournamentFormPage {
@@ -415,6 +440,11 @@ export class TournamentFormPage {
   protected readonly profileAddress = computed(() => this.profile()?.publicAddress ?? '');
   protected readonly inventoryMaps = computed(() => this.profile()?.inventory?.maps ?? []);
   protected readonly inventoryBots = computed(() => this.profile()?.inventory?.bots ?? []);
+  /** true/false once the server was scanned, null if unknown. */
+  protected readonly ssbInstalled = computed(() => {
+    const pk = this.profile()?.inventory?.packages;
+    return pk ? pk.some((p) => p.toLowerCase() === 'smartstockbots') : null;
+  });
   protected readonly mapChoices = computed(() => {
     this.agentTick();
     const f = this.m();
@@ -491,6 +521,9 @@ export class TournamentFormPage {
       mapMode: 'vote',
       voteTimeoutSec: 45,
       countdownSec: 5,
+      smartStockBots: !!a?.profiles[0]?.inventory?.packages?.some(
+        (p) => p.toLowerCase() === 'smartstockbots',
+      ),
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -529,6 +562,7 @@ export class TournamentFormPage {
       mapMode: r['mapMode'] === 'random' ? 'random' : 'vote',
       voteTimeoutSec: num('voteTimeoutSec', 45),
       countdownSec: num('countdownSec', 5),
+      smartStockBots: r['smartStockBots'] === true,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
@@ -602,6 +636,7 @@ export class TournamentFormPage {
             mapPool: f.mapPool,
             voteTimeoutSec: f.voteTimeoutSec,
             countdownSec: f.countdownSec,
+            smartStockBots: f.smartStockBots,
           },
         },
       },

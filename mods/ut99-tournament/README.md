@@ -127,3 +127,27 @@ Work through these in order and note what happens. Each item names what to look 
 | 23 | **Standings** | `!standings` (12 s); at the end next to the bracket with the shutdown countdown |
 | 24 | **Follow** | As spectator at game start you look through side A's eyes. FIRE switches players and stays in first person; `!fp` toggles, `!follow Mario`, `!follow off` |
 | 25 | **Map change** | After several games and map changes no `Failed to garbage collect` or `Accessed None` in the client log (`UnrealTournament.log`) |
+| 26 | **SmartStockBots** (optional, see below) | Server log at start: SmartStockBots loaded; bots dodge, translocate and combo visibly better; before the countdown and during a pause the bot stays invisible and does not move |
+
+## SmartStockBots (optional)
+
+SmartStockBots makes the stock bots play much better. It runs on the server only; clients need nothing.
+
+1. Copy `SmartStockBots.u`, `SmartStockBots.int` and `SmartStockBots.ini` into the `System` folder of the
+   server installation, then scan the server on the website (Servers → Scan maps and bots).
+2. Tick **SmartStockBots** in the match rules of the tournament (or `"smartStockBots": true` in the rules of a
+   tournament file). The bridge adds `ServerActors=SmartStockBots.SmartStockBots` to `Tourney.ini` and removes
+   it again for tournaments without it. A tournament with the box ticked does not start if `SmartStockBots.u`
+   is missing (clear message on the website / in the bridge log).
+3. Its settings stay in `SmartStockBots.ini`. The mod keeps held bots held: SmartStockBots' `FastRespawn`
+   cannot bring a bot back before the countdown, during a pause or after the game.
+
+## Known limitations
+
+- Bot skill is mapped from 0–7 to UT's 0–3 bot skill; the global novice flag of DeathMatchPlus is not
+  changed per bot.
+- A tournament pause from the bridge holds the game only while a match is live; during the ready check
+  the countdown still runs.
+- Players can rename themselves with the `name` command; the bridge identifies them by token anyway.
+- The token fallback after a map change (by IP address) cannot tell apart two players behind the same IP.
+- The HUD is only drawn while the scoreboard is closed (UT draws HUD mutators after the scoreboard check).
