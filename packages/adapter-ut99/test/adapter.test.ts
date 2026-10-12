@@ -199,7 +199,11 @@ describe('server launch', () => {
       bridgePort: 7790,
       sharedKey: 'secret',
     });
-    expect(changes.some((c) => c.key === 'ServerPackages')).toBe(false);
+    expect(changes).toContainEqual({
+      section: 'Engine.GameEngine',
+      key: 'ServerPackages',
+      ensure: 'UTTourney_v1',
+    });
     expect(changes).toContainEqual({
       section: 'UTTourney_v1.TournamentDM',
       key: 'bMultiWeaponStay',

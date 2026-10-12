@@ -256,6 +256,8 @@ describe('server setup', () => {
     expect(ini.get('Engine.GameReplicationInfo', 'ServerName')).toBe('Cup');
     expect(ini.get('UTTourney_v1.TournamentConfig', 'SharedKey')).toBe('k3y-12345');
     expect(ini.get('UTTourney_v1.TournamentDM', 'bMultiWeaponStay')).toBe('True');
+    // Clients download the mod (HUD, vote window); existing entries are kept.
+    expect(ini.getAll('Engine.GameEngine', 'ServerPackages')).toContain('UTTourney_v1');
     expect(fs.readFileSync(p.userIniPath, 'latin1')).toContain('BotNames[0]=Xan');
     expect(
       fs.readFileSync(path.join(profile.installDir, 'System', 'UnrealTournament.ini'), 'latin1'),

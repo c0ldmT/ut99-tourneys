@@ -3,8 +3,8 @@
 UnrealScript package for UT99 469f. It turns a dedicated server into a tournament server driven by the bridge
 (see [`docs/protocol.md`](../../docs/protocol.md)).
 
-> **Status (milestone 4):** compiles with 469f and was tested against a real server (token login, check-in,
-> map vote, ready check, bots, reconnect). The checklist below is the regression test after changes.
+> **Status:** the server part (milestone 4) is tested on 469f. **Milestone 6 (HUD, vote window, spectator
+> follow) is written but not compiled yet**: please run `build` and the checklist items 18–25 below.
 
 ## Classes
 
@@ -16,9 +16,29 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 | `TourneyMutator` | Console `mutate tourney <cmd>` (fallback for chat commands) |
 | `TourneyChatListener` | Server-only listener for chat commands `!ready !vote !bracket !standings !help` (also from spectators) |
 | `TournamentConfig` | Ini settings (bridge host/port/key) and a cache that survives map changes |
+| `TourneyGRI` | Tournament state replicated to all clients (phase, match, scores, ready, bracket, standings, vote maps) |
+| `TourneyClient` | One per player, client side a HUD mutator: banner, ready/vote panels, bracket, standings, follow hint; opens the vote window; carries the calls between client and server |
+| `TourneyVoteWindow`, `TourneyVoteClient` | UWindow map vote dialog (click up to 3 maps, then "Vote") |
 
-Planned for milestone 6: HUD overlay for the bracket, UWindow dialogs for vote and ready.
-Until then the bracket is shown as text (`!bracket`) and players vote by chat.
+**Clients download the package** (it is in `ServerPackages`; the bridge adds it to `Tourney.ini`). Clients
+whose HUD did not register get the old text versions (progress messages, console). The HUD is drawn only while
+the scoreboard (F1) is closed; with `togglehud` hidden it is not drawn at all.
+
+### In-game commands
+
+| Command | Who | What |
+|---|---|---|
+| `!ready` / FIRE | match players | ready during the ready check |
+| `!vote 2 1 3`, `!v 2 1 3` | match players | vote by number (best first); `!vote` alone opens the vote window |
+| `!bracket` | everybody | show/hide the bracket (shown automatically in the lobby, between games and at the end) |
+| `!standings` | everybody | show/hide the standings |
+| `!follow`, `!follow <name>`, `!follow off` | spectators | follow side A/B (toggle), a player by name prefix, or free camera |
+| `!fp` | spectators | switch between first and third person while following |
+| `!help` | everybody | list of commands |
+
+All of them also work from the console as `mutate tourney <command>` (e.g. `mutate tourney bracket`, bindable to
+a key: `set input F6 mutate tourney bracket`). Spectators follow side A automatically at the start of every game,
+in first person by default.
 
 ## Build
 
@@ -48,8 +68,12 @@ If `ucc make ini=TourneyMake.ini` is not accepted by your build, add `EditPackag
    MaxPlayers=4
    ```
 
-   Do **not** add the package to `ServerPackages` yet: nothing in it runs on clients so far, so clients do not
-   need to download it.
+   and add the package to the downloads (the bridge does this itself when it manages the server):
+
+   ```ini
+   [Engine.GameEngine]
+   ServerPackages=UTTourney_v1
+   ```
 
 2. Start the bridge (see `apps/bridge/README.md`):
 
@@ -95,12 +119,11 @@ Work through these in order and note what happens. Each item names what to look 
 | 15 | Long names / umlauts | Names show correctly; no `line too long` warnings in the bridge log |
 | 16 | `!bracket`, `!standings` | Text bracket in the console; standings in the middle of the screen for 10 s and in the console |
 | 17 | End of the tournament | Scoreboard closes, final standings in the middle of the screen with a 30 s countdown; then the bridge stops the server and exits |
-
-## Known limitations
-
-- Bot skill is mapped from 0–7 to UT's 0–3 bot skill; the global novice flag of DeathMatchPlus is not
-  changed per bot.
-- A tournament pause from the bridge holds the game only while a match is live; during the ready check
-  the countdown still runs.
-- Players can rename themselves with the `name` command; the bridge identifies them by token anyway.
-- The token fallback after a map change (by IP address) cannot tell apart two players behind the same IP.
+| 18 | **HUD download** | Joining shows the package download once (a few hundred KB). Server log: no errors from `TourneyClient`/`TourneyGRI` |
+| 19 | **Banner** | During ready, countdown and the game: names, score, match id, Bo and map at the top centre |
+| 20 | **Ready panel** | Both names with READY / not ready, the hint and the seconds left; no more progress-message text for you |
+| 21 | **Vote window** | When your vote starts a window opens: click up to 3 maps (numbers appear), "Vote" closes it and your vote is shown in the panel. Esc/console key closes it; `!vote` opens it again. Spectators see the panel only |
+| 22 | **Bracket** | In the lobby, between games and at the end the bracket is drawn (winners, losers, grand final, scores, live match in green). `!bracket` hides/shows it, also during a game (20 s) |
+| 23 | **Standings** | `!standings` (12 s); at the end next to the bracket with the shutdown countdown |
+| 24 | **Follow** | As spectator at game start you look through side A's eyes. FIRE switches players and stays in first person; `!fp` toggles, `!follow Mario`, `!follow off` |
+| 25 | **Map change** | After several games and map changes no `Failed to garbage collect` or `Accessed None` in the client log (`UnrealTournament.log`) |

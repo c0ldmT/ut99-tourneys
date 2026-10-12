@@ -108,6 +108,8 @@ export type ModPhase = z.infer<typeof ModPhaseSchema>;
 
 export const BridgeToModSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('welcome'), pv: int, rev: int }),
+  /** Tournament name for the HUD. */
+  z.object({ t: z.literal('title'), name: str(64) }),
   /** Snapshot framing: everything between sync begin and end replaces the mod's state. */
   z.object({ t: z.literal('sync'), st: z.enum(['begin', 'end']), rev: int }),
   /** Current phase. `sec` = seconds until the phase times out (-1 = none). */

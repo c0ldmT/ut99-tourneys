@@ -16,6 +16,7 @@ import {
   type NewTournamentEvent,
   type TournamentEvent,
   type TournamentProjection,
+  wireName,
 } from '@tourney/protocol';
 import {
   loserPickMap,
@@ -515,6 +516,7 @@ export class MatchDirector extends EventEmitter {
     const lines: BridgeToMod[] = [
       { t: 'welcome', pv: 1, rev: this.rev },
       { t: 'sync', st: 'begin', rev: this.rev },
+      { t: 'title', name: wireName(this.proj.name) },
     ];
     if (cm) lines.push(...matchLines(this.proj, this.rules, cm.matchId, cm.game, cm.entrants));
     lines.push(...aclLines(this.proj, this.access, cm?.entrants, this.rev));

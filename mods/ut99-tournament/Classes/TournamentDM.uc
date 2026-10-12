@@ -12,7 +12,7 @@
 //=============================================================================
 class TournamentDM extends DeathMatchPlus;
 
-const MOD_VERSION = "0.1.4";
+const MOD_VERSION = "0.2.0";
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
@@ -21,6 +21,7 @@ var BridgeLink Link;
 var TourneyMsg OutMsg;
 var TourneyMutator TMut;
 var TourneyChatListener ChatListener;
+var TourneyGRI TGRI;
 var float NextConnectTime;
 var bool bJoinsSent;
 var bool bInSync;
@@ -52,6 +53,9 @@ var string TrackTok[64];
 var string TrackRole[64];
 var byte TrackReady[64]; // 0/1 - UE1 has no bool arrays
 var float TrackPanelUntil[64]; // a panel (standings) owns the middle of the screen until then
+var TourneyClient TrackClient[64]; // HUD, vote window and follow for this player
+var float TrackVoteAt[64];         // last vote (rate limit)
+var string VoteKey;                // match and game of the current vote (a resync repeats vopen)
 var int TrackCount;
 
 // Match runtime.
@@ -93,6 +97,8 @@ function PostBeginPlay()
 {
 	Super.PostBeginPlay();
 	OutMsg = Spawn(class'TourneyMsg');
+	TGRI = Spawn(class'TourneyGRI');
+	TGRI.MapName = CurrentMapName();
 	TMut = Spawn(class'TourneyMutator');
 	TMut.Game = self;
 	BaseMutator.AddMutator(TMut);
@@ -172,6 +178,9 @@ function HandleBridgeMessage(TourneyMsg M)
 	{
 		case "welcome":
 			break;
+		case "title":
+			TGRI.TName = M.Get("name");
+			break;
 		case "sync":
 			bInSync = M.Get("st") == "begin";
 			if (!bInSync)
@@ -187,6 +196,8 @@ function HandleBridgeMessage(TourneyMsg M)
 			PhaseSec = M.GetInt("sec");
 			if (Phase == "vote")
 				VoteSecLeft = PhaseSec;
+			TGRI.Phase = Phase;
+			TGRI.PhaseSec = PhaseSec;
 			if (!bInSync)
 				ApplyPhase();
 			break;
@@ -204,6 +215,15 @@ function HandleBridgeMessage(TourneyMsg M)
 			MatchTimeLimit = M.GetInt("tl");
 			bBotA = false;
 			bBotB = false;
+			TGRI.MatchId = MatchId;
+			TGRI.GameNo = GameNo;
+			TGRI.BestOf = BestOf;
+			TGRI.WinsA = WinsA;
+			TGRI.WinsB = WinsB;
+			TGRI.NameA = NameA;
+			TGRI.NameB = NameB;
+			TGRI.bBotA = false;
+			TGRI.bBotB = false;
 			if (!bGameLive)
 				ApplyMatchRules();
 			break;
@@ -211,6 +231,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			if (M.Get("s") == "a")
 			{
 				bBotA = true;
+				TGRI.bBotA = true;
 				BotNameA = M.Get("name");
 				BotSkillA = M.GetInt("sk");
 				BotClsA = M.Get("cls");
@@ -218,6 +239,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			else
 			{
 				bBotB = true;
+				TGRI.bBotB = true;
 				BotNameB = M.Get("name");
 				BotSkillB = M.GetInt("sk");
 				BotClsB = M.Get("cls");
@@ -244,8 +266,18 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "vopen":
 			VoteCount = 0;
 			VoteSecLeft = M.GetInt("sec");
+			TGRI.VoteCount = 0;
+			if (Phase == "vote" && M.Get("mid") $ "/" $ GameNo == VoteKey)
+				break; // same vote again (bridge resync): keep votes and the window state
+			VoteKey = M.Get("mid") $ "/" $ GameNo;
 			for (i = 0; i < 64; i++)
 				TrackVote[i] = "";
+			for (i = 0; i < TrackCount; i++)
+				if (TrackClient[i] != None)
+				{
+					TrackClient[i].MyVote = "";
+					TrackClient[i].bVoteOpened = false;
+				}
 			break;
 		case "vmap":
 			i = M.GetInt("i") - 1;
@@ -253,10 +285,18 @@ function HandleBridgeMessage(TourneyMsg M)
 			{
 				VoteMap[i] = M.Get("map");
 				VoteCount = Max(VoteCount, i + 1);
+				if (i < 16)
+				{
+					TGRI.VoteMaps[i] = VoteMap[i];
+					TGRI.VoteCount = Min(16, VoteCount);
+				}
 			}
 			break;
 		case "vclose":
 			ClearAllProgress();
+			for (i = 0; i < TrackCount; i++)
+				if (TrackClient[i] != None && TrackClient[i].bHasHud)
+					TrackClient[i].ClientCloseVote();
 			BroadcastMessage("Next map:" @ M.Get("map"), true, 'CriticalEvent');
 			break;
 		case "travel":
@@ -265,6 +305,7 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "cd":
 			CountdownLeft = Max(1, M.GetInt("sec"));
 			Phase = "countdown";
+			AutoFollowAll();
 			break;
 		case "pause":
 			SetTourneyPause(M.GetBool("on"), M.Get("why"));
@@ -274,12 +315,17 @@ function HandleBridgeMessage(TourneyMsg M)
 			break;
 		case "brh":
 			BracketCount = 0;
+			TGRI.LineCount = 0;
+			TGRI.Fmt = M.Get("fmt");
+			TGRI.BracketRev++;
 			break;
 		case "brm":
 			AddBracketLine(M);
 			break;
 		case "sth":
 			StandCount = 0;
+			TGRI.StandCount = 0;
+			TGRI.StandRev++;
 			break;
 		case "ste":
 			AddStandingLine(M);
@@ -483,10 +529,7 @@ event PostLogin(PlayerPawn NewPlayer)
 	if (Phase == "vote" && IsMatchPlayerToken(TrackTok[t]))
 		ShowVoteTo(NewPlayer);
 	else if (Phase == "finished")
-	{
 		ShowStandings(NewPlayer);
-		ShowStandingsPanel(NewPlayer, 30, ShutdownText());
-	}
 }
 
 function SendLost(string SRole)
@@ -547,6 +590,13 @@ function Track(PlayerPawn P, string Tok, string SRole)
 	TrackReady[TrackCount] = 0;
 	TrackVote[TrackCount] = "";
 	TrackPanelUntil[TrackCount] = 0;
+	TrackVoteAt[TrackCount] = -10;
+	TrackClient[TrackCount] = Spawn(class'TourneyClient', P);
+	if (TrackClient[TrackCount] != None)
+	{
+		TrackClient[TrackCount].Game = self;
+		TrackClient[TrackCount].MyRole = SRole;
+	}
 	TrackCount++;
 }
 
@@ -559,6 +609,11 @@ function Untrack(int t)
 	TrackReady[t] = TrackReady[TrackCount];
 	TrackVote[t] = TrackVote[TrackCount];
 	TrackPanelUntil[t] = TrackPanelUntil[TrackCount];
+	TrackVoteAt[t] = TrackVoteAt[TrackCount];
+	if (TrackClient[t] != None)
+		TrackClient[t].Destroy();
+	TrackClient[t] = TrackClient[TrackCount];
+	TrackClient[TrackCount] = None;
 	TrackPawn[TrackCount] = None;
 }
 
@@ -736,6 +791,9 @@ function Bot SpawnSideBot(string BName, int BSkill, string BClass)
 function Timer()
 {
 	BridgeTick();
+	if (Phase == "ready" && PhaseSec > 0)
+		PhaseSec--;
+	UpdateGRI();
 	if (Phase == "vote")
 	{
 		VoteTick();
@@ -763,6 +821,55 @@ function Timer()
 	}
 	Super.Timer();
 	LiveTick();
+}
+
+// Copies the per-second state into the replicated TourneyGRI (HUD of the clients).
+function UpdateGRI()
+{
+	local int t;
+
+	if (TGRI == None)
+		return;
+	TGRI.Phase = Phase;
+	if (Phase == "vote")
+		TGRI.PhaseSec = VoteSecLeft;
+	else if (Phase == "countdown")
+		TGRI.PhaseSec = CountdownLeft;
+	else if (Phase == "ready" || Phase == "finished")
+		TGRI.PhaseSec = PhaseSec;
+	else
+		TGRI.PhaseSec = -1;
+	TGRI.ScoreA = SideScore(0);
+	TGRI.ScoreB = SideScore(1);
+	TGRI.ReadyA = ReadyFlag("a", bBotA);
+	TGRI.ReadyB = ReadyFlag("b", bBotB);
+	TGRI.bPaused = bTourneyPaused || Phase == "paused";
+	for (t = 0; t < TrackCount; t++)
+		if (TrackClient[t] != None)
+			TrackClient[t].bVoter = Phase == "vote" && IsMatchPlayerToken(TrackTok[t]);
+}
+
+function byte ReadyFlag(string SRole, bool bBot)
+{
+	local int t;
+	if (bBot)
+		return 1;
+	t = FindTrack(SidePlayer(SRole));
+	if (t < 0)
+		return 0;
+	return TrackReady[t];
+}
+
+function bool IsVoter(PlayerPawn P)
+{
+	local int t;
+	t = FindTrack(P);
+	return Phase == "vote" && t >= 0 && IsMatchPlayerToken(TrackTok[t]);
+}
+
+function bool HasHud(int t)
+{
+	return t >= 0 && TrackClient[t] != None && TrackClient[t].bHasHud;
 }
 
 function PreMatchTick()
@@ -842,6 +949,7 @@ function StartTournamentMatch()
 	LastSentA = -1;
 	LastSentB = -1;
 	StartMatch();
+	AutoFollowAll();
 	OutMsg.Begin("live");
 	OutMsg.AddStr("mid", MatchId);
 	OutMsg.AddInt("g", GameNo);
@@ -986,6 +1094,8 @@ function SetTourneyPause(bool bOn, string Why)
 		}
 	}
 	bTourneyPaused = bOn;
+	if (bOn && TGRI != None)
+		TGRI.PauseReason = Why;
 	if (!bGameLive || bGameEnded)
 		return;
 	for (Side = 0; Side < 2; Side++)
@@ -1079,7 +1189,16 @@ function ShowVote()
 	local int t;
 	for (t = 0; t < TrackCount; t++)
 		if (TrackPawn[t] != None && IsMatchPlayerToken(TrackTok[t]))
+		{
 			ShowVoteTo(TrackPawn[t]);
+			if (TrackClient[t] != None)
+				TrackClient[t].bVoter = true;
+			if (HasHud(t) && !TrackClient[t].bVoteOpened)
+			{
+				TrackClient[t].bVoteOpened = true;
+				TrackClient[t].ClientOpenVote();
+			}
+		}
 	VoteTick();
 }
 
@@ -1172,15 +1291,28 @@ function HandleCommand(PlayerPawn P, string Cmd)
 	else if (Word ~= "vote" || Word ~= "v")
 		HandleVote(P, Rest);
 	else if (Word ~= "bracket")
-		ShowBracket(P);
+	{
+		t = FindTrack(P);
+		if (HasHud(t))
+			TrackClient[t].ClientShowBracket();
+		else
+			ShowBracket(P);
+	}
 	else if (Word ~= "standings")
 	{
+		t = FindTrack(P);
 		ShowStandings(P);
-		if (Phase != "finished")
+		if (HasHud(t))
+			TrackClient[t].ClientShowStandings();
+		else if (Phase != "finished")
 			ShowStandingsPanel(P, 10, "");
 	}
+	else if (Word ~= "follow")
+		FollowCommand(P, Rest);
+	else if (Word ~= "fp")
+		ToggleFirstPerson(P);
 	else if (Word ~= "help")
-		P.ClientMessage("Commands: !ready  !vote 3 1 5 (or !v)  !bracket  !standings");
+		P.ClientMessage("Commands: !ready  !vote 3 1 5 (or !v, !vote alone opens the window)  !bracket  !standings  !follow [name|off]  !fp");
 }
 
 function HandleVote(PlayerPawn P, string Args)
@@ -1213,8 +1345,37 @@ function HandleVote(PlayerPawn P, string Args)
 	if (n == 0)
 	{
 		ShowVoteTo(P);
+		t = FindTrack(P);
+		if (HasHud(t) && IsMatchPlayerToken(TrackTok[t]))
+			TrackClient[t].ClientOpenVote();
 		return;
 	}
+	SendVote(P, Pick[0], Pick[1], Pick[2]);
+}
+
+// From the vote window (TourneyClient.ServerVote): map names instead of numbers.
+function VoteByName(PlayerPawn P, string M1, string M2, string M3)
+{
+	if (Phase != "vote" || FindTrack(P) < 0 || M1 == "")
+		return;
+	SendVote(P, M1, M2, M3);
+}
+
+function SendVote(PlayerPawn P, string M1, string M2, string M3)
+{
+	local string Pick[3];
+	local int t;
+
+	t = FindTrack(P);
+	if (t >= 0)
+	{
+		if (Level.TimeSeconds - TrackVoteAt[t] < 0.5)
+			return;
+		TrackVoteAt[t] = Level.TimeSeconds;
+	}
+	Pick[0] = M1;
+	Pick[1] = M2;
+	Pick[2] = M3;
 	OutMsg.Begin("vote");
 	OutMsg.AddInt("pid", P.PlayerReplicationInfo.PlayerID);
 	OutMsg.AddStr("m1", OutMsg.FitWire(Pick[0], 64));
@@ -1223,7 +1384,11 @@ function HandleVote(PlayerPawn P, string Args)
 	Send();
 	t = FindTrack(P);
 	if (t >= 0)
+	{
 		TrackVote[t] = TrimSpaces(Pick[0] @ Pick[1] @ Pick[2]);
+		if (TrackClient[t] != None)
+			TrackClient[t].MyVote = TrackVote[t];
+	}
 	P.ClientMessage("Vote received:" @ Pick[0] @ Pick[1] @ Pick[2]);
 	VoteTick();
 }
@@ -1237,11 +1402,29 @@ function string TrimSpaces(string S)
 	return S;
 }
 
+// "|" separates the fields of the HUD lines; names must not contain it.
+function string NoBar(string S)
+{
+	local int i;
+	i = InStr(S, "|");
+	while (i >= 0)
+	{
+		S = Left(S, i) $ "/" $ Mid(S, i + 1);
+		i = InStr(S, "|");
+	}
+	return S;
+}
+
 function AddBracketLine(TourneyMsg M)
 {
 	local string S, St;
 	if (BracketCount >= 64)
 		return;
+	TGRI.Lines[BracketCount] = M.Get("s") $ "|" $ M.Get("r") $ "|" $ M.Get("i") $ "|" $ M.Get("id") $ "|"
+		$ NoBar(M.Get("na")) $ "|" $ NoBar(M.Get("nb")) $ "|" $ M.Get("sa") $ "|" $ M.Get("sb") $ "|"
+		$ M.Get("st") $ "|" $ M.Get("w");
+	TGRI.LineCount = BracketCount + 1;
+	TGRI.BracketRev++;
 	St = M.Get("st");
 	S = M.Get("id") $ ":" @ NameOr(M.Get("na"));
 	if (M.GetInt("sa") >= 0)
@@ -1272,6 +1455,9 @@ function AddStandingLine(TourneyMsg M)
 	local string S;
 	if (StandCount >= 32)
 		return;
+	TGRI.Stand[StandCount] = M.Get("pl") $ "|" $ NoBar(M.Get("name")) $ "|" $ M.Get("w") $ "|" $ M.Get("l") $ "|" $ M.Get("bot");
+	TGRI.StandCount = StandCount + 1;
+	TGRI.StandRev++;
 	if (M.GetInt("pl") > 0)
 		S = M.Get("pl") $ "." @ M.Get("name");
 	else
@@ -1280,7 +1466,7 @@ function AddStandingLine(TourneyMsg M)
 	StandingText[StandCount++] = S;
 }
 
-// Text version until the HUD overlay exists (milestone 6).
+// Text version (console) for clients without the HUD and for the console history.
 function ShowBracket(PlayerPawn P)
 {
 	local int i;
@@ -1295,9 +1481,11 @@ function ShowStandings(PlayerPawn P)
 		P.ClientMessage(StandingText[i]);
 }
 
+// True if the middle of this player's screen is taken: by a standings panel, or by the
+// HUD of the mod itself (then the text fallbacks with progress messages are not needed).
 function bool PanelActive(int t)
 {
-	return TrackPanelUntil[t] > Level.TimeSeconds;
+	return HasHud(t) || TrackPanelUntil[t] > Level.TimeSeconds;
 }
 
 // Standings in the middle of the screen (the 8 progress message lines).
@@ -1342,7 +1530,8 @@ function ShowFinalStandings(bool bFirst)
 			continue;
 		if (bFirst)
 			ShowStandings(TrackPawn[t]);
-		ShowStandingsPanel(TrackPawn[t], 3, ShutdownText());
+		if (!HasHud(t))
+			ShowStandingsPanel(TrackPawn[t], 3, ShutdownText());
 	}
 }
 
@@ -1404,6 +1593,116 @@ function StripInventory(Pawn P)
 	{
 		Next = Inv.Inventory;
 		Inv.Destroy();
+	}
+}
+
+//=============================================================================
+// Spectators: follow a player
+//=============================================================================
+
+function FollowCommand(PlayerPawn P, string Arg)
+{
+	local int t;
+	local Pawn Target, Q;
+
+	t = FindTrack(P);
+	if (t < 0 || TrackClient[t] == None)
+		return;
+	if (!P.IsA('Spectator'))
+	{
+		P.ClientMessage("Only spectators can follow a player.");
+		return;
+	}
+	if (Arg ~= "off")
+	{
+		TrackClient[t].bAutoFollow = false;
+		P.ViewTarget = None;
+		P.bBehindView = false;
+		TrackClient[t].ClientViewMode(false);
+		P.ClientMessage("Free camera. !follow to follow the match players again.");
+		return;
+	}
+	TrackClient[t].bAutoFollow = true;
+	if (Arg == "")
+	{
+		// Toggle between the two sides of the current match.
+		Target = SidePawn(0);
+		if (Target == None || P.ViewTarget == Target)
+			Target = SidePawn(1);
+	}
+	else
+	{
+		for (Q = Level.PawnList; Q != None; Q = Q.NextPawn)
+			// Not bIsSpectator: held match players (PlayerWaiting) are flagged as spectators too.
+			if (Q.bIsPlayer && Q.PlayerReplicationInfo != None && !Q.IsA('Spectator')
+				&& Left(Q.PlayerReplicationInfo.PlayerName, Len(Arg)) ~= Arg)
+			{
+				Target = Q;
+				break;
+			}
+	}
+	if (Target == None)
+	{
+		P.ClientMessage("Nobody to follow" @ Arg);
+		return;
+	}
+	SetFollow(t, Target);
+}
+
+function SetFollow(int t, Pawn Target)
+{
+	local PlayerPawn P;
+	P = TrackPawn[t];
+	if (P == None || Target == None || Target == P)
+		return;
+	P.ViewTarget = Target;
+	P.bBehindView = !TrackClient[t].bFirstPerson;
+	TrackClient[t].ClientViewMode(!TrackClient[t].bFirstPerson);
+	if (Target.PlayerReplicationInfo != None)
+		P.ClientMessage("Following" @ Target.PlayerReplicationInfo.PlayerName, 'Event');
+}
+
+function ToggleFirstPerson(PlayerPawn P)
+{
+	local int t;
+	t = FindTrack(P);
+	if (t < 0 || TrackClient[t] == None)
+		return;
+	TrackClient[t].bFirstPerson = !TrackClient[t].bFirstPerson;
+	if (P.ViewTarget != None)
+	{
+		P.bBehindView = !TrackClient[t].bFirstPerson;
+		TrackClient[t].ClientViewMode(!TrackClient[t].bFirstPerson);
+	}
+	if (TrackClient[t].bFirstPerson)
+		P.ClientMessage("First person view");
+	else
+		P.ClientMessage("Third person view");
+}
+
+// At the start of a game every spectator who wants it watches side a (FIRE switches).
+function AutoFollowAll()
+{
+	local int t;
+	local Pawn Target;
+	local Pawn A, B;
+
+	A = SidePawn(0);
+	B = SidePawn(1);
+	Target = A;
+	if (Target == None)
+		Target = B;
+	if (Target == None)
+		return;
+	for (t = 0; t < TrackCount; t++)
+	{
+		if (TrackPawn[t] == None || !TrackPawn[t].IsA('Spectator') || TrackClient[t] == None)
+			continue;
+		if (!TrackClient[t].bAutoFollow)
+			continue;
+		if (TrackPawn[t].ViewTarget != None && (TrackPawn[t].ViewTarget == A || TrackPawn[t].ViewTarget == B))
+			continue;
+		SetFollow(t, Target);
 	}
 }
 
