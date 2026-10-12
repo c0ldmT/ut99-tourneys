@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildStructure, dropInOrder, losersRoundSize, type MatchNode } from '../src/index.js';
 
-const SIZES = [8, 16, 32] as const;
+const SIZES = [4, 8, 16, 32] as const;
 
 function feeds(nodes: MatchNode[], kind: 'winner' | 'loser', id: string) {
   return nodes.filter((n) => n.sources.some((s) => s.kind === kind && s.matchId === id));

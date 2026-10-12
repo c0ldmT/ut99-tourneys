@@ -51,6 +51,8 @@ export interface TournamentSummary {
   phase: Phase;
   format: 'single' | 'double';
   size: number;
+  teamSize: number;
+  teams: number;
   registered: number;
   registeredMe: boolean;
   registrationOpen: boolean;
@@ -85,12 +87,43 @@ export interface TournamentDetail {
   registrationOpen: boolean;
   scheduledAt: string | null;
   createdAt: string;
-  registrations: { userId: string; displayName: string; avatar: string | null }[];
+  registrations: {
+    userId: string;
+    displayName: string;
+    avatar: string | null;
+    teamId: string | null;
+    sub: boolean;
+  }[];
+  teams: TeamView[];
   watchers: number;
-  me: { registered: boolean; watching: boolean; entrantId: string | null; hasAccess: boolean };
+  me: {
+    registered: boolean;
+    watching: boolean;
+    entrantId: string | null;
+    hasAccess: boolean;
+    teamId: string | null;
+    captain: boolean;
+  };
   projection: (TournamentProjection & { bracket?: BracketState }) | null;
   live: LiveInfo | null;
   agent: { online: boolean };
+}
+
+export interface TeamView {
+  id: string;
+  name: string;
+  tag: string | null;
+  captainId: string;
+  members: { userId: string; displayName: string; avatar: string | null; sub: boolean }[];
+  /** Only for the team's members and admins. */
+  inviteCode: string | null;
+}
+
+export interface InvitePreview {
+  teamId: string;
+  name: string;
+  tag: string | null;
+  members: { displayName: string; sub: boolean }[];
 }
 
 export interface Inventory {

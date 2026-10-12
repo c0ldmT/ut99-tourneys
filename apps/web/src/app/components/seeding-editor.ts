@@ -32,17 +32,21 @@ interface Option {
           <div class="muted small">W1-{{ pair + 1 }}</div>
           @for (i of [pair * 2, pair * 2 + 1]; track i) {
             <select [ngModel]="slots()[i]" (ngModelChange)="set(i, $event)" [class.dup]="isDup(i)">
-              <option [ngValue]="null">{{ 'seed.randomBot' | t }}</option>
-              <optgroup [label]="'seed.players' | t">
+              <option [ngValue]="null">
+                {{ (teamMode() ? 'seed.botTeam' : 'seed.randomBot') | t }}
+              </option>
+              <optgroup [label]="(teamMode() ? 'seed.teams' : 'seed.players') | t">
                 @for (o of humans(); track o.id) {
                   <option [ngValue]="o.id">{{ o.label }}</option>
                 }
               </optgroup>
-              <optgroup [label]="'seed.bots' | t">
-                @for (o of bots(); track o.id) {
-                  <option [ngValue]="o.id">{{ o.label }}</option>
-                }
-              </optgroup>
+              @if (!teamMode()) {
+                <optgroup [label]="'seed.bots' | t">
+                  @for (o of bots(); track o.id) {
+                    <option [ngValue]="o.id">{{ o.label }}</option>
+                  }
+                </optgroup>
+              }
             </select>
           }
         </div>
@@ -54,10 +58,13 @@ interface Option {
     @if (hasDup()) {
       <p class="error small">{{ 'seed.duplicate' | t }}</p>
     }
+    @if (solos() > 0) {
+      <p class="error small">{{ 'seed.formTeamsFirst' | t: { n: solos() } }}</p>
+    }
     <div class="row">
       <button
         class="primary"
-        [disabled]="busy() || hasDup() || missing().length > 0"
+        [disabled]="busy() || hasDup() || missing().length > 0 || solos() > 0"
         (click)="saveManual.emit(slots())"
       >
         {{ 'seed.saveManual' | t }}
@@ -91,8 +98,18 @@ export class SeedingEditor {
 
   protected readonly slots = signal<(string | null)[]>([]);
 
+  protected readonly teamMode = computed(() => this.tournament().settings.teamSize > 1);
+  /** Players without a team; team tournaments need them in teams before manual seeding. */
+  protected readonly solos = computed(() =>
+    this.teamMode() ? this.tournament().registrations.filter((r) => !r.teamId).length : 0,
+  );
   protected readonly humans = computed<Option[]>(() =>
-    this.tournament().registrations.map((r) => ({ id: `u-${r.userId}`, label: r.displayName })),
+    this.teamMode()
+      ? this.tournament().teams.map((x) => ({ id: x.id, label: x.name }))
+      : this.tournament().registrations.map((r) => ({
+          id: `u-${r.userId}`,
+          label: r.displayName,
+        })),
   );
   protected readonly bots = computed<Option[]>(() => {
     const seen = new Set<string>();
@@ -120,7 +137,9 @@ export class SeedingEditor {
       const size = t.settings.size;
       const current = t.projection?.bracketDefinition?.slots;
       if (current && current.length === size) {
-        this.slots.set([...current]);
+        // Bot teams get drawn again on saving, so they show as "bot team".
+        const known = new Set([...this.humans(), ...this.bots()].map((o) => o.id));
+        this.slots.set(current.map((id) => (known.has(id) ? id : null)));
       } else {
         const s: (string | null)[] = Array(size).fill(null);
         this.humans().forEach((h, i) => (s[i * 2 < size ? i * 2 : ((i * 2) % size) + 1] = h.id));

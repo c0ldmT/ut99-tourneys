@@ -3,6 +3,7 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   AgentView,
+  InvitePreview,
   Me,
   PublicUser,
   SiteConfig,
@@ -75,6 +76,26 @@ export class Api {
   unregister = (id: string) => this.call<void>('DELETE', `/tournaments/${id}/registration`);
   kick = (id: string, userId: string) =>
     this.call<void>('DELETE', `/tournaments/${id}/registrations/${userId}`);
+  createTeam = (id: string, name: string, tag: string | null) =>
+    this.call<TournamentDetail>('POST', `/tournaments/${id}/teams`, { name, tag });
+  invitePreview = (id: string, code: string) =>
+    this.call<InvitePreview>('GET', `/tournaments/${id}/teams/invite/${encodeURIComponent(code)}`);
+  joinTeam = (id: string, code: string) =>
+    this.call<TournamentDetail>('POST', `/tournaments/${id}/teams/join`, { code });
+  updateTeam = (id: string, teamId: string, body: unknown) =>
+    this.call<TournamentDetail>('PATCH', `/tournaments/${id}/teams/${teamId}`, body);
+  deleteTeam = (id: string, teamId: string) =>
+    this.call<void>('DELETE', `/tournaments/${id}/teams/${teamId}`);
+  newInvite = (id: string, teamId: string) =>
+    this.call<{ inviteCode: string }>('POST', `/tournaments/${id}/teams/${teamId}/invite`);
+  setLineup = (id: string, teamId: string, starters: string[]) =>
+    this.call<void>('PUT', `/tournaments/${id}/teams/${teamId}/lineup`, { starters });
+  removeMember = (id: string, teamId: string, userId: string) =>
+    this.call<void>('DELETE', `/tournaments/${id}/teams/${teamId}/members/${userId}`);
+  moveMember = (id: string, userId: string, teamId: string | null, sub = false) =>
+    this.call<void>('PUT', `/tournaments/${id}/registrations/${userId}`, { teamId, sub });
+  buildTeams = (id: string) =>
+    this.call<TournamentDetail>('POST', `/tournaments/${id}/teams/build`);
   watch = (id: string) => this.call<void>('POST', `/tournaments/${id}/watch`);
   unwatch = (id: string) => this.call<void>('DELETE', `/tournaments/${id}/watch`);
   seed = (id: string, body: unknown) =>

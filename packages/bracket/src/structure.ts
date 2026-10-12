@@ -8,6 +8,7 @@ import type {
   MatchSource,
   MatchStage,
 } from './types.js';
+import { BRACKET_SIZES } from './types.js';
 
 export const matchId = (side: 'W' | 'L', round: number, index: number): MatchId =>
   `${side}${round}-${index}`;
@@ -180,7 +181,8 @@ export function buildStructure(
 
 export function validateDefinition(def: BracketDefinition): string[] {
   const errors: string[] = [];
-  if (![8, 16, 32].includes(def.size)) errors.push(`unsupported size ${def.size}`);
+  if (!(BRACKET_SIZES as readonly number[]).includes(def.size))
+    errors.push(`unsupported size ${def.size}`);
   if (def.format !== 'single' && def.format !== 'double')
     errors.push(`unknown format ${def.format}`);
   if (def.slots.length !== def.size)

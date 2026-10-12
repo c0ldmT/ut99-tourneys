@@ -12,6 +12,8 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
+import { TeamPanel } from '../components/team-panel';
+import { TeamRoster } from '../components/team-roster';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
@@ -22,7 +24,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
 
 @Component({
   selector: 'app-tournament-page',
-  imports: [FormsModule, RouterLink, TPipe, BracketView, SeedingEditor],
+  imports: [FormsModule, RouterLink, TPipe, BracketView, SeedingEditor, TeamPanel, TeamRoster],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -36,7 +38,13 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             {{ t.name }} <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
           </h1>
           <div class="muted small">
-            {{ 'format.' + t.settings.format | t }} · {{ t.settings.size }} {{ 'list.slots' | t }} ·
+            {{ 'format.' + t.settings.format | t }} ·
+            @if (teamMode()) {
+              {{ 'team.mode' | t: { k: t.settings.teamSize } }} · {{ t.settings.size }}
+              {{ 'list.teams' | t }} ·
+            } @else {
+              {{ t.settings.size }} {{ 'list.slots' | t }} ·
+            }
             {{ 'tp.bestOf' | t: { n: t.settings.bestOf.default } }}
             @if (t.settings.bestOf.grandFinal) {
               · {{ 'tp.gfBestOf' | t: { n: t.settings.bestOf.grandFinal } }}
@@ -64,9 +72,23 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <div class="card champion">🏆 {{ 'tp.champion' | t: { name: c } }}</div>
       }
 
+      @if (teamMode() && t.phase === 'draft') {
+        <div class="card">
+          <app-team-panel
+            [tournament]="t"
+            [isAdmin]="isAdmin()"
+            [myUserId]="auth.me()?.id ?? null"
+            [joinCode]="join() ?? null"
+            (changed)="reload()"
+          />
+        </div>
+      }
+
       <div class="grid two">
         <!-- Taking part -->
-        @if (t.phase !== 'finished' && t.phase !== 'aborted') {
+        @if (
+          t.phase !== 'finished' && t.phase !== 'aborted' && !(teamMode() && t.phase === 'draft')
+        ) {
           <div class="card">
             @if (t.phase === 'draft') {
               <h2>{{ 'tp.registration' | t }}</h2>
@@ -156,12 +178,21 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         } @else if (t.phase === 'checkIn') {
           <div class="card">
             <h2>{{ 'tp.checkIn' | t }}</h2>
-            <p class="small">
-              {{
-                'tp.checkedIn'
-                  | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
-              }}
-            </p>
+            @if (teamMode()) {
+              <p class="small">
+                {{
+                  'tp.checkedInTeams'
+                    | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
+                }}
+              </p>
+            } @else {
+              <p class="small">
+                {{
+                  'tp.checkedIn'
+                    | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
+                }}
+              </p>
+            }
             <ul class="small">
               @for (h of humans(); track h.id) {
                 <li>
@@ -193,7 +224,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             <thead>
               <tr>
                 <th>#</th>
-                <th>{{ 'tp.player' | t }}</th>
+                <th>{{ (teamMode() ? 'tp.team' : 'tp.player') | t }}</th>
                 <th>{{ 'tp.wins' | t }}</th>
                 <th>{{ 'tp.losses' | t }}</th>
               </tr>
@@ -217,7 +248,18 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         </div>
       }
 
-      @if (t.phase === 'draft') {
+      @if (teamMode() && t.projection) {
+        <div class="card">
+          <app-team-roster
+            [tournament]="t"
+            [isAdmin]="isAdmin()"
+            [myUserId]="auth.me()?.id ?? null"
+            (changed)="reload()"
+          />
+        </div>
+      }
+
+      @if (t.phase === 'draft' && !teamMode()) {
         <div class="card">
           <h2>{{ 'tp.players' | t }} ({{ t.registrations.length }})</h2>
           @if (!t.registrations.length) {
@@ -472,6 +514,8 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
 })
 export class TournamentPage {
   readonly id = input.required<string>();
+  /** Invite code of a team (link "?join=…"). */
+  readonly join = input<string | undefined>(undefined);
   protected readonly api = inject(Api);
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
@@ -503,8 +547,12 @@ export class TournamentPage {
     const cm = this.current();
     return cm ? (this.t()?.projection?.bracket?.byId[cm.matchId]?.bestOf ?? 1) : 1;
   });
+  protected readonly teamMode = computed(() => (this.t()?.settings.teamSize ?? 1) > 1);
+  /** Entrants with people: players in 1v1, teams with members in team tournaments. */
   protected readonly humans = computed(() =>
-    Object.values(this.t()?.projection?.entrants ?? {}).filter((e) => e.kind === 'human'),
+    Object.values(this.t()?.projection?.entrants ?? {}).filter(
+      (e) => e.kind === 'human' || (e.kind === 'team' && e.members.length > 0),
+    ),
   );
   protected readonly champion = computed(() => {
     const p = this.t()?.projection;
@@ -551,7 +599,19 @@ export class TournamentPage {
   }
 
   protected isBot(id: string): boolean {
-    return this.t()?.projection?.entrants[id]?.kind === 'bot';
+    const e = this.t()?.projection?.entrants[id];
+    return e?.kind === 'bot' || (e?.kind === 'team' && e.members.length === 0);
+  }
+
+  protected reload() {
+    void this.load(this.id());
+  }
+
+  private memberName(entrantId: string, userId: string): string {
+    const e = this.t()?.projection?.entrants[entrantId];
+    return (
+      (e?.kind === 'team' && e.members.find((m) => m.userId === userId)?.displayName) || userId
+    );
   }
 
   protected liveScore(id: string): string {
@@ -647,7 +707,13 @@ export class TournamentPage {
       case 'match.called':
         return `${d['matchId']}: ${(d['entrants'] as string[]).map((x) => this.name(x)).join(' vs ')}`;
       case 'entrant.checkedIn':
-        return this.name(d['entrantId'] as string);
+        return d['userId']
+          ? `${this.name(d['entrantId'] as string)}: ${this.memberName(d['entrantId'] as string, d['userId'] as string)}`
+          : this.name(d['entrantId'] as string);
+      case 'team.lineupSet':
+        return `${this.name(d['entrantId'] as string)}: ${(d['starters'] as string[])
+          .map((u) => this.memberName(d['entrantId'] as string, u))
+          .join(', ')}`;
       case 'entrant.replaced':
         return `${this.name(d['entrantId'] as string)} → bot`;
       case 'tournament.paused':

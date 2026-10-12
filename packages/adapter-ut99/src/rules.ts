@@ -13,7 +13,27 @@ export const MOD_GAME_CLASS = `${MOD_PACKAGE}.TournamentDM`;
 export const SMART_STOCK_BOTS_PACKAGE = 'SmartStockBots';
 export const SMART_STOCK_BOTS_ACTOR = `${SMART_STOCK_BOTS_PACKAGE}.SmartStockBots`;
 
-/** Match rules for 1v1 Deathmatch, editable per tournament on the website. */
+/**
+ * Suggested frag limit (team score in team games) and time limit per team size.
+ * The website pre-fills them; they stay editable.
+ */
+export function defaultLimits(teamSize: number): { fragLimit: number; timeLimitMin: number } {
+  switch (teamSize) {
+    case 2:
+      return { fragLimit: 30, timeLimitMin: 15 };
+    case 3:
+      return { fragLimit: 40, timeLimitMin: 15 };
+    case 5:
+      return { fragLimit: 60, timeLimitMin: 15 };
+    default:
+      return { fragLimit: 20, timeLimitMin: 10 };
+  }
+}
+
+/**
+ * Match rules for Deathmatch (1v1) and Team Deathmatch, editable per tournament on the website.
+ * In team games the frag limit is the team score.
+ */
 export const Ut99DmRulesSchema = z
   .object({
     /** 0 = no frag limit. */
@@ -34,6 +54,9 @@ export const Ut99DmRulesSchema = z
     avoidRecentMaps: z.number().int().min(0).max(10).default(3),
 
     countdownSec: z.number().int().min(3).max(30).default(5),
+
+    /** Team games only: damage dealt to team mates in percent. */
+    friendlyFirePct: z.union([z.literal(0), z.literal(50), z.literal(100)]).default(0),
 
     // Server-wide game settings (applied via ini at server start).
     weaponStay: z.boolean().default(true),

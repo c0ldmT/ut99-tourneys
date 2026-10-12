@@ -10,7 +10,7 @@ export type EntrantId = string;
 export type MatchId = string;
 
 export type BracketFormat = 'single' | 'double';
-export const BRACKET_SIZES = [8, 16, 32] as const;
+export const BRACKET_SIZES = [4, 8, 16, 32] as const;
 export type BracketSize = (typeof BRACKET_SIZES)[number];
 
 /** W = winners bracket (also used for single elimination), L = losers bracket, GF = grand final. */

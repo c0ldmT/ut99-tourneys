@@ -20,7 +20,12 @@ export const BestOfPolicySchema = z.object({
 }) satisfies z.ZodType<BestOfPolicy>;
 
 export const BracketFormatSchema = z.enum(['single', 'double']);
-export const BracketSizeSchema = z.union([z.literal(8), z.literal(16), z.literal(32)]);
+export const BracketSizeSchema = z.union([
+  z.literal(4),
+  z.literal(8),
+  z.literal(16),
+  z.literal(32),
+]);
 
 export const BracketDefinitionSchema = z.object({
   format: BracketFormatSchema,
@@ -58,6 +63,22 @@ export const BotSpecSchema = z.object({
 });
 export type BotSpec = z.infer<typeof BotSpecSchema>;
 
+/** Players per team: 1 = one on one, otherwise team deathmatch (2on2, 3on3, 5on5). */
+export const TeamSizeSchema = z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(5)]);
+export type TeamSize = z.infer<typeof TeamSizeSchema>;
+/** Substitutes a team may register on top of its starters. */
+export const MAX_SUBS = 2;
+/** Largest bracket (in teams) for team tournaments. */
+export const MAX_TEAM_BRACKET = 16;
+
+export const TeamMemberSchema = z.object({
+  userId: Id,
+  displayName: z.string().min(1).max(32),
+  /** Substitutes play only when a starter is missing (or the captain lines them up). */
+  sub: z.boolean(),
+});
+export type TeamMember = z.infer<typeof TeamMemberSchema>;
+
 /**
  * A bracket position holder. The id never changes; the occupant can (e.g. a bot replacing a
  * no-show at check-in), which is recorded with an `entrant.replaced` event.
@@ -76,6 +97,18 @@ export const EntrantSchema = z.discriminatedUnion('kind', [
     displayName: z.string().min(1).max(32),
     bot: BotSpecSchema,
   }),
+  z.object({
+    id: Id,
+    kind: z.literal('team'),
+    /** Team name. */
+    displayName: z.string().min(1).max(32),
+    tag: z.string().min(1).max(8).optional(),
+    captainUserId: Id.optional(),
+    /** Starters first, then substitutes. Empty for a bot team. */
+    members: z.array(TeamMemberSchema).max(5 + MAX_SUBS),
+    /** Bots that take the starter places nobody fills, in this order. */
+    bots: z.array(BotSpecSchema).max(5),
+  }),
 ]);
 export type Entrant = z.infer<typeof EntrantSchema>;
 
@@ -85,6 +118,42 @@ export const botEntrantId = (name: string) => `bot-${name.replace(/[^A-Za-z0-9_-
 export function botEntrant(spec: BotSpec, id = botEntrantId(spec.name)): Entrant {
   return { id, kind: 'bot', displayName: spec.name, bot: spec };
 }
+
+export type TeamEntrant = Extract<Entrant, { kind: 'team' }>;
+
+/** Starters of a team in lineup order (at most `teamSize`). */
+export const teamStarters = (team: TeamEntrant, teamSize: number) =>
+  team.members.filter((m) => !m.sub).slice(0, teamSize);
+
+/** Website user ids that belong to an entrant (the player, or every team member). */
+export function entrantUserIds(e: Entrant): string[] {
+  if (e.kind === 'human') return [e.userId];
+  if (e.kind === 'team') return e.members.map((m) => m.userId);
+  return [];
+}
+
+/** Classic UT team names, used for teams made of bots only. */
+export const BOT_TEAM_NAMES = [
+  'Thunder Crash',
+  'Iron Guard',
+  'Hellions',
+  'Juggernauts',
+  'Black Legion',
+  'Venom',
+  'Blood Reavers',
+  'Iron Skull',
+  'Bloodfist',
+  'Corrupt',
+  'Necris Clan',
+  'Krall Raiders',
+  'Skaarj Hybrids',
+  'Nali Avengers',
+  'Mercenaries',
+  'Rogue Squad',
+] as const;
+
+export const botTeamName = (index: number): string =>
+  BOT_TEAM_NAMES[index] ?? `Bot Team ${index + 1}`;
 
 /** Entrant id of a website user. */
 export const userEntrantId = (userId: string) => `u-${userId}`;
@@ -96,6 +165,8 @@ export type ServerOs = z.infer<typeof ServerOsSchema>;
 export const TournamentSettingsSchema = z.object({
   format: BracketFormatSchema,
   size: BracketSizeSchema,
+  /** 1 = one on one; 2, 3 or 5 = team deathmatch, the bracket then holds teams. */
+  teamSize: TeamSizeSchema.default(1),
   grandFinalReset: z.boolean().default(true),
   bestOf: BestOfPolicySchema.default({ default: 1 }),
   /** Minutes players have to connect before missing ones are replaced by bots. */
@@ -119,4 +190,13 @@ export const TournamentSettingsSchema = z.object({
   }),
 });
 export type TournamentSettings = z.infer<typeof TournamentSettingsSchema>;
+
+/** Cross-field checks the schema cannot express. Returns human-readable problems. */
+export function settingsProblems(s: TournamentSettings): string[] {
+  const problems: string[] = [];
+  if (s.teamSize > 1 && s.size > MAX_TEAM_BRACKET) {
+    problems.push(`team tournaments hold at most ${MAX_TEAM_BRACKET} teams`);
+  }
+  return problems;
+}
 export type TournamentSettingsInput = z.input<typeof TournamentSettingsSchema>;

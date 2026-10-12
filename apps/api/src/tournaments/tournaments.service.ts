@@ -1,15 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
-import { buildSlots, createRng, fillEmptySlots } from '@tourney/bracket';
+import { buildSlots, createRng, fillEmptySlots, type Rng } from '@tourney/bracket';
 import {
   BotSpecSchema,
+  MAX_SUBS,
   TournamentSettingsSchema,
   botEntrant,
+  botTeamName,
+  entrantUserIds,
+  settingsProblems,
   userEntrantId,
   type AccessEntry,
   type BotSpec,
   type Entrant,
   type NewTournamentEvent,
+  type TeamEntrant,
   type TournamentProjection,
   type TournamentSettings,
 } from '@tourney/protocol';
@@ -18,7 +23,7 @@ import { z } from 'zod';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { registrations, tournaments, users, watchers } from '../db/schema.js';
-import { badRequest, conflict, notFound } from '../common/http.js';
+import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { randomId, slugify, TOURNAMENT_ID } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { AgentConnections } from '../agents/connections.js';
@@ -26,6 +31,8 @@ import { AgentsService } from '../agents/agents.service.js';
 import type { User } from '../auth/users.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
+import { assignBots, fits, formTeams, joinRole, type TeamShape } from './teams.js';
+import { shapeOf, TeamsService, type TeamView } from './teams.service.js';
 
 export type TournamentRow = typeof tournaments.$inferSelect;
 
@@ -75,6 +82,28 @@ export const CommandBody = z.discriminatedUnion('kind', [
 ]);
 export type Command = z.infer<typeof CommandBody>;
 
+export const CreateTeamBody = z.object({
+  name: z.string().trim().min(1).max(40),
+  tag: z.string().trim().max(20).nullable().optional(),
+});
+export const JoinTeamBody = z.object({ code: z.string().regex(/^[A-Za-z0-9]{8,32}$/) });
+export const UpdateTeamBody = z.object({
+  name: z.string().trim().min(1).max(40).optional(),
+  tag: z.string().trim().max(20).nullable().optional(),
+  captainId: z.string().min(1).max(64).optional(),
+});
+export const LineupBody = z.object({ starters: z.array(z.string().min(1).max(64)).max(5) });
+export const MoveMemberBody = z.object({
+  teamId: z.string().min(1).max(64).nullable(),
+  sub: z.boolean().default(false),
+});
+export type CreateTeam = z.infer<typeof CreateTeamBody>;
+export type UpdateTeam = z.infer<typeof UpdateTeamBody>;
+export type MoveMember = z.infer<typeof MoveMemberBody>;
+
+/** Bracket entrant ids of teams made of bots only (the team table uses "t-…"). */
+const botTeamId = (n: number) => `botteam-${n}`;
+
 @Injectable()
 export class TournamentsService {
   constructor(
@@ -85,6 +114,7 @@ export class TournamentsService {
     @Inject(AgentsService) private readonly agents: AgentsService,
     @Inject(AgentConnections) private readonly connections: AgentConnections,
     @Inject(LOGGER) private readonly logger: ApiLogger,
+    @Inject(TeamsService) private readonly teams: TeamsService,
   ) {}
 
   private now() {
@@ -117,10 +147,24 @@ export class TournamentsService {
   // Drafts
   // ------------------------------------------------------------------------------------------
 
-  private checkFields(f: { settings?: TournamentSettings; agentId?: string; profileId?: string }) {
+  private checkFields(f: {
+    settings?: TournamentSettings;
+    botPool?: BotSpec[];
+    agentId?: string;
+    profileId?: string;
+  }) {
     if (f.settings) {
       if (f.settings.game.adapter !== 'ut99-dm') {
         throw badRequest(`unknown game adapter ${f.settings.game.adapter}`);
+      }
+      const problems = settingsProblems(f.settings);
+      if (problems.length) throw badRequest(problems.join('; '));
+      const distinctBots = new Set((f.botPool ?? []).map((b) => b.name.toLowerCase())).size;
+      if (f.settings.teamSize > 1 && f.botPool && distinctBots < 2 * f.settings.teamSize) {
+        // Two full bot teams must be able to play each other.
+        throw badRequest(
+          `team tournaments of ${f.settings.teamSize} need at least ${2 * f.settings.teamSize} different bots in the pool`,
+        );
       }
       try {
         parseRules(f.settings.game.rules);
@@ -179,7 +223,8 @@ export class TournamentsService {
       throw conflict('the bot pool cannot change while the tournament runs');
     }
     this.checkFields({
-      settings: body.settings,
+      settings: body.settings ?? (body.botPool ? this.settings(t) : undefined),
+      botPool: body.botPool ?? this.botPool(t),
       agentId: body.agentId ?? (body.profileId ? t.agentId : undefined),
       profileId: body.profileId ?? t.profileId,
     });
@@ -192,8 +237,13 @@ export class TournamentsService {
     if (body.botPool !== undefined) set.botPoolJson = JSON.stringify(body.botPool);
     if (body.registrationOpen !== undefined) set.registrationOpen = body.registrationOpen;
     if (body.scheduledAt !== undefined) set.scheduledAt = body.scheduledAt;
+    const oldTeamSize = this.settings(t).teamSize;
     if (Object.keys(set).length) {
       this.db.update(tournaments).set(set).where(eq(tournaments.id, id)).run();
+      if (body.settings && body.settings.teamSize !== oldTeamSize) {
+        if (body.settings.teamSize === 1) this.teams.dissolveAll(id);
+        else this.teams.normalize(id, body.settings.teamSize, MAX_SUBS);
+      }
       this.notifyDraft(id);
     }
     return this.require(id);
@@ -243,24 +293,239 @@ export class TournamentsService {
     if (t.phase !== 'draft')
       throw conflict('registration is closed: the bracket is already seeded');
     if (!t.registrationOpen) throw conflict('registration is closed');
-    const count = this.registered(id).length;
-    if (count >= this.settings(t).size) throw conflict('the tournament is full');
-    this.db
-      .insert(registrations)
-      .values({ tournamentId: id, userId: user.id, createdAt: this.now() })
-      .onConflictDoNothing()
-      .run();
+    if (this.teams.registration(id, user.id)) return;
+    const settings = this.settings(t);
+    const teams = this.teams.list(id);
+    const solos = this.teams.solos(id).length + 1;
+    if (
+      !fits({ size: settings.size, teamSize: settings.teamSize, teams: teams.map(shapeOf), solos })
+    )
+      throw conflict('the tournament is full');
+    this.teams.setMembership(id, user.id, null, false);
     this.notifyDraft(id);
   }
 
   unregister(id: string, userId: string): void {
     const t = this.require(id);
     if (t.phase !== 'draft') throw conflict('the bracket is already seeded');
+    const teamId = this.teams.registration(id, userId)?.teamId;
     this.db
       .delete(registrations)
       .where(and(eq(registrations.tournamentId, id), eq(registrations.userId, userId)))
       .run();
+    if (teamId) this.teams.repair(id, teamId);
     this.notifyDraft(id);
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Teams (team deathmatch)
+  // ------------------------------------------------------------------------------------------
+
+  private requireTeamDraft(id: string, opts: { open?: boolean } = {}) {
+    const t = this.require(id);
+    const settings = this.settings(t);
+    if (settings.teamSize < 2) throw conflict('this is not a team tournament');
+    if (t.phase !== 'draft') throw conflict('teams are fixed: the bracket is already seeded');
+    if (opts.open && !t.registrationOpen) throw conflict('registration is closed');
+    return { t, settings };
+  }
+
+  private requireManager(team: { captainId: string }, user: User) {
+    if (!user.isAdmin && team.captainId !== user.id)
+      throw forbidden('only the captain can do this');
+  }
+
+  /** Throws unless every solo player still finds a starter place after a change. */
+  private ensureFits(settings: TournamentSettings, teams: TeamShape[], solos: number) {
+    if (!fits({ size: settings.size, teamSize: settings.teamSize, teams, solos })) {
+      throw conflict('the tournament is full');
+    }
+  }
+
+  createTeam(id: string, user: User, body: CreateTeam) {
+    const { settings } = this.requireTeamDraft(id, { open: true });
+    const reg = this.teams.registration(id, user.id);
+    if (reg?.teamId) throw conflict('leave your team first');
+    const teams = this.teams.list(id).map(shapeOf);
+    const solos = this.teams.solos(id).length - (reg ? 1 : 0);
+    this.ensureFits(
+      settings,
+      [...teams, { id: 'new', members: [{ userId: user.id, sub: false }] }],
+      solos,
+    );
+    const row = this.teams.create(id, user, body);
+    this.notifyDraft(id);
+    return row;
+  }
+
+  /** What an invite link points to (shown before joining). */
+  invitePreview(id: string, code: string) {
+    this.require(id);
+    const team = this.teams.byInvite(id, code);
+    return {
+      teamId: team.id,
+      name: team.name,
+      tag: team.tag,
+      members: team.members.map((m) => ({ displayName: m.user.displayName, sub: m.sub })),
+    };
+  }
+
+  joinTeam(id: string, user: User, code: string) {
+    const { settings } = this.requireTeamDraft(id, { open: true });
+    const team = this.teams.byInvite(id, code);
+    const reg = this.teams.registration(id, user.id);
+    if (reg?.teamId === team.id) return;
+    if (reg?.teamId) throw conflict('leave your team first');
+    const role = joinRole(shapeOf(team), settings.teamSize);
+    if (!role) throw conflict('the team is full');
+    const teams = this.teams.list(id).map((t) =>
+      t.id === team.id
+        ? {
+            ...shapeOf(t),
+            members: [...shapeOf(t).members, { userId: user.id, sub: role === 'sub' }],
+          }
+        : shapeOf(t),
+    );
+    this.ensureFits(settings, teams, this.teams.solos(id).length - (reg ? 1 : 0));
+    this.teams.setMembership(id, user.id, team.id, role === 'sub');
+    this.notifyDraft(id);
+  }
+
+  updateTeam(id: string, teamId: string, user: User, body: UpdateTeam) {
+    this.requireTeamDraft(id);
+    this.requireManager(this.teams.get(id, teamId), user);
+    this.teams.update(id, teamId, body);
+    this.notifyDraft(id);
+  }
+
+  newInvite(id: string, teamId: string, user: User): string {
+    this.requireTeamDraft(id);
+    this.requireManager(this.teams.get(id, teamId), user);
+    return this.teams.newInvite(id, teamId);
+  }
+
+  /** Deletes a team; its members stay registered without a team. */
+  removeTeam(id: string, teamId: string, user: User) {
+    const { settings } = this.requireTeamDraft(id);
+    const team = this.teams.get(id, teamId);
+    this.requireManager(team, user);
+    const teams = this.teams
+      .list(id)
+      .filter((t) => t.id !== teamId)
+      .map(shapeOf);
+    this.ensureFits(settings, teams, this.teams.solos(id).length + team.members.length);
+    this.teams.remove(id, teamId);
+    this.notifyDraft(id);
+  }
+
+  /** A member leaves the team (or the captain/an admin removes them); they stay registered solo. */
+  removeMember(id: string, teamId: string, userId: string, user: User) {
+    const { settings } = this.requireTeamDraft(id);
+    const team = this.teams.get(id, teamId);
+    if (userId !== user.id) this.requireManager(team, user);
+    if (!team.members.some((m) => m.user.id === userId)) throw notFound(`member ${userId}`);
+    const teams = this.teams
+      .list(id)
+      .map((t) =>
+        t.id === teamId
+          ? { ...shapeOf(t), members: shapeOf(t).members.filter((m) => m.userId !== userId) }
+          : shapeOf(t),
+      );
+    this.ensureFits(settings, teams, this.teams.solos(id).length + 1);
+    this.teams.setMembership(id, userId, null, false);
+    this.teams.repair(id, teamId);
+    this.notifyDraft(id);
+  }
+
+  /** Admin: puts a registered player into a team (or makes them solo). */
+  moveMember(id: string, userId: string, body: MoveMember) {
+    const { settings } = this.requireTeamDraft(id);
+    const reg = this.teams.registration(id, userId);
+    if (!reg) throw notFound(`registration of ${userId}`);
+    if (body.teamId) {
+      const target = this.teams.get(id, body.teamId);
+      const others = target.members.filter((m) => m.user.id !== userId);
+      if (others.length >= settings.teamSize + MAX_SUBS) throw conflict('the team is full');
+      if (!body.sub && others.filter((m) => !m.sub).length >= settings.teamSize)
+        throw conflict('the team has all its starters');
+    }
+    this.teams.setMembership(id, userId, body.teamId, body.teamId ? body.sub : false);
+    if (reg.teamId && reg.teamId !== body.teamId) this.teams.repair(id, reg.teamId);
+    this.notifyDraft(id);
+  }
+
+  /**
+   * Who starts. Before seeding the database changes; afterwards a `team.lineupSet` event goes into
+   * the log (the bridge applies it from the next game on).
+   */
+  setLineup(id: string, teamId: string, user: User, starters: string[]) {
+    const t = this.require(id);
+    const settings = this.settings(t);
+    if (settings.teamSize < 2) throw conflict('this is not a team tournament');
+    const unique = [...new Set(starters)];
+    if (unique.length > settings.teamSize)
+      throw badRequest(`at most ${settings.teamSize} starters`);
+    if (t.phase === 'draft') {
+      const team = this.teams.get(id, teamId);
+      this.requireManager(team, user);
+      const unknown = unique.filter((u) => !team.members.some((m) => m.user.id === u));
+      if (unknown.length) throw badRequest(`not in the team: ${unknown.join(', ')}`);
+      this.teams.setStarters(id, teamId, unique);
+      this.notifyDraft(id);
+      return;
+    }
+    if (t.phase === 'finished' || t.phase === 'aborted')
+      throw conflict(`the tournament is ${t.phase}`);
+    const entrant = this.log.projection(id)?.entrants[teamId];
+    if (entrant?.kind !== 'team') throw notFound(`team ${teamId}`);
+    this.requireManager({ captainId: entrant.captainUserId ?? '' }, user);
+    const unknown = unique.filter((u) => !entrant.members.some((m) => m.userId === u));
+    if (unknown.length) throw badRequest(`not in the team: ${unknown.join(', ')}`);
+    const head = t.headSeq;
+    const res = this.log.append(id, head, [
+      {
+        type: 'team.lineupSet',
+        actor: { kind: user.isAdmin ? 'admin' : 'player', id: user.id },
+        data: { entrantId: teamId, starters: unique },
+      },
+    ]);
+    if (!res.accepted) throw conflict(res.reason);
+    this.syncToAgent(this.require(id), head);
+  }
+
+  /** Admin: puts every solo player into a team (see formTeams). */
+  buildTeams(id: string) {
+    const { t, settings } = this.requireTeamDraft(id);
+    this.applyFormTeams(t, settings, createRng(`${id}-teams-${this.clock.now()}`));
+    this.notifyDraft(id);
+  }
+
+  private applyFormTeams(t: TournamentRow, settings: TournamentSettings, rng: Rng) {
+    const solos = this.teams.solos(t.id);
+    if (!solos.length) return;
+    let formed;
+    try {
+      formed = formTeams({
+        size: settings.size,
+        teamSize: settings.teamSize,
+        teams: this.teams.list(t.id).map(shapeOf),
+        solos: solos.map((u) => u.id),
+        rng,
+      });
+    } catch (e) {
+      throw badRequest((e as Error).message);
+    }
+    for (const f of formed.fills) this.teams.setMembership(t.id, f.userId, f.teamId, false);
+    for (const group of formed.created) {
+      const [captain, ...rest] = group.map((uid) => solos.find((u) => u.id === uid) as User);
+      const row = this.teams.create(
+        t.id,
+        captain as User,
+        { name: `Team ${(captain as User).displayName}` },
+        { uniqueSuffix: true },
+      );
+      for (const u of rest) this.teams.setMembership(t.id, u.id, row.id, false);
+    }
   }
 
   async watch(id: string, user: User): Promise<void> {
@@ -291,9 +556,22 @@ export class TournamentsService {
     this.notifyDraft(id);
   }
 
-  /** Who may join the game server: the players first, then spectators who clicked "watch". */
+  /** Entrant per website user (the player in 1v1, the team in team tournaments). */
+  private entrantByUser(proj: TournamentProjection | undefined): Map<string, Entrant> {
+    const out = new Map<string, Entrant>();
+    for (const e of Object.values(proj?.entrants ?? {})) {
+      for (const userId of entrantUserIds(e)) out.set(userId, e);
+    }
+    return out;
+  }
+
+  /**
+   * Who may join the game server: the players first (those of the current match before everyone
+   * else, so they always fit into the mod's 64 entries), then spectators who clicked "watch".
+   */
   access(t: TournamentRow): AccessEntry[] {
     const proj = this.log.projection(t.id);
+    const byUser = this.entrantByUser(proj);
     const out: AccessEntry[] = [];
     const seen = new Set<string>();
     const add = (e: AccessEntry) => {
@@ -301,13 +579,19 @@ export class TournamentsService {
       seen.add(e.userId);
       out.push(e);
     };
-    for (const u of this.registered(t.id)) {
-      const entrant = proj?.entrants[userEntrantId(u.id)];
+    const playing = new Set(proj?.currentMatch?.entrants ?? []);
+    const players = this.registered(t.id);
+    const inMatch = (u: User) => playing.has(byUser.get(u.id)?.id ?? '');
+    for (const u of [...players.filter(inMatch), ...players.filter((u) => !inMatch(u))]) {
+      const entrant = byUser.get(u.id);
+      const member =
+        entrant?.kind === 'team' ? entrant.members.find((m) => m.userId === u.id) : undefined;
       add({
         userId: u.id,
-        displayName: entrant?.displayName ?? u.displayName,
+        displayName:
+          entrant?.kind === 'human' ? entrant.displayName : (member?.displayName ?? u.displayName),
         token: u.joinToken,
-        ...(entrant && entrant.kind === 'human' ? { entrantId: entrant.id } : {}),
+        ...(entrant && entrant.kind !== 'bot' ? { entrantId: entrant.id } : {}),
       });
     }
     for (const u of this.watching(t.id)) {
@@ -346,23 +630,39 @@ export class TournamentsService {
       throw conflict(`cannot seed in phase ${t.phase}`);
     }
     const settings = this.settings(t);
-    const humans: Entrant[] = this.registered(id).map((u) => ({
-      id: userEntrantId(u.id),
-      kind: 'human',
-      displayName: u.displayName,
-      userId: u.id,
-    }));
-    if (!humans.length) throw badRequest('nobody is registered');
-    if (humans.length > settings.size) {
-      throw badRequest(`${humans.length} players do not fit into a bracket of ${settings.size}`);
-    }
-    const bots: Entrant[] = [];
-    for (const spec of this.botPool(t)) {
-      const e = botEntrant(spec);
-      if (!bots.some((b) => b.id === e.id)) bots.push(e);
-    }
+    const teamMode = settings.teamSize > 1;
     const rngSeed = body.rngSeed ?? `${id}-${this.clock.now()}`;
     const rng = createRng(rngSeed);
+    let humans: Entrant[];
+    const bots: Entrant[] = [];
+    if (teamMode) {
+      if (this.teams.solos(id).length) {
+        if (body.mode === 'manual')
+          throw badRequest('form the teams first: some players have no team');
+        if (t.phase !== 'draft') throw badRequest('reset the seeding to change the teams');
+        this.applyFormTeams(t, settings, rng);
+      }
+      humans = this.teams.list(id).map((v) => this.teamEntrant(v, settings.teamSize));
+      for (let n = 1; n <= settings.size; n++) {
+        bots.push({ id: botTeamId(n), kind: 'team', displayName: 'Bots', members: [], bots: [] });
+      }
+    } else {
+      humans = this.registered(id).map((u) => ({
+        id: userEntrantId(u.id),
+        kind: 'human',
+        displayName: u.displayName,
+        userId: u.id,
+      }));
+      for (const spec of this.botPool(t)) {
+        const e = botEntrant(spec);
+        if (!bots.some((b) => b.id === e.id)) bots.push(e);
+      }
+    }
+    if (!humans.length) throw badRequest('nobody is registered');
+    if (humans.length > settings.size) {
+      const what = teamMode ? 'teams' : 'players';
+      throw badRequest(`${humans.length} ${what} do not fit into a bracket of ${settings.size}`);
+    }
     const humanIds = humans.map((h) => h.id);
     const botIds = bots.map((b) => b.id);
     let slots: string[];
@@ -393,7 +693,20 @@ export class TournamentsService {
       throw badRequest((e as Error).message);
     }
     const used = new Set(slots);
-    const entrants = [...humans, ...bots].filter((e) => used.has(e.id));
+    let entrants = [...humans, ...bots].filter((e) => used.has(e.id));
+    if (teamMode) {
+      try {
+        entrants = this.fillTeamsWithBots(
+          t,
+          slots,
+          entrants as TeamEntrant[],
+          settings.teamSize,
+          rng,
+        );
+      } catch (e) {
+        throw badRequest((e as Error).message);
+      }
+    }
     const actor = { kind: 'admin' as const, id: by.id };
     const batch: NewTournamentEvent[] = [];
     const head = this.log.load(id).length;
@@ -423,6 +736,51 @@ export class TournamentsService {
     if (!res.accepted) throw conflict(res.reason);
     this.syncToAgent(t, head);
     return res.projection;
+  }
+
+  private teamEntrant(v: TeamView, teamSize: number): TeamEntrant {
+    return {
+      id: v.id,
+      kind: 'team',
+      displayName: v.name,
+      ...(v.tag ? { tag: v.tag } : {}),
+      captainUserId: v.captainId,
+      // Starters first; substitutes move up when the team has fewer starters than places.
+      members: v.members.map((m, i) => ({
+        userId: m.user.id,
+        displayName: m.user.displayName,
+        sub: i >= teamSize,
+      })),
+      bots: [],
+    };
+  }
+
+  /** Bots for the starter places nobody fills, and names for the teams made of bots only. */
+  private fillTeamsWithBots(
+    t: TournamentRow,
+    slots: string[],
+    entrants: TeamEntrant[],
+    teamSize: number,
+    rng: Rng,
+  ): TeamEntrant[] {
+    const ordered = slots.map((id) => entrants.find((e) => e.id === id) as TeamEntrant);
+    const need = ordered.map((e) => Math.max(0, teamSize - e.members.length));
+    const fills = assignBots(need, this.botPool(t), rng);
+    const taken = new Set(
+      entrants.filter((e) => e.members.length).map((e) => e.displayName.toLowerCase()),
+    );
+    let next = 0;
+    const botName = () => {
+      let name = botTeamName(next++);
+      while (taken.has(name.toLowerCase())) name = botTeamName(next++);
+      taken.add(name.toLowerCase());
+      return name;
+    };
+    return ordered.map((e, i) => ({
+      ...e,
+      ...(e.members.length ? {} : { displayName: botName() }),
+      bots: fills[i] ?? [],
+    }));
   }
 
   /** Throws away the seeding (allowed until check-in opens). */
@@ -528,11 +886,13 @@ export class TournamentsService {
         t: tournaments,
         registered: sql<number>`(select count(*) from registrations r where r.tournament_id = ${tournaments.id})`,
         mine: sql<number>`(select count(*) from registrations r where r.tournament_id = ${tournaments.id} and r.user_id = ${user.id})`,
+        // Unqualified "id" would bind to teams.id inside the subquery, so name the outer table.
+        teamCount: sql<number>`(select count(*) from teams x where x.tournament_id = "tournaments"."id")`,
       })
       .from(tournaments)
       .orderBy(desc(tournaments.createdAt))
       .all();
-    return rows.map(({ t, registered, mine }) => {
+    return rows.map(({ t, registered, mine, teamCount }) => {
       const s = this.settings(t);
       const proj = t.phase === 'finished' ? this.log.projection(t.id) : undefined;
       return {
@@ -541,6 +901,8 @@ export class TournamentsService {
         phase: t.phase,
         format: s.format,
         size: s.size,
+        teamSize: s.teamSize,
+        teams: teamCount,
         registered,
         registeredMe: mine > 0,
         registrationOpen: t.registrationOpen,
@@ -562,7 +924,14 @@ export class TournamentsService {
     const regs = this.registered(id);
     const watching = this.watching(id);
     const proj = this.log.projection(id);
-    const myEntrant = proj?.entrants[userEntrantId(user.id)];
+    const myEntrant = this.entrantByUser(proj).get(user.id);
+    const teamViews = this.teams.list(id);
+    const myTeam = teamViews.find((v) => v.members.some((m) => m.user.id === user.id));
+    const membership = new Map(
+      teamViews.flatMap((v) =>
+        v.members.map((m) => [m.user.id, { teamId: v.id, sub: m.sub }] as const),
+      ),
+    );
     const inAccess =
       ACTIVE_PHASES.includes(t.phase) || t.phase === 'seeded'
         ? this.access(t).some((a) => a.userId === user.id)
@@ -585,12 +954,32 @@ export class TournamentsService {
         userId: u.id,
         displayName: u.displayName,
         avatar: u.avatar,
+        teamId: membership.get(u.id)?.teamId ?? null,
+        sub: membership.get(u.id)?.sub ?? false,
+      })),
+      teams: teamViews.map((v) => ({
+        id: v.id,
+        name: v.name,
+        tag: v.tag,
+        captainId: v.captainId,
+        members: v.members.map((m) => ({
+          userId: m.user.id,
+          displayName: m.user.displayName,
+          avatar: m.user.avatar,
+          sub: m.sub,
+        })),
+        // Only the team itself (and admins) see the invite code.
+        inviteCode: user.isAdmin || v.id === myTeam?.id ? v.inviteCode : null,
       })),
       watchers: watching.length,
       me: {
         registered: regs.some((u) => u.id === user.id),
         watching: watching.some((u) => u.id === user.id),
-        entrantId: myEntrant?.kind === 'human' ? myEntrant.id : null,
+        entrantId: myEntrant && myEntrant.kind !== 'bot' ? myEntrant.id : null,
+        teamId: myTeam?.id ?? null,
+        captain: myTeam
+          ? myTeam.captainId === user.id
+          : myEntrant?.kind === 'team' && myEntrant.captainUserId === user.id,
         hasAccess: inAccess,
       },
       projection: proj ?? null,

@@ -50,6 +50,9 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
                   [class.loser]="!!id && m.loserId === id"
                   [class.me]="!!id && id === myEntrantId()"
                 >
+                  @if (members(id); as list) {
+                    <title>{{ name(id) }}: {{ list }}</title>
+                  }
                   <rect class="row" [attr.width]="boxW" [attr.height]="boxH / 2" rx="6" />
                   <text class="name" x="10" [attr.y]="boxH / 4 + 5">{{ name(id) }}</text>
                   @if (isBot(id)) {
@@ -183,7 +186,16 @@ export class BracketView {
   }
 
   protected isBot(id: string | null): boolean {
-    return !!id && this.entrants()[id]?.kind === 'bot';
+    const e = id ? this.entrants()[id] : undefined;
+    return e?.kind === 'bot' || (e?.kind === 'team' && e.members.length === 0);
+  }
+
+  /** Tooltip: the team line-up (starters, substitutes, bots). */
+  protected members(id: string | null): string {
+    const e = id ? this.entrants()[id] : undefined;
+    if (e?.kind !== 'team') return '';
+    const people = e.members.map((m) => (m.sub ? `(${m.displayName})` : m.displayName));
+    return [...people, ...e.bots.map((b) => `${b.name} [BOT]`)].join(', ');
   }
 
   protected isDone(matchId: string): boolean {

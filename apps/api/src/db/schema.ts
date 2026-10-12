@@ -62,12 +62,26 @@ export const tournaments = sqliteTable('tournaments', {
   headSeq: integer('head_seq').notNull().default(0),
 });
 
+export const teams = sqliteTable('teams', {
+  id: text('id').primaryKey(),
+  tournamentId: text('tournament_id').notNull(),
+  name: text('name').notNull(),
+  nameKey: text('name_key').notNull(),
+  tag: text('tag'),
+  captainId: text('captain_id').notNull(),
+  inviteCode: text('invite_code').notNull().unique(),
+  createdAt: text('created_at').notNull(),
+});
+
 export const registrations = sqliteTable(
   'registrations',
   {
     tournamentId: text('tournament_id').notNull(),
     userId: text('user_id').notNull(),
     createdAt: text('created_at').notNull(),
+    /** Team tournaments: null = solo player (drawn into a team before seeding). */
+    teamId: text('team_id'),
+    sub: integer('sub', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => [primaryKey({ columns: [t.tournamentId, t.userId] })],
 );

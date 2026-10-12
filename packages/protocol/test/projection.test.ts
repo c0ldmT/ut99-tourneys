@@ -7,6 +7,9 @@ import {
   type Entrant,
   type NewTournamentEvent,
   type TournamentEvent,
+  entrantUserIds,
+  settingsProblems,
+  teamStarters,
 } from '../src/index.js';
 
 const settings = TournamentSettingsSchema.parse({
@@ -173,5 +176,93 @@ describe('projection', () => {
         }),
       ),
     ).toThrow(/phase checkIn/);
+  });
+});
+
+describe('team tournaments', () => {
+  const teamSettings = TournamentSettingsSchema.parse({
+    format: 'single',
+    size: 4,
+    teamSize: 2,
+    game: { adapter: 'ut99-dm', rules: {} },
+  });
+  const team = (n: number, members: string[]): Entrant => ({
+    id: `t${n}`,
+    kind: 'team',
+    displayName: `Team ${n}`,
+    captainUserId: members[0],
+    members: members.map((u, i) => ({ userId: u, displayName: u.toUpperCase(), sub: i >= 2 })),
+    bots: members.length < 2 ? [{ name: `Fill${n}`, skill: 3 }] : [],
+  });
+  const teams = [team(1, ['a', 'b', 'c']), team(2, ['d', 'e']), team(3, ['f']), team(4, [])];
+  const teamBase: NewTournamentEvent[] = [
+    {
+      type: 'tournament.created',
+      actor: sys,
+      data: { tournamentId: 't1', name: 'Cup', settings: teamSettings },
+    },
+    {
+      type: 'seeding.set',
+      actor: { kind: 'admin', id: 'a' },
+      data: {
+        entrants: teams,
+        rngSeed: 'x',
+        bracket: {
+          format: 'single',
+          size: 4,
+          slots: teams.map((t) => t.id),
+          grandFinalReset: true,
+          bestOf: { default: 1 },
+        },
+      },
+    },
+    { type: 'checkin.opened', actor: bridge, data: { serverProfileId: 'p1' } },
+  ];
+
+  it('accepts team settings and the bracket of 4', () => {
+    expect(teamSettings.teamSize).toBe(2);
+    expect(settingsProblems(teamSettings)).toEqual([]);
+    expect(settingsProblems({ ...teamSettings, size: 32 })).toHaveLength(1);
+    expect(settings.teamSize).toBe(1);
+  });
+
+  it('tracks member check-ins and lineup changes', () => {
+    const p = projectTournament(
+      log(
+        ...teamBase,
+        { type: 'entrant.checkedIn', actor: bridge, data: { entrantId: 't1', userId: 'c' } },
+        { type: 'entrant.checkedIn', actor: bridge, data: { entrantId: 't1', userId: 'a' } },
+        {
+          type: 'team.lineupSet',
+          actor: { kind: 'player', id: 'a' },
+          data: { entrantId: 't1', starters: ['c', 'a'] },
+        },
+      ),
+    );
+    expect(p.checkedIn).toEqual(['t1']);
+    expect(p.checkedInUsers).toEqual(['c', 'a']);
+    const t1 = p.entrants.t1;
+    if (t1?.kind !== 'team') throw new Error('not a team');
+    expect(t1.members.map((m) => [m.userId, m.sub])).toEqual([
+      ['c', false],
+      ['a', false],
+      ['b', true],
+    ]);
+    expect(teamStarters(t1, 2).map((m) => m.userId)).toEqual(['c', 'a']);
+    expect(entrantUserIds(t1)).toEqual(['c', 'a', 'b']);
+  });
+
+  it('rejects impossible lineups', () => {
+    const bad = (starters: string[], entrantId = 't1') =>
+      projectTournament(
+        log(...teamBase, {
+          type: 'team.lineupSet',
+          actor: { kind: 'admin', id: 'a' },
+          data: { entrantId, starters },
+        }),
+      );
+    expect(() => bad(['a', 'b', 'c'])).toThrow(/at most 2 starters/);
+    expect(() => bad(['a', 'x'])).toThrow(/not in the team/);
+    expect(() => bad(['a'], 'nope')).toThrow(/is not a team/);
   });
 });

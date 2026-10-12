@@ -29,7 +29,7 @@ describe('bracket layout', () => {
   });
 
   it('puts the losers bracket below and the grand final to the right', () => {
-    for (const size of [8, 16, 32] as const) {
+    for (const size of [4, 8, 16, 32] as const) {
       const s = computeBracket(
         {
           format: 'double',

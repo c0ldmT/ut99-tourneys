@@ -246,6 +246,10 @@ export class WebsiteAgent {
     const created = events[0];
     if (!created || created.type !== 'tournament.created')
       throw new Error(`no event log for ${tournamentId}`);
+    if (created.data.settings.teamSize > 1) {
+      // Team deathmatch arrives with the next bridge and mod version (milestone 7, step 3).
+      throw new Error('team tournaments are not supported by this bridge version yet');
+    }
     const rules = parseRules(created.data.settings.game.rules);
 
     let server: ServerProcess | undefined;

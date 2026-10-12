@@ -31,8 +31,14 @@ import type { TournamentSummary } from '../core/types';
               <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
             </div>
             <div class="muted small">
-              {{ 'format.' + t.format | t }} · {{ t.size }} {{ 'list.slots' | t }} ·
-              {{ 'list.registered' | t: { n: t.registered } }}
+              {{ 'format.' + t.format | t }} ·
+              @if (t.teamSize > 1) {
+                {{ 'team.mode' | t: { k: t.teamSize } }} · {{ t.size }} {{ 'list.teams' | t }} ·
+                {{ 'list.teamsRegistered' | t: { teams: t.teams, n: t.registered } }}
+              } @else {
+                {{ t.size }} {{ 'list.slots' | t }} ·
+                {{ 'list.registered' | t: { n: t.registered } }}
+              }
             </div>
             @if (t.scheduledAt) {
               <div class="small">{{ i18n.date(t.scheduledAt) }}</div>

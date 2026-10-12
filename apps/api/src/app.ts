@@ -23,6 +23,7 @@ import { EventLogService } from './tournaments/event-log.service.js';
 import { LiveHub } from './tournaments/hub.js';
 import { TournamentsController } from './tournaments/tournaments.controller.js';
 import { TournamentsService } from './tournaments/tournaments.service.js';
+import { TeamsService } from './tournaments/teams.service.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
@@ -66,6 +67,7 @@ class AppModule {
         EventLogService,
         AgentConnections,
         AgentsService,
+        TeamsService,
         TournamentsService,
         AgentGateway,
       ],

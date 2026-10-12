@@ -92,7 +92,7 @@ describe('schedule', () => {
     expect(next.indexOf('W2-2')).toBeGreaterThan(next.indexOf('L1-1'));
   });
 
-  it.each([8, 16, 32] as const)(
+  it.each([4, 8, 16, 32] as const)(
     'double %i: nobody plays twice in a row unless unavoidable',
     (size) => {
       for (let seed = 0; seed < 10; seed++) {
@@ -102,8 +102,9 @@ describe('schedule', () => {
           const prev = new Set(results[i - 1]?.entrants);
           if (results[i]?.entrants.some((e) => prev.has(e))) backToBack++;
         }
-        // Only the final stretch (LB semi -> LB final -> GF -> reset) is unavoidable.
-        expect(backToBack).toBeLessThanOrEqual(3);
+        // Only the final stretch (LB semi -> LB final -> GF -> reset) is unavoidable; a bracket
+        // of 4 has one more because round two starts right after round one.
+        expect(backToBack).toBeLessThanOrEqual(size === 4 ? 4 : 3);
       }
     },
   );

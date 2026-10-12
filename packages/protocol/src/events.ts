@@ -18,8 +18,9 @@ import {
  */
 
 export const ActorSchema = z.object({
-  kind: z.enum(['admin', 'bridge', 'system']),
-  /** User id for admins, agent id for bridges. */
+  /** `player`: a team captain changing the lineup on the website. */
+  kind: z.enum(['admin', 'bridge', 'system', 'player']),
+  /** User id for admins and players, agent id for bridges. */
   id: z.string().optional(),
 });
 
@@ -52,7 +53,16 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
     }),
   ),
   event('checkin.opened', z.object({ serverProfileId: Id })),
-  event('entrant.checkedIn', z.object({ entrantId: Id })),
+  event(
+    'entrant.checkedIn',
+    z.object({
+      entrantId: Id,
+      /** Team tournaments: the member who connected. The team counts as checked in with the first. */
+      userId: Id.optional(),
+    }),
+  ),
+  /** Team tournaments: who starts. Members not listed become substitutes. Applies from the next game. */
+  event('team.lineupSet', z.object({ entrantId: Id, starters: z.array(Id) })),
   event(
     'entrant.replaced',
     z.object({

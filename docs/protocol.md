@@ -20,7 +20,8 @@ games, bracket via the bracket engine). Website and bridge run the same code, so
 | `tournament.created`              | website         | Name and settings (format, size, best-of policy, timeouts, game rules)                |
 | `seeding.set`                     | website (admin) | Entrant list, first-round slots, RNG seed. Can be re-issued until check-in opens      |
 | `checkin.opened`                  | bridge          | Game server is up, players may connect                                                |
-| `entrant.checkedIn`               | bridge          | A human entrant connected with a valid token                                          |
+| `entrant.checkedIn`               | bridge          | A human entrant connected with a valid token (teams: `userId` names the member)       |
+| `team.lineupSet`                  | admin / player  | Team tournaments: a captain picks the starters; applies from the next game            |
 | `entrant.replaced`                | bridge / admin  | A bot takes over a bracket position (no-show at check-in, admin)                      |
 | `tournament.started`              | bridge          | All checked in (or forced / check-in window over)                                     |
 | `match.called`                    | bridge          | Next match chosen by the scheduler                                                    |
@@ -30,6 +31,10 @@ games, bracket via the bracket engine). Website and bridge run the same code, so
 | `match.result`                    | bridge / admin  | Final result of a match; a later result for the same match overrides                  |
 | `tournament.paused` / `resumed`   | admin / bridge  |                                                                                       |
 | `tournament.finished` / `aborted` | bridge / admin  |                                                                                       |
+
+**Team tournaments.** With `settings.teamSize` 2, 3 or 5 every bracket entrant has `kind: "team"`: name, tag,
+captain, `members` (starters first, `sub` marks substitutes, at most `teamSize + 2`) and `bots` for starter places
+nobody fills. Teams made of bots only have no members. Brackets of 4, 8 and 16 teams; 4 is also allowed for 1v1.
 
 **Concurrency.** The bridge sends `events.append` with `baseSeq` (the head it based its decision on). The
 website accepts only if `baseSeq` is still the head and answers `events.ack {accepted:true, events}` with

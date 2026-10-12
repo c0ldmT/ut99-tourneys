@@ -7,7 +7,7 @@ import {
 } from '../src/index.js';
 import { def, playOut, win } from './helpers.js';
 
-const SIZES = [8, 16, 32] as const;
+const SIZES = [4, 8, 16, 32] as const;
 
 function placements(state: ReturnType<typeof computeBracket>) {
   return state.standings.map((s) => s.placement).sort((a, b) => (a ?? 0) - (b ?? 0));
@@ -20,7 +20,8 @@ describe('engine: full runs', () => {
       expect(state.status).toBe('finished');
       expect(results).toHaveLength(size - 1);
       expect(state.issues).toEqual([]);
-      const expected = [1, 2, 3, 3, ...Array(4).fill(5)];
+      const expected = [1, 2, 3, 3];
+      if (size >= 8) expected.push(...Array(4).fill(5));
       if (size >= 16) expected.push(...Array(8).fill(9));
       if (size >= 32) expected.push(...Array(16).fill(17));
       expect(placements(state)).toEqual(expected);
@@ -41,6 +42,11 @@ describe('engine: full runs', () => {
     }
   });
 
+  it('double 4 placements: 1,2,3,4', () => {
+    const { state } = playOut(def('double', 4), createRng(3));
+    expect(placements(state)).toEqual([1, 2, 3, 4]);
+  });
+
   it('double 8 placements: 1,2,3,4,5,5,7,7', () => {
     const { state } = playOut(def('double', 8), createRng(42));
     expect(placements(state)).toEqual([1, 2, 3, 4, 5, 5, 7, 7]);
@@ -53,7 +59,9 @@ describe('engine: full runs', () => {
     expect(counts).toEqual({ 1: 1, 2: 1, 3: 1, 4: 1, 5: 2, 7: 2, 9: 4, 13: 4, 17: 8, 25: 8 });
   });
 
-  it.each(SIZES)(
+  // In a bracket of 4 the losers final is a rematch whenever the winners-final loser drops onto
+  // its first-round opponent; that cannot be avoided.
+  it.each(SIZES.filter((s) => s > 4))(
     'double %i: a drop-down never meets an earlier opponent in losers round 2',
     (size) => {
       for (let seed = 0; seed < 25; seed++) {

@@ -2,6 +2,7 @@ import { createRng } from '@tourney/bracket';
 import { ServerProfileSchema } from '@tourney/protocol';
 import { describe, expect, it } from 'vitest';
 import {
+  defaultLimits,
   iniChanges,
   loserPickMap,
   parseRules,
@@ -37,7 +38,15 @@ describe('rules', () => {
       mapMode: 'vote',
       countdownSec: 5,
       voteTimeoutSec: 45,
+      friendlyFirePct: 0,
     });
+  });
+
+  it('suggests team limits by team size', () => {
+    expect(defaultLimits(1)).toEqual({ fragLimit: 20, timeLimitMin: 10 });
+    expect(defaultLimits(2)).toEqual({ fragLimit: 30, timeLimitMin: 15 });
+    expect(defaultLimits(5)).toEqual({ fragLimit: 60, timeLimitMin: 15 });
+    expect(() => parseRules({ mapPool: pool, friendlyFirePct: 30 })).toThrow();
   });
 
   it('rejects unusable rules', () => {

@@ -47,6 +47,8 @@ export interface TournamentProjection {
   /** Current occupant per entrant id (after replacements). */
   entrants: Record<string, Entrant>;
   checkedIn: string[];
+  /** Team tournaments: members who connected during check-in (user ids). */
+  checkedInUsers: string[];
   bracketDefinition?: BracketDefinition;
   rngSeed?: string;
   results: MatchResult[];
@@ -84,6 +86,7 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
     headSeq: 0,
     entrants: {},
     checkedIn: [],
+    checkedInUsers: [],
     results: [],
     games: {},
     mapHistory: [],
@@ -120,7 +123,29 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
       case 'entrant.checkedIn':
         if (!p.entrants[e.data.entrantId]) fail(`unknown entrant ${e.data.entrantId}`);
         if (!p.checkedIn.includes(e.data.entrantId)) p.checkedIn.push(e.data.entrantId);
+        if (e.data.userId && !p.checkedInUsers.includes(e.data.userId)) {
+          p.checkedInUsers.push(e.data.userId);
+        }
         break;
+      case 'team.lineupSet': {
+        const team = p.entrants[e.data.entrantId];
+        if (team?.kind !== 'team') fail(`${e.data.entrantId} is not a team`);
+        if (p.phase === 'finished' || p.phase === 'aborted') fail(`tournament is ${p.phase}`);
+        const t = team as Extract<Entrant, { kind: 'team' }>;
+        const starters = [...new Set(e.data.starters)];
+        if (starters.length > p.settings.teamSize) fail(`at most ${p.settings.teamSize} starters`);
+        const unknown = starters.filter((u) => !t.members.some((m) => m.userId === u));
+        if (unknown.length) fail(`not in the team: ${unknown.join(', ')}`);
+        const ordered = [
+          ...starters.map((u) => t.members.find((m) => m.userId === u)!),
+          ...t.members.filter((m) => !starters.includes(m.userId)),
+        ];
+        p.entrants[t.id] = {
+          ...t,
+          members: ordered.map((m) => ({ ...m, sub: !starters.includes(m.userId) })),
+        };
+        break;
+      }
       case 'entrant.replaced':
         if (!p.entrants[e.data.entrantId]) fail(`unknown entrant ${e.data.entrantId}`);
         if (e.data.replacement.id !== e.data.entrantId)

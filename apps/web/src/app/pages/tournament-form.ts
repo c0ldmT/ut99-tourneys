@@ -24,6 +24,14 @@ const DEFAULT_BOTS: BotSpec[] = [
   'Dominator',
 ].map((name, i) => ({ name, skill: [6, 5, 5, 4, 4, 3, 3, 2][i] ?? 3 }));
 
+/** Suggested frag/time limits per team size (same as the adapter's defaultLimits). */
+const LIMITS: Record<number, { fragLimit: number; timeLimitMin: number }> = {
+  1: { fragLimit: 20, timeLimitMin: 10 },
+  2: { fragLimit: 30, timeLimitMin: 15 },
+  3: { fragLimit: 40, timeLimitMin: 15 },
+  5: { fragLimit: 60, timeLimitMin: 15 },
+};
+
 interface Model {
   name: string;
   agentId: string;
@@ -33,6 +41,7 @@ interface Model {
   registrationOpen: boolean;
   format: 'single' | 'double';
   size: number;
+  teamSize: number;
   grandFinalReset: boolean;
   boDefault: number;
   boSemi: number;
@@ -52,6 +61,7 @@ interface Model {
   voteTimeoutSec: number;
   countdownSec: number;
   smartStockBots: boolean;
+  friendlyFirePct: 0 | 50 | 100;
   mapPool: string[];
   botPool: BotSpec[];
 }
@@ -137,6 +147,16 @@ function toLocalInput(iso: string | null): string {
           <legend>{{ 'form.bracket' | t }}</legend>
           <div class="fields">
             <div class="field">
+              <label>{{ 'form.mode' | t }}</label>
+              <select name="teamSize" [ngModel]="f.teamSize" (ngModelChange)="onTeamSize($event)">
+                @for (k of teamSizes; track k) {
+                  <option [ngValue]="k">
+                    {{ (k === 1 ? 'form.mode1v1' : 'team.mode') | t: { k } }}
+                  </option>
+                }
+              </select>
+            </div>
+            <div class="field">
               <label>{{ 'form.format' | t }}</label>
               <select name="format" [(ngModel)]="f.format">
                 <option value="single">{{ 'format.single' | t }}</option>
@@ -144,9 +164,9 @@ function toLocalInput(iso: string | null): string {
               </select>
             </div>
             <div class="field">
-              <label>{{ 'form.size' | t }}</label>
+              <label>{{ (f.teamSize > 1 ? 'form.sizeTeams' : 'form.size') | t }}</label>
               <select name="size" [(ngModel)]="f.size">
-                @for (s of [8, 16, 32]; track s) {
+                @for (s of f.teamSize > 1 ? [4, 8, 16] : [4, 8, 16, 32]; track s) {
                   <option [ngValue]="s">{{ s }}</option>
                 }
               </select>
@@ -210,7 +230,20 @@ function toLocalInput(iso: string | null): string {
               <label>{{ 'form.countdown' | t }}</label
               ><input type="number" name="cd" min="3" max="30" [(ngModel)]="f.countdownSec" />
             </div>
+            @if (f.teamSize > 1) {
+              <div class="field">
+                <label>{{ 'form.friendlyFire' | t }}</label>
+                <select name="ff" [(ngModel)]="f.friendlyFirePct">
+                  @for (p of [0, 50, 100]; track p) {
+                    <option [ngValue]="p">{{ p }} %</option>
+                  }
+                </select>
+              </div>
+            }
           </div>
+          @if (f.teamSize > 1) {
+            <p class="muted small">{{ 'form.teamRulesHint' | t }}</p>
+          }
           <label class="row"
             ><input type="checkbox" name="ssb" [(ngModel)]="f.smartStockBots" />
             {{ 'form.smartStockBots' | t }}</label
@@ -311,7 +344,13 @@ function toLocalInput(iso: string | null): string {
 
         <fieldset [disabled]="botsLocked()">
           <legend>{{ 'form.botPool' | t: { n: f.botPool.length } }}</legend>
-          <p class="muted small">{{ 'form.botPoolHint' | t: { size: f.size } }}</p>
+          <p class="muted small">
+            @if (f.teamSize > 1) {
+              {{ 'form.botPoolHintTeam' | t: { n: f.teamSize * 2 } }}
+            } @else {
+              {{ 'form.botPoolHint' | t: { size: f.size } }}
+            }
+          </p>
           <table>
             <tbody>
               @for (b of f.botPool; track $index) {
@@ -418,6 +457,7 @@ export class TournamentFormPage {
   protected readonly busy = signal(false);
   protected readonly bestOf = [1, 3, 5, 7];
   protected readonly skills = [0, 1, 2, 3, 4, 5, 6, 7];
+  protected readonly teamSizes = [1, 2, 3, 5];
   protected newMap = '';
   private agentTick = signal(0);
 
@@ -503,6 +543,7 @@ export class TournamentFormPage {
       registrationOpen: true,
       format: 'double',
       size: 8,
+      teamSize: 1,
       grandFinalReset: true,
       boDefault: 1,
       boSemi: 0,
@@ -524,6 +565,7 @@ export class TournamentFormPage {
       smartStockBots: !!a?.profiles[0]?.inventory?.packages?.some(
         (p) => p.toLowerCase() === 'smartstockbots',
       ),
+      friendlyFirePct: 0,
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -544,6 +586,7 @@ export class TournamentFormPage {
       registrationOpen: d.registrationOpen,
       format: s.format,
       size: s.size,
+      teamSize: s.teamSize ?? 1,
       grandFinalReset: s.grandFinalReset,
       boDefault: s.bestOf.default,
       boSemi: s.bestOf.semifinal ?? 0,
@@ -563,9 +606,25 @@ export class TournamentFormPage {
       voteTimeoutSec: num('voteTimeoutSec', 45),
       countdownSec: num('countdownSec', 5),
       smartStockBots: r['smartStockBots'] === true,
+      friendlyFirePct:
+        r['friendlyFirePct'] === 50 || r['friendlyFirePct'] === 100 ? r['friendlyFirePct'] : 0,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
+  }
+
+  /** Switches the mode; limits still at the old mode's suggestion follow the new one. */
+  protected onTeamSize(k: number) {
+    const f = this.m();
+    if (!f) return;
+    const before = LIMITS[f.teamSize];
+    const after = LIMITS[k];
+    if (before && after) {
+      if (f.fragLimit === before.fragLimit) f.fragLimit = after.fragLimit;
+      if (f.timeLimitMin === before.timeLimitMin) f.timeLimitMin = after.timeLimitMin;
+    }
+    f.teamSize = k;
+    if (k > 1 && f.size > 16) f.size = 16;
   }
 
   protected onAgent() {
@@ -618,6 +677,7 @@ export class TournamentFormPage {
       settings: {
         format: f.format,
         size: f.size,
+        teamSize: f.teamSize,
         grandFinalReset: f.format === 'double' ? f.grandFinalReset : false,
         bestOf,
         checkInWindowMin: f.checkInWindowMin,
@@ -637,6 +697,7 @@ export class TournamentFormPage {
             voteTimeoutSec: f.voteTimeoutSec,
             countdownSec: f.countdownSec,
             smartStockBots: f.smartStockBots,
+            friendlyFirePct: f.friendlyFirePct,
           },
         },
       },

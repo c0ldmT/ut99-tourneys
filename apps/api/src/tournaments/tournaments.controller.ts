@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Req,
   Res,
 } from '@nestjs/common';
@@ -18,13 +19,21 @@ import type { User } from '../auth/users.service.js';
 import { LiveHub, type HubMessage } from './hub.js';
 import {
   CommandBody,
+  CreateTeamBody,
   CreateTournamentBody,
+  JoinTeamBody,
+  LineupBody,
+  MoveMemberBody,
   SeedBody,
   TournamentsService,
+  UpdateTeamBody,
   UpdateTournamentBody,
   type Command,
+  type CreateTeam,
   type CreateTournament,
+  type MoveMember,
   type Seed,
+  type UpdateTeam,
   type UpdateTournament,
 } from './tournaments.service.js';
 
@@ -97,6 +106,102 @@ export class TournamentsController {
   @HttpCode(204)
   kick(@Param('id') id: string, @Param('userId') userId: string) {
     this.svc.unregister(id, userId);
+  }
+
+  // --- Teams ------------------------------------------------------------------------------
+
+  /** Creates a team with the caller as captain (and registers them). */
+  @Post(':id/teams')
+  createTeam(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(CreateTeamBody)) body: CreateTeam,
+  ) {
+    this.svc.createTeam(id, user, body);
+    return this.svc.detail(id, user);
+  }
+
+  @Get(':id/teams/invite/:code')
+  invite(@Param('id') id: string, @Param('code') code: string) {
+    return this.svc.invitePreview(id, code);
+  }
+
+  @Post(':id/teams/join')
+  @HttpCode(200)
+  join(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(JoinTeamBody)) body: { code: string },
+  ) {
+    this.svc.joinTeam(id, user, body.code);
+    return this.svc.detail(id, user);
+  }
+
+  /** Admin: draws every player without a team into teams. */
+  @AdminOnly()
+  @Post(':id/teams/build')
+  @HttpCode(200)
+  build(@CurrentUser() user: User, @Param('id') id: string) {
+    this.svc.buildTeams(id);
+    return this.svc.detail(id, user);
+  }
+
+  @Patch(':id/teams/:teamId')
+  updateTeam(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('teamId') teamId: string,
+    @Body(new ZodPipe(UpdateTeamBody)) body: UpdateTeam,
+  ) {
+    this.svc.updateTeam(id, teamId, user, body);
+    return this.svc.detail(id, user);
+  }
+
+  @Delete(':id/teams/:teamId')
+  @HttpCode(204)
+  removeTeam(@CurrentUser() user: User, @Param('id') id: string, @Param('teamId') teamId: string) {
+    this.svc.removeTeam(id, teamId, user);
+  }
+
+  @Post(':id/teams/:teamId/invite')
+  @HttpCode(200)
+  newInvite(@CurrentUser() user: User, @Param('id') id: string, @Param('teamId') teamId: string) {
+    return { inviteCode: this.svc.newInvite(id, teamId, user) };
+  }
+
+  @Put(':id/teams/:teamId/lineup')
+  @HttpCode(204)
+  lineup(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('teamId') teamId: string,
+    @Body(new ZodPipe(LineupBody)) body: { starters: string[] },
+  ) {
+    this.svc.setLineup(id, teamId, user, body.starters);
+  }
+
+  /** Leave the team (own user id) or, as captain/admin, remove a member. They stay registered. */
+  @Delete(':id/teams/:teamId/members/:userId')
+  @HttpCode(204)
+  removeMember(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Param('teamId') teamId: string,
+    @Param('userId') userId: string,
+  ) {
+    this.svc.removeMember(id, teamId, userId, user);
+  }
+
+  /** Admin: moves a registered player into a team (teamId null = no team). */
+  @AdminOnly()
+  @Put(':id/registrations/:userId')
+  @HttpCode(204)
+  move(
+    @Param('id') id: string,
+    @Param('userId') userId: string,
+    @Body(new ZodPipe(MoveMemberBody)) body: MoveMember,
+  ) {
+    this.svc.moveMember(id, userId, body);
   }
 
   @Post(':id/watch')

@@ -102,6 +102,9 @@ async function main(): Promise<void> {
   const log = consoleLogger(config.logLevel);
   checkServerOs(config, log);
   const rules = parseRules(tournament.settings.game.rules);
+  if (tournament.settings.teamSize > 1) {
+    throw new Error('team tournaments are not supported by this bridge version yet');
+  }
 
   // Fail before anything starts if the map pool does not match the installation.
   if (config.server) {

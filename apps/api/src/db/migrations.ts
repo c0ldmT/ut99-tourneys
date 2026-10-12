@@ -74,4 +74,22 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (tournament_id, seq)
   );
   `,
+  // 2: team tournaments (milestone 7). Teams exist per tournament; a registration without a team
+  // is a solo player who gets drawn into a team before seeding.
+  `
+  CREATE TABLE teams (
+    id TEXT PRIMARY KEY,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    tag TEXT,
+    captain_id TEXT NOT NULL,
+    invite_code TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    UNIQUE (tournament_id, name_key)
+  );
+  CREATE INDEX teams_tournament ON teams(tournament_id);
+  ALTER TABLE registrations ADD COLUMN team_id TEXT REFERENCES teams(id) ON DELETE SET NULL;
+  ALTER TABLE registrations ADD COLUMN sub INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
