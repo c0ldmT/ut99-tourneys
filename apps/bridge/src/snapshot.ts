@@ -8,7 +8,7 @@ import {
   type ModPhase,
   type TournamentProjection,
 } from '@tourney/protocol';
-import { travelOptions, type Ut99DmRules } from '@tourney/adapter-ut99';
+import { ADAPTER_MH, travelOptions, type Ut99DmRules } from '@tourney/adapter-ut99';
 
 /** Builds the bridge -> mod lines from the tournament projection. Pure functions. */
 
@@ -142,13 +142,15 @@ export function bracketLines(
   const lines: BridgeToMod[] = [
     { t: 'brh', fmt: b.definition.format, size: b.definition.size, n: b.matches.length, rev },
   ];
+  // Monster Hunt: game scores are run times in ms; the HUD shows games won instead.
+  const race = proj.settings.game.adapter === ADAPTER_MH;
   for (const m of b.matches) {
     let sa = -1;
     let sb = -1;
     const [ea, eb] = m.entrants;
     if (ea && eb) {
       const games = proj.games[m.id] ?? [];
-      if (m.bestOf === 1 && games[0]) {
+      if (m.bestOf === 1 && games[0] && !race) {
         sa = games[0].scores[ea] ?? -1;
         sb = games[0].scores[eb] ?? -1;
       } else if (games.length) {

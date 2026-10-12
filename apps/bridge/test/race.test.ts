@@ -75,6 +75,10 @@ describe('Monster Hunt time race against the simulated UT server', () => {
     // Two travels to the same map per game.
     expect(env.sim.travels).toHaveLength(6);
     expect(env.sim.travels[0]).toBe(env.sim.travels[1]);
+    // The in-game bracket shows games won, not run times in ms.
+    const brm = env.sim.received.filter((m) => m.t === 'brm') as any[];
+    expect(brm.some((m) => m.sa === 1 || m.sb === 1)).toBe(true);
+    expect(brm.every((m) => m.sa <= 1 && m.sb <= 1)).toBe(true);
     expect(env.log.lines.filter((l) => /^(warn|error):/.test(l))).toEqual([]);
   });
 
