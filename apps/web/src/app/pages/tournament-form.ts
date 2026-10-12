@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
+import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { MH_ADAPTER } from '../core/race';
 import type { AgentView, BotSpec, TournamentDetail } from '../core/types';
@@ -72,6 +73,8 @@ interface Model {
   monsterSkill: number;
   mapPool: string[];
   botPool: BotSpec[];
+  notifyMode: 'default' | 'custom' | 'off';
+  webhookUrl: string;
 }
 
 function toLocalInput(iso: string | null): string {
@@ -384,6 +387,42 @@ function toLocalInput(iso: string | null): string {
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend>{{ 'form.notify' | t }}</legend>
+          <div class="fields">
+            <div class="field">
+              <label>{{ 'form.notifyChannel' | t }}</label>
+              <select name="nm" [(ngModel)]="f.notifyMode">
+                <option value="default">
+                  {{
+                    (notifyStatus().defaultChannel
+                      ? 'form.notifyDefault'
+                      : 'form.notifyDefaultNone'
+                    ) | t
+                  }}
+                </option>
+                <option value="custom">{{ 'form.notifyCustom' | t }}</option>
+                <option value="off">{{ 'form.notifyOff' | t }}</option>
+              </select>
+            </div>
+            @if (f.notifyMode === 'custom') {
+              <div class="field wide">
+                <label>{{ 'form.webhookUrl' | t }}</label>
+                <input
+                  name="wh"
+                  [(ngModel)]="f.webhookUrl"
+                  placeholder="https://discord.com/api/webhooks/…"
+                  maxlength="300"
+                />
+              </div>
+            }
+          </div>
+          <p class="muted small">
+            {{ 'form.notifyHint' | t }}
+            {{ (notifyStatus().directMessages ? 'form.notifyDmOn' : 'form.notifyDmOff') | t }}
+          </p>
+        </fieldset>
+
         <fieldset [disabled]="botsLocked()">
           <legend>{{ 'form.botPool' | t: { n: f.botPool.length } }}</legend>
           <p class="muted small">
@@ -490,6 +529,7 @@ export class TournamentFormPage {
   readonly id = input<string | undefined>(undefined);
   private readonly api = inject(Api);
   private readonly router = inject(Router);
+  private readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
 
   protected readonly agents = signal<AgentView[]>([]);
@@ -504,6 +544,14 @@ export class TournamentFormPage {
   private agentTick = signal(0);
 
   protected readonly editing = computed(() => !!this.id());
+  /** What the installation offers (from the detail when editing, else the site config). */
+  protected readonly notifyStatus = computed(() => {
+    const n = this.detail()?.notify;
+    return {
+      defaultChannel: n?.defaultChannel ?? !!this.auth.config().notify?.defaultChannel,
+      directMessages: n?.directMessages ?? !!this.auth.config().notify?.directMessages,
+    };
+  });
   protected readonly locked = computed(() => !!this.detail() && this.detail()!.phase !== 'draft');
   protected readonly botsLocked = computed(() =>
     ['checkIn', 'running', 'paused'].includes(this.detail()?.phase ?? ''),
@@ -612,6 +660,8 @@ export class TournamentFormPage {
       friendlyFirePct: 0,
       penaltySec: 5,
       monsterSkill: 5,
+      notifyMode: 'default',
+      webhookUrl: '',
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -657,6 +707,8 @@ export class TournamentFormPage {
         r['friendlyFirePct'] === 50 || r['friendlyFirePct'] === 100 ? r['friendlyFirePct'] : 0,
       penaltySec: num('penaltySec', 5),
       monsterSkill: num('monsterSkill', 5),
+      notifyMode: d.notify?.mode ?? 'default',
+      webhookUrl: d.notify?.webhookUrl ?? '',
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
@@ -742,6 +794,8 @@ export class TournamentFormPage {
       connectAddress: f.connectAddress.trim() || null,
       scheduledAt: f.scheduledAt ? new Date(f.scheduledAt).toISOString() : null,
       registrationOpen: f.registrationOpen,
+      notifyMode: f.notifyMode,
+      webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
       botPool: f.botPool
         .filter((b) => b.name.trim())
         .map((b) => ({ name: b.name.trim(), skill: b.skill })),
@@ -791,6 +845,8 @@ export class TournamentFormPage {
           connectAddress: body.connectAddress,
           scheduledAt: body.scheduledAt,
           registrationOpen: body.registrationOpen,
+          notifyMode: body.notifyMode,
+          webhookUrl: body.webhookUrl,
         };
         if (!this.locked())
           Object.assign(patch, {

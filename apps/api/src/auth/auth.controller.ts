@@ -19,6 +19,7 @@ import { randomId } from '../common/ids.js';
 import type { ApiLogger } from '../common/logger.js';
 import { LOGGER } from '../common/logger.js';
 import { DISCORD, type DiscordApi } from './discord.js';
+import { isWebhookUrl } from '../notify/discord-out.js';
 import { AdminOnly, CurrentUser, Public, type AuthedRequest } from './guard.js';
 import { SESSION_COOKIE, SessionsService } from './sessions.service.js';
 import { publicUser, UsersService, type User } from './users.service.js';
@@ -29,7 +30,11 @@ const DevLoginBody = z.object({
   name: z.string().min(2).max(32),
   admin: z.boolean().optional(),
 });
-const MeBody = z.object({ displayName: z.string().min(2).max(32) });
+const MeBody = z.object({
+  displayName: z.string().min(2).max(32).optional(),
+  /** Discord direct messages from the bot. */
+  notifyDm: z.boolean().optional(),
+});
 const AdminBody = z.object({ isAdmin: z.boolean() });
 
 @Controller()
@@ -50,6 +55,10 @@ export class AuthController {
       siteName: this.config.siteName,
       discordLogin: this.config.discord.enabled,
       devLogin: this.config.devLogin,
+      notify: {
+        directMessages: Boolean(this.config.notify.botToken),
+        defaultChannel: isWebhookUrl(this.config.notify.webhookUrl),
+      },
     };
   }
 
@@ -136,12 +145,21 @@ export class AuthController {
 
   @Get('me')
   me(@CurrentUser() user: User) {
-    return { ...publicUser(user), joinToken: user.joinToken };
+    return {
+      ...publicUser(user),
+      joinToken: user.joinToken,
+      notifyDm: user.notifyDm,
+      // Direct messages need a Discord account (not a development login).
+      discordAccount: /^\d+$/.test(user.discordId),
+    };
   }
 
   @Patch('me')
   updateMe(@CurrentUser() user: User, @Body(new ZodPipe(MeBody)) body: z.infer<typeof MeBody>) {
-    return this.me(this.users.setDisplayName(user.id, body.displayName));
+    let u = user;
+    if (body.displayName !== undefined) u = this.users.setDisplayName(u.id, body.displayName);
+    if (body.notifyDm !== undefined) u = this.users.setNotifyDm(u.id, body.notifyDm);
+    return this.me(u);
   }
 
   @Post('me/token')

@@ -13,6 +13,14 @@ import { DB, type Db } from '../db/database.js';
 import { events, tournaments } from '../db/schema.js';
 import { LiveHub } from './hub.js';
 
+/** Called after every accepted append (notifications). `before` folds the log as it was. */
+export type AppendListener = (
+  tournamentId: string,
+  stored: readonly TournamentEvent[],
+  projection: TournamentProjection,
+  before: () => TournamentProjection | undefined,
+) => void;
+
 export type AppendResult =
   | { accepted: true; events: TournamentEvent[]; projection: TournamentProjection }
   | { accepted: false; missing: TournamentEvent[]; reason: string };
@@ -25,6 +33,7 @@ export type AppendResult =
 @Injectable()
 export class EventLogService {
   private cache = new Map<string, TournamentEvent[]>();
+  private listeners: AppendListener[] = [];
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -44,6 +53,10 @@ export class EventLogService {
     const log = rows.map((r) => TournamentEventSchema.parse(JSON.parse(r.json)));
     this.cache.set(tournamentId, log);
     return log;
+  }
+
+  onAppend(listener: AppendListener): void {
+    this.listeners.push(listener);
   }
 
   projection(tournamentId: string): TournamentProjection | undefined {
@@ -92,6 +105,14 @@ export class EventLogService {
       headSeq: projection.headSeq,
       phase: projection.phase,
     });
+    const before = () => (log.length ? projectTournament(log) : undefined);
+    for (const l of this.listeners) {
+      try {
+        l(tournamentId, stored, projection, before);
+      } catch {
+        // A listener (notifications) must never break the log.
+      }
+    }
     return { accepted: true, events: stored, projection };
   }
 

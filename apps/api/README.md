@@ -45,6 +45,21 @@ All settings are environment variables, see [.env.example](.env.example).
 | `DEV_LOGIN`                                   | `false`                    | Name-only login for local tests                  |
 | `WEB_DIST`                                    | `apps/web/dist` if present | Built frontend                                   |
 | `SESSION_DAYS`                                | `30`                       | Login lifetime                                   |
+| `DISCORD_WEBHOOK_URL`                         |                            | Optional: default channel for notifications      |
+| `DISCORD_BOT_TOKEN`                           |                            | Optional: direct messages from a bot             |
+| `NOTIFY_LANG` / `NOTIFY_REMIND_MIN`           | `de` / `30`                | Message language, reminder before the start      |
+
+### Discord notifications (optional)
+
+Nothing depends on them: without these settings, or with wrong ones, the website works as before (a wrong
+webhook URL or a rejected bot token is logged once and the notifications stay off).
+
+- **Channel (webhook):** registration open, check-in started, every match result, the champion. Default from
+  `DISCORD_WEBHOOK_URL`; each tournament can use the default, its own webhook or none (tournament form).
+- **Direct messages (bot):** check-in with the personal connect command, "your match starts now", a reminder
+  `NOTIFY_REMIND_MIN` minutes before the scheduled start, team joins (to the player and the captain), the
+  final place. Players switch them off in their profile. The bot must share a Discord server with the player;
+  development logins get none.
 
 ## Running it for real
 

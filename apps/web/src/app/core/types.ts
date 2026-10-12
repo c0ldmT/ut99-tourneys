@@ -24,6 +24,8 @@ export interface SiteConfig {
   siteName: string;
   discordLogin: boolean;
   devLogin: boolean;
+  /** The website can send Discord direct messages (a bot is configured). */
+  notify?: { directMessages: boolean; defaultChannel: boolean };
 }
 
 export interface Me {
@@ -33,6 +35,9 @@ export interface Me {
   avatar: string | null;
   isAdmin: boolean;
   joinToken: string;
+  notifyDm?: boolean;
+  /** Logged in with Discord (development logins cannot get direct messages). */
+  discordAccount?: boolean;
 }
 
 export interface PublicUser {
@@ -107,6 +112,13 @@ export interface TournamentDetail {
   }[];
   teams: TeamView[];
   watchers: number;
+  /** Admins only: Discord channel of this tournament and what the installation offers. */
+  notify: {
+    mode: 'default' | 'custom' | 'off';
+    webhookUrl: string | null;
+    defaultChannel: boolean;
+    directMessages: boolean;
+  } | null;
   me: {
     registered: boolean;
     watching: boolean;

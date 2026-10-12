@@ -13,6 +13,8 @@ export const users = sqliteTable('users', {
   joinToken: text('join_token').notNull().unique(),
   createdAt: text('created_at').notNull(),
   lastLoginAt: text('last_login_at').notNull(),
+  /** Discord direct messages from the bot (if one is configured). */
+  notifyDm: integer('notify_dm', { mode: 'boolean' }).notNull().default(true),
 });
 
 export const sessions = sqliteTable('sessions', {
@@ -60,6 +62,12 @@ export const tournaments = sqliteTable('tournaments', {
   /** Cached projection phase ("draft" while there are no events). */
   phase: text('phase').notNull().default('draft'),
   headSeq: integer('head_seq').notNull().default(0),
+  /** Discord channel: "default" (DISCORD_WEBHOOK_URL), "custom" (webhookUrl) or "off". */
+  notifyMode: text('notify_mode').notNull().default('default'),
+  webhookUrl: text('webhook_url'),
+  /** When "registration open" was posted, and when registered players were reminded. */
+  announcedAt: text('announced_at'),
+  remindedAt: text('reminded_at'),
 });
 
 export const teams = sqliteTable('teams', {

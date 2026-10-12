@@ -40,6 +40,16 @@ export const ApiConfigSchema = z
     WEB_DIST: z.string().default(''),
     SESSION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+    /**
+     * Discord notifications, all optional. A webhook posts to one channel (tournaments can use
+     * their own or none); a bot token enables direct messages. Wrong values only disable the
+     * notifications (checked when used, with a warning), they never stop the website.
+     */
+    DISCORD_WEBHOOK_URL: z.string().default(''),
+    DISCORD_BOT_TOKEN: z.string().default(''),
+    NOTIFY_LANG: z.string().default('de'),
+    /** Minutes before the scheduled start when registered players get a reminder (0 = none). */
+    NOTIFY_REMIND_MIN: z.string().default('30'),
   })
   .transform((c) => ({
     host: c.HOST,
@@ -60,6 +70,12 @@ export const ApiConfigSchema = z
     sessionDays: c.SESSION_DAYS,
     logLevel: c.LOG_LEVEL,
     secureCookies: c.PUBLIC_URL.startsWith('https://'),
+    notify: {
+      webhookUrl: c.DISCORD_WEBHOOK_URL.trim(),
+      botToken: c.DISCORD_BOT_TOKEN.trim(),
+      lang: (c.NOTIFY_LANG.trim().toLowerCase() === 'en' ? 'en' : 'de') as 'en' | 'de',
+      remindMin: Math.max(0, Math.min(1440, Number.parseInt(c.NOTIFY_REMIND_MIN, 10) || 0)),
+    },
   }));
 
 export type ApiConfig = z.output<typeof ApiConfigSchema>;

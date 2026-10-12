@@ -29,6 +29,8 @@ import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { AgentConnections } from '../agents/connections.js';
 import { AgentsService } from '../agents/agents.service.js';
 import type { User } from '../auth/users.service.js';
+import { isWebhookUrl } from '../notify/discord-out.js';
+import { NotificationsService } from '../notify/notifications.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
 import { assignBots, fits, formTeams, joinRole, type TeamShape } from './teams.js';
@@ -50,6 +52,15 @@ const TournamentFields = z.object({
   botPool: z.array(BotSpecSchema).min(1).max(64),
   registrationOpen: z.boolean().optional(),
   scheduledAt: z.iso.datetime().nullable().optional(),
+  /** Discord channel for this tournament: the default webhook, its own, or none. */
+  notifyMode: z.enum(['default', 'custom', 'off']).optional(),
+  webhookUrl: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((v) => v === '' || isWebhookUrl(v), 'not a Discord webhook URL')
+    .nullable()
+    .optional(),
 });
 export const CreateTournamentBody = TournamentFields.extend({
   id: z.string().regex(TOURNAMENT_ID).optional(),
@@ -124,6 +135,7 @@ export class TournamentsService {
     @Inject(AgentConnections) private readonly connections: AgentConnections,
     @Inject(LOGGER) private readonly logger: ApiLogger,
     @Inject(TeamsService) private readonly teams: TeamsService,
+    @Inject(NotificationsService) private readonly notify: NotificationsService,
   ) {}
 
   private now() {
@@ -201,11 +213,14 @@ export class TournamentsService {
         botPoolJson: JSON.stringify(body.botPool),
         registrationOpen: body.registrationOpen ?? true,
         scheduledAt: body.scheduledAt ?? null,
+        notifyMode: body.notifyMode ?? 'default',
+        webhookUrl: body.webhookUrl || null,
         createdBy: by.id,
         createdAt: this.now(),
       })
       .run();
     this.logger.info(`tournament ${id} created by ${by.displayName}`);
+    this.notify.announceIfOpen(id);
     return this.require(id);
   }
 
@@ -235,7 +250,12 @@ export class TournamentsService {
     if (body.settings !== undefined) set.settingsJson = JSON.stringify(body.settings);
     if (body.botPool !== undefined) set.botPoolJson = JSON.stringify(body.botPool);
     if (body.registrationOpen !== undefined) set.registrationOpen = body.registrationOpen;
-    if (body.scheduledAt !== undefined) set.scheduledAt = body.scheduledAt;
+    if (body.scheduledAt !== undefined && body.scheduledAt !== t.scheduledAt) {
+      set.scheduledAt = body.scheduledAt;
+      set.remindedAt = null; // a new start gets a new reminder
+    }
+    if (body.notifyMode !== undefined) set.notifyMode = body.notifyMode;
+    if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
     const oldTeamSize = this.settings(t).teamSize;
     if (Object.keys(set).length) {
       this.db.update(tournaments).set(set).where(eq(tournaments.id, id)).run();
@@ -244,6 +264,7 @@ export class TournamentsService {
         else this.teams.normalize(id, body.settings.teamSize, MAX_SUBS);
       }
       this.notifyDraft(id);
+      this.notify.announceIfOpen(id);
     }
     return this.require(id);
   }
@@ -388,6 +409,7 @@ export class TournamentsService {
     this.ensureFits(settings, teams, this.teams.solos(id).length - (reg ? 1 : 0));
     this.teams.setMembership(id, user.id, team.id, role === 'sub');
     this.notifyDraft(id);
+    this.notify.teamJoined(id, { name: team.name, captainId: team.captainId }, user);
   }
 
   updateTeam(id: string, teamId: string, user: User, body: UpdateTeam) {
@@ -1030,6 +1052,10 @@ export class TournamentsService {
         inviteCode: user.isAdmin || v.id === myTeam?.id ? v.inviteCode : null,
       })),
       watchers: watching.length,
+      // Admins only: the webhook URL is a secret of the channel.
+      notify: user.isAdmin
+        ? { mode: t.notifyMode, webhookUrl: t.webhookUrl, ...this.notify.status() }
+        : null,
       me: {
         registered: regs.some((u) => u.id === user.id),
         watching: watching.some((u) => u.id === user.id),

@@ -124,6 +124,11 @@ export class UsersService {
     return this.require(userId);
   }
 
+  setNotifyDm(userId: string, on: boolean): User {
+    this.db.update(users).set({ notifyDm: on }).where(eq(users.id, userId)).run();
+    return this.require(userId);
+  }
+
   rotateToken(userId: string): User {
     this.db.update(users).set({ joinToken: newJoinToken() }).where(eq(users.id, userId)).run();
     return this.require(userId);

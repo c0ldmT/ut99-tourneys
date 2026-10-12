@@ -24,12 +24,16 @@ import { LiveHub } from './tournaments/hub.js';
 import { TournamentsController } from './tournaments/tournaments.controller.js';
 import { TournamentsService } from './tournaments/tournaments.service.js';
 import { TeamsService } from './tournaments/teams.service.js';
+import { DISCORD_OUT, discordOut, type DiscordOut } from './notify/discord-out.js';
+import { NotificationsService } from './notify/notifications.service.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
   logger?: ApiLogger;
   discord?: DiscordApi | null;
   db?: Db;
+  /** Outgoing Discord notifications (tests record them). */
+  discordOut?: DiscordOut;
 }
 
 @Module({})
@@ -55,6 +59,12 @@ class AppModule {
         { provide: LOGGER, useValue: o.logger ?? consoleLogger(config.logLevel) },
         { provide: DB, useValue: o.db ?? openDatabase(config.dbFile) },
         { provide: DISCORD, useValue: discord },
+        {
+          provide: DISCORD_OUT,
+          useFactory: (log: ApiLogger) =>
+            o.discordOut ?? discordOut({ botToken: config.notify.botToken, log }),
+          inject: [LOGGER],
+        },
         { provide: APP_GUARD, useClass: AuthGuard },
         {
           provide: APP_FILTER,
@@ -68,6 +78,7 @@ class AppModule {
         AgentConnections,
         AgentsService,
         TeamsService,
+        NotificationsService,
         TournamentsService,
         AgentGateway,
       ],

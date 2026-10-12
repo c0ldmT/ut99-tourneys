@@ -45,6 +45,23 @@ import { TPipe } from '../core/i18n';
           <p class="muted small">{{ 'profile.rotateHint' | t }}</p>
         </div>
       </div>
+      @if (auth.config().notify?.directMessages) {
+        <div class="card">
+          <h2>{{ 'profile.notify' | t }}</h2>
+          <label class="row"
+            ><input
+              type="checkbox"
+              [checked]="me.notifyDm !== false"
+              [disabled]="busy() || !me.discordAccount"
+              (change)="setDm($any($event.target).checked)"
+            />
+            {{ 'profile.notifyDm' | t }}</label
+          >
+          <p class="muted small">
+            {{ (me.discordAccount ? 'profile.notifyDmHint' : 'profile.notifyNoDiscord') | t }}
+          </p>
+        </div>
+      }
       <p class="muted small">Discord: {{ me.username }}</p>
     }
   `,
@@ -63,6 +80,13 @@ export class ProfilePage {
       const me = await this.api.updateMe(this.name);
       this.auth.me.set(me);
       this.name = me.displayName;
+      return 'profile.saved';
+    });
+  }
+
+  protected async setDm(on: boolean) {
+    await this.act(async () => {
+      this.auth.me.set(await this.api.setNotifyDm(on));
       return 'profile.saved';
     });
   }

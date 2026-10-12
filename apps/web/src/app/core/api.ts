@@ -59,6 +59,7 @@ export class Api {
     this.call<Me>('POST', '/auth/dev-login', { name, admin });
   logout = () => this.call<void>('POST', '/auth/logout');
   updateMe = (displayName: string) => this.call<Me>('PATCH', '/me', { displayName });
+  setNotifyDm = (notifyDm: boolean) => this.call<Me>('PATCH', '/me', { notifyDm });
   rotateToken = () => this.call<Me>('POST', '/me/token');
 
   users = () => this.call<PublicUser[]>('GET', '/users');

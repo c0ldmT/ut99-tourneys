@@ -7,7 +7,12 @@ import {
   WebsiteAgent,
 } from '@tourney/bridge';
 import { afterEach, describe, expect, it } from 'vitest';
+import type { RunningApi } from '../src/app.js';
+import { DB, type Db } from '../src/db/database.js';
+import { users } from '../src/db/schema.js';
+import type { DiscordOut } from '../src/notify/discord-out.js';
 import { Client, startApi, tournamentBody } from './helpers.js';
+import { eq } from 'drizzle-orm';
 
 const KEY = 'test-shared-key';
 const cleanups: (() => Promise<void> | void)[] = [];
@@ -25,10 +30,20 @@ async function until(cond: () => boolean | Promise<boolean>, ms = 10_000) {
 }
 
 async function setup(
-  opts: { players?: string[]; size?: number; settings?: Record<string, unknown> } = {},
+  opts: {
+    players?: string[];
+    size?: number;
+    settings?: Record<string, unknown>;
+    env?: Record<string, string>;
+    discordOut?: DiscordOut;
+    beforeCreate?: (api: RunningApi) => void;
+  } = {},
 ) {
   const clock = new FakeClock();
-  const { api } = await startApi({}, { clock });
+  const { api } = await startApi(opts.env ?? {}, {
+    clock,
+    ...(opts.discordOut ? { discordOut: opts.discordOut } : {}),
+  });
   cleanups.push(() => api.close());
   const admin = await Client.login(api, 'Boss', true);
   const { token } = (await admin.post('/agents', { id: 'pi', name: 'Raspberry' })).body;
@@ -72,6 +87,7 @@ async function setup(
 
   const names = opts.players ?? ['Mario', 'Anna', 'Jonas'];
   const players = await Promise.all(names.map((n) => Client.login(api, n)));
+  opts.beforeCreate?.(api);
   const created = await admin.post(
     '/tournaments',
     tournamentBody({}, { ...(opts.size ? { size: opts.size } : {}), ...opts.settings }),
@@ -277,6 +293,78 @@ describe('website + bridge + simulated UT server', () => {
     expect(d.projection.results.find((r: any) => r.matchId === cm.matchId).outcome).toBe(
       'override',
     );
+  });
+
+  it('sends Discord notifications when they are configured', async () => {
+    const posts: string[] = [];
+    const dms: { to: string; text: string }[] = [];
+    const out: DiscordOut = {
+      webhook: (_url, text) => void posts.push(text),
+      dm: (to, text) => void dms.push({ to, text }),
+      idle: async () => {},
+    };
+    const env = await setup({
+      players: ['Mario', 'Anna'],
+      env: {
+        DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/123456/abc-DEF_1',
+        DISCORD_BOT_TOKEN: 'bot-token',
+        NOTIFY_LANG: 'en',
+      },
+      discordOut: out,
+      // The players log in with Discord: give them Discord ids (dev logins have none).
+      beforeCreate: (api) => {
+        const db = api.app.get<Db>(DB);
+        db.update(users)
+          .set({ discordId: '300000000000000001' })
+          .where(eq(users.displayName, 'Mario'))
+          .run();
+        db.update(users)
+          .set({ discordId: '300000000000000002' })
+          .where(eq(users.displayName, 'Anna'))
+          .run();
+      },
+    });
+    const { admin, id } = env;
+    expect(posts[0]).toMatch(/Friday Cup.*registration is open/);
+    // Anna does not want direct messages.
+    expect((await env.players[1]!.patch('/me', { notifyDm: false })).body.notifyDm).toBe(false);
+
+    await admin.post(`/tournaments/${id}/seed`, { mode: 'auto' });
+    await admin.post(`/tournaments/${id}/run`);
+    env.startSim();
+    await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
+    const d = (await admin.get(`/tournaments/${id}`)).body;
+
+    expect(posts.some((p) => p.startsWith('🟢 Check-in for **Friday Cup**'))).toBe(true);
+    const results = posts.filter((p) => /^`[WLG]/.test(p));
+    expect(results).toHaveLength(d.projection.results.length);
+    expect(posts.at(-1)).toMatch(/^🏆 \*\*.+\*\* wins \*\*Friday Cup\*\*/);
+
+    // Only Mario gets DMs: check-in with his connect command, his matches, his place.
+    expect(dms.every((m) => m.to === '300000000000000001')).toBe(true);
+    const mario = env.tokens.find((t) => t.displayName === 'Mario')!;
+    expect(dms[0]!.text).toContain(`open ut.test:7777?tk=${mario.joinToken}`);
+    expect(dms.some((m) => m.text.startsWith('Your match'))).toBe(true);
+    expect(dms.some((m) => /place \d|won \*\*Friday Cup/.test(m.text))).toBe(true);
+    expect(d.notify).toMatchObject({ mode: 'default', defaultChannel: true, directMessages: true });
+  });
+
+  it('keeps working without and with broken notification settings', async () => {
+    const env = await setup({
+      players: ['Mario', 'Anna'],
+      env: { DISCORD_WEBHOOK_URL: 'https://example.com/hook', NOTIFY_REMIND_MIN: 'soon' },
+    });
+    const { admin, id } = env;
+    // A wrong webhook URL on a tournament is refused; "off" is fine.
+    expect(
+      (await admin.patch(`/tournaments/${id}`, { notifyMode: 'custom', webhookUrl: 'https://x.y' }))
+        .status,
+    ).toBe(400);
+    expect((await admin.patch(`/tournaments/${id}`, { notifyMode: 'off' })).status).toBe(200);
+    await admin.post(`/tournaments/${id}/seed`, { mode: 'auto' });
+    await admin.post(`/tournaments/${id}/run`);
+    env.startSim();
+    await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
   });
 
   it('resumes a running tournament after the bridge reconnects', async () => {

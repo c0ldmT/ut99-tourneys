@@ -92,4 +92,14 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE registrations ADD COLUMN team_id TEXT REFERENCES teams(id) ON DELETE SET NULL;
   ALTER TABLE registrations ADD COLUMN sub INTEGER NOT NULL DEFAULT 0;
   `,
+  // 3: Discord notifications (milestone 9). Players can switch off direct messages; a tournament
+  // posts to the default webhook, its own webhook or nowhere. announced/reminded keep messages
+  // from being sent twice.
+  `
+  ALTER TABLE users ADD COLUMN notify_dm INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE tournaments ADD COLUMN notify_mode TEXT NOT NULL DEFAULT 'default';
+  ALTER TABLE tournaments ADD COLUMN webhook_url TEXT;
+  ALTER TABLE tournaments ADD COLUMN announced_at TEXT;
+  ALTER TABLE tournaments ADD COLUMN reminded_at TEXT;
+  `,
 ];

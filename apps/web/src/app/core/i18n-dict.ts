@@ -82,6 +82,11 @@ const en = {
   'profile.rotate': 'New token',
   'profile.rotated': 'You have a new token. The old one no longer works.',
   'profile.rotateHint': 'If somebody else got your token, create a new one.',
+  'profile.notify': 'Discord messages',
+  'profile.notifyDm': 'Direct messages from the tournament bot',
+  'profile.notifyDmHint':
+    'Check-in, your next match, reminders, team news and your final place. The bot can only write to you if you share a Discord server with it.',
+  'profile.notifyNoDiscord': 'Only for accounts logged in with Discord.',
 
   'users.title': 'Users',
   'users.name': 'Name',
@@ -245,6 +250,18 @@ const en = {
   'seed.formTeamsFirst': '{n} players have no team yet. Build the teams first (Teams card).',
 
   'team.mode': '{k} on {k}',
+  'form.notify': 'Discord notifications',
+  'form.notifyChannel': 'Channel',
+  'form.notifyDefault': 'Default channel of this website',
+  'form.notifyDefaultNone': 'Default channel (none configured)',
+  'form.notifyCustom': 'Own webhook',
+  'form.notifyOff': 'Off',
+  'form.webhookUrl': 'Discord webhook URL',
+  'form.notifyHint':
+    'Optional. The channel gets: registration open, check-in, every result and the champion.',
+  'form.notifyDmOn':
+    'Players also get direct messages from the bot (they can turn them off in their profile).',
+  'form.notifyDmOff': 'No bot is configured: no direct messages.',
   'form.game': 'Game',
   'form.gameDm': 'Deathmatch',
   'form.gameMh': 'Monster Hunt (time race)',
@@ -449,6 +466,11 @@ const de: Record<TKey, string> = {
   'profile.rotate': 'Neuer Token',
   'profile.rotated': 'Du hast einen neuen Token. Der alte funktioniert nicht mehr.',
   'profile.rotateHint': 'Wenn jemand anderes deinen Token kennt, erstelle einen neuen.',
+  'profile.notify': 'Discord-Nachrichten',
+  'profile.notifyDm': 'Direktnachrichten vom Turnier-Bot',
+  'profile.notifyDmHint':
+    'Check-in, dein nächstes Match, Erinnerungen, Team-Neuigkeiten und deine Platzierung. Der Bot kann dir nur schreiben, wenn ihr einen gemeinsamen Discord-Server habt.',
+  'profile.notifyNoDiscord': 'Nur für Konten mit Discord-Login.',
 
   'users.title': 'Benutzer',
   'users.name': 'Name',
@@ -614,6 +636,18 @@ const de: Record<TKey, string> = {
     '{n} Spieler haben noch kein Team. Bilde zuerst die Teams (Karte „Teams“).',
 
   'team.mode': '{k} gegen {k}',
+  'form.notify': 'Discord-Benachrichtigungen',
+  'form.notifyChannel': 'Kanal',
+  'form.notifyDefault': 'Standardkanal dieser Website',
+  'form.notifyDefaultNone': 'Standardkanal (keiner eingerichtet)',
+  'form.notifyCustom': 'Eigener Webhook',
+  'form.notifyOff': 'Aus',
+  'form.webhookUrl': 'Discord-Webhook-URL',
+  'form.notifyHint':
+    'Optional. Der Kanal bekommt: Anmeldung offen, Check-in, jedes Ergebnis und den Sieger.',
+  'form.notifyDmOn':
+    'Spieler bekommen zusätzlich Direktnachrichten vom Bot (im Profil abschaltbar).',
+  'form.notifyDmOff': 'Kein Bot eingerichtet: keine Direktnachrichten.',
   'form.game': 'Spiel',
   'form.gameDm': 'Deathmatch',
   'form.gameMh': 'Monster Hunt (Zeitrennen)',
