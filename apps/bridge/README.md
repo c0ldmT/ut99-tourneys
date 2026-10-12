@@ -89,6 +89,10 @@ Team tournaments in standalone mode: set `"teamSize": 2` (3, 5) in the settings 
 ]
 ```
 
+Monster Hunt (time race, teams only, Monster Hunt 613 and the mod's `UTTourneyMH_v1.u` on the server): set
+`"game": { "adapter": "ut99-mh", "rules": { "mapPool": ["MH-NaliVillage", …], "timeLimitMin": 20, "penaltySec": 5,
+"monsterSkill": 5 } }`. The inventory lists `DM-` and `MH-` maps.
+
 Restarting the bridge with the same files resumes the tournament from the event log. Delete the `.jsonl` file
 to start over.
 
@@ -107,6 +111,7 @@ node apps/bridge/dist/sim-cli.js -c bridge.json -t tournament.json --game 5   # 
 | ----------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `src/director.ts`             | Match director: check-in, scheduling, map vote, travel, ready check, countdown, live, forfeits, best-of, finish |
 | `src/teams.ts`                | Team games: line-up, acting captain, bots for free places                                                       |
+| `test/race.test.ts`           | Monster Hunt time race end to end (two runs per game, order, penalty, DNF, restart)                             |
 | `src/mod-server.ts`           | TCP server for the mod (handshake, line protocol)                                                               |
 | `src/event-store.ts`          | Event log with optimistic concurrency (local JSONL, standalone mode)                                            |
 | `src/website/link.ts`         | WebSocket client to the website (hello, reconnect, request/answer)                                              |

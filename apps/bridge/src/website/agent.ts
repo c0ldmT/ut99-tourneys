@@ -1,6 +1,11 @@
 import os from 'node:os';
 import path from 'node:path';
-import { parseRules, validateAgainstInventory } from '@tourney/adapter-ut99';
+import {
+  GAME_ADAPTERS,
+  gameModeOf,
+  parseRules,
+  validateAgainstInventory,
+} from '@tourney/adapter-ut99';
 import type {
   AccessEntry,
   AgentCommand,
@@ -65,7 +70,7 @@ export class WebsiteAgent {
         agentVersion: AGENT_VERSION,
         os: process.platform === 'win32' ? 'windows' : 'linux',
         arch: os.arch(),
-        adapters: ['ut99-dm'],
+        adapters: [...GAME_ADAPTERS],
         knownSeq: this.store.knownSeq(),
         profiles: this.profiles(),
         ...(this.runtime ? { activeTournamentId: this.runtime.tournamentId } : {}),
@@ -247,12 +252,13 @@ export class WebsiteAgent {
     if (!created || created.type !== 'tournament.created')
       throw new Error(`no event log for ${tournamentId}`);
     const rules = parseRules(created.data.settings.game.rules);
+    const mode = gameModeOf(created.data.settings);
 
     let server: ServerProcess | undefined;
     const cleanups: (() => void)[] = [];
     if (profile.manage) {
       const inv = scanInventory(profile, { readMeta: false });
-      const problems = inv.maps.length ? validateAgainstInventory(rules, inv) : [];
+      const problems = inv.maps.length ? validateAgainstInventory(rules, inv, mode) : [];
       if (problems.length) throw new Error(`tournament cannot run: ${problems.join('; ')}`);
       const prepared = prepareServer(
         profile,
@@ -263,6 +269,7 @@ export class WebsiteAgent {
           sharedKey: this.o.config.mod.sharedKey,
         },
         undefined,
+        mode,
         created.data.settings.teamSize,
       );
       this.o.log.info(`wrote ${prepared.iniPath}`);

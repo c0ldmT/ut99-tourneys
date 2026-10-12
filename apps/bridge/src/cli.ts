@@ -1,7 +1,7 @@
 import path from 'node:path';
 import readline from 'node:readline';
 import { parseArgs } from 'node:util';
-import { parseRules, validateAgainstInventory } from '@tourney/adapter-ut99';
+import { gameModeOf, parseRules, validateAgainstInventory } from '@tourney/adapter-ut99';
 import { bootstrapFromFile, TournamentFileSchema } from './bootstrap.js';
 import { realClock } from './clock.js';
 import {
@@ -102,12 +102,13 @@ async function main(): Promise<void> {
   const log = consoleLogger(config.logLevel);
   checkServerOs(config, log);
   const rules = parseRules(tournament.settings.game.rules);
+  const mode = gameModeOf(tournament.settings);
 
   // Fail before anything starts if the map pool does not match the installation.
   if (config.server) {
     const inv = scanInventory(config.server, { readMeta: false });
     for (const w of inv.warnings) log.warn(`inventory: ${w}`);
-    const problems = inv.maps.length ? validateAgainstInventory(rules, inv) : [];
+    const problems = inv.maps.length ? validateAgainstInventory(rules, inv, mode) : [];
     if (problems.length) throw new Error(`tournament cannot run:\n  ${problems.join('\n  ')}`);
   }
 
@@ -151,6 +152,7 @@ async function main(): Promise<void> {
         sharedKey: config.mod.sharedKey,
       },
       undefined,
+      mode,
       director.projection.settings.teamSize,
     );
     log.info(`wrote ${prepared.iniPath}`);

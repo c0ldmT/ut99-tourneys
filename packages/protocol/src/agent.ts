@@ -259,6 +259,17 @@ export const MatchLive = envelope(
     /** Unix ms when the current phase times out (vote end, no-show forfeit, ...). */
     deadline: z.number().int().optional(),
     secondsLeft: z.number().optional(),
+    /** Monster Hunt race: the run in progress (the finished run is in the event log). */
+    race: z
+      .object({
+        runner: Id,
+        run: z.number().int().min(1).max(2),
+        timeMs: z.number().int().nonnegative(),
+        deaths: z.number().int().nonnegative(),
+        penaltyMs: z.number().int().nonnegative(),
+        points: z.number().int(),
+      })
+      .optional(),
   }),
 );
 

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { ServerProfile } from '@tourney/protocol';
 import {
+  type GameMode,
   GENERATED_FILES,
   iniChanges,
   serverArgs,
@@ -68,6 +69,7 @@ export function prepareServer(
   rules: Ut99DmRules,
   mod: ModConnectionConfig,
   arch: CpuArch = currentArch(),
+  mode: GameMode = 'dm',
   teamSize = 1,
 ): PreparedServer {
   const binary = resolveBinary(profile, arch);
@@ -89,7 +91,7 @@ export function prepareServer(
   ]);
 
   const ini = IniFile.parse(fs.readFileSync(baseIni, 'latin1'));
-  ini.apply(iniChanges(rules, profile, mod, teamSize));
+  ini.apply(iniChanges(rules, profile, mod, mode, teamSize));
   const iniPath = path.join(systemDir, GENERATED_FILES.ini);
   const userIniPath = path.join(systemDir, GENERATED_FILES.userIni);
   try {
@@ -105,5 +107,5 @@ export function prepareServer(
       { cause: e },
     );
   }
-  return { binary, systemDir, args: serverArgs(rules, profile, teamSize), iniPath, userIniPath };
+  return { binary, systemDir, args: serverArgs(rules, profile, mode), iniPath, userIniPath };
 }

@@ -266,3 +266,64 @@ describe('team tournaments', () => {
     expect(() => bad(['a'], 'nope')).toThrow(/is not a team/);
   });
 });
+
+describe('Monster Hunt race', () => {
+  const start: NewTournamentEvent[] = [
+    ...base,
+    { type: 'tournament.started', actor: bridge, data: {} },
+    { type: 'match.called', actor: bridge, data: { matchId: 'W1-1', entrants: ['e1', 'e2'] } },
+    {
+      type: 'match.mapSelected',
+      actor: bridge,
+      data: { matchId: 'W1-1', game: 1, map: 'MH-Egypt', method: 'vote', runOrder: ['e2', 'e1'] },
+    },
+  ];
+  const run = (entrantId: string, timeMs: number): NewTournamentEvent => ({
+    type: 'match.runFinished',
+    actor: bridge,
+    data: {
+      matchId: 'W1-1',
+      game: 1,
+      entrantId,
+      map: 'MH-Egypt',
+      timeMs,
+      deaths: 1,
+      penaltyMs: 5000,
+      points: 90,
+      finished: true,
+    },
+  });
+  const started = (runner: string): NewTournamentEvent => ({
+    type: 'match.started',
+    actor: bridge,
+    data: { matchId: 'W1-1', game: 1, runner },
+  });
+
+  it('tracks the runs of a game and keeps them with the game', () => {
+    let p = projectTournament(log(...start, started('e2'), run('e2', 300_000)));
+    expect(p.currentMatch).toMatchObject({ status: 'mapSelected', map: 'MH-Egypt' });
+    expect(p.currentMatch?.runs).toHaveLength(1);
+    expect(p.currentMatch?.runner).toBeUndefined();
+    p = projectTournament(
+      log(...start, started('e2'), run('e2', 300_000), started('e1'), run('e1', 280_000), {
+        type: 'match.gameFinished',
+        actor: bridge,
+        data: {
+          matchId: 'W1-1',
+          game: 1,
+          map: 'MH-Egypt',
+          scores: { e2: 305_000, e1: 285_000 },
+          winnerId: 'e1',
+          endReason: 'race',
+        },
+      }),
+    );
+    expect(p.games['W1-1']?.[0]?.runs?.map((r) => r.entrantId)).toEqual(['e2', 'e1']);
+    expect(p.currentMatch?.runs).toBeUndefined();
+  });
+
+  it('rejects runs out of order', () => {
+    expect(() => projectTournament(log(...start, started('e1')))).toThrow(ProjectionError);
+    expect(() => projectTournament(log(...start, run('e1', 1)))).toThrow(ProjectionError);
+  });
+});

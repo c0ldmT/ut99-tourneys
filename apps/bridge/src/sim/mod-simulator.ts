@@ -40,6 +40,11 @@ export interface SimBehaviour {
   /** Team games: players who type !start during the ready check (after captainStartAfterMs). */
   captains: string[];
   captainStartAfterMs: number;
+  /**
+   * Monster Hunt: results of the runs in the order they are played (time, deaths, exit reached,
+   * monster points). Runs beyond the list take gameDurationMs, 0-3 deaths and reach the exit.
+   */
+  runs: { ms?: number; deaths?: number; done?: boolean; pts?: number }[];
 }
 
 export interface SimOptions {
@@ -66,6 +71,7 @@ const DEFAULT_BEHAVIOUR: SimBehaviour = {
   winChanceA: 0.5,
   captains: [],
   captainStartAfterMs: 61_000,
+  runs: [],
 };
 
 interface Joined {
@@ -85,6 +91,9 @@ export class ModSimulator {
   private joined = new Map<string, Joined>();
   private voteOptions: string[] = [];
   private match?: { mid: string; g: number; ts: number };
+  /** Monster Hunt: the run on this level (from the race line). */
+  private race?: { rs: 'a' | 'b'; n: number };
+  private runsPlayed = 0;
   private phase = 'lobby';
   private inSync = false;
   private gameTimers: TimerHandle[] = [];
@@ -195,6 +204,10 @@ export class ModSimulator {
         return;
       case 'match':
         this.match = { mid: msg.mid, g: msg.g, ts: msg.ts };
+        this.race = undefined;
+        return;
+      case 'race':
+        this.race = { rs: msg.rs, n: msg.n };
         return;
       case 'botadd':
         this.botsAdded.push(msg.name);
@@ -309,6 +322,7 @@ export class ModSimulator {
     if (!m) return;
     this.inGame = true;
     this.send({ t: 'live', mid: m.mid, g: m.g });
+    if (this.race) return this.startRun(m, this.race);
     let sa = 0;
     let sb = 0;
     const tick = () => {
@@ -331,6 +345,40 @@ export class ModSimulator {
     this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
     this.armEnd(this.b.gameDurationMs);
 
+    this.scheduleDrop();
+  }
+
+  /** Monster Hunt: one team runs the map; progress lines, then the end of the run. */
+  private startRun(m: { mid: string; g: number }, race: { rs: 'a' | 'b'; n: number }): void {
+    const spec = this.b.runs[this.runsPlayed++] ?? {};
+    const ms = spec.ms ?? this.b.gameDurationMs;
+    const deaths = spec.deaths ?? Math.floor(this.rng() * 4);
+    const pts = spec.pts ?? 100;
+    const started = this.o.clock.now();
+    const tick = () => {
+      if (!this.inGame) return;
+      const elapsed = Math.min(ms, this.o.clock.now() - started);
+      const d = Math.floor((deaths * elapsed) / ms);
+      this.send({ t: 'rp', mid: m.mid, g: m.g, n: race.n, ms: elapsed, d, pts: 0 });
+      this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
+    };
+    this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
+    const handle = this.later(this.b.gameDurationMs, () => {
+      if (!this.inGame) return;
+      this.inGame = false;
+      this.clearGame();
+      this.send({
+        t: 'runend',
+        mid: m.mid,
+        g: m.g,
+        n: race.n,
+        ms,
+        d: deaths,
+        pts,
+        done: spec.done ?? true,
+      });
+    });
+    this.endTimer = { handle, due: this.o.clock.now() + this.b.gameDurationMs };
     this.scheduleDrop();
   }
 

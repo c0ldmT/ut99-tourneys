@@ -21,11 +21,17 @@ import {
   wireName,
 } from '@tourney/protocol';
 import {
+  ADAPTER_MH,
+  finalMs,
+  firstRunner,
+  formatRaceTime,
   loserPickMap,
   parseRules,
+  raceWinner,
   randomBallot,
   randomMap,
   resolveMapVote,
+  simulateRace,
   simulateSeries,
   teamBallot,
   type Ut99DmRules,
@@ -109,6 +115,15 @@ export interface LiveInfo {
   scores?: Record<string, number>;
   ready?: Record<string, boolean>;
   deadline?: number;
+  /** Monster Hunt race: the run in progress. */
+  race?: {
+    runner: string;
+    run: number;
+    timeMs: number;
+    deaths: number;
+    penaltyMs: number;
+    points: number;
+  };
 }
 
 type VoteMethod = 'vote' | 'loserPick';
@@ -199,8 +214,16 @@ export class MatchDirector extends EventEmitter {
   private readonly timing: DirectorTiming;
   /** Who may join the server; replaced by the website while the tournament runs. */
   private access: AccessEntry[];
-  /** Team games: line-up of the current game (user ids per entrant), fixed before the map loads. */
-  private lineup?: { matchId: string; game: number; sides: Record<string, string[]> };
+  /**
+   * Team games: line-up of the current game (user ids per entrant), fixed before the map loads.
+   * Monster Hunt: per run, only the running team has a line-up.
+   */
+  private lineup?: {
+    matchId: string;
+    game: number;
+    run: number;
+    sides: Record<string, string[]>;
+  };
   /** Team games: bots playing the current game per entrant (from the countdown on). */
   private gameBots: Record<string, BotSpec[]> = {};
   /** Team games: who played the current game, for match.started. */
@@ -560,6 +583,29 @@ export class MatchDirector extends EventEmitter {
     return this.proj.settings.teamSize;
   }
 
+  /** Monster Hunt: every game is two runs on the same map, one per team, the faster wins. */
+  private get raceMode(): boolean {
+    return this.proj.settings.game.adapter === ADAPTER_MH;
+  }
+
+  /** Monster Hunt: the run of the current game being prepared or played (1 or 2). */
+  private raceRun(): number {
+    return (this.proj.currentMatch?.runs?.length ?? 0) + 1;
+  }
+
+  /** Monster Hunt: the team that runs next (or now); undefined outside a race game. */
+  private runner(): string | undefined {
+    const cm = this.proj.currentMatch;
+    return cm?.runOrder?.[cm.runs?.length ?? 0];
+  }
+
+  /** Entrants that play on the server right now: both, or in a race only the running team. */
+  private activeEntrants(): string[] {
+    const { entrants } = this.current();
+    const runner = this.raceMode ? this.runner() : undefined;
+    return runner ? [runner] : [...entrants];
+  }
+
   private team(entrantId: string | undefined): TeamEntrant | undefined {
     const e = entrantId ? this.proj.entrants[entrantId] : undefined;
     return isTeam(e) ? e : undefined;
@@ -632,7 +678,7 @@ export class MatchDirector extends EventEmitter {
     game: number,
     entrants: readonly [string, string],
   ): BridgeToMod[] {
-    return matchLines(
+    const lines = matchLines(
       this.proj,
       this.rules,
       matchId,
@@ -640,6 +686,22 @@ export class MatchDirector extends EventEmitter {
       entrants,
       this.teamMode ? this.teamBots() : undefined,
     );
+    const cm = this.proj.currentMatch;
+    const runner = this.raceMode ? this.runner() : undefined;
+    if (cm?.matchId === matchId && cm.game === game && runner) {
+      const prev = cm.runs?.[0];
+      lines.push({
+        t: 'race',
+        rs: entrants[0] === runner ? 'a' : 'b',
+        n: this.raceRun(),
+        pen: this.rules.penaltySec,
+        pt: prev ? finalMs(prev) : -1,
+        pd: prev?.deaths ?? 0,
+        pp: prev?.points ?? 0,
+        pf: prev?.finished ?? false,
+      });
+    }
+    return lines;
   }
 
   /** Team games: a team is ready when it is made of bots, was declared ready, or its line-up is. */
@@ -1066,17 +1128,41 @@ export class MatchDirector extends EventEmitter {
     method: 'vote' | 'random' | 'loserPick',
     details?: Record<string, unknown>,
   ): Promise<void> {
+    const runOrder = this.raceMode ? this.runOrderFor(matchId, game) : undefined;
     if (
       !(await this.append({
         type: 'match.mapSelected',
-        data: { matchId, game, map, method, ...(details ? { details } : {}) },
+        data: {
+          matchId,
+          game,
+          map,
+          method,
+          ...(details ? { details } : {}),
+          ...(runOrder ? { runOrder } : {}),
+        },
       }))
     ) {
       return;
     }
     if (method !== 'random') this.send([{ t: 'vclose', map }]);
-    this.say(`Map: ${map}`);
+    this.say(
+      runOrder
+        ? `Map: ${map}. ${this.name(runOrder[0])} runs first, then ${this.name(runOrder[1])}`
+        : `Map: ${map}`,
+    );
     await this.travel(matchId, game, map);
+  }
+
+  /** Monster Hunt: game 1 starts by lot, then whoever ran second in the last game starts. */
+  private runOrderFor(matchId: string, game: number): [string, string] {
+    const { entrants } = this.current();
+    const last = (this.proj.games[matchId] ?? []).at(-1);
+    const first = firstRunner(
+      entrants,
+      last?.runs?.map((r) => r.entrantId),
+      this.rng(matchId, game, 'order'),
+    );
+    return [first, entrants[0] === first ? entrants[1] : entrants[0]];
   }
 
   private async travel(matchId: string, game: number, map: string): Promise<void> {
@@ -1117,17 +1203,22 @@ export class MatchDirector extends EventEmitter {
    */
   private fixLineup(matchId: string, game: number): void {
     if (!this.teamMode) return;
-    if (this.lineup?.matchId === matchId && this.lineup.game === game) return;
+    const run = this.raceMode ? this.raceRun() : 1;
+    const l = this.lineup;
+    if (l?.matchId === matchId && l.game === game && l.run === run) return;
     const { entrants } = this.current();
+    const active = this.activeEntrants();
     const connected = this.connectedUsers();
     const benched = this.benched.get(matchId) ?? new Set<string>();
     const sides: Record<string, string[]> = {};
     for (const e of entrants) {
       const team = this.team(e);
-      sides[e] = team ? lineupFor(team, connected, this.teamSize, benched) : [];
+      // Monster Hunt: the team that does not run watches its opponent.
+      sides[e] =
+        team && active.includes(e) ? lineupFor(team, connected, this.teamSize, benched) : [];
     }
-    this.lineup = { matchId, game, sides };
-    for (const e of entrants) {
+    this.lineup = { matchId, game, run, sides };
+    for (const e of active) {
       const names = (sides[e] ?? []).map((u) => this.userName(u));
       this.o.log.info(`line-up ${this.name(e)}: ${names.join(', ') || '(bots)'}`);
     }
@@ -1261,9 +1352,10 @@ export class MatchDirector extends EventEmitter {
     const used = new Set<string>();
     this.gameBots = {};
     this.startLineups = {};
+    const active = this.activeEntrants();
     for (const e of entrants) {
       const team = this.team(e);
-      if (!team) continue;
+      if (!team || !active.includes(e)) continue;
       const humans = this.lineupOf(e).filter((u) => s.present.has(u));
       const bots = pickBots(team.bots, this.o.botPool, used, this.teamSize - humans.length);
       this.gameBots[e] = bots;
@@ -1297,7 +1389,7 @@ export class MatchDirector extends EventEmitter {
    * the gaps, players who are not ready yet play anyway); a team with nobody here forfeits.
    */
   private async onTeamTimeUp(s: Extract<Stage, { kind: 'readyCheck' }>): Promise<void> {
-    const { entrants } = this.current();
+    const entrants = this.activeEntrants();
     const connected = this.connectedUsers();
     const absent = entrants.filter((e) => {
       const team = this.team(e);
@@ -1307,7 +1399,11 @@ export class MatchDirector extends EventEmitter {
     });
     if (absent.length === 0) {
       for (const e of entrants) s.teamReady.add(e);
-      this.say('Time is up: the game starts, bots fill missing places');
+      this.say(
+        this.raceMode
+          ? 'Time is up: the run starts, bots fill missing places'
+          : 'Time is up: the game starts, bots fill missing places',
+      );
       return this.checkAllReady();
     }
     const loser =
@@ -1382,6 +1478,7 @@ export class MatchDirector extends EventEmitter {
     this.send([this.phase()]);
     this.setTimer(this.timing.simulateDelayMs, async () => {
       const skills = entrants.map((e) => botSkill(this.proj.entrants[e])) as [number, number];
+      if (this.raceMode) return this.simulateRaceSeries(matchId, entrants, bestOf, skills);
       const series = simulateSeries({
         skills,
         bestOf,
@@ -1415,6 +1512,48 @@ export class MatchDirector extends EventEmitter {
       this.say(`${matchId} simulated: ${this.name(entrants[series.winner])} wins`);
       await this.afterResult();
     });
+  }
+
+  private async simulateRaceSeries(
+    matchId: string,
+    entrants: [string, string],
+    bestOf: number,
+    skills: [number, number],
+  ): Promise<void> {
+    const series = simulateRace({
+      entrants,
+      skills,
+      bestOf,
+      timeLimitMin: this.rules.timeLimitMin,
+      penaltySec: this.rules.penaltySec,
+      rng: this.rng(matchId, 'simulate'),
+    });
+    const games = series.games.map((g) => ({
+      map: '(simulated)',
+      scores: Object.fromEntries(g.runs.map((r) => [r.entrantId, finalMs(r)])),
+      winnerId: g.winnerId,
+    }));
+    const ok = await this.append(
+      ...games.map((g, i) => ({
+        type: 'match.gameFinished' as const,
+        data: { matchId, game: i + 1, ...g, endReason: 'race' as const },
+      })),
+      {
+        type: 'match.result',
+        data: {
+          result: {
+            matchId,
+            entrants,
+            winnerId: series.winnerId,
+            outcome: 'simulated' as const,
+            games,
+          },
+        },
+      },
+    );
+    if (!ok) return;
+    this.say(`${matchId} simulated: ${this.name(series.winnerId)} wins`);
+    await this.afterResult();
   }
 
   // -------------------------------------------------------------------------------------------
@@ -1477,10 +1616,16 @@ export class MatchDirector extends EventEmitter {
         if (s.kind !== 'countdown' || s.matchId !== msg.mid) return;
         this.stage = { kind: 'live', matchId: s.matchId, game: s.game, map: s.map, scores: [0, 0] };
         const lineups = this.startLineups;
+        const runner = this.raceMode ? this.runner() : undefined;
         if (
           !(await this.append({
             type: 'match.started',
-            data: { matchId: s.matchId, game: s.game, ...(lineups ? { lineups } : {}) },
+            data: {
+              matchId: s.matchId,
+              game: s.game,
+              ...(runner ? { runner } : {}),
+              ...(lineups ? { lineups } : {}),
+            },
           }))
         )
           return;
@@ -1490,7 +1635,7 @@ export class MatchDirector extends EventEmitter {
       }
       case 'score': {
         const s = this.stage;
-        if (s.kind !== 'live' || s.matchId !== msg.mid) return;
+        if (this.raceMode || s.kind !== 'live' || s.matchId !== msg.mid) return;
         s.scores = [msg.sa, msg.sb];
         const { entrants } = this.current();
         this.telemetry('live', { scores: { [entrants[0]]: msg.sa, [entrants[1]]: msg.sb } });
@@ -1503,7 +1648,29 @@ export class MatchDirector extends EventEmitter {
         return this.onMatchPlayerLost(entrants[msg.s === 'a' ? 0 : 1]);
       }
       case 'end':
+        // Monster Hunt ends a level per run (runend); the game is decided by the bridge.
+        if (this.raceMode) return;
         return this.onGameEnd(msg);
+      case 'rp': {
+        const s = this.stage;
+        const runner = this.runner();
+        if (!this.raceMode || s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g)
+          return;
+        if (!runner || msg.n !== this.raceRun()) return;
+        this.telemetry('live', {
+          race: {
+            runner,
+            run: msg.n,
+            timeMs: msg.ms,
+            deaths: msg.d,
+            penaltyMs: msg.d * this.rules.penaltySec * 1000,
+            points: msg.pts,
+          },
+        });
+        return;
+      }
+      case 'runend':
+        return this.onRunEnd(msg);
       case 'hb':
         return;
       case 'err':
@@ -1822,22 +1989,28 @@ export class MatchDirector extends EventEmitter {
     ) {
       return;
     }
-    const bestOf = this.proj.bracket?.byId[s.matchId]?.bestOf ?? 1;
-    const wins = seriesWins(this.proj, s.matchId, entrants);
-    const needed = Math.ceil(bestOf / 2);
     this.say(`${this.name(winnerId)} wins game ${s.game} (${msg.sa}:${msg.sb})`);
+    await this.afterGame(s.matchId, s.game, winnerId);
+  }
+
+  /** A game of the series is recorded: next game, or the match result. */
+  private async afterGame(matchId: string, game: number, winnerId: string): Promise<void> {
+    const { entrants } = this.current();
+    const bestOf = this.proj.bracket?.byId[matchId]?.bestOf ?? 1;
+    const wins = seriesWins(this.proj, matchId, entrants);
+    const needed = Math.ceil(bestOf / 2);
     if (wins[0] < needed && wins[1] < needed) {
       this.cooldownUntil = this.o.clock.now() + this.timing.postGameDelayMs;
       this.stage = { kind: 'between' };
       this.send([...this.bracketUpdate(), this.phase()]);
-      return this.startGame(s.matchId, s.game + 1);
+      return this.startGame(matchId, game + 1);
     }
     const result: MatchResult = {
-      matchId: s.matchId,
+      matchId,
       entrants,
       winnerId,
       outcome: 'played',
-      games: (this.proj.games[s.matchId] ?? []).map((g) => ({
+      games: (this.proj.games[matchId] ?? []).map((g) => ({
         map: g.map,
         scores: g.scores,
         winnerId: g.winnerId,
@@ -1845,5 +2018,77 @@ export class MatchDirector extends EventEmitter {
     };
     if (!(await this.append({ type: 'match.result', data: { result } }))) return;
     await this.afterResult();
+  }
+
+  /**
+   * Monster Hunt: a run is over. After the first run the other team runs the same map; after the
+   * second the game goes to the faster team (time plus penalty per death, see raceWinner).
+   */
+  private async onRunEnd(msg: Extract<ModToBridge, { t: 'runend' }>): Promise<void> {
+    const s = this.stage;
+    const runner = this.runner();
+    if (!this.raceMode || s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g) return;
+    if (!runner || msg.n !== this.raceRun()) return;
+    this.clearTimer();
+    this.resetGame();
+    const penaltyMs = msg.d * this.rules.penaltySec * 1000;
+    if (
+      !(await this.append({
+        type: 'match.runFinished',
+        data: {
+          matchId: s.matchId,
+          game: s.game,
+          entrantId: runner,
+          map: s.map,
+          timeMs: msg.ms,
+          deaths: msg.d,
+          penaltyMs,
+          points: msg.pts,
+          finished: msg.done,
+        },
+      }))
+    ) {
+      return;
+    }
+    const total = formatRaceTime(msg.ms + penaltyMs);
+    this.say(
+      msg.done
+        ? `${this.name(runner)}: ${formatRaceTime(msg.ms)} + ${msg.d} deaths x ${this.rules.penaltySec}s = ${total}`
+        : `${this.name(runner)} did not reach the exit (${msg.pts} monster points, ${msg.d} deaths)`,
+    );
+    const cm = this.proj.currentMatch;
+    const runs = cm?.runs ?? [];
+    if (runs.length < 2) {
+      // The other team runs the same map after the scoreboard time.
+      this.cooldownUntil = this.o.clock.now() + this.timing.postGameDelayMs;
+      this.send([...this.bracketUpdate()]);
+      return this.travel(s.matchId, s.game, s.map);
+    }
+    const [r1, r2] = runs as [(typeof runs)[0], (typeof runs)[0]];
+    const { winnerId, decidedBy } = raceWinner(r1, r2, this.rng(s.matchId, s.game, 'race'));
+    if (
+      !(await this.append({
+        type: 'match.gameFinished',
+        data: {
+          matchId: s.matchId,
+          game: s.game,
+          map: s.map,
+          scores: { [r1.entrantId]: finalMs(r1), [r2.entrantId]: finalMs(r2) },
+          winnerId,
+          endReason: 'race',
+        },
+      }))
+    ) {
+      return;
+    }
+    const how = {
+      time: 'faster',
+      finish: 'reached the exit',
+      points: 'more monster points',
+      deaths: 'fewer deaths',
+      lot: 'by lot',
+    }[decidedBy];
+    this.say(`${this.name(winnerId)} wins game ${s.game} (${how})`);
+    await this.afterGame(s.matchId, s.game, winnerId);
   }
 }

@@ -44,7 +44,7 @@ export function tournamentFile(
       postTournamentShutdownSec: 30,
       ...settings,
       game: {
-        adapter: 'ut99-dm',
+        adapter: (settings['adapter'] as string | undefined) ?? 'ut99-dm',
         rules: {
           mapPool: ['DM-Deck16][', 'DM-Morpheus', 'DM-Phobos', 'DM-Codex'],
           voteTimeoutSec: 15,

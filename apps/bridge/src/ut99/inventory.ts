@@ -54,8 +54,8 @@ export interface Inventory {
 }
 
 export interface ScanOptions {
-  /** Map file prefix for the game type, e.g. "DM". */
-  prefix?: string;
+  /** Map file prefixes of the game types, default DM (deathmatch) and MH (Monster Hunt). */
+  prefixes?: readonly string[];
   /** Read Title/Author from the map packages (slower; reads every file). */
   readMeta?: boolean;
 }
@@ -65,7 +65,7 @@ export function scanInventory(
   profile: Pick<ServerProfile, 'installDir'>,
   options: ScanOptions = {},
 ): Inventory {
-  const prefix = `${options.prefix ?? 'DM'}-`.toLowerCase();
+  const prefixes = (options.prefixes ?? ['DM', 'MH']).map((x) => `${x}-`.toLowerCase());
   const warnings: string[] = [];
   const mapsDir = findDir(profile.installDir, 'Maps');
   const maps: MapInfo[] = [];
@@ -76,7 +76,7 @@ export function scanInventory(
     for (const file of fs.readdirSync(mapsDir)) {
       const ext = path.extname(file).toLowerCase();
       const id = file.slice(0, -ext.length);
-      if (ext !== '.unr' || !id.toLowerCase().startsWith(prefix)) continue;
+      if (ext !== '.unr' || !prefixes.some((x) => id.toLowerCase().startsWith(x))) continue;
       const full = path.join(mapsDir, file);
       const info: MapInfo = { id, stock: STOCK_DM.has(id.toLowerCase()) };
       try {

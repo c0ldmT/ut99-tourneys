@@ -85,6 +85,27 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
   }),
   /** A match player disconnected during a live game (the mod paused the game). 1v1 only. */
   z.object({ t: z.literal('lost'), mid: str(16), s: side }),
+  /** Monster Hunt race: progress of the running team (every few seconds and on every death). */
+  z.object({
+    t: z.literal('rp'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(1).max(2), // run 1 or 2 of the game
+    ms: int.nonnegative(), // run time so far, pauses excluded
+    d: int.nonnegative(), // deaths in the team, bots included
+    pts: int, // monster points of the team
+  }),
+  /** Monster Hunt race: the run is over (exit reached, time limit, or no hunters left). */
+  z.object({
+    t: z.literal('runend'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(1).max(2),
+    ms: int.nonnegative(),
+    d: int.nonnegative(),
+    pts: int,
+    done: z.boolean(), // reached the exit before the time limit
+  }),
   /** A chat command the bridge decides on, e.g. "start" (team captain starts with bots). */
   z.object({ t: z.literal('cmd'), pid, c: str(16) }),
   z.object({ t: z.literal('hb'), up: int.nonnegative() }), // heartbeat, uptime in seconds
@@ -149,6 +170,21 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     name: str(MAX_NAME_CHARS),
     sk: int.min(0).max(7),
     cls: str(128),
+  }),
+  /**
+   * Monster Hunt race, sent with the match: which side runs on this level (the other team
+   * watches), the penalty per death and the other team's finished run of this game (p* fields,
+   * pt = -1 if this is the first run).
+   */
+  z.object({
+    t: z.literal('race'),
+    rs: side,
+    n: int.min(1).max(2),
+    pen: int.nonnegative(), // seconds per death
+    pt: int.min(-1), // other team: final time in ms (time + penalty)
+    pd: int.nonnegative(),
+    pp: int,
+    pf: z.boolean(),
   }),
   /** Team games: a stand-in bot leaves (the player is back). */
   z.object({ t: z.literal('botdel'), name: str(MAX_NAME_CHARS) }),

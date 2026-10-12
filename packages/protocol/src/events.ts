@@ -83,6 +83,8 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
       method: z.enum(['vote', 'random', 'loserPick', 'admin']),
       /** Optional transparency data, e.g. per-map scores of the vote. */
       details: z.record(z.string(), z.unknown()).optional(),
+      /** Monster Hunt race: which entrant runs first and which second in this game. */
+      runOrder: z.tuple([Id, Id]).optional(),
     }),
   ),
   event(
@@ -90,6 +92,8 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
     z.object({
       matchId: Id,
       game: z.number().int().positive(),
+      /** Monster Hunt race: the entrant whose run started (the other team watches). */
+      runner: Id.optional(),
       /** Team games: who played for each entrant (humans first, then bots). */
       lineups: z
         .record(
@@ -105,6 +109,26 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
         .optional(),
     }),
   ),
+  /** Monster Hunt race: one team's run of the current game is over. */
+  event(
+    'match.runFinished',
+    z.object({
+      matchId: Id,
+      game: z.number().int().positive(),
+      entrantId: Id,
+      map: z.string(),
+      /** From the start to the exit (or to the time limit), pauses excluded. */
+      timeMs: z.number().int().nonnegative(),
+      /** Deaths in the team, bots included. */
+      deaths: z.number().int().nonnegative(),
+      /** deaths x the tournament's penalty per death. */
+      penaltyMs: z.number().int().nonnegative(),
+      /** Monster points of the team (tie-breaker). */
+      points: z.number().int(),
+      /** Reached the exit before the time limit. */
+      finished: z.boolean(),
+    }),
+  ),
   event(
     'match.gameFinished',
     z.object({
@@ -113,7 +137,8 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
       map: z.string(),
       scores: z.record(z.string(), z.number()),
       winnerId: Id,
-      endReason: z.enum(['fragLimit', 'timeLimit', 'suddenDeath', 'forfeit', 'admin']),
+      /** `race`: Monster Hunt, decided by the two runs (scores are the final times in ms). */
+      endReason: z.enum(['fragLimit', 'timeLimit', 'suddenDeath', 'forfeit', 'admin', 'race']),
     }),
   ),
   event('match.result', z.object({ result: MatchResultSchema })),

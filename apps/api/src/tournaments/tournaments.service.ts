@@ -18,7 +18,7 @@ import {
   type TournamentProjection,
   type TournamentSettings,
 } from '@tourney/protocol';
-import { parseRules } from '@tourney/adapter-ut99';
+import { gameProblems } from '@tourney/adapter-ut99';
 import { z } from 'zod';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
@@ -154,23 +154,13 @@ export class TournamentsService {
     profileId?: string;
   }) {
     if (f.settings) {
-      if (f.settings.game.adapter !== 'ut99-dm') {
-        throw badRequest(`unknown game adapter ${f.settings.game.adapter}`);
-      }
-      const problems = settingsProblems(f.settings);
+      const problems = [...settingsProblems(f.settings), ...gameProblems(f.settings)];
       if (problems.length) throw badRequest(problems.join('; '));
       const distinctBots = new Set((f.botPool ?? []).map((b) => b.name.toLowerCase())).size;
       if (f.settings.teamSize > 1 && f.botPool && distinctBots < 2 * f.settings.teamSize) {
         // Two full bot teams must be able to play each other.
         throw badRequest(
           `team tournaments of ${f.settings.teamSize} need at least ${2 * f.settings.teamSize} different bots in the pool`,
-        );
-      }
-      try {
-        parseRules(f.settings.game.rules);
-      } catch (e) {
-        throw badRequest(
-          `invalid game rules: ${e instanceof z.ZodError ? z.prettifyError(e) : (e as Error).message}`,
         );
       }
     }

@@ -3,6 +3,10 @@ import { ServerProfileSchema } from '@tourney/protocol';
 import { describe, expect, it } from 'vitest';
 import {
   defaultLimits,
+  firstRunner,
+  formatRaceTime,
+  gameProblems,
+  raceWinner,
   teamBallot,
   iniChanges,
   loserPickMap,
@@ -216,11 +220,11 @@ describe('server launch', () => {
   });
 
   it('runs the team game class with room for both teams', () => {
-    expect(serverArgs(rules, profile, 3)[1]).toBe(
+    expect(serverArgs(rules, profile, 'tdm')[1]).toBe(
       'DM-Deck16][?game=UTTourney_v1.TournamentTDM?mutator=BotPack.InstaGibDM?MaxSpectators=32',
     );
     const mod = { bridgeHost: '127.0.0.1', bridgePort: 7790, sharedKey: 'secret' };
-    expect(iniChanges(rules, profile, mod, 5)).toContainEqual({
+    expect(iniChanges(rules, profile, mod, 'tdm', 5)).toContainEqual({
       section: 'UTTourney_v1.TournamentTDM',
       key: 'MaxPlayers',
       value: '12',
@@ -279,6 +283,94 @@ describe('server launch', () => {
       section: 'UTTourney_v1.TournamentConfig',
       key: 'SharedKey',
       value: 'secret',
+    });
+  });
+});
+
+describe('Monster Hunt race', () => {
+  const run = (entrantId: string, over: Partial<Parameters<typeof raceWinner>[0]> = {}) => ({
+    entrantId,
+    timeMs: 300_000,
+    deaths: 0,
+    penaltyMs: 0,
+    points: 50,
+    finished: true,
+    ...over,
+  });
+
+  it('decides by final time, finish, points, deaths and lot', () => {
+    const rng = createRng(1);
+    // 5:00 + 3 deaths x 5 s = 5:15 loses against 5:10.
+    expect(raceWinner(run('a', { penaltyMs: 15_000 }), run('b', { timeMs: 310_000 }), rng)).toEqual(
+      { winnerId: 'b', decidedBy: 'time' },
+    );
+    expect(raceWinner(run('a', { finished: false }), run('b', { timeMs: 1_000_000 }), rng)).toEqual(
+      {
+        winnerId: 'b',
+        decidedBy: 'finish',
+      },
+    );
+    expect(
+      raceWinner(run('a', { finished: false, points: 80 }), run('b', { finished: false }), rng),
+    ).toEqual({ winnerId: 'a', decidedBy: 'points' });
+    // Same second: points, then deaths.
+    expect(raceWinner(run('a', { timeMs: 300_400 }), run('b', { deaths: 1 }), rng).decidedBy).toBe(
+      'deaths',
+    );
+    expect(raceWinner(run('a'), run('b'), rng).decidedBy).toBe('lot');
+  });
+
+  it('alternates the start after game 1', () => {
+    expect(firstRunner(['a', 'b'], ['a', 'b'], createRng(1))).toBe('b');
+    expect(['a', 'b']).toContain(firstRunner(['a', 'b'], undefined, createRng(1)));
+    expect(formatRaceTime(247_345)).toBe('4:07.3');
+  });
+
+  it('checks Monster Hunt settings', () => {
+    const rules = { mapPool: ['MH-NaliVillage'], timeLimitMin: 20 };
+    expect(gameProblems({ teamSize: 2, game: { adapter: 'ut99-mh', rules } })).toEqual([]);
+    expect(gameProblems({ teamSize: 1, game: { adapter: 'ut99-mh', rules } })).toHaveLength(1);
+    expect(gameProblems({ teamSize: 2, game: { adapter: 'ut99-xx', rules } })).toHaveLength(1);
+    expect(
+      validateAgainstInventory(
+        parseRules(rules),
+        { maps: [{ id: 'MH-NaliVillage' }], packages: ['MonsterHunt'] },
+        'mh',
+      ),
+    ).toEqual(['UTTourneyMH_v1.u is not installed on the server (System folder)']);
+  });
+
+  it('starts the Monster Hunt game class with its settings', () => {
+    const profile = ServerProfileSchema.parse({
+      id: 'p',
+      name: 'P',
+      os: 'linux',
+      installDir: '/opt/ut99',
+      lobbyMap: 'DM-Deck16][',
+    });
+    const rules = parseRules({ mapPool: ['MH-NaliVillage'], timeLimitMin: 20, monsterSkill: 3 });
+    expect(serverArgs(rules, profile, 'mh')[1]).toContain('?game=UTTourneyMH_v1.TournamentMH');
+    const ini = iniChanges(
+      rules,
+      profile,
+      { bridgeHost: 'h', bridgePort: 1, sharedKey: 'k' },
+      'mh',
+      2,
+    );
+    expect(ini).toContainEqual({
+      section: 'UTTourneyMH_v1.TournamentMH',
+      key: 'MonsterSkill',
+      value: '3',
+    });
+    expect(ini).toContainEqual({
+      section: 'UTTourneyMH_v1.TournamentMH',
+      key: 'Lives',
+      value: '0',
+    });
+    expect(ini).toContainEqual({
+      section: 'Engine.GameEngine',
+      key: 'ServerPackages',
+      ensure: 'MonsterHunt',
     });
   });
 });

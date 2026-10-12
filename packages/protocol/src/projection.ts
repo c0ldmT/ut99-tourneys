@@ -20,12 +20,25 @@ export type TournamentPhase =
   | 'finished'
   | 'aborted';
 
+/** Monster Hunt race: one team's run. */
+export interface RunRecord {
+  entrantId: string;
+  map: string;
+  timeMs: number;
+  deaths: number;
+  penaltyMs: number;
+  points: number;
+  finished: boolean;
+}
+
 export interface GameRecord {
   game: number;
   map: string;
   scores: Record<string, number>;
   winnerId: string;
   endReason: string;
+  /** Monster Hunt race: both runs, in the order they were played. */
+  runs?: RunRecord[];
 }
 
 export interface CurrentMatch {
@@ -36,6 +49,10 @@ export interface CurrentMatch {
   map?: string;
   mapMethod?: string;
   status: 'called' | 'mapSelected' | 'live';
+  /** Monster Hunt race: run order of the current game, finished runs, the running team. */
+  runOrder?: [string, string];
+  runs?: RunRecord[];
+  runner?: string;
 }
 
 export interface TournamentProjection {
@@ -171,12 +188,45 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         cm.map = e.data.map;
         cm.mapMethod = e.data.method;
         cm.status = 'mapSelected';
+        if (e.data.runOrder) {
+          cm.runOrder = e.data.runOrder;
+          cm.runs = [];
+        }
         break;
       }
       case 'match.started': {
         const cm = requireCurrent(p, e.data.matchId, fail);
         cm.game = e.data.game;
         cm.status = 'live';
+        if (e.data.runner) {
+          if (!cm.runOrder) fail('runner without a run order');
+          if (e.data.runner !== cm.runOrder?.[cm.runs?.length ?? 0])
+            fail(`${e.data.runner} does not run now`);
+          cm.runner = e.data.runner;
+        }
+        break;
+      }
+      case 'match.runFinished': {
+        const cm = requireCurrent(p, e.data.matchId, fail);
+        if (!cm.runOrder || !cm.runs) fail('no race in this game');
+        if (cm.game !== e.data.game) fail(`game ${e.data.game} is not the current game`);
+        const runs = cm.runs as RunRecord[];
+        if (runs.length >= 2) fail('both runs are already finished');
+        if (cm.runOrder?.[runs.length] !== e.data.entrantId)
+          fail(`${e.data.entrantId} does not run now`);
+        const d = e.data;
+        runs.push({
+          entrantId: d.entrantId,
+          map: d.map,
+          timeMs: d.timeMs,
+          deaths: d.deaths,
+          penaltyMs: d.penaltyMs,
+          points: d.points,
+          finished: d.finished,
+        });
+        // Back to the loaded map: the other team runs next (same map).
+        cm.status = 'mapSelected';
+        delete cm.runner;
         break;
       }
       case 'match.gameFinished': {
@@ -188,12 +238,16 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
           scores: e.data.scores,
           winnerId: e.data.winnerId,
           endReason: e.data.endReason,
+          ...(cm.runs?.length ? { runs: cm.runs } : {}),
         });
         p.mapHistory.push({ matchId: e.data.matchId, map: e.data.map, entrants: cm.entrants });
         cm.game = e.data.game + 1;
         cm.status = 'called';
         delete cm.map;
         delete cm.mapMethod;
+        delete cm.runOrder;
+        delete cm.runs;
+        delete cm.runner;
         break;
       }
       case 'match.result':

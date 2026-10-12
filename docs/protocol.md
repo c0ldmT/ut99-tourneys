@@ -27,6 +27,7 @@ games, bracket via the bracket engine). Website and bridge run the same code, so
 | `match.called`                    | bridge          | Next match chosen by the scheduler                                                    |
 | `match.mapSelected`               | bridge          | Map for a game, with method (`vote`, `random`, `loserPick`, `admin`) and vote details |
 | `match.started`                   | bridge          | Countdown over, game is live                                                          |
+| `match.runFinished`               | bridge          | Monster Hunt: one team's run of the game is over (time, deaths, penalty, points)      |
 | `match.gameFinished`              | bridge          | One game of a series is over (scores, end reason)                                     |
 | `match.result`                    | bridge / admin  | Final result of a match; a later result for the same match overrides                  |
 | `tournament.paused` / `resumed`   | admin / bridge  |                                                                                       |
@@ -35,6 +36,13 @@ games, bracket via the bracket engine). Website and bridge run the same code, so
 **Team tournaments.** With `settings.teamSize` 2, 3 or 5 every bracket entrant has `kind: "team"`: name, tag,
 captain, `members` (starters first, `sub` marks substitutes, at most `teamSize + 2`) and `bots` for starter places
 nobody fills. Teams made of bots only have no members. Brackets of 4, 8 and 16 teams; 4 is also allowed for 1v1.
+
+**Monster Hunt** (`game.adapter: "ut99-mh"`, teams only). Every game is a time race on one map: both teams run
+it one after the other. `match.mapSelected.runOrder` fixes the order (game 1 by lot, then whoever ran second
+starts), `match.started.runner` names the running team, `match.runFinished` records each run. After the second
+run `match.gameFinished` (`endReason: "race"`, `scores` = final times in ms) names the winner: a team at the exit
+beats one that is not; otherwise the lower time plus `penaltySec` per death (whole seconds), then monster points,
+fewer deaths, lot.
 
 **Concurrency.** The bridge sends `events.append` with `baseSeq` (the head it based its decision on). The
 website accepts only if `baseSeq` is still the head and answers `events.ack {accepted:true, events}` with
@@ -171,6 +179,21 @@ The server runs `TournamentTDM` (red = side a, blue = side b); the frag limit is
   out of that match; the stand-in stays.
 - **Line-up changes** from the website (`team.lineupSet`) are passive events: the bridge applies them from the
   next game and never re-plans for them.
+
+### Monster Hunt time race
+
+The server runs `UTTourneyMH_v1.TournamentMH` (a `MonsterHunt` subclass, Monster Hunt 613). Each game loads the
+map twice, once per team:
+
+- **Roles.** Only the line-up of the running team has role `a`/`b`; the other team joins as spectators and
+  watches. The running team plays in Monster Hunt's hunter team. Fill bots and stand-in bots as in team games.
+- **`race`** (bridge → mod, with `match`): `rs` running side, `n` run 1/2, `pen` seconds per death, and the other
+  team's finished run (`pt` final time in ms or -1, `pd` deaths, `pp` points, `pf` reached the exit).
+- **`rp`** (mod → bridge): progress every few seconds and on every death: `ms` run time (pauses excluded), `d`
+  deaths in the team (bots included), `pts` monster points.
+- **`runend`** (mod → bridge): the run is over (`done: true` at the exit, `false` at the time limit or with no
+  hunters left), same fields. The bridge records it and loads the map again for the other team. `score`/`end`
+  are not used.
 
 ### Typical match sequence
 
