@@ -25,6 +25,7 @@ var TourneyGRI GRI;
 var float BracketUntil;    // show the bracket until (Level.TimeSeconds)
 var float StandUntil;      // show the standings until
 var bool bBracketHidden;   // player closed the automatic bracket with !bracket
+var bool bPendingVote;     // open the vote window as soon as the player stops typing
 var float NextGRIScan;
 var float NextParse;
 var Actor LastViewTarget;
@@ -100,6 +101,8 @@ simulated function Tick(float Delta)
 		bRegistered = true;
 		ServerHello();
 	}
+	if (bPendingVote)
+		TryOpenVote();
 	// FIRE (next player) switches spectators to third person; keep the chosen view.
 	if (Spectator(P) != None && P.ViewTarget != None && P.ViewTarget != LastViewTarget)
 	{
@@ -145,6 +148,15 @@ simulated function ClientViewMode(bool bBehind)
 
 simulated function ClientOpenVote()
 {
+	bPendingVote = true;
+	TryOpenVote();
+}
+
+// Opens the vote window in full UWindow mode (like the Esc menu): mouse cursor, keyboard and
+// Esc go to the window. The "quick key" mode is keyboard-only (speech menu) and must not be
+// used. While the player is typing a chat line the window waits.
+simulated function TryOpenVote()
+{
 	local PlayerPawn P;
 	local WindowConsole WC;
 
@@ -153,12 +165,20 @@ simulated function ClientOpenVote()
 		return;
 	WC = WindowConsole(P.Player.Console);
 	if (WC == None)
+	{
+		bPendingVote = false;
 		return;
+	}
+	if (WC.bTyping)
+		return; // Tick tries again
+	bPendingVote = false;
+	if (GRI != None && GRI.Phase != "vote")
+		return; // the vote is already over
 	if (!WC.bCreatedRoot || WC.Root == None)
 		WC.CreateRootWindow(None);
 	if (WC.Root == None)
 		return;
-	WC.bQuickKeyEnable = true;
+	WC.bQuickKeyEnable = false;
 	WC.LaunchUWindow();
 	if (UMenuRootWindow(WC.Root) != None && UMenuRootWindow(WC.Root).MenuBar != None)
 		UMenuRootWindow(WC.Root).MenuBar.HideWindow();
@@ -171,6 +191,7 @@ simulated function ClientCloseVote()
 	local WindowConsole WC;
 	local UWindowWindow W;
 
+	bPendingVote = false;
 	P = PlayerPawn(Owner);
 	if (P == None || P.Player == None)
 		return;
@@ -182,7 +203,8 @@ simulated function ClientCloseVote()
 		W.Close();
 }
 
-// The console key closes UWindow mode without closing our window: clean up properly.
+// Something left UWindow mode without closing our window (console key, speech menu):
+// close it properly so the menu bar comes back and nothing is left half open.
 simulated function CloseStaleVoteWindow()
 {
 	local PlayerPawn P;
@@ -193,7 +215,7 @@ simulated function CloseStaleVoteWindow()
 	if (P == None || P.Player == None)
 		return;
 	WC = WindowConsole(P.Player.Console);
-	if (WC == None || WC.Root == None || WC.bUWindowActive || WC.bQuickKeyEnable)
+	if (WC == None || WC.Root == None || WC.IsInState('UWindow'))
 		return;
 	W = WC.Root.FindChildWindow(class'TourneyVoteWindow', true);
 	if (W != None && W.bWindowVisible)
@@ -210,7 +232,7 @@ simulated function bool VoteWindowOpen()
 	if (P == None || P.Player == None)
 		return false;
 	WC = WindowConsole(P.Player.Console);
-	if (WC == None || WC.Root == None || !WC.bUWindowActive && !WC.bQuickKeyEnable)
+	if (WC == None || WC.Root == None || !WC.IsInState('UWindow'))
 		return false;
 	W = WC.Root.FindChildWindow(class'TourneyVoteWindow', true);
 	return W != None && W.bWindowVisible;
@@ -462,7 +484,7 @@ simulated function DrawVotePanel(Canvas C)
 	else if (MyVote != "")
 		Foot = "Your vote:" @ MyVote $ "   (vote again to change)";
 	else
-		Foot = "Press T and type  !vote 2 1 3  (up to 3 numbers, best first) - or  !vote  for the vote window";
+		Foot = "Type  !vote  for the vote window (mouse), or  !vote 2 1 3  (up to 3 numbers, best first)";
 	C.StrLen(Foot, XL, YL);
 	PutText(C, Foot, X + 16, Y + H - YL - 8, 139, 152, 168);
 }

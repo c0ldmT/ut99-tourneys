@@ -122,7 +122,7 @@ Work through these in order and note what happens. Each item names what to look 
 | 18 | **HUD download** | Joining shows the package download once (a few hundred KB). Server log: no errors from `TourneyClient`/`TourneyGRI` |
 | 19 | **Banner** | During ready, countdown and the game: names, score, match id, Bo and map at the top centre |
 | 20 | **Ready panel** | Both names with READY / not ready, the hint and the seconds left; no more progress-message text for you |
-| 21 | **Vote window** | When your vote starts a window opens: click up to 3 maps (numbers appear), "Vote" closes it and your vote is shown in the panel. Esc/console key closes it; `!vote` opens it again. Spectators see the panel only |
+| 21 | **Vote window** | When your vote starts a window opens with the mouse cursor (like the Esc menu; it waits while you are typing). Click up to 3 maps (numbers appear), "Vote" closes it and your vote is shown in the panel. Esc closes it without voting and gives the controls back; `!vote` opens it again. Spectators see the panel only |
 | 22 | **Bracket** | In the lobby, between games and at the end the bracket is drawn (winners, losers, grand final, scores, live match in green). `!bracket` hides/shows it, also during a game (20 s) |
 | 23 | **Standings** | `!standings` (12 s); at the end next to the bracket with the shutdown countdown |
 | 24 | **Follow** | As spectator at game start you look through side A's eyes. FIRE switches players and stays in first person; `!fp` toggles, `!follow Mario`, `!follow off` |
