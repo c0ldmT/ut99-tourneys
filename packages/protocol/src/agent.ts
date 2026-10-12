@@ -59,6 +59,13 @@ export const ServerProfileSchema = z.object({
   publicAddress: z.string().max(128).optional(),
   /** Extra server URL options / command line arguments, appended verbatim. */
   extraArgs: z.string().max(512).optional(),
+  /**
+   * Optional HTTP redirect for faster downloads: a web server with the maps and packages as
+   * compressed .uz files (ucc compress). Without it clients download from the game server itself.
+   */
+  downloadRedirect: z.url().max(256).optional(),
+  /** Optional bandwidth per client in bytes/s (also the download speed from the game server). */
+  maxClientRate: z.number().int().min(5_000).max(1_000_000).optional(),
 });
 export type ServerProfile = z.infer<typeof ServerProfileSchema>;
 

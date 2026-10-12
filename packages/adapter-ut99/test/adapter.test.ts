@@ -374,3 +374,48 @@ describe('Monster Hunt race', () => {
     });
   });
 });
+
+describe('downloads', () => {
+  const mod = { bridgeHost: 'h', bridgePort: 1, sharedKey: 'k' };
+  const rules = parseRules({ mapPool: ['DM-Deck16]['] });
+  const base = {
+    id: 'p',
+    name: 'P',
+    os: 'linux',
+    installDir: '/opt/ut99',
+    lobbyMap: 'DM-Deck16][',
+  };
+  it('lets clients download missing maps and packages, HTTP redirect first', () => {
+    const ini = iniChanges(rules, ServerProfileSchema.parse(base), mod);
+    const net = ini.filter((c) => c.section === 'IpDrv.TcpNetDriver');
+    expect(net).toContainEqual({
+      section: 'IpDrv.TcpNetDriver',
+      key: 'AllowDownloads',
+      value: 'True',
+    });
+    const ensured = net.flatMap((c) =>
+      'ensure' in c && c.key === 'DownloadManagers' ? [c.ensure] : [],
+    );
+    expect(ensured).toEqual(['IpDrv.HTTPDownload', 'Engine.ChannelDownload']);
+    expect(ini.some((c) => c.section === 'IpDrv.HTTPDownload')).toBe(false);
+    const withRedirect = iniChanges(
+      rules,
+      ServerProfileSchema.parse({
+        ...base,
+        downloadRedirect: 'https://files.example.com/ut/',
+        maxClientRate: 100000,
+      }),
+      mod,
+    );
+    expect(withRedirect).toContainEqual({
+      section: 'IpDrv.HTTPDownload',
+      key: 'RedirectToURL',
+      value: 'https://files.example.com/ut/',
+    });
+    expect(withRedirect).toContainEqual({
+      section: 'IpDrv.TcpNetDriver',
+      key: 'MaxClientRate',
+      value: '100000',
+    });
+  });
+});

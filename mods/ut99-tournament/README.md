@@ -6,6 +6,7 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > **Status:** 1v1 and team deathmatch are tested on 469f (mod 0.3.0). Mod 0.4.0 moved the tournament logic into
 > `TourneyCore`. Mod 0.5.0 adds Monster Hunt (package `UTTourneyMH_v1`, tested). Mod 0.5.1 only changes the
 > message when the organizer restarts a game, sets a winner or calls a match off (instead of "wins by forfeit").
+> Mod 0.5.2 shows its version in the game type name (scoreboard, server browser) and in the bracket title.
 
 ## Classes
 

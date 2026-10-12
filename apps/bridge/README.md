@@ -57,6 +57,15 @@ bridge restart the website tells it to resume the running tournament.
 - The binary is found automatically (`System/ucc-bin-amd64`, `System/ucc-bin-arm64`, `System/UCC.exe`, ...);
   set `"binary"` to override.
 - Before the start the map pool is checked against the `Maps` folder.
+- **Downloads:** players get what they are missing automatically when they connect (after the token check):
+  the map, Monster Hunt, the tournament mod and the map's own packages (`AllowDownloads=True`, no size limit,
+  `IpDrv.HTTPDownload` then `Engine.ChannelDownload`). Without more setup they download from the game server
+  itself, which is slow for big maps. Faster:
+  - `"maxClientRate": 100000` (bytes/s per client) raises the speed of downloads from the game server;
+  - `"downloadRedirect": "https://files.example.com/ut/"` lets clients fetch compressed `.uz` files from a
+    web server (create them with `ucc compress ../Maps/MH-Example.unr`, put them in that folder).
+    Clients still need the same version of a package as the server (UT refuses a different file with the same
+    name).
 - `"manage": false` keeps the old behaviour: you start the server yourself.
 - The bridge needs write access to the UT `System` folder (not the case under `C:\Program Files` without
   admin rights).

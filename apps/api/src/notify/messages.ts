@@ -33,9 +33,9 @@ const T = {
     dmJoinedTeam: 'Du bist jetzt im Team **{team}** für **{name}**: {link}',
     dmTeamJoin: '**{who}** ist deinem Team **{team}** in **{name}** beigetreten.',
     dmOut: '**{name}**: {who} ist ausgeschieden – Platz {place}. Danke fürs Mitspielen!',
+    dmOutYou: '**{name}**: Du bist ausgeschieden – Platz {place}. Danke fürs Mitspielen!',
     dmWon: '🏆 Glückwunsch! {who} hat **{name}** gewonnen.',
-    you: 'Du',
-    dnf: 'nicht im Ziel',
+    dmWonYou: '🏆 Glückwunsch! Du hast **{name}** gewonnen.',
   },
   en: {
     single: 'single elimination',
@@ -65,9 +65,9 @@ const T = {
     dmJoinedTeam: 'You are now in team **{team}** for **{name}**: {link}',
     dmTeamJoin: '**{who}** joined your team **{team}** in **{name}**.',
     dmOut: '**{name}**: {who} is out – place {place}. Thanks for playing!',
+    dmOutYou: '**{name}**: you are out – place {place}. Thanks for playing!',
     dmWon: '🏆 Congratulations! {who} won **{name}**.',
-    you: 'You',
-    dnf: 'DNF',
+    dmWonYou: '🏆 Congratulations! You won **{name}**.',
   },
 } as const;
 
@@ -200,8 +200,12 @@ export const dmTeamJoin = (lang: Lang, t: TournamentInfo, team: string, who: str
 
 /** `team`: the team's name in team tournaments, else the player ("You"). */
 export function dmPlacement(lang: Lang, t: TournamentInfo, place: number, team?: string): string {
-  const who = team ? `**${md(team)}**` : fill(lang, 'you');
+  const name = md(t.name);
+  // German and English conjugate differently for "you": own sentences instead of a placeholder.
+  if (!team)
+    return place === 1 ? fill(lang, 'dmWonYou', { name }) : fill(lang, 'dmOutYou', { name, place });
+  const who = `**${md(team)}**`;
   return place === 1
-    ? fill(lang, 'dmWon', { who, name: md(t.name) })
-    : fill(lang, 'dmOut', { who, name: md(t.name), place });
+    ? fill(lang, 'dmWon', { who, name })
+    : fill(lang, 'dmOut', { who, name, place });
 }

@@ -7,6 +7,7 @@
 class TourneyGRI extends ReplicationInfo;
 
 var string TName;          // tournament name
+var string ModVersion;     // "UTTourney v0.5.2", shown in the bracket title
 var string Phase;          // lobby vote ready countdown live paused post finished
 var int PhaseSec;          // seconds left in the current phase (-1 = none)
 var string MatchId, NameA, NameB, MapName;
@@ -41,7 +42,7 @@ var byte VoteCount;
 replication
 {
 	reliable if (Role == ROLE_Authority)
-		TName, Phase, PhaseSec, MatchId, NameA, NameB, MapName, GameNo, BestOf, WinsA, WinsB,
+		TName, ModVersion, Phase, PhaseSec, MatchId, NameA, NameB, MapName, GameNo, BestOf, WinsA, WinsB,
 		ScoreA, ScoreB, ReadyA, ReadyB, bBotA, bBotB, bPaused, PauseReason,
 		TeamSize, PresentA, PresentB, TeamReadyA, TeamReadyB,
 		RaceSide, RaceRun, RaceMs, RaceDeaths, RacePen, RaceLimit, PrevMs, PrevDeaths, bPrevDone,

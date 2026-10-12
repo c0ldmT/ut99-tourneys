@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.5.1";
+const MOD_VERSION = "0.5.2";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -100,6 +100,9 @@ var float ReleaseAt; // see ReleaseScoreboards
 // Subclasses must not use Game before this (it is set right after the core is spawned).
 function OnInitGame()
 {
+	// Scoreboard and server browser show the game type with the mod version (GameInfo copies it
+	// into the GameReplicationInfo in PostBeginPlay).
+	Game.GameName = Game.default.GameName @ "v" $ MOD_VERSION;
 	Game.MinPlayers = 0;
 	Game.MaxPlayers = Max(Game.MaxPlayers, 4);
 	Game.RemainingBots = 0;
@@ -120,6 +123,7 @@ function OnPostBeginPlay()
 	OutMsg = Spawn(class'TourneyMsg');
 	TGRI = Spawn(class'TourneyGRI');
 	TGRI.MapName = CurrentMapName();
+	TGRI.ModVersion = "UTTourney v" $ MOD_VERSION;
 	TMut = Spawn(class'TourneyMutator');
 	TMut.Game = self;
 	Game.BaseMutator.AddMutator(TMut);

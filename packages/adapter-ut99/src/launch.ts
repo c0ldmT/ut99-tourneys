@@ -106,6 +106,8 @@ const bool = (b: boolean) => (b ? 'True' : 'False');
  * Changes applied to a copy of the installation's UnrealTournament.ini to produce Tourney.ini.
  * Match-specific values (frag/time limit) are not here; the mod applies them per match.
  */
+const NET = 'IpDrv.TcpNetDriver';
+
 export function iniChanges(
   rules: Ut99DmRules,
   profile: ServerProfile,
@@ -126,6 +128,25 @@ export function iniChanges(
       ? { section: 'Engine.GameEngine', key: 'ServerActors', ensure: SMART_STOCK_BOTS_ACTOR }
       : { section: 'Engine.GameEngine', key: 'ServerActors', remove: SMART_STOCK_BOTS_ACTOR },
     { section: 'URL', key: 'Port', value: String(profile.port) },
+    // Players get what they do not have (the map, Monster Hunt, the mod) when they connect: from a
+    // redirect web server if one is set, otherwise from the game server itself. Only after the
+    // token check (PreLogin runs before the download).
+    { section: NET, key: 'AllowDownloads', value: 'True' },
+    { section: NET, key: 'MaxDownloadSize', value: '0' },
+    // HTTP first (uses the redirect, falls back to the next one without), then the game server.
+    { section: NET, key: 'DownloadManagers', remove: 'IpDrv.HTTPDownload' },
+    { section: NET, key: 'DownloadManagers', remove: 'Engine.ChannelDownload' },
+    { section: NET, key: 'DownloadManagers', ensure: 'IpDrv.HTTPDownload' },
+    { section: NET, key: 'DownloadManagers', ensure: 'Engine.ChannelDownload' },
+    ...(profile.downloadRedirect
+      ? [
+          { section: 'IpDrv.HTTPDownload', key: 'RedirectToURL', value: profile.downloadRedirect },
+          { section: 'IpDrv.HTTPDownload', key: 'UseCompression', value: 'True' },
+        ]
+      : []),
+    ...(profile.maxClientRate
+      ? [{ section: NET, key: 'MaxClientRate', value: String(profile.maxClientRate) }]
+      : []),
     ...(profile.serverName
       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]
       : []),

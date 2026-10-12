@@ -119,6 +119,13 @@ describe('messages', () => {
     expect(M.dmPlacement('de', { name: 'Cup', link: '', settings }, 3, 'Red')).toBe(
       '**Cup**: **Red** ist ausgeschieden – Platz 3. Danke fürs Mitspielen!',
     );
+    const t = { name: 'Cup', link: '', settings };
+    expect(M.dmPlacement('de', t, 1)).toBe('🏆 Glückwunsch! Du hast **Cup** gewonnen.');
+    expect(M.dmPlacement('de', t, 2)).toBe(
+      '**Cup**: Du bist ausgeschieden – Platz 2. Danke fürs Mitspielen!',
+    );
+    expect(M.dmPlacement('en', t, 1)).toBe('🏆 Congratulations! You won **Cup**.');
+    expect(M.dmPlacement('de', t, 1, 'Red')).toBe('🏆 Glückwunsch! **Red** hat **Cup** gewonnen.');
   });
 });
 

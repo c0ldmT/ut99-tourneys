@@ -797,6 +797,8 @@ simulated function DrawBracket(Canvas C, bool bStandingsBeside)
 	if (Title == "")
 		Title = "Tournament";
 	PutText(C, Title @ "-  !bracket to hide", PX, PY - 26, 240, 163, 43);
+	if (GRI.ModVersion != "")
+		TextRight(C, GRI.ModVersion, PX + PW, PY - 26, 139, 152, 168);
 	if (LayoutRev != ParsedRev || LayoutClipX != C.ClipX || LayoutClipY != C.ClipY)
 		LayoutBracket(C, PX, PY, PW, PH);
 	C.Font = BracketFont;
