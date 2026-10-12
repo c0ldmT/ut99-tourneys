@@ -162,10 +162,13 @@ export class MatchDirector extends EventEmitter {
   /** Disconnects per match and entrant during live games (for maxReconnects). */
   private disconnects = new Map<string, Map<string, number>>();
   private readonly timing: DirectorTiming;
+  /** Who may join the server; replaced by the website while the tournament runs. */
+  private access: AccessEntry[];
 
   constructor(private readonly o: DirectorOptions) {
     super();
     this.timing = { ...DEFAULT_TIMING, ...o.timing };
+    this.access = [...o.access];
   }
 
   // -------------------------------------------------------------------------------------------
@@ -287,6 +290,65 @@ export class MatchDirector extends EventEmitter {
       this.send([{ t: 'pause', on: true, why: reason.slice(0, 100) }, this.phase()]);
       this.telemetry('paused');
     });
+  }
+
+  /** Website mode: the bridge opens check-in itself once the server is up. */
+  openCheckIn(serverProfileId: string): Promise<void> {
+    return this.enqueue(async () => {
+      if (this.proj.phase !== 'seeded') return;
+      if (!(await this.append({ type: 'checkin.opened', data: { serverProfileId } }))) return;
+      await this.enterCheckIn();
+    });
+  }
+
+  /** Ends the tournament early (organizer decision). */
+  abort(reason: string): Promise<void> {
+    return this.enqueue(async () => {
+      const ph = this.proj.phase;
+      if (ph === 'finished' || ph === 'aborted' || ph === 'draft') return;
+      if (!(await this.append({ type: 'tournament.aborted', data: { reason } }))) return;
+      this.clearTimer();
+      this.stage = { kind: 'idle' };
+      this.say(`The tournament was stopped by the organizer: ${reason}`);
+      this.send(this.snapshot());
+      this.emit('aborted', reason);
+    });
+  }
+
+  announce(message: string): Promise<void> {
+    return this.enqueue(() => this.say(message));
+  }
+
+  /** Replaces the access list (website: watchers, new join tokens) and updates the server. */
+  setAccess(entries: readonly AccessEntry[]): Promise<void> {
+    return this.enqueue(() => {
+      this.access = [...entries];
+      this.send(aclLines(this.proj, this.access, this.proj.currentMatch?.entrants, ++this.rev));
+    });
+  }
+
+  /**
+   * Somebody else changed the log (an admin on the website while the bridge was offline):
+   * reload and continue from the new state.
+   */
+  refresh(): Promise<void> {
+    return this.enqueue(async () => {
+      const before = this.proj.headSeq;
+      await this.reload();
+      if (this.proj.headSeq === before) return;
+      await this.resumeFromProjection();
+      if (this.proj.phase === 'aborted') this.emit('aborted', this.proj.abortedReason ?? '');
+    });
+  }
+
+  /** Players currently on the server (for status reports). */
+  connectedPlayers(): { name: string; userId?: string; role: 'player' | 'spectator' }[] {
+    const match: readonly string[] = this.proj?.currentMatch?.entrants ?? [];
+    return [...this.players.values()].map((p) => ({
+      name: p.name,
+      ...(p.userId ? { userId: p.userId } : {}),
+      role: p.entrantId && match.includes(p.entrantId) ? 'player' : 'spectator',
+    }));
   }
 
   resume(): Promise<void> {
@@ -455,7 +517,7 @@ export class MatchDirector extends EventEmitter {
       { t: 'sync', st: 'begin', rev: this.rev },
     ];
     if (cm) lines.push(...matchLines(this.proj, this.rules, cm.matchId, cm.game, cm.entrants));
-    lines.push(...aclLines(this.proj, this.o.access, cm?.entrants, this.rev));
+    lines.push(...aclLines(this.proj, this.access, cm?.entrants, this.rev));
     lines.push(...this.bracketUpdate());
     if (this.stage.kind === 'voting') {
       lines.push(
@@ -570,7 +632,7 @@ export class MatchDirector extends EventEmitter {
     if (!(await this.append(...replacements, { type: 'tournament.started', data: {} }))) return;
     this.say('The tournament starts now!');
     // Roles changed for replaced players: refresh the access list on the server.
-    this.send(aclLines(this.proj, this.o.access, undefined, ++this.rev));
+    this.send(aclLines(this.proj, this.access, undefined, ++this.rev));
     await this.nextMatch();
   }
 
@@ -591,7 +653,7 @@ export class MatchDirector extends EventEmitter {
     // Tell the server who plays next, so it can show vote/ready UI to the right players.
     this.send([
       ...matchLines(this.proj, this.rules, m.id, 1, entrants),
-      ...aclLines(this.proj, this.o.access, entrants, ++this.rev),
+      ...aclLines(this.proj, this.access, entrants, ++this.rev),
     ]);
     this.say(`Next match (${m.id}): ${this.name(entrants[0])} vs ${this.name(entrants[1])}`);
     if (
@@ -735,7 +797,7 @@ export class MatchDirector extends EventEmitter {
     // before the bridge connection is re-established.
     this.send([
       ...matchLines(this.proj, this.rules, s.matchId, s.game, entrants),
-      ...aclLines(this.proj, this.o.access, entrants, ++this.rev),
+      ...aclLines(this.proj, this.access, entrants, ++this.rev),
       this.phase(),
       travelLine(this.rules, s.map, s.matchId, s.game),
     ]);
@@ -925,7 +987,7 @@ export class MatchDirector extends EventEmitter {
   // -------------------------------------------------------------------------------------------
 
   private entrantFor(token: string): { entry?: AccessEntry; entrantId?: string } {
-    const entry = this.o.access.find((a) => a.token === token);
+    const entry = this.access.find((a) => a.token === token);
     if (!entry?.entrantId) return entry ? { entry } : {};
     const ent = this.proj.entrants[entry.entrantId];
     const isTheirs = ent?.kind === 'human' && ent.userId === entry.userId;

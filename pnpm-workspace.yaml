@@ -1,6 +1,8 @@
 packages:
   - 'apps/*'
   - 'packages/*'
-onlyBuiltDependencies:
-  - better-sqlite3
-  - esbuild
+# better-sqlite3 v13 ships prebuilt binaries for linux x64/arm64 and windows in the package itself,
+# so its node-gyp build must not run (it would need a compiler and the Node headers).
+allowBuilds:
+  esbuild: true
+  better-sqlite3: false

@@ -19,6 +19,19 @@
     "@tourney/adapter-ut99": "workspace:*",
     "@tourney/bracket": "workspace:*",
     "@tourney/protocol": "workspace:*",
+    "ws": "^8.22.0",
     "zod": "^4.6.5"
-  }
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.2"
+  },
+  "exports": {
+    ".": {
+      "@tourney/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts"
 }

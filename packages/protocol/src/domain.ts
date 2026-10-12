@@ -79,6 +79,16 @@ export const EntrantSchema = z.discriminatedUnion('kind', [
 ]);
 export type Entrant = z.infer<typeof EntrantSchema>;
 
+/** Entrant id of a bot, derived from its name (stable, safe for file names and URLs). */
+export const botEntrantId = (name: string) => `bot-${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+
+export function botEntrant(spec: BotSpec, id = botEntrantId(spec.name)): Entrant {
+  return { id, kind: 'bot', displayName: spec.name, bot: spec };
+}
+
+/** Entrant id of a website user. */
+export const userEntrantId = (userId: string) => `u-${userId}`;
+
 export const ServerOsSchema = z.enum(['linux', 'windows']);
 export type ServerOs = z.infer<typeof ServerOsSchema>;
 

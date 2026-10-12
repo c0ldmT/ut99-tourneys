@@ -55,10 +55,31 @@ export const ServerProfileSchema = z.object({
   lobbyMap: z.string().min(1),
   maxSpectators: z.number().int().min(0).max(64).default(32),
   serverName: z.string().max(64).optional(),
+  /** Address players use to connect, e.g. "ut.example.com:7777" (shown on the website). */
+  publicAddress: z.string().max(128).optional(),
   /** Extra server URL options / command line arguments, appended verbatim. */
   extraArgs: z.string().max(512).optional(),
 });
 export type ServerProfile = z.infer<typeof ServerProfileSchema>;
+
+/**
+ * A game server profile as the bridge reports it. Profiles (install path, binary, arguments)
+ * are configured on the bridge machine only: the website can pick a profile by id but never
+ * define what the bridge executes.
+ */
+export const AgentProfileSchema = z.object({
+  id: Id,
+  name: z.string().min(1).max(64),
+  os: ServerOsSchema,
+  port: z.number().int().min(1).max(65535),
+  lobbyMap: z.string(),
+  serverName: z.string().max(64).optional(),
+  /** Address players use to connect, e.g. "ut.example.com:7777". */
+  publicAddress: z.string().max(128).optional(),
+  /** True if the bridge starts and stops the server itself. */
+  manage: z.boolean(),
+});
+export type AgentProfile = z.infer<typeof AgentProfileSchema>;
 
 export const ServerStateSchema = z.enum(['stopped', 'starting', 'running', 'stopping', 'crashed']);
 
@@ -85,12 +106,17 @@ export type AccessEntry = z.infer<typeof AccessEntrySchema>;
 // ---------------------------------------------------------------------------------------------
 
 export const AgentCommandSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('inventory.rescan'), profile: ServerProfileSchema }),
-  /** Starts the game server and opens check-in for a tournament. */
+  z.object({ kind: z.literal('inventory.rescan'), profileId: Id }),
+  /**
+   * Starts the game server and opens check-in for a tournament (or resumes it after a bridge
+   * restart). The event log and the access list arrive before with `tournament.sync`.
+   */
   z.object({
     kind: z.literal('tournament.run'),
     tournamentId: Id,
-    profile: ServerProfileSchema,
+    profileId: Id,
+    /** Bots that replace players who do not check in. */
+    botPool: z.array(BotSpecSchema).min(1),
   }),
   z.object({ kind: z.literal('tournament.forceStart'), tournamentId: Id }),
   z.object({ kind: z.literal('tournament.pause'), tournamentId: Id, reason: z.string().max(200) }),
@@ -124,6 +150,9 @@ export const AgentHello = envelope(
     adapters: z.array(z.string()),
     /** Last event seq the agent knows per tournament, so the website can send only the delta. */
     knownSeq: z.record(z.string(), z.number().int().nonnegative()),
+    profiles: z.array(AgentProfileSchema).default([]),
+    /** Tournament the agent is currently running, if any. */
+    activeTournamentId: Id.optional(),
   }),
 );
 

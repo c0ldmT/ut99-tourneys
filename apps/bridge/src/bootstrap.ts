@@ -3,6 +3,7 @@ import { buildSlots, createRng } from '@tourney/bracket';
 import {
   AccessEntrySchema,
   BotSpecSchema,
+  botEntrant,
   TournamentSettingsSchema,
   type AccessEntry,
   type BotSpec,
@@ -39,11 +40,7 @@ export interface BootstrapResult {
   created: boolean;
 }
 
-export const botEntrantId = (name: string) => `bot-${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
-
-export function botEntrant(spec: BotSpec, id = botEntrantId(spec.name)): Entrant {
-  return { id, kind: 'bot', displayName: spec.name, bot: spec };
-}
+export { botEntrant, botEntrantId } from '@tourney/protocol';
 
 export async function bootstrapFromFile(
   store: EventStore,

@@ -1,0 +1,128 @@
+import 'reflect-metadata';
+import fs from 'node:fs';
+import type { Server } from 'node:http';
+import path from 'node:path';
+import { Module, type DynamicModule, type INestApplication } from '@nestjs/common';
+import { APP_FILTER, APP_GUARD, HttpAdapterHost, NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import express from 'express';
+import { AgentsController } from './agents/agents.controller.js';
+import { AgentsService } from './agents/agents.service.js';
+import { AgentConnections } from './agents/connections.js';
+import { AgentGateway } from './agents/gateway.js';
+import { AuthController } from './auth/auth.controller.js';
+import { discordApi, DISCORD, type DiscordApi } from './auth/discord.js';
+import { AuthGuard } from './auth/guard.js';
+import { SessionsService } from './auth/sessions.service.js';
+import { UsersService } from './auth/users.service.js';
+import { ApiExceptionFilter } from './common/errors.js';
+import { consoleLogger, LOGGER, type ApiLogger } from './common/logger.js';
+import { CLOCK, CONFIG, systemClock, type ApiClock, type ApiConfig } from './config.js';
+import { DB, openDatabase, type Db } from './db/database.js';
+import { EventLogService } from './tournaments/event-log.service.js';
+import { LiveHub } from './tournaments/hub.js';
+import { TournamentsController } from './tournaments/tournaments.controller.js';
+import { TournamentsService } from './tournaments/tournaments.service.js';
+
+export interface AppOverrides {
+  clock?: ApiClock;
+  logger?: ApiLogger;
+  discord?: DiscordApi | null;
+  db?: Db;
+}
+
+@Module({})
+class AppModule {
+  static forRoot(config: ApiConfig, o: AppOverrides): DynamicModule {
+    const discord =
+      o.discord !== undefined
+        ? o.discord
+        : config.discord.enabled
+          ? discordApi({
+              clientId: config.discord.clientId,
+              clientSecret: config.discord.clientSecret,
+              redirectUri: `${config.publicUrl}/api/auth/discord/callback`,
+              withGuilds: Boolean(config.discord.guildId),
+            })
+          : null;
+    return {
+      module: AppModule,
+      controllers: [AuthController, TournamentsController, AgentsController],
+      providers: [
+        { provide: CONFIG, useValue: config },
+        { provide: CLOCK, useValue: o.clock ?? systemClock },
+        { provide: LOGGER, useValue: o.logger ?? consoleLogger(config.logLevel) },
+        { provide: DB, useValue: o.db ?? openDatabase(config.dbFile) },
+        { provide: DISCORD, useValue: discord },
+        { provide: APP_GUARD, useClass: AuthGuard },
+        {
+          provide: APP_FILTER,
+          useFactory: (host: HttpAdapterHost) => new ApiExceptionFilter(host.httpAdapter),
+          inject: [HttpAdapterHost],
+        },
+        UsersService,
+        SessionsService,
+        LiveHub,
+        EventLogService,
+        AgentConnections,
+        AgentsService,
+        TournamentsService,
+        AgentGateway,
+      ],
+    };
+  }
+}
+
+export interface RunningApi {
+  app: INestApplication;
+  url: string;
+  close(): Promise<void>;
+}
+
+export async function createApi(
+  config: ApiConfig,
+  overrides: AppOverrides = {},
+): Promise<RunningApi> {
+  const log = overrides.logger ?? consoleLogger(config.logLevel);
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule.forRoot(config, { ...overrides, logger: log }),
+    { logger: ['error', 'warn'], bodyParser: true },
+  );
+  app.setGlobalPrefix('api');
+  app.disable('x-powered-by');
+  app.set('trust proxy', 'loopback');
+  serveWebApp(app, config, log);
+  await app.listen(config.port, config.host);
+  const server = app.getHttpServer() as Server;
+  const gateway = app.get(AgentGateway);
+  gateway.attach(server);
+  const addr = server.address();
+  const port = typeof addr === 'object' && addr ? addr.port : config.port;
+  const host = config.host === '0.0.0.0' || config.host === '::' ? '127.0.0.1' : config.host;
+  return {
+    app,
+    url: `http://${host}:${port}`,
+    async close() {
+      gateway.close();
+      await app.close();
+      app.get<Db>(DB).$client.close();
+    },
+  };
+}
+
+/** Serves the built Angular app; unknown non-API paths get index.html (client-side routing). */
+function serveWebApp(app: NestExpressApplication, config: ApiConfig, log: ApiLogger) {
+  if (!config.webDist) return;
+  const dir = path.resolve(config.webDist);
+  const index = path.join(dir, 'index.html');
+  if (!fs.existsSync(index)) {
+    log.warn(`WEB_DIST ${dir} has no index.html; serving the API only`);
+    return;
+  }
+  app.use(express.static(dir, { index: false, maxAge: '1h' }));
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/') || req.path === '/api') return next();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(index);
+  });
+}

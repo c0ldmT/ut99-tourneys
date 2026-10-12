@@ -14,4 +14,9 @@ export default tseslint.config(
       eqeqeq: ['error', 'always'],
     },
   },
+  {
+    // Tests poke at loosely typed JSON responses.
+    files: ['**/test/**/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
 );

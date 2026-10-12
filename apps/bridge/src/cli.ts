@@ -18,10 +18,14 @@ import { ModServer } from './mod-server.js';
 import { scanInventory } from './ut99/inventory.js';
 import { prepareServer } from './ut99/prepare.js';
 import { ServerProcess } from './ut99/server-process.js';
+import { WebsiteAgent } from './website/agent.js';
 
 const HELP = `tourney-bridge <command>
 
 Commands:
+  run -c <bridge.json>
+        Website mode (needs a "website" section in bridge.json): connect to the website and run
+        the tournaments it starts. Keeps running; stop with Ctrl+C.
   run -c <bridge.json> -t <tournament.json>
         Run a tournament defined in a file (standalone mode, no website).
         With a "server" section in bridge.json the bridge starts and supervises the UT server.
@@ -77,13 +81,23 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (cmd !== 'run' || !values.config || !values.tournament) {
+  if (cmd !== 'run' || !values.config) {
     console.log(HELP);
     process.exitCode = cmd ? 1 : 0;
     return;
   }
 
   const config = readJsonFile(values.config, BridgeConfigSchema);
+  if (!values.tournament) {
+    if (!config.website) {
+      console.log('bridge.json has no "website" section: pass a tournament file with -t\n');
+      console.log(HELP);
+      process.exitCode = 1;
+      return;
+    }
+    return runWebsiteMode({ ...config, website: config.website }, path.dirname(values.config));
+  }
+
   const tournament = readJsonFile(values.tournament, TournamentFileSchema);
   const log = consoleLogger(config.logLevel);
   checkServerOs(config, log);
@@ -178,6 +192,29 @@ async function main(): Promise<void> {
       else if (c) log.info('commands: start, pause [reason], resume, status, quit');
     });
   }
+}
+
+async function runWebsiteMode(
+  config: BridgeConfig & { website: NonNullable<BridgeConfig['website']> },
+  baseDir: string,
+): Promise<void> {
+  const log = consoleLogger(config.logLevel);
+  checkServerOs(config, log);
+  const mod = new ModServer({ ...config.mod, log });
+  await mod.listen();
+  log.info(`mod server listening on ${config.mod.host}:${config.mod.port}`);
+  const agent = new WebsiteAgent({ config, baseDir, mod, clock: realClock, log });
+  agent.start();
+  log.info(`website mode: agent ${config.agentId} -> ${config.website.url}`);
+
+  const shutdown = async () => {
+    log.info('shutting down');
+    await agent.stop();
+    await mod.close();
+    process.exit(0);
+  };
+  process.on('SIGINT', () => void shutdown());
+  process.on('SIGTERM', () => void shutdown());
 }
 
 main().catch((e: unknown) => {

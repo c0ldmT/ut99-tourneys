@@ -10,7 +10,6 @@ afterEach(async () => {
 
 const finished = (e: Env) => () => e.director.projection.phase === 'finished';
 const events = (e: Env, type: string) =>
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (e.director as any).events.filter((x: { type: string }) => x.type === type) as any[];
 
 describe('end to end against the simulated UT server', () => {

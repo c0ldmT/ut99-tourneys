@@ -21,6 +21,18 @@ export const BridgeConfigSchema = z.object({
     name: z.string().default('Local UT server'),
     manage: z.boolean().default(true),
   }).optional(),
+  /**
+   * Website mode: the bridge connects to the website (outbound WebSocket) and runs the
+   * tournaments the website sends. Without it the bridge runs a tournament from a JSON file.
+   */
+  website: z
+    .object({
+      /** e.g. wss://cup.example.com/api/agent */
+      url: z.string().regex(/^wss?:\/\//, 'must start with ws:// or wss://'),
+      /** Agent token from the website (Admin > Agents). */
+      token: z.string().min(8),
+    })
+    .optional(),
   logLevel: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
 });
 export type BridgeConfig = z.infer<typeof BridgeConfigSchema>;
@@ -50,7 +62,12 @@ export const EXAMPLE_CONFIG = {
     lobbyMap: 'DM-Deck16][',
     serverName: 'Friday Cup',
     maxSpectators: 32,
+    publicAddress: 'ut.example.com:7777',
     manage: true,
+  },
+  website: {
+    url: 'wss://cup.example.com/api/agent',
+    token: 'agt_paste-the-token-from-the-website',
   },
   logLevel: 'info',
 };
