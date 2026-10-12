@@ -1,4 +1,5 @@
 import type { BracketState, MatchState } from '@tourney/bracket';
+import { raceTime } from '../core/race';
 
 /** Geometry of the bracket drawing (pure, testable without Angular). */
 export const BOX_W = 180;
@@ -132,12 +133,31 @@ export function matchScore(
   m: MatchState,
   /** Finished games of this match so far (projection.games[m.id]). */
   played: readonly { winnerId: string; scores: Record<string, number> }[],
-  live?: { matchId: string; scores?: Record<string, number> } | null,
+  live?: {
+    matchId: string;
+    scores?: Record<string, number>;
+    race?: { runner: string; timeMs: number; penaltyMs: number };
+  } | null,
+  /** Monster Hunt: game scores are final times in ms. */
+  race = false,
 ): [string, string] {
   const [a, b] = m.entrants;
   if (!a || !b) return ['', ''];
   const games = m.result?.games?.length ? m.result.games : played;
   const wins = (id: string) => games.filter((g) => g.winnerId === id).length;
+  if (race) {
+    const r = live && live.matchId === m.id && m.status !== 'completed' ? live.race : undefined;
+    if (r) {
+      const t = (id: string) =>
+        id === r.runner ? `▶ ${raceTime(r.timeMs + r.penaltyMs, false)}` : '';
+      return m.bestOf > 1 ? [`${wins(a)} ${t(a)}`, `${wins(b)} ${t(b)}`] : [t(a), t(b)];
+    }
+    if (m.bestOf === 1 && games.length === 1) {
+      const g = games[0]!;
+      const t = (id: string) => (g.scores[id] === undefined ? '' : raceTime(g.scores[id]!, false));
+      return [t(a), t(b)];
+    }
+  }
   const running = live && live.matchId === m.id && live.scores && m.status !== 'completed';
   if (running) {
     const la = live.scores![a] ?? 0;

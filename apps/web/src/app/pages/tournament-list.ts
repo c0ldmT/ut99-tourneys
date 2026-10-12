@@ -32,6 +32,9 @@ import type { TournamentSummary } from '../core/types';
             </div>
             <div class="muted small">
               {{ 'format.' + t.format | t }} ·
+              @if (t.game === 'mh') {
+                {{ 'race.mode' | t }} ·
+              }
               @if (t.teamSize > 1) {
                 {{ 'team.mode' | t: { k: t.teamSize } }} · {{ t.size }} {{ 'list.teams' | t }} ·
                 {{ 'list.teamsRegistered' | t: { teams: t.teams, n: t.registered } }}

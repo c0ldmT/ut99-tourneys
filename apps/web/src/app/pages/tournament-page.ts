@@ -18,6 +18,7 @@ import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
+import { finalMs, isRace, raceTime, type RunView } from '../core/race';
 import type { TournamentDetail, TournamentEventView } from '../core/types';
 
 const ACTIVE = ['checkIn', 'running', 'paused'];
@@ -39,6 +40,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           </h1>
           <div class="muted small">
             {{ 'format.' + t.settings.format | t }} ·
+            @if (race()) {
+              {{ 'race.mode' | t }} ·
+            }
             @if (teamMode()) {
               {{ 'team.mode' | t: { k: t.settings.teamSize } }} · {{ t.settings.size }}
               {{ 'list.teams' | t }} ·
@@ -150,22 +154,45 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 >
               }
             </h2>
-            <div class="versus">
-              <div class="side">
-                <div class="name">{{ name(cm.entrants[0]) }}</div>
-                <div class="score">{{ liveScore(cm.entrants[0]) }}</div>
+            @if (race()) {
+              <div class="versus">
+                @for (id of cm.entrants; track id; let i = $index) {
+                  @if (i === 1) {
+                    <div class="vs">vs</div>
+                  }
+                  <div class="side">
+                    <div class="name">
+                      {{ name(id) }}
+                      @if (runnerNow() === id) {
+                        <span class="badge running">{{ 'race.running' | t }}</span>
+                      }
+                    </div>
+                    <div class="score">{{ raceScore(id) }}</div>
+                    <div class="muted small">{{ raceDetail(id) }}</div>
+                  </div>
+                }
               </div>
-              <div class="vs">vs</div>
-              <div class="side">
-                <div class="name">{{ name(cm.entrants[1]) }}</div>
-                <div class="score">{{ liveScore(cm.entrants[1]) }}</div>
+            } @else {
+              <div class="versus">
+                <div class="side">
+                  <div class="name">{{ name(cm.entrants[0]) }}</div>
+                  <div class="score">{{ liveScore(cm.entrants[0]) }}</div>
+                </div>
+                <div class="vs">vs</div>
+                <div class="side">
+                  <div class="name">{{ name(cm.entrants[1]) }}</div>
+                  <div class="score">{{ liveScore(cm.entrants[1]) }}</div>
+                </div>
               </div>
-            </div>
+            }
             <p class="small">
               @if (liveNow(); as l) {
                 <b>{{ 'live.' + l.phase | t }}</b>
                 @if (l.map || cm.map) {
                   · {{ l.map || cm.map }}
+                }
+                @if (race() && runnerNow(); as r) {
+                  · {{ 'race.runOf' | t: { n: (cm.runs?.length ?? 0) + 1, team: name(r) } }}
                 }
                 @if (secondsLeft() !== null) {
                   · {{ 'tp.secondsLeft' | t: { s: secondsLeft()! } }}
@@ -216,8 +243,62 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             [currentMatchId]="t.projection!.currentMatch?.matchId"
             [live]="liveNow()"
             [myEntrantId]="t.me.entrantId"
+            [race]="race()"
           />
         </div>
+        @if (race() && raceRows().length) {
+          <div class="card">
+            <h2>{{ 'race.results' | t }}</h2>
+            <p class="muted small">{{ 'race.resultsHint' | t: { s: penaltySec() } }}</p>
+            <div class="scroll">
+              <table class="races">
+                <thead>
+                  <tr>
+                    <th>{{ 'race.match' | t }}</th>
+                    <th>{{ 'race.map' | t }}</th>
+                    <th>{{ 'tp.team' | t }}</th>
+                    <th class="num">{{ 'race.raw' | t }}</th>
+                    <th class="num">{{ 'race.deaths' | t }}</th>
+                    <th class="num">{{ 'race.penalty' | t }}</th>
+                    <th class="num">{{ 'race.total' | t }}</th>
+                    <th class="num">{{ 'race.points' | t }}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of raceRows(); track $index) {
+                    <tr [class.win]="row.won" [class.first]="row.first">
+                      <td>
+                        @if (row.first) {
+                          {{ row.matchId }} G{{ row.game }}
+                        }
+                      </td>
+                      <td>
+                        @if (row.first) {
+                          {{ row.map }}
+                        }
+                      </td>
+                      <td>
+                        {{ name(row.run.entrantId) }}
+                        @if (row.won) {
+                          🏁
+                        }
+                      </td>
+                      <td class="num">{{ raceTime(row.run.timeMs) }}</td>
+                      <td class="num">{{ row.run.deaths }}</td>
+                      <td class="num">+{{ raceTime(row.run.penaltyMs) }}</td>
+                      <td class="num">
+                        <b>{{
+                          row.run.finished ? raceTime(finalMs(row.run)) : ('race.dnf' | t)
+                        }}</b>
+                      </td>
+                      <td class="num">{{ row.run.points }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
         <div class="card">
           <h2>{{ 'tp.standings' | t }}</h2>
           <table>
@@ -496,6 +577,27 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     .live {
       border-color: var(--live);
     }
+    .badge.running {
+      background: var(--live);
+      color: #000;
+      margin-left: 6px;
+      font-size: 0.7rem;
+    }
+    .scroll {
+      overflow-x: auto;
+    }
+    table.races td.num,
+    table.races th.num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    table.races tr.first td {
+      border-top: 1px solid var(--border);
+    }
+    table.races tr.win td {
+      color: var(--accent);
+    }
     .players {
       columns: 3 180px;
       padding-left: 18px;
@@ -548,6 +650,62 @@ export class TournamentPage {
     return cm ? (this.t()?.projection?.bracket?.byId[cm.matchId]?.bestOf ?? 1) : 1;
   });
   protected readonly teamMode = computed(() => (this.t()?.settings.teamSize ?? 1) > 1);
+  /** Monster Hunt time race. */
+  protected readonly race = computed(() => isRace(this.t()?.settings));
+  protected readonly penaltySec = computed(
+    () => ((this.t()?.settings.game.rules as { penaltySec?: number }).penaltySec ?? 5) as number,
+  );
+  protected readonly raceTime = raceTime;
+  protected readonly finalMs = finalMs;
+  /** The team running right now (live telemetry, else the projection). */
+  protected readonly runnerNow = computed(() => {
+    const cm = this.current();
+    if (!cm || !this.race()) return null;
+    return this.liveNow()?.race?.runner ?? cm.runner ?? null;
+  });
+  /** Every finished run, grouped by game (newest game first), current game included. */
+  protected readonly raceRows = computed(() => {
+    const p = this.t()?.projection;
+    if (!p) return [];
+    type Row = {
+      matchId: string;
+      game: number;
+      map: string;
+      run: RunView;
+      won: boolean;
+      first: boolean;
+    };
+    const groups: Row[][] = [];
+    for (const [matchId, games] of Object.entries(p.games)) {
+      for (const g of games) {
+        if (!g.runs?.length) continue;
+        groups.push(
+          g.runs.map((run, i) => ({
+            matchId,
+            game: g.game,
+            map: g.map,
+            run,
+            won: run.entrantId === g.winnerId,
+            first: i === 0,
+          })),
+        );
+      }
+    }
+    const cm = p.currentMatch;
+    if (cm?.runs?.length) {
+      groups.push(
+        cm.runs.map((run, i) => ({
+          matchId: cm.matchId,
+          game: cm.game,
+          map: cm.map ?? run.map,
+          run,
+          won: false,
+          first: i === 0,
+        })),
+      );
+    }
+    return groups.reverse().flat();
+  });
   /** Entrants with people: players in 1v1, teams with members in team tournaments. */
   protected readonly humans = computed(() =>
     Object.values(this.t()?.projection?.entrants ?? {}).filter(
@@ -619,12 +777,44 @@ export class TournamentPage {
     return s === undefined ? '–' : String(s);
   }
 
+  /** Monster Hunt: final time of a finished run, the running time, or a dash. */
+  protected raceScore(id: string): string {
+    const cm = this.current();
+    const done = cm?.runs?.find((r) => r.entrantId === id);
+    if (done) return done.finished ? raceTime(finalMs(done), false) : this.i18n.t('race.dnf');
+    const r = this.liveNow()?.race;
+    if (r && r.runner === id) return raceTime(r.timeMs + r.penaltyMs, false);
+    return '–';
+  }
+
+  protected raceDetail(id: string): string {
+    const cm = this.current();
+    const done = cm?.runs?.find((r) => r.entrantId === id);
+    const r = this.liveNow()?.race;
+    const run = done ?? (r && r.runner === id ? r : undefined);
+    if (!run) return '';
+    return this.i18n.t('race.detail', {
+      raw: raceTime(run.timeMs),
+      d: run.deaths,
+      pen: raceTime(run.penaltyMs),
+    });
+  }
+
   protected rulesText(t: TournamentDetail): string {
     const r = t.settings.game.rules as {
       fragLimit?: number;
       timeLimitMin?: number;
       smartStockBots?: boolean;
+      penaltySec?: number;
+      monsterSkill?: number;
     };
+    if (isRace(t.settings)) {
+      return this.i18n.t('race.rules', {
+        min: r.timeLimitMin ?? 20,
+        s: r.penaltySec ?? 5,
+        skill: r.monsterSkill ?? 5,
+      });
+    }
     const text = this.i18n.t('tp.rules', { frags: r.fragLimit ?? 20, min: r.timeLimitMin ?? 10 });
     return r.smartStockBots ? `${text} · SmartStockBots` : text;
   }
@@ -702,6 +892,13 @@ export class TournamentPage {
       }
       case 'match.gameFinished':
         return `${d['matchId']} G${d['game']} ${d['map']}: ${this.name(d['winnerId'] as string)}`;
+      case 'match.runFinished': {
+        const run = d as unknown as RunView;
+        const time = run.finished
+          ? `${raceTime(run.timeMs)} + ${raceTime(run.penaltyMs)} = ${raceTime(finalMs(run))}`
+          : `${this.i18n.t('race.dnf')} (${run.points})`;
+        return `${d['matchId']} G${d['game']} ${this.name(run.entrantId)}: ${time}`;
+      }
       case 'match.mapSelected':
         return `${d['matchId']} G${d['game']}: ${d['map']} (${d['method']})`;
       case 'match.called':
@@ -717,7 +914,8 @@ export class TournamentPage {
               .map(([id, l]) => `${this.name(id)}: ${l.map((x) => x.name).join(', ')}`)
               .join(' | ')
           : '';
-        return `${d['matchId']} G${d['game']}${who ? ` – ${who}` : ''}`;
+        const runner = d['runner'] ? ` ▶ ${this.name(d['runner'] as string)}` : '';
+        return `${d['matchId']} G${d['game']}${runner}${who ? ` – ${who}` : ''}`;
       }
       case 'team.lineupSet':
         return `${this.name(d['entrantId'] as string)}: ${(d['starters'] as string[])

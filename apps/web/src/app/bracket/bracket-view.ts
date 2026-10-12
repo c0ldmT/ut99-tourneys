@@ -160,6 +160,8 @@ export class BracketView {
   readonly currentMatchId = input<string | undefined>(undefined);
   readonly live = input<LiveInfo | null>(null);
   readonly myEntrantId = input<string | null>(null);
+  /** Monster Hunt: scores are run times. */
+  readonly race = input(false);
 
   private readonly i18n = inject(I18n);
   protected readonly boxW = BOX_W;
@@ -203,6 +205,6 @@ export class BracketView {
   }
 
   protected score(m: MatchState): [string, string] {
-    return matchScore(m, this.games()[m.id] ?? [], this.live());
+    return matchScore(m, this.games()[m.id] ?? [], this.live(), this.race());
   }
 }

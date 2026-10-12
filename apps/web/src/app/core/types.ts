@@ -52,6 +52,8 @@ export interface TournamentSummary {
   format: 'single' | 'double';
   size: number;
   teamSize: number;
+  /** dm: deathmatch (1v1 or teams), mh: Monster Hunt time race. */
+  game?: 'dm' | 'mh';
   teams: number;
   registered: number;
   registeredMe: boolean;
@@ -71,6 +73,15 @@ export interface LiveInfo {
   scores?: Record<string, number>;
   ready?: Record<string, boolean>;
   deadline?: number;
+  /** Monster Hunt: the run in progress. */
+  race?: {
+    runner: string;
+    run: number;
+    timeMs: number;
+    deaths: number;
+    penaltyMs: number;
+    points: number;
+  };
 }
 
 export interface TournamentDetail {

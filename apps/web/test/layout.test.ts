@@ -85,6 +85,32 @@ describe('bracket layout', () => {
     ]);
     expect(matchScore(bo1.byId['W1-1']!, [], null)).toEqual(['20', '5']);
   });
+
+  it('shows run times in a Monster Hunt race', () => {
+    const def = {
+      format: 'single' as const,
+      size: 8 as const,
+      slots: slots(8),
+      grandFinalReset: false,
+      bestOf: { default: 1 },
+    };
+    const m = computeBracket(def, []).byId['W1-1']!;
+    const live = {
+      matchId: 'W1-1',
+      race: { runner: 'e2', timeMs: 61_000, penaltyMs: 5_000 },
+    };
+    expect(matchScore(m, [], live, true)).toEqual(['', '▶ 1:06']);
+    const done = computeBracket(def, [
+      {
+        matchId: 'W1-1',
+        entrants: ['e1', 'e2'],
+        winnerId: 'e1',
+        outcome: 'played',
+        games: [{ winnerId: 'e1', scores: { e1: 310_000, e2: 315_400 } }],
+      },
+    ]).byId['W1-1']!;
+    expect(matchScore(done, [], null, true)).toEqual(['5:10', '5:15']);
+  });
 });
 
 function assertNoOverlap(boxes: { x: number; y: number; match: { id: string } }[]) {

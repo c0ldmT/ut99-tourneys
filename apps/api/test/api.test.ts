@@ -69,6 +69,20 @@ describe('tournaments', () => {
     const bad = await admin.post('/tournaments', tournamentBody({}, { size: 12 }));
     expect(bad.status).toBe(400);
 
+    // Monster Hunt: teams only, MH maps only; listed with its game mode.
+    const mh = (teamSize: number, mapPool = ['MH-NaliVillage']) => {
+      const body = tournamentBody({ name: `Hunt ${teamSize}` }, { teamSize });
+      const rules = { mapPool, timeLimitMin: 20, fragLimit: 0 };
+      return { ...body, settings: { ...body.settings, game: { adapter: 'ut99-mh', rules } } };
+    };
+    expect((await admin.post('/tournaments', mh(1))).status).toBe(400);
+    expect((await admin.post('/tournaments', mh(2, ['DM-Deck16][']))).status).toBe(400);
+    const hunt = await admin.post('/tournaments', mh(2));
+    expect(hunt.status).toBe(201);
+    const listed = (await admin.get('/tournaments')).body as { id: string; game: string }[];
+    expect(listed.find((x) => x.id === hunt.body.id)?.game).toBe('mh');
+    expect((await admin.req('DELETE', `/tournaments/${hunt.body.id}`)).status).toBe(204);
+
     const players = await Promise.all(['Mario', 'Anna', 'Jonas'].map((n) => Client.login(api!, n)));
     for (const p of players)
       expect((await p.post(`/tournaments/${id}/registration`)).status).toBe(204);

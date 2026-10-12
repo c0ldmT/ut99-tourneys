@@ -903,6 +903,7 @@ export class TournamentsService {
         format: s.format,
         size: s.size,
         teamSize: s.teamSize,
+        game: s.game.adapter === 'ut99-mh' ? ('mh' as const) : ('dm' as const),
         teams: teamCount,
         registered,
         registeredMe: mine > 0,

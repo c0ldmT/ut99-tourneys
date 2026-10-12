@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
+import { MH_ADAPTER } from '../core/race';
 import type { AgentView, BotSpec, TournamentDetail } from '../core/types';
 
 const STOCK_POOL = [
@@ -24,6 +25,9 @@ const DEFAULT_BOTS: BotSpec[] = [
   'Dominator',
 ].map((name, i) => ({ name, skill: [6, 5, 5, 4, 4, 3, 3, 2][i] ?? 3 }));
 
+/** Monster Hunt: time limit per run (same as the adapter's defaultLimits). */
+const MH_TIME_LIMIT = 20;
+
 /** Suggested frag/time limits per team size (same as the adapter's defaultLimits). */
 const LIMITS: Record<number, { fragLimit: number; timeLimitMin: number }> = {
   1: { fragLimit: 20, timeLimitMin: 10 },
@@ -42,6 +46,8 @@ interface Model {
   format: 'single' | 'double';
   size: number;
   teamSize: number;
+  /** dm: deathmatch, mh: Monster Hunt time race (teams only). */
+  game: 'dm' | 'mh';
   grandFinalReset: boolean;
   boDefault: number;
   boSemi: number;
@@ -62,6 +68,8 @@ interface Model {
   countdownSec: number;
   smartStockBots: boolean;
   friendlyFirePct: 0 | 50 | 100;
+  penaltySec: number;
+  monsterSkill: number;
   mapPool: string[];
   botPool: BotSpec[];
 }
@@ -147,9 +155,16 @@ function toLocalInput(iso: string | null): string {
           <legend>{{ 'form.bracket' | t }}</legend>
           <div class="fields">
             <div class="field">
+              <label>{{ 'form.game' | t }}</label>
+              <select name="game" [ngModel]="f.game" (ngModelChange)="onGame($event)">
+                <option value="dm">{{ 'form.gameDm' | t }}</option>
+                <option value="mh">{{ 'form.gameMh' | t }}</option>
+              </select>
+            </div>
+            <div class="field">
               <label>{{ 'form.mode' | t }}</label>
               <select name="teamSize" [ngModel]="f.teamSize" (ngModelChange)="onTeamSize($event)">
-                @for (k of teamSizes; track k) {
+                @for (k of f.game === 'mh' ? [2, 3, 5] : teamSizes; track k) {
                   <option [ngValue]="k">
                     {{ (k === 1 ? 'form.mode1v1' : 'team.mode') | t: { k } }}
                   </option>
@@ -207,14 +222,33 @@ function toLocalInput(iso: string | null): string {
         <fieldset [disabled]="locked()">
           <legend>{{ 'form.rules' | t }}</legend>
           <div class="fields">
-            <div class="field">
-              <label>{{ 'form.fragLimit' | t }}</label
-              ><input type="number" name="fl" min="0" max="200" [(ngModel)]="f.fragLimit" />
-            </div>
-            <div class="field">
-              <label>{{ 'form.timeLimit' | t }}</label
-              ><input type="number" name="tl" min="0" max="60" [(ngModel)]="f.timeLimitMin" />
-            </div>
+            @if (f.game === 'mh') {
+              <div class="field">
+                <label>{{ 'form.runTimeLimit' | t }}</label
+                ><input type="number" name="tl" min="1" max="60" [(ngModel)]="f.timeLimitMin" />
+              </div>
+              <div class="field">
+                <label>{{ 'form.penalty' | t }}</label
+                ><input type="number" name="pen" min="0" max="60" [(ngModel)]="f.penaltySec" />
+              </div>
+              <div class="field">
+                <label>{{ 'form.monsterSkill' | t }}</label>
+                <select name="msk" [(ngModel)]="f.monsterSkill">
+                  @for (s of skills; track s) {
+                    <option [ngValue]="s">{{ s }}</option>
+                  }
+                </select>
+              </div>
+            } @else {
+              <div class="field">
+                <label>{{ 'form.fragLimit' | t }}</label
+                ><input type="number" name="fl" min="0" max="200" [(ngModel)]="f.fragLimit" />
+              </div>
+              <div class="field">
+                <label>{{ 'form.timeLimit' | t }}</label
+                ><input type="number" name="tl" min="0" max="60" [(ngModel)]="f.timeLimitMin" />
+              </div>
+            }
             <div class="field">
               <label>{{ 'form.mapMode' | t }}</label>
               <select name="mm" [(ngModel)]="f.mapMode">
@@ -230,7 +264,7 @@ function toLocalInput(iso: string | null): string {
               <label>{{ 'form.countdown' | t }}</label
               ><input type="number" name="cd" min="3" max="30" [(ngModel)]="f.countdownSec" />
             </div>
-            @if (f.teamSize > 1) {
+            @if (f.teamSize > 1 && f.game === 'dm') {
               <div class="field">
                 <label>{{ 'form.friendlyFire' | t }}</label>
                 <select name="ff" [(ngModel)]="f.friendlyFirePct">
@@ -241,7 +275,9 @@ function toLocalInput(iso: string | null): string {
               </div>
             }
           </div>
-          @if (f.teamSize > 1) {
+          @if (f.game === 'mh') {
+            <p class="muted small">{{ 'form.mhRulesHint' | t }}</p>
+          } @else if (f.teamSize > 1) {
             <p class="muted small">{{ 'form.teamRulesHint' | t }}</p>
           }
           <label class="row"
@@ -279,13 +315,19 @@ function toLocalInput(iso: string | null): string {
             }
           </div>
           <div class="row add">
-            <input name="newmap" [(ngModel)]="newMap" placeholder="DM-Example" />
+            <input
+              name="newmap"
+              [(ngModel)]="newMap"
+              [placeholder]="f.game === 'mh' ? 'MH-Example' : 'DM-Example'"
+            />
             <button type="button" (click)="addMap()" [disabled]="!newMap.trim()">
               {{ 'form.addMap' | t }}
             </button>
           </div>
           @if (!inventoryMaps().length) {
-            <p class="muted small">{{ 'form.noInventory' | t }}</p>
+            <p class="muted small">
+              {{ (f.game === 'mh' ? 'form.noInventoryMh' : 'form.noInventory') | t }}
+            </p>
           }
           <p class="muted small">{{ 'form.customMapHint' | t }}</p>
         </fieldset>
@@ -488,12 +530,13 @@ export class TournamentFormPage {
   protected readonly mapChoices = computed(() => {
     this.agentTick();
     const f = this.m();
-    const inv = this.inventoryMaps().filter((x) => x.id.toUpperCase().startsWith('DM-'));
-    const list = inv.length
+    const prefix = f?.game === 'mh' ? 'MH-' : 'DM-';
+    const inv = this.inventoryMaps().filter((x) => x.id.toUpperCase().startsWith(prefix));
+    const list: { id: string; title?: string; stock?: boolean }[] = inv.length
       ? [...inv]
-      : STOCK_POOL.map(
-          (id) => ({ id, stock: true }) as { id: string; title?: string; stock?: boolean },
-        );
+      : f?.game === 'mh'
+        ? []
+        : STOCK_POOL.map((id) => ({ id, stock: true }));
     for (const id of f?.mapPool ?? []) if (!list.some((x) => x.id === id)) list.push({ id });
     return list.sort((a, b) => a.id.localeCompare(b.id));
   });
@@ -544,6 +587,7 @@ export class TournamentFormPage {
       format: 'double',
       size: 8,
       teamSize: 1,
+      game: 'dm',
       grandFinalReset: true,
       boDefault: 1,
       boSemi: 0,
@@ -566,6 +610,8 @@ export class TournamentFormPage {
         (p) => p.toLowerCase() === 'smartstockbots',
       ),
       friendlyFirePct: 0,
+      penaltySec: 5,
+      monsterSkill: 5,
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -587,6 +633,7 @@ export class TournamentFormPage {
       format: s.format,
       size: s.size,
       teamSize: s.teamSize ?? 1,
+      game: s.game.adapter === MH_ADAPTER ? 'mh' : 'dm',
       grandFinalReset: s.grandFinalReset,
       boDefault: s.bestOf.default,
       boSemi: s.bestOf.semifinal ?? 0,
@@ -608,6 +655,8 @@ export class TournamentFormPage {
       smartStockBots: r['smartStockBots'] === true,
       friendlyFirePct:
         r['friendlyFirePct'] === 50 || r['friendlyFirePct'] === 100 ? r['friendlyFirePct'] : 0,
+      penaltySec: num('penaltySec', 5),
+      monsterSkill: num('monsterSkill', 5),
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
@@ -619,12 +668,34 @@ export class TournamentFormPage {
     if (!f) return;
     const before = LIMITS[f.teamSize];
     const after = LIMITS[k];
-    if (before && after) {
+    if (before && after && f.game === 'dm') {
       if (f.fragLimit === before.fragLimit) f.fragLimit = after.fragLimit;
       if (f.timeLimitMin === before.timeLimitMin) f.timeLimitMin = after.timeLimitMin;
     }
     f.teamSize = k;
     if (k > 1 && f.size > 16) f.size = 16;
+  }
+
+  /** Switches between deathmatch and Monster Hunt: teams only, own maps and time limit. */
+  protected onGame(game: 'dm' | 'mh') {
+    const f = this.m();
+    if (!f || f.game === game) return;
+    const prefix = game === 'mh' ? 'MH-' : 'DM-';
+    f.mapPool = f.mapPool.filter((id) => id.toUpperCase().startsWith(prefix));
+    if (game === 'mh') {
+      if (f.teamSize === 1) f.teamSize = 2;
+      if (f.size > 16) f.size = 16;
+      f.timeLimitMin = MH_TIME_LIMIT;
+    } else {
+      const l = LIMITS[f.teamSize];
+      if (l) {
+        f.fragLimit = l.fragLimit;
+        f.timeLimitMin = l.timeLimitMin;
+      }
+      if (!f.mapPool.length) f.mapPool = [...STOCK_POOL];
+    }
+    f.game = game;
+    this.agentTick.update((n) => n + 1);
   }
 
   protected onAgent() {
@@ -688,16 +759,18 @@ export class TournamentFormPage {
         botPlacement: f.botPlacement,
         postTournamentShutdownSec: f.postTournamentShutdownSec,
         game: {
-          adapter: 'ut99-dm',
+          adapter: f.game === 'mh' ? MH_ADAPTER : 'ut99-dm',
           rules: {
-            fragLimit: f.fragLimit,
+            fragLimit: f.game === 'mh' ? 0 : f.fragLimit,
             timeLimitMin: f.timeLimitMin,
             mapMode: f.mapMode,
             mapPool: f.mapPool,
             voteTimeoutSec: f.voteTimeoutSec,
             countdownSec: f.countdownSec,
             smartStockBots: f.smartStockBots,
-            friendlyFirePct: f.friendlyFirePct,
+            friendlyFirePct: f.game === 'mh' ? 0 : f.friendlyFirePct,
+            penaltySec: f.penaltySec,
+            monsterSkill: f.monsterSkill,
           },
         },
       },
