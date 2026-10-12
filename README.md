@@ -22,6 +22,14 @@ Angular SPA ──HTTP/WS──> API (NestJS, SQLite)  <──WSS──  Bridge 
 | `apps/api`              | NestJS backend, Discord OAuth, event store, agent gateway                              | done (M5)           |
 | `apps/web`              | Angular frontend: tournaments, live bracket, registration, admin                       | done (M5)           |
 
+## Installation
+
+Download a release bundle (or build one with `pnpm release`) and follow the guide for your server:
+
+- [Raspberry Pi](docs/install-raspberry-pi.md) (website, bridge and UT server on one Pi)
+- [Linux server](docs/install-linux.md) (Debian/Ubuntu, x86_64 or ARM64, systemd, HTTPS with Caddy)
+- [Windows server](docs/install-windows.md) (scheduled tasks, firewall)
+
 ## Development
 
 Requirements: Node ≥ 22.12, pnpm 10 (`corepack enable`).
@@ -51,3 +59,4 @@ For frontend work: `pnpm --filter @tourney/api dev` (API with tsx) and `pnpm --f
 - [Architecture](docs/architecture.md)
 - [Protocol](docs/protocol.md)
 - [Decisions](docs/decisions.md)
+- Installation: [Raspberry Pi](docs/install-raspberry-pi.md), [Linux](docs/install-linux.md), [Windows](docs/install-windows.md)

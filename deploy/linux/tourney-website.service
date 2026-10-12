@@ -1,0 +1,23 @@
+# Tourney website (API + web app). Installed by deploy/linux/install.sh.
+# Settings: /etc/tourney/website.env (see website/.env.example).
+[Unit]
+Description=Tourney website (UT99 tournaments)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=tourney
+Group=tourney
+WorkingDirectory=/opt/tourney/website
+EnvironmentFile=/etc/tourney/website.env
+ExecStart=/usr/bin/node dist/main.js
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/tourney
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

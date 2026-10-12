@@ -1,0 +1,19 @@
+{
+  "agentId": "my-server",
+  "mod": { "host": "127.0.0.1", "port": 7790, "sharedKey": "change-me-to-a-long-random-string" },
+  "dataDir": "./data",
+  "server": {
+    "os": "linux",
+    "installDir": "/opt/ut99",
+    "lobbyMap": "DM-Deck16][",
+    "port": 7777,
+    "serverName": "UT99 Tournament",
+    "publicAddress": "ut.example.com:7777",
+    "manage": true
+  },
+  "website": {
+    "url": "ws://127.0.0.1:8080/api/agent",
+    "token": "PASTE-THE-TOKEN-FROM-THE-WEBSITE"
+  },
+  "logLevel": "info"
+}

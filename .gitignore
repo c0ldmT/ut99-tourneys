@@ -12,3 +12,4 @@ coverage/
 mods/**/System/*.u
 mods/**/build/
 out-tsc/
+release/

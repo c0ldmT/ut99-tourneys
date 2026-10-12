@@ -40,7 +40,8 @@ export type BridgeConfig = z.infer<typeof BridgeConfigSchema>;
 export function readJsonFile<T>(file: string, schema: z.ZodType<T>): T {
   let raw: unknown;
   try {
-    raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    // Windows editors may save UTF-8 with a byte order mark, which JSON.parse refuses.
+    raw = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
   } catch (e) {
     throw new Error(`cannot read ${file}: ${(e as Error).message}`, { cause: e });
   }

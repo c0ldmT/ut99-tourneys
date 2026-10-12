@@ -66,7 +66,9 @@ webhook URL or a rejected bot token is logged once and the notifications stay of
 Everything on one Raspberry Pi (64-bit OS) or the website on a separate host — both work, the bridge connects
 outbound to the website.
 
-- **systemd:** [deploy/systemd](../../deploy/systemd) has units for the API and the bridge.
+- **Installation:** release bundle and install scripts, see [Raspberry Pi](../../docs/install-raspberry-pi.md),
+  [Linux server](../../docs/install-linux.md) and [Windows server](../../docs/install-windows.md). The systemd
+  units are in [deploy/linux](../../deploy/linux).
 - **HTTPS:** Discord requires https for public redirect URLs. A reverse proxy such as Caddy does it in two
   lines ([deploy/Caddyfile](../../deploy/Caddyfile)); it passes WebSockets (`/api/agent`) and server-sent events
   (`/api/tournaments/*/stream`) through without extra settings. With nginx, disable buffering for the stream

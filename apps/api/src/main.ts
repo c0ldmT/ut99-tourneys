@@ -7,9 +7,12 @@ import { loadConfig } from './config.js';
 
 const config = loadConfig();
 if (!config.webDist) {
-  // Monorepo layout: apps/api/dist/main.js -> apps/web/dist
-  const sibling = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
-  if (fs.existsSync(path.join(sibling, 'index.html'))) config.webDist = sibling;
+  // Release bundle: website/dist/main.js -> website/web; monorepo: apps/api/dist -> apps/web/dist.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const found = ['../web', '../../web/dist']
+    .map((p) => path.resolve(here, p))
+    .find((dir) => fs.existsSync(path.join(dir, 'index.html')));
+  if (found) config.webDist = found;
 }
 const log = consoleLogger(config.logLevel);
 if (config.devLogin) log.warn('DEV_LOGIN is enabled: anybody can log in with any name');

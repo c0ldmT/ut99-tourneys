@@ -1,0 +1,23 @@
+# Tourney bridge next to the UT server. It starts, watches and stops the UT server itself
+# (server.manage = true), so the UT folder must belong to the tourney user.
+# Settings: /etc/tourney/bridge.json. Installed by deploy/linux/install.sh.
+[Unit]
+Description=Tourney bridge (runs the UT99 server)
+After=network-online.target tourney-website.service
+Wants=network-online.target
+
+[Service]
+User=tourney
+Group=tourney
+WorkingDirectory=/opt/tourney/bridge
+ExecStart=/usr/bin/node dist/cli.js run -c /etc/tourney/bridge.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+# The UT server gets a few seconds to save and quit when the bridge stops.
+TimeoutStopSec=20
+# Stop signal to the bridge only; it shuts the UT server down itself (the rest is killed after the timeout).
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target
