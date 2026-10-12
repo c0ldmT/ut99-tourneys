@@ -243,6 +243,42 @@ describe('website + bridge + simulated UT server', () => {
     expect(env.agent.active).toBeUndefined();
   });
 
+  it('restarts a game and sets results through the organizer tools', async () => {
+    const env = await setup({ players: ['Mario', 'Anna'] });
+    const { admin, id } = env;
+    await admin.post(`/tournaments/${id}/seed`, { mode: 'auto' });
+    // Not running yet: no results, no restart.
+    expect(
+      (await admin.post(`/tournaments/${id}/override`, { matchId: 'W1-1', winnerId: 'x' })).status,
+    ).toBe(409);
+    await admin.post(`/tournaments/${id}/run`);
+    env.startSim();
+    await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.live?.phase === 'live');
+
+    let d = (await admin.get(`/tournaments/${id}`)).body;
+    const cm = d.projection.currentMatch;
+    expect((await admin.post(`/tournaments/${id}/command`, { kind: 'restart' })).status).toBe(204);
+    await until(() => env.blog.lines.some((l) => l.includes(`restarting ${cm.matchId}`)));
+
+    // A player may not set results; a stranger is no winner.
+    const mario = await Client.login(env.api, 'Mario');
+    const body = { matchId: cm.matchId, winnerId: cm.entrants[1] };
+    expect((await mario.post(`/tournaments/${id}/override`, body)).status).toBe(403);
+    expect(
+      (await admin.post(`/tournaments/${id}/override`, { ...body, winnerId: 'nobody' })).status,
+    ).toBe(400);
+    expect((await admin.post(`/tournaments/${id}/override`, body)).status).toBe(204);
+    await until(() =>
+      env.blog.lines.some((l) => l.includes(`The organizer decided ${cm.matchId}`)),
+    );
+    await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
+    d = (await admin.get(`/tournaments/${id}`)).body;
+    expect(d.projection.bracket.byId[cm.matchId].winnerId).toBe(cm.entrants[1]);
+    expect(d.projection.results.find((r: any) => r.matchId === cm.matchId).outcome).toBe(
+      'override',
+    );
+  });
+
   it('resumes a running tournament after the bridge reconnects', async () => {
     const env = await setup({ players: ['Mario', 'Anna'] });
     const { admin, id } = env;

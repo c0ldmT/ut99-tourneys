@@ -24,6 +24,7 @@ import {
   JoinTeamBody,
   LineupBody,
   MoveMemberBody,
+  OverrideBody,
   SeedBody,
   TournamentsService,
   UpdateTeamBody,
@@ -32,6 +33,7 @@ import {
   type CreateTeam,
   type CreateTournament,
   type MoveMember,
+  type Override,
   type Seed,
   type UpdateTeam,
   type UpdateTournament,
@@ -252,6 +254,17 @@ export class TournamentsController {
     @Body(new ZodPipe(CommandBody)) body: Command,
   ) {
     await this.svc.command(id, body, user);
+  }
+
+  @AdminOnly()
+  @Post(':id/override')
+  @HttpCode(204)
+  override(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(OverrideBody)) body: Override,
+  ) {
+    this.svc.override(id, body, user);
   }
 
   /** Server-sent events: "change" (refetch the detail) and "live" (match telemetry). */

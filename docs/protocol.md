@@ -49,6 +49,13 @@ website accepts only if `baseSeq` is still the head and answers `events.ack {acc
 seq/timestamps assigned. Otherwise it answers `accepted:false` with the events the bridge missed (e.g. an admin
 override); the bridge re-projects and decides again. Admin actions therefore always win.
 
+**Organizer tools.** `POST /tournaments/:id/override {matchId, winnerId}` appends `match.result` with
+`outcome: "override"` for any match whose entrants are known (current, coming or played). If it decides the current
+match, or a corrected earlier result changes the current match's pairing, the projection drops the current match;
+the bridge ends the game on the server (`abort` with `why` `admin`/`void`) and calls the next match. A match called
+again starts its series from game 1. The command `restart` (bridge: `match.restart`) loads the current game's map
+again (Monster Hunt: the current run); nothing goes into the log.
+
 **Overrides.** Correcting a result upstream can invalidate results further down. The engine does not throw; it
 ignores results whose pairing no longer matches and reports them as `stale_result` issues so the admin UI can
 show them.
@@ -153,7 +160,7 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends 
 | `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                                                                          |
 | `cd`                                 | Start countdown                                                                                                                                                          |
 | `pause`                              | Pause / unpause                                                                                                                                                          |
-| `abort`                              | End the current game with a given winner (forfeit decided by the bridge)                                                                                                 |
+| `abort`                              | End the current game without a result: `why` = `forfeit`, `admin` (organizer set the winner), `void` (match called off), `restart`                                       |
 | `brh` / `brm`                        | Bracket for the HUD                                                                                                                                                      |
 | `sth` / `ste`                        | Standings for the HUD                                                                                                                                                    |
 | `say`                                | Message to all (`pid: -1`) or one player                                                                                                                                 |

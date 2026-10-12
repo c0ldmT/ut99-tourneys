@@ -79,8 +79,17 @@ export const CommandBody = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('resume') }),
   z.object({ kind: z.literal('abort'), reason: z.string().trim().min(1).max(200) }),
   z.object({ kind: z.literal('announce'), message: z.string().trim().min(1).max(200) }),
+  /** Plays the current game (Monster Hunt: run) of the current match again. */
+  z.object({ kind: z.literal('restart') }),
 ]);
 export type Command = z.infer<typeof CommandBody>;
+
+/** Admin: sets the winner of a match (the current one, a coming one, or a correction). */
+export const OverrideBody = z.object({
+  matchId: z.string().min(1).max(16),
+  winnerId: z.string().min(1).max(64),
+});
+export type Override = z.infer<typeof OverrideBody>;
 
 export const CreateTeamBody = z.object({
   name: z.string().trim().min(1).max(40),
@@ -874,7 +883,54 @@ export class TournamentsService {
         });
       case 'announce':
         return this.connections.command(t.agentId, { kind: 'announce', message: cmd.message });
+      case 'restart': {
+        const cm = this.log.projection(id)?.currentMatch;
+        if (!cm) throw conflict('no match is being played right now');
+        if (!cm.map) throw conflict(`${cm.matchId} has no map yet (map vote)`);
+        return this.connections.command(t.agentId, {
+          kind: 'match.restart',
+          tournamentId: id,
+          matchId: cm.matchId,
+        });
+      }
     }
+  }
+
+  /**
+   * Admin: sets the winner of a match whose two entrants are known. For the current match the
+   * bridge ends the game on the server; a corrected earlier result makes later results that
+   * depended on it void (those matches are played again). Works while the bridge is offline too:
+   * it gets the event when it reconnects.
+   */
+  override(id: string, body: Override, by: User): void {
+    const t = this.require(id);
+    if (t.phase !== 'running' && t.phase !== 'paused')
+      throw conflict(`results can only be set while the tournament runs (${t.phase})`);
+    const p = this.log.projection(id);
+    const node = p?.bracket?.byId[body.matchId];
+    if (!p || !node) throw notFound(`match ${body.matchId}`);
+    const [a, b] = node.entrants;
+    if (!a || !b || (node.status !== 'ready' && node.status !== 'completed'))
+      throw conflict(`${body.matchId} cannot be decided yet (entrants not known)`);
+    if (body.winnerId !== a && body.winnerId !== b)
+      throw badRequest(`${body.winnerId} does not play in ${body.matchId}`);
+    const head = t.headSeq;
+    const res = this.log.append(id, head, [
+      {
+        type: 'match.result',
+        actor: { kind: 'admin', id: by.id },
+        data: {
+          result: {
+            matchId: body.matchId,
+            entrants: [a, b],
+            winnerId: body.winnerId,
+            outcome: 'override',
+          },
+        },
+      },
+    ]);
+    if (!res.accepted) throw conflict(res.reason);
+    this.syncToAgent(this.require(id), head);
   }
 
   // ------------------------------------------------------------------------------------------

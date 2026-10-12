@@ -327,3 +327,72 @@ describe('Monster Hunt race', () => {
     expect(() => projectTournament(log(...start, run('e1', 1)))).toThrow(ProjectionError);
   });
 });
+
+describe('admin overrides', () => {
+  const played = (
+    matchId: string,
+    entrants: [string, string],
+    winnerId: string,
+  ): NewTournamentEvent => ({
+    type: 'match.result',
+    actor: bridge,
+    data: { result: { matchId, entrants, winnerId, outcome: 'played' } },
+  });
+  const start: NewTournamentEvent[] = [
+    ...base,
+    { type: 'tournament.started', actor: bridge, data: {} },
+    { type: 'match.called', actor: bridge, data: { matchId: 'W1-1', entrants: ['e1', 'e2'] } },
+    played('W1-1', ['e1', 'e2'], 'e1'),
+    { type: 'match.called', actor: bridge, data: { matchId: 'W1-2', entrants: ['e3', 'e4'] } },
+    played('W1-2', ['e3', 'e4'], 'e3'),
+    { type: 'match.called', actor: bridge, data: { matchId: 'W2-1', entrants: ['e1', 'e3'] } },
+    { type: 'match.started', actor: bridge, data: { matchId: 'W2-1', game: 1 } },
+  ];
+  const override = (
+    matchId: string,
+    entrants: [string, string],
+    winnerId: string,
+  ): NewTournamentEvent => ({
+    type: 'match.result',
+    actor: { kind: 'admin', id: 'u1' },
+    data: { result: { matchId, entrants, winnerId, outcome: 'override' } },
+  });
+
+  it('calls off the current match when an earlier result changes its pairing', () => {
+    const p = projectTournament(log(...start, override('W1-1', ['e1', 'e2'], 'e2')));
+    expect(p.currentMatch).toBeUndefined();
+    expect(p.bracket?.byId['W2-1']?.entrants).toEqual(['e2', 'e3']);
+  });
+
+  it('keeps the current match when the correction does not touch it', () => {
+    const p = projectTournament(log(...start, override('W1-1', ['e1', 'e2'], 'e1')));
+    expect(p.currentMatch?.matchId).toBe('W2-1');
+  });
+
+  it('decides the current match and restarts a re-called series', () => {
+    let p = projectTournament(log(...start, override('W2-1', ['e1', 'e3'], 'e3')));
+    expect(p.currentMatch).toBeUndefined();
+    expect(p.bracket?.byId['W2-1']?.winnerId).toBe('e3');
+    p = projectTournament(
+      log(
+        ...start,
+        {
+          type: 'match.gameFinished',
+          actor: bridge,
+          data: {
+            matchId: 'W2-1',
+            game: 1,
+            map: 'DM-Codex',
+            scores: { e1: 20, e3: 3 },
+            winnerId: 'e1',
+            endReason: 'fragLimit',
+          },
+        },
+        override('W1-1', ['e1', 'e2'], 'e2'),
+        { type: 'match.called', actor: bridge, data: { matchId: 'W2-1', entrants: ['e2', 'e3'] } },
+      ),
+    );
+    expect(p.currentMatch).toMatchObject({ matchId: 'W2-1', game: 1 });
+    expect(p.games['W2-1']).toBeUndefined();
+  });
+});

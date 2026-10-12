@@ -216,7 +216,9 @@ export class WebsiteAgent {
         await this.runtime?.server?.stop();
         return;
       case 'match.restart':
-        throw new Error('match.restart is not supported yet');
+        if (this.runtime?.tournamentId !== cmd.tournamentId)
+          throw new Error(`tournament ${cmd.tournamentId} is not running here`);
+        return this.runtime.director.restartGame(cmd.matchId);
       case 'inventory.rescan':
         return this.rescan(cmd.profileId);
     }

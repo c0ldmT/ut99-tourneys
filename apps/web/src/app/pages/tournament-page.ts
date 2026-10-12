@@ -458,10 +458,40 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                   } @else {
                     <button (click)="pause()" [disabled]="busy()">{{ 'admin.pause' | t }}</button>
                   }
+                  @if (current()?.map && t.phase === 'running') {
+                    <button (click)="restart()" [disabled]="busy()">
+                      {{ (race() ? 'admin.restartRun' : 'admin.restartGame') | t }}
+                    </button>
+                  }
                   <button class="danger" (click)="abort()" [disabled]="busy()">
                     {{ 'admin.abort' | t }}
                   </button>
                 </div>
+                @if (t.phase === 'running' || t.phase === 'paused') {
+                  <div class="override">
+                    <b>{{ 'admin.override' | t }}</b>
+                    <p class="muted small">{{ 'admin.overrideHint' | t }}</p>
+                    <div class="row">
+                      <select
+                        name="ovm"
+                        [ngModel]="overrideMatch()"
+                        (ngModelChange)="overrideMatch.set($event)"
+                      >
+                        <option value="">{{ 'admin.overridePick' | t }}</option>
+                        @for (m of decidable(); track m.id) {
+                          <option [value]="m.id">{{ m.label }}</option>
+                        }
+                      </select>
+                      @if (decidableMatch(); as m) {
+                        @for (e of m.entrants; track e) {
+                          <button (click)="overrideWinner(m.id, e)" [disabled]="busy()">
+                            {{ 'admin.overrideWins' | t: { name: name(e) } }}
+                          </button>
+                        }
+                      }
+                    </div>
+                  </div>
+                }
                 <form class="row" (ngSubmit)="announce()">
                   <input
                     name="msg"
@@ -612,6 +642,13 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     .admin .row input {
       max-width: 420px;
     }
+    .override {
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+    .override select {
+      max-width: 420px;
+    }
   `,
 })
 export class TournamentPage {
@@ -716,6 +753,35 @@ export class TournamentPage {
     const p = this.t()?.projection;
     return p?.championId ? (p.entrants[p.championId]?.displayName ?? null) : null;
   });
+
+  /** Admin: match picked in "set result". */
+  protected readonly overrideMatch = signal('');
+  /** Matches an organizer can decide: both entrants known, not void (current, coming, played). */
+  protected readonly decidable = computed(() => {
+    const b = this.t()?.projection?.bracket;
+    if (!b) return [];
+    const cm = this.current()?.matchId;
+    return b.matches
+      .filter(
+        (m) => m.entrants[0] && m.entrants[1] && (m.status === 'ready' || m.status === 'completed'),
+      )
+      .map((m) => {
+        const state =
+          m.id === cm
+            ? this.i18n.t('admin.matchNow')
+            : m.status === 'completed'
+              ? this.i18n.t('admin.matchWon', { name: this.name(m.winnerId) })
+              : this.i18n.t('admin.matchOpen');
+        return {
+          id: m.id,
+          entrants: [m.entrants[0], m.entrants[1]] as string[],
+          label: `${m.id}: ${this.name(m.entrants[0])} vs ${this.name(m.entrants[1])} (${state})`,
+        };
+      });
+  });
+  protected readonly decidableMatch = computed(
+    () => this.decidable().find((m) => m.id === this.overrideMatch()) ?? null,
+  );
 
   private loading = false;
   private again = false;
@@ -852,6 +918,27 @@ export class TournamentPage {
     if (reason) void this.command({ kind: 'pause', reason });
   }
 
+  protected restart() {
+    const cm = this.current();
+    if (!cm) return;
+    const key = this.race() ? 'admin.restartRunConfirm' : 'admin.restartGameConfirm';
+    if (confirm(this.i18n.t(key, { match: cm.matchId, map: cm.map ?? '' })))
+      void this.command({ kind: 'restart' });
+  }
+
+  protected overrideWinner(matchId: string, winnerId: string) {
+    const m = this.t()?.projection?.bracket?.byId[matchId];
+    const key =
+      m?.status === 'completed'
+        ? 'admin.overrideConfirmPlayed'
+        : matchId === this.current()?.matchId
+          ? 'admin.overrideConfirmNow'
+          : 'admin.overrideConfirm';
+    if (!confirm(this.i18n.t(key, { match: matchId, name: this.name(winnerId) }))) return;
+    this.overrideMatch.set('');
+    void this.act(this.api.override(this.id(), matchId, winnerId));
+  }
+
   protected abort() {
     const reason = prompt(this.i18n.t('admin.abortReason'));
     if (reason) void this.command({ kind: 'abort', reason });
@@ -888,7 +975,8 @@ export class TournamentPage {
     switch (e.type) {
       case 'match.result': {
         const r = d['result'] as { matchId: string; winnerId: string; outcome: string };
-        return `${r.matchId}: ${this.name(r.winnerId)} (${r.outcome})`;
+        const how = r.outcome === 'override' ? this.i18n.t('admin.byOrganizer') : r.outcome;
+        return `${r.matchId}: ${this.name(r.winnerId)} (${how})`;
       }
       case 'match.gameFinished':
         return `${d['matchId']} G${d['game']} ${d['map']}: ${this.name(d['winnerId'] as string)}`;

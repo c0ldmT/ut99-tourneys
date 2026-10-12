@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.5.0";
+const MOD_VERSION = "0.5.1";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -1310,7 +1310,8 @@ function ReportEnd(string Reason, bool bWasOvertime)
 	Send();
 }
 
-// The bridge decided the game (forfeit). End it without reporting a result.
+// The bridge ended the game: forfeit, organizer decision ("admin"), match called off ("void")
+// or restart. End it without reporting a result.
 function AbortGame(string Winner, string Why)
 {
 	local Pawn P;
@@ -1328,7 +1329,15 @@ function AbortGame(string Winner, string Why)
 				PlayerPawn(P).ClientGameEnded();
 		}
 	}
-	if (Winner == "a")
+	if (Why == "restart")
+		Game.BroadcastMessage("The organizer restarts this game", true);
+	else if (Why == "void")
+		Game.BroadcastMessage("The organizer called this match off", true);
+	else if (Why == "admin" && Winner == "a")
+		Game.BroadcastMessage(NameA @ "wins (decided by the organizer)", true);
+	else if (Why == "admin")
+		Game.BroadcastMessage(NameB @ "wins (decided by the organizer)", true);
+	else if (Winner == "a")
 		Game.BroadcastMessage(NameA @ "wins by forfeit", true);
 	else
 		Game.BroadcastMessage(NameB @ "wins by forfeit", true);

@@ -175,6 +175,9 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         break;
       case 'match.called':
         if (p.phase !== 'running') fail(`cannot call a match in phase ${p.phase}`);
+        // A match is called once; games left from an earlier call were made void by an admin
+        // override (its pairing changed or it was interrupted), so the series starts over.
+        delete p.games[e.data.matchId];
         p.currentMatch = {
           matchId: e.data.matchId,
           entrants: e.data.entrants,
@@ -250,10 +253,23 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         delete cm.runner;
         break;
       }
-      case 'match.result':
+      case 'match.result': {
         p.results.push(e.data.result);
-        if (p.currentMatch?.matchId === e.data.result.matchId) delete p.currentMatch;
+        const cm = p.currentMatch;
+        if (cm?.matchId === e.data.result.matchId) delete p.currentMatch;
+        else if (cm && p.bracketDefinition && e.data.result.outcome === 'override') {
+          // An admin corrected an earlier match: the current match may not exist any more in this
+          // form (other entrants), then it is called off and scheduled again.
+          const node = computeBracket(p.bracketDefinition, p.results).byId[cm.matchId];
+          const [a, b] = node?.entrants ?? [];
+          const same =
+            node?.status === 'ready' &&
+            ((a === cm.entrants[0] && b === cm.entrants[1]) ||
+              (a === cm.entrants[1] && b === cm.entrants[0]));
+          if (!same) delete p.currentMatch;
+        }
         break;
+      }
       case 'tournament.paused':
         if (p.phase === 'paused') break;
         phaseBeforePause = p.phase;

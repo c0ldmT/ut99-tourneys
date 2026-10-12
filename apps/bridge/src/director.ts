@@ -434,6 +434,7 @@ export class MatchDirector extends EventEmitter {
   refresh(): Promise<void> {
     return this.enqueue(async () => {
       const before = this.proj.headSeq;
+      const onServer = this.stageMatch();
       await this.reload();
       if (this.proj.headSeq === before) return;
       const fresh = this.events.slice(before);
@@ -442,6 +443,7 @@ export class MatchDirector extends EventEmitter {
         this.o.log.info(`applied ${fresh.map((e) => e.type).join(', ')} from the website`);
         return;
       }
+      this.callOffIfGone(onServer);
       await this.resumeFromProjection();
       if (this.proj.phase === 'aborted') this.emit('aborted', this.proj.abortedReason ?? '');
     });
@@ -466,9 +468,83 @@ export class MatchDirector extends EventEmitter {
     });
   }
 
+  /**
+   * Organizer: plays the current game (Monster Hunt: the current run) again on the same map:
+   * the map is loaded again and the ready check starts over. Earlier games of the series stay.
+   */
+  restartGame(matchId: string): Promise<void> {
+    return this.enqueueChecked(async () => {
+      const cm = this.proj.currentMatch;
+      if (!cm || cm.matchId !== matchId) throw new Error(`match ${matchId} is not running`);
+      if (this.proj.phase === 'paused')
+        throw new Error('the tournament is paused, resume it first');
+      if (!cm.map) throw new Error(`${matchId} has no map yet (map vote)`);
+      const what = this.raceMode ? `run ${this.raceRun()} of game ${cm.game}` : `game ${cm.game}`;
+      this.say(`The organizer restarts ${what} of ${matchId} on ${cm.map}`);
+      if (this.stage.kind === 'live') {
+        const winner = cm.entrants[0];
+        // Ends the running game without a result; the travel follows right away.
+        this.send([{ t: 'abort', mid: cm.matchId, w: this.sideOf(winner) ?? 'a', why: 'restart' }]);
+      }
+      this.o.log.info(`restarting ${matchId} ${what} (organizer)`);
+      await this.travel(cm.matchId, cm.game, cm.map);
+    });
+  }
+
   // -------------------------------------------------------------------------------------------
   // Plumbing
   // -------------------------------------------------------------------------------------------
+
+  /** The match the server is busy with right now (vote, loading, ready, countdown, live). */
+  private stageMatch(): { matchId: string; live: boolean } | undefined {
+    const s = this.stage;
+    if (!('matchId' in s) || s.kind === 'simulating') return undefined;
+    return { matchId: s.matchId, live: s.kind === 'live' || s.kind === 'countdown' };
+  }
+
+  /**
+   * After a change from the website: if the match on the server is no longer the current match
+   * (an organizer set its result, or changed an earlier result so its pairing changed), end it
+   * on the server and tell the players.
+   */
+  private callOffIfGone(onServer: { matchId: string; live: boolean } | undefined): void {
+    if (!onServer || this.proj.currentMatch?.matchId === onServer.matchId) return;
+    const { matchId } = onServer;
+    this.clearTimer();
+    this.resetGame();
+    this.lineup = undefined;
+    this.cooldownUntil = this.o.clock.now() + this.timing.postGameDelayMs;
+    const result = this.proj.results.filter((r) => r.matchId === matchId).at(-1);
+    const node = this.proj.bracket?.byId[matchId];
+    const decided = !!result && node?.status === 'completed' && node.winnerId === result.winnerId;
+    if (onServer.live) {
+      const w = decided && result.entrants[1] === result.winnerId ? 'b' : 'a';
+      this.send([{ t: 'abort', mid: matchId, w, why: decided ? 'admin' : 'void' }]);
+    }
+    this.say(
+      decided
+        ? `The organizer decided ${matchId}: ${this.name(result.winnerId)} wins`
+        : `The organizer changed an earlier result: ${matchId} is called off and will be played later`,
+    );
+    this.o.log.info(`${matchId} called off on the server (changed on the website)`);
+    this.stage = { kind: 'between' };
+  }
+
+  /** Like enqueue, but the caller gets the error (commands from the website report it back). */
+  private enqueueChecked(fn: () => Promise<void> | void): Promise<void> {
+    let failure: unknown;
+    let failed = false;
+    return this.enqueue(async () => {
+      try {
+        await fn();
+      } catch (e) {
+        failed = true;
+        failure = e;
+      }
+    }).then(() => {
+      if (failed) throw failure;
+    });
+  }
 
   private enqueue(fn: () => Promise<void> | void): Promise<void> {
     this.queue = this.queue
@@ -503,10 +579,12 @@ export class MatchDirector extends EventEmitter {
         return true;
       }
       const before = this.proj.headSeq;
+      const onServer = this.stageMatch();
       await this.reload();
       const fresh = this.events.slice(before);
       if (fresh.length && fresh.every((e) => PASSIVE_EVENTS.has(e.type))) continue;
       this.o.log.warn(`event append rejected (${res.reason}), re-planning`);
+      this.callOffIfGone(onServer);
       await this.resumeFromProjection();
       return false;
     }

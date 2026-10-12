@@ -104,6 +104,8 @@ export class Api {
   run = (id: string) => this.call<void>('POST', `/tournaments/${id}/run`);
   command = (id: string, body: unknown) =>
     this.call<void>('POST', `/tournaments/${id}/command`, body);
+  override = (id: string, matchId: string, winnerId: string) =>
+    this.call<void>('POST', `/tournaments/${id}/override`, { matchId, winnerId });
 
   agents = () => this.call<AgentView[]>('GET', '/agents');
   createAgent = (id: string, name: string) =>

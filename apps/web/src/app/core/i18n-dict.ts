@@ -333,6 +333,25 @@ const en = {
   'admin.pause': 'Pause',
   'admin.resume': 'Resume',
   'admin.abort': 'Abort tournament',
+  'admin.restartGame': 'Restart game',
+  'admin.restartRun': 'Restart run',
+  'admin.restartGameConfirm':
+    'Play the current game of {match} again on {map}? The game is ended without a result, the map loads again and the ready check starts over.',
+  'admin.restartRunConfirm':
+    'Run the current run of {match} again on {map}? The run is ended without a result, the map loads again and the ready check starts over.',
+  'admin.override': 'Set result',
+  'admin.overrideHint':
+    'Decide the current match, a coming one (e.g. walkover) or correct a played one. Later results that depended on a corrected match become void and are played again.',
+  'admin.overridePick': 'Pick a match…',
+  'admin.overrideWins': '{name} wins',
+  'admin.overrideConfirm': '{name} wins {match} without playing?',
+  'admin.overrideConfirmNow': '{name} wins {match}? The game on the server is ended now.',
+  'admin.overrideConfirmPlayed':
+    'Correct {match}: {name} wins? Matches that followed from it are played again if their pairing changes.',
+  'admin.matchNow': 'now',
+  'admin.matchOpen': 'open',
+  'admin.matchWon': 'won by {name}',
+  'admin.byOrganizer': 'set by the organizer',
   'admin.announce': 'Announce',
   'admin.announcePlaceholder': 'Message to everybody on the server',
   'admin.watchers': '{n} spectators have access',
@@ -683,6 +702,26 @@ const de: Record<TKey, string> = {
   'admin.pause': 'Pause',
   'admin.resume': 'Fortsetzen',
   'admin.abort': 'Turnier abbrechen',
+  'admin.restartGame': 'Spiel neu starten',
+  'admin.restartRun': 'Lauf neu starten',
+  'admin.restartGameConfirm':
+    'Das aktuelle Spiel von {match} auf {map} neu spielen? Das Spiel endet ohne Ergebnis, die Map wird neu geladen und der Ready-Check beginnt von vorn.',
+  'admin.restartRunConfirm':
+    'Den aktuellen Lauf von {match} auf {map} neu starten? Der Lauf endet ohne Ergebnis, die Map wird neu geladen und der Ready-Check beginnt von vorn.',
+  'admin.override': 'Ergebnis festlegen',
+  'admin.overrideHint':
+    'Das laufende Match entscheiden, ein kommendes (z. B. kampflos) oder ein gespieltes korrigieren. Spätere Ergebnisse, die von einem korrigierten Match abhängen, verfallen und werden neu gespielt.',
+  'admin.overridePick': 'Match wählen…',
+  'admin.overrideWins': '{name} gewinnt',
+  'admin.overrideConfirm': '{name} gewinnt {match} kampflos?',
+  'admin.overrideConfirmNow':
+    '{name} gewinnt {match}? Das Spiel auf dem Server wird sofort beendet.',
+  'admin.overrideConfirmPlayed':
+    '{match} korrigieren: {name} gewinnt? Darauf folgende Matches werden neu gespielt, wenn sich ihre Paarung ändert.',
+  'admin.matchNow': 'läuft',
+  'admin.matchOpen': 'offen',
+  'admin.matchWon': 'gewonnen von {name}',
+  'admin.byOrganizer': 'vom Veranstalter festgelegt',
   'admin.announce': 'Durchsagen',
   'admin.announcePlaceholder': 'Nachricht an alle auf dem Server',
   'admin.watchers': '{n} Zuschauer haben Zugang',
