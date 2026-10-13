@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
+import { copyText, selectText } from '../core/clipboard';
 import { I18n, TPipe } from '../core/i18n';
 import type { AgentView } from '../core/types';
 
@@ -22,8 +23,8 @@ import type { AgentView } from '../core/types';
       <div class="card">
         <h2>{{ 'agents.tokenTitle' | t: { id: tk.id } }}</h2>
         <p class="notice">{{ 'agents.tokenOnce' | t }}</p>
-        <pre class="mono snippet">{{ snippet(tk.id, tk.token) }}</pre>
-        <button (click)="copy(snippet(tk.id, tk.token))">{{ 'common.copy' | t }}</button>
+        <pre #snip class="mono snippet">{{ snippet(tk.id, tk.token) }}</pre>
+        <button (click)="copy(snippet(tk.id, tk.token), snip)">{{ copyLabel() | t }}</button>
         <button class="link" (click)="newToken.set(null)">{{ 'common.close' | t }}</button>
       </div>
     }
@@ -168,8 +169,20 @@ export class AgentsPage {
     return JSON.stringify({ agentId: id, website: { url: ws, token } }, null, 2);
   }
 
-  protected copy(text: string) {
-    void navigator.clipboard?.writeText(text);
+  private readonly copied = signal<'' | 'ok' | 'manual'>('');
+  protected readonly copyLabel = computed(() =>
+    this.copied() === 'ok'
+      ? 'common.copied'
+      : this.copied() === 'manual'
+        ? 'common.copyManual'
+        : 'common.copy',
+  );
+
+  protected async copy(text: string, el: Element) {
+    const ok = await copyText(text);
+    if (!ok) selectText(el);
+    this.copied.set(ok ? 'ok' : 'manual');
+    setTimeout(() => this.copied.set(''), ok ? 1500 : 5000);
   }
 
   private async act(fn: () => Promise<void>) {

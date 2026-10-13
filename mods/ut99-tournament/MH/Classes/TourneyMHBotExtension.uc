@@ -12,8 +12,9 @@
 //    bots only use JumpSpots with a translocator, jump boots or low gravity;
 //    here the route search accepts them, the jump itself is a normal jump.
 // 3. Movers (lifts, doors, gates) that turn back when they hit somebody: a bot
-//    keeps its distance while such a mover moves or waits to move, and while a
-//    lift is above it, and goes on when the mover is ready (lift on its level).
+//    keeps its distance while such a mover closes or waits to move in front of
+//    it, and while a lift is above it, and goes on when the mover is ready (lift
+//    on its level). Opening doors are not waited for (they move away).
 //    Bots that wait for a lift wait away from it, so they never block the way
 //    out for a bot under it; bots standing close to such a lift make room.
 // 4. Stuck bots: 3 s without progress -> jump to the side, 8 s -> detour over a
@@ -670,6 +671,27 @@ function bool MoverBusy(Mover M)
 	return false;
 }
 
+// A threat for a bot in front of it: closing, or waiting to move (DelayTime). A door that is
+// opening moves away from the bot; waiting at a distance would only make a proximity door
+// (TriggerControl) close again. Any mover of its return group near M counts.
+function bool MoverThreat(Mover M)
+{
+	local Mover L;
+	local int n;
+
+	L = M.Leader;
+	if (L == None)
+		L = M;
+	while (L != None && n < 64)
+	{
+		if ((L.bDelaying || (L.bInterpolating && !L.bOpening)) && VSize(L.Location - M.Location) < 1024)
+			return true;
+		L = L.Follower;
+		n++;
+	}
+	return false;
+}
+
 // Where the lift's LiftCenter is now (the lift's position plus the map's offset).
 function vector LiftSpot(Mover M)
 {
@@ -812,7 +834,9 @@ function WatchMovers()
 			Op = 1;
 		if (Op == WOpening[i])
 			continue;
-		if (M.MoveTime >= 0.5 && Level.TimeSeconds - WFlip[i] < M.MoveTime - 0.1)
+		// TriggerControl/TriggerToggle/TriggerPound movers change direction on purpose
+		if (M.MoveTime >= 0.5 && Level.TimeSeconds - WFlip[i] < M.MoveTime - 0.1 && M.InitialState != 'TriggerControl'
+			&& M.InitialState != 'TriggerToggle' && M.InitialState != 'TriggerPound')
 		{
 			P = NearestPawn(M.Location, D);
 			if (Op == 0)
@@ -966,7 +990,7 @@ function Mover MoverAhead(Bot B, out vector Danger)
 	{
 		Start = B.Location + vect(0,0,1) * ((i - 0.5) * B.CollisionHeight);
 		A = B.Trace(HitLoc, HitNorm, Start + Dir * (B.CollisionRadius + 48), Start, true);
-		if (Mover(A) != None && A != B.Base && Guards(Mover(A)) && !Cooling(B, Mover(A), 2) && MoverBusy(Mover(A)))
+		if (Mover(A) != None && A != B.Base && Guards(Mover(A)) && !Cooling(B, Mover(A), 2) && MoverThreat(Mover(A)))
 		{
 			Danger = HitLoc;
 			return Mover(A);
@@ -1000,8 +1024,8 @@ function StartHold(Bot B, int k, Mover M, byte Kind, vector Danger)
 	else if (Kind == 3)
 		BotLog(BName(B) $ ": makes room at lift" @ M.Name @ "(" $ M.Tag $ ") for a bot under it, waits at" @ N.Name);
 	else
-		BotLog(BName(B) $ ":" @ M.Name @ "(" $ M.Tag $ ") moves in front of it at" @ Where(B.Location) $ ", waits at"
-			@ N.Name @ "until it has stopped");
+		BotLog(BName(B) $ ":" @ M.Name @ "(" $ M.Tag $ ") closes or is about to move in front of it at"
+			@ Where(B.Location) $ ", waits at" @ N.Name);
 	MoveBot(B, N);
 }
 
@@ -1131,6 +1155,17 @@ function CheckRelease(Bot B, int k)
 		if (SomeoneUnder(M, k))
 			return;
 		BotLog(BName(B) $ ": nobody under lift" @ M.Name @ "any more after" @ int(Level.TimeSeconds - SHoldSince[k])
+			@ "s, goes on");
+		ClearHold(k);
+		B.SpecialPause = 0;
+		SRefLoc[k] = B.Location;
+		return;
+	}
+	if (SHoldKind[k] == 2)
+	{
+		if (MoverThreat(M))
+			return;
+		BotLog(BName(B) $ ":" @ M.Name @ "no longer closes on it after" @ int(Level.TimeSeconds - SHoldSince[k])
 			@ "s, goes on");
 		ClearHold(k);
 		B.SpecialPause = 0;

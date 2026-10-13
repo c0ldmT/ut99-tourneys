@@ -15,6 +15,7 @@ import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
 import { TeamRoster } from '../components/team-roster';
 import { Api, errorText } from '../core/api';
+import { copyText, selectText } from '../core/clipboard';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
@@ -117,9 +118,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 @if (t.connectAddress) {
                   <p class="muted small">{{ 'tp.connectHint' | t }}</p>
                   <div class="connect">
-                    <code>{{ connectCommand(t) }}</code>
-                    <button (click)="copy(connectCommand(t))">
-                      {{ copied() ? ('common.copied' | t) : ('common.copy' | t) }}
+                    <code #cmd>{{ connectCommand(t) }}</code>
+                    <button (click)="copy(connectCommand(t), cmd)">
+                      {{ copyLabel() | t }}
                     </button>
                   </div>
                   <p class="muted small">
@@ -672,7 +673,7 @@ export class TournamentPage {
   protected readonly error = signal('');
   protected readonly actionError = signal('');
   protected readonly busy = signal(false);
-  protected readonly copied = signal(false);
+  protected readonly copied = signal<'' | 'ok' | 'manual'>('');
   protected readonly tab = signal<'control' | 'seeding' | 'events'>('control');
   protected readonly events = signal<TournamentEventView[]>([]);
   protected message = '';
@@ -901,11 +902,19 @@ export class TournamentPage {
     return `open ${t.connectAddress}?tk=${this.auth.me()?.joinToken ?? ''}`;
   }
 
-  protected copy(text: string) {
-    void navigator.clipboard?.writeText(text).then(() => {
-      this.copied.set(true);
-      setTimeout(() => this.copied.set(false), 1500);
-    });
+  protected readonly copyLabel = computed(() =>
+    this.copied() === 'ok'
+      ? 'common.copied'
+      : this.copied() === 'manual'
+        ? 'common.copyManual'
+        : 'common.copy',
+  );
+
+  protected async copy(text: string, el: Element) {
+    const ok = await copyText(text);
+    if (!ok) selectText(el);
+    this.copied.set(ok ? 'ok' : 'manual');
+    setTimeout(() => this.copied.set(''), ok ? 1500 : 5000);
   }
 
   protected async act(p: Promise<unknown>) {

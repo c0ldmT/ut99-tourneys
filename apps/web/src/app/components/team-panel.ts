@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
+import { copyText } from '../core/clipboard';
 import { I18n, TPipe } from '../core/i18n';
 import type { InvitePreview, TeamView, TournamentDetail } from '../core/types';
 
@@ -72,13 +73,14 @@ export function inviteCodeFrom(text: string): string {
           <label>{{ 'team.inviteLink' | t }}</label>
           <div class="row">
             <input
+              #invite
               class="grow"
               readonly
               [value]="inviteLink(team)"
               (focus)="$any($event.target).select()"
             />
-            <button (click)="copy(inviteLink(team))">
-              {{ copied() ? ('common.copied' | t) : ('common.copy' | t) }}
+            <button (click)="copy(inviteLink(team), invite)">
+              {{ copyLabel() | t }}
             </button>
           </div>
         }
@@ -334,7 +336,7 @@ export class TeamPanel {
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
-  protected readonly copied = signal(false);
+  protected readonly copied = signal<'' | 'ok' | 'manual'>('');
   protected readonly invite = signal<InvitePreview | null>(null);
   protected newName = '';
   protected newTag = '';
@@ -386,11 +388,19 @@ export class TeamPanel {
     return `${location.origin}/t/${this.tournament().id}?join=${team.inviteCode}`;
   }
 
-  protected copy(text: string) {
-    void navigator.clipboard?.writeText(text).then(() => {
-      this.copied.set(true);
-      setTimeout(() => this.copied.set(false), 1500);
-    });
+  protected readonly copyLabel = computed(() =>
+    this.copied() === 'ok'
+      ? 'common.copied'
+      : this.copied() === 'manual'
+        ? 'common.copyManual'
+        : 'common.copy',
+  );
+
+  protected async copy(text: string, input: HTMLInputElement) {
+    const ok = await copyText(text);
+    if (!ok) input.select();
+    this.copied.set(ok ? 'ok' : 'manual');
+    setTimeout(() => this.copied.set(''), ok ? 1500 : 5000);
   }
 
   protected async act(p: Promise<unknown>) {

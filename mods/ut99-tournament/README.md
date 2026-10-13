@@ -21,6 +21,9 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > closed gate (monster, trigger, button) and hunt key monsters instead of fearing them, route to the path point
 > next to an unreachable waypoint, bots make room at lifts; log shows who made a mover turn back, objectives and key
 > monster deaths.
+> Mod 0.5.8: bots no longer wait in front of opening doors (only closing ones or those about to move), so
+> proximity doors (MH-Trials' big doors) do not close again in front of them; the "turned back" log leaves out
+> doors that change direction on purpose (TriggerControl/TriggerToggle/TriggerPound).
 
 ## Classes
 
