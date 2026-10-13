@@ -211,6 +211,7 @@ function LiveTick()
 {
 	if (!RunActive())
 		return;
+	StatTick();
 	CaptainTick();
 	RpTicks++;
 	if (RpTicks >= 3 || RunDeaths != LastRpDeaths)
@@ -328,6 +329,32 @@ function int HunterPoints()
 	return int(Sum);
 }
 
+// Statistics: every hunter runs for the running side.
+function byte StatSide(Pawn P)
+{
+	if (RaceSide == 2)
+		return 1;
+	return 0;
+}
+
+// Monster points: the hunter's score (players who left: their saved score).
+function int StatPoints(int i)
+{
+	local int j;
+
+	if (StPawn[i] != None && !StPawn[i].bDeleteMe && StPawn[i].PlayerReplicationInfo != None)
+		return int(StPawn[i].PlayerReplicationInfo.Score);
+	if (StKey[i] != "")
+	{
+		j = FindSaved(StKey[i]);
+		if (j < 0 && TeamSize <= 1)
+			j = FindSaved(SideRole(StSide[i])); // one player per side: saved by side
+		if (j >= 0)
+			return int(SavedScore[j]);
+	}
+	return 0;
+}
+
 // Reasons that are not the exit: time limit, no hunters left, score limits.
 function bool ReachedExit(string Reason)
 {
@@ -347,6 +374,7 @@ function OnEndGame(string Reason, bool bWasOvertime)
 
 function ReportRun(bool bDone)
 {
+	SendStats(Max(1, RaceRun), int(RunSec)); // the running team's players and bots
 	bRunReported = true;
 	bEndReported = true;
 	OutMsg.Begin("runend");

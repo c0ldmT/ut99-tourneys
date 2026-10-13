@@ -107,6 +107,14 @@ function Timer()
 		Super(GameInfo).Timer(); // the game clock stands still before the start and in a pause
 }
 
+// Statistics: the core counts kills, deaths and more per player (before the scoring).
+function Killed(Pawn Killer, Pawn Other, name DamageType)
+{
+	if (TCore != None)
+		TCore.OnKilled(Killer, Other, DamageType);
+	Super.Killed(Killer, Other, DamageType);
+}
+
 function EndGame(string Reason)
 {
 	local bool bWasOvertime;

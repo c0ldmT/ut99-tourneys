@@ -15,6 +15,7 @@ import {
   type ModPhase,
   type ModToBridge,
   type NewTournamentEvent,
+  type PlayerGameStats,
   type TeamEntrant,
   type TournamentEvent,
   type TournamentProjection,
@@ -173,6 +174,13 @@ type Stage =
  * Kept from the ready check into the countdown, so a player leaving the countdown does not
  * reset everybody else.
  */
+/** The statistics lines of one player in one game (run), see `collectStat`. */
+interface StatLine {
+  ps?: Extract<ModToBridge, { t: 'ps' }>;
+  px?: Extract<ModToBridge, { t: 'px' }>;
+  weapons: Record<string, number>;
+}
+
 interface ReadyState {
   ready: Set<string>;
   present: Set<string>;
@@ -258,6 +266,8 @@ export class MatchDirector extends EventEmitter {
   private readonly onMessageListener = (m: Exclude<ModToBridge, ModHello>) =>
     void this.enqueue(() => this.onMessage(m));
   private stopped = false;
+  /** Player statistics lines of the current game/run (ps, px, pw), until `pse` completes them. */
+  private statLines = new Map<string, StatLine>();
   private reminder?: TimerHandle;
 
   start(): Promise<void> {
@@ -1771,12 +1781,109 @@ export class MatchDirector extends EventEmitter {
       }
       case 'runend':
         return this.onRunEnd(msg);
+      case 'ps':
+      case 'px':
+      case 'pw':
+        this.collectStat(msg);
+        return;
+      case 'pse':
+        return this.onStatsEnd(msg);
       case 'hb':
         return;
       case 'err':
         this.o.log.warn(`mod error: ${msg.msg}`);
         return;
     }
+  }
+
+  private collectStat(msg: Extract<ModToBridge, { t: 'ps' | 'px' | 'pw' }>): void {
+    const key = `${msg.mid}/${msg.g}/${msg.n}/${msg.i}`;
+    const line = this.statLines.get(key) ?? { weapons: {} };
+    if (msg.t === 'ps') line.ps = msg;
+    else if (msg.t === 'px') line.px = msg;
+    else line.weapons[msg.w] = (line.weapons[msg.w] ?? 0) + msg.c;
+    this.statLines.set(key, line);
+  }
+
+  /**
+   * All statistics lines of a game (run) are in: one `match.playerStats` event, before the
+   * game's end (run end) is recorded. Lines of other games are dropped.
+   */
+  private async onStatsEnd(msg: Extract<ModToBridge, { t: 'pse' }>): Promise<void> {
+    const prefix = `${msg.mid}/${msg.g}/${msg.n}/`;
+    const lines = [...this.statLines.entries()]
+      .filter(([k]) => k.startsWith(prefix))
+      .map(([, l]) => l);
+    this.statLines.clear();
+    const s = this.stage;
+    if (s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g) return;
+    if (this.raceMode ? msg.n !== this.raceRun() : msg.n !== 0) return;
+    // Sent again after a reconnect (with the pending end): recorded once.
+    const run = msg.n > 0 ? msg.n : undefined;
+    if (
+      this.events.some(
+        (e) =>
+          e.type === 'match.playerStats' &&
+          e.data.matchId === msg.mid &&
+          e.data.game === msg.g &&
+          e.data.run === run,
+      )
+    )
+      return;
+    if (lines.length !== msg.c)
+      this.o.log.warn(
+        `player statistics of ${msg.mid} game ${msg.g}: ${lines.length} of ${msg.c} players arrived`,
+      );
+    const { entrants } = this.current();
+    const players: PlayerGameStats[] = [];
+    for (const l of lines) {
+      if (!l.ps) continue;
+      const p = l.ps;
+      const x = l.px;
+      let name = p.bn;
+      let userId: string | undefined;
+      let entrantId: string | undefined = entrants[p.s === 'a' ? 0 : 1];
+      if (p.tk) {
+        const { entry, entrantId: eid } = this.entrantFor(p.tk);
+        if (!entry) continue; // unknown token: nothing to attribute
+        name = entry.displayName;
+        userId = entry.userId;
+        entrantId = eid ?? entrantId;
+      }
+      if (!name) continue;
+      players.push({
+        name: name.slice(0, 32),
+        ...(userId ? { userId } : { bot: true }),
+        ...(entrantId ? { entrantId } : {}),
+        kills: p.k,
+        deaths: p.d,
+        suicides: p.su,
+        teamKills: p.tm,
+        headshots: x?.hs ?? 0,
+        firstBlood: x?.fb ?? false,
+        bestSpree: x?.bs ?? 0,
+        sprees: x?.sp ?? 0,
+        multi2: x?.m2 ?? 0,
+        multi3: x?.m3 ?? 0,
+        multi4: x?.m4 ?? 0,
+        multi5: x?.m5 ?? 0,
+        timeSec: p.sec,
+        monsters: x?.mk ?? 0,
+        monsterPoints: x?.mp ?? 0,
+        weapons: l.weapons,
+      });
+    }
+    await this.append({
+      type: 'match.playerStats',
+      data: {
+        matchId: s.matchId,
+        game: s.game,
+        ...(msg.n > 0 ? { run: msg.n } : {}),
+        map: s.map,
+        durationSec: msg.sec,
+        players,
+      },
+    });
   }
 
   private async onJoin(pid: number, token: string, name: string): Promise<void> {

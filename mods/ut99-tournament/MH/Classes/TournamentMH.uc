@@ -135,6 +135,8 @@ function JoinHunters(Pawn P)
 // Every death of a hunter (players and bots) costs the team time.
 function Killed(Pawn Killer, Pawn Other, name DamageType)
 {
+	if (TCore != None)
+		TCore.OnKilled(Killer, Other, DamageType); // statistics (monsters killed, deaths, ...)
 	if (TourneyCoreMH(TCore) != None)
 		TourneyCoreMH(TCore).OnPawnKilled(Other);
 	Super.Killed(Killer, Other, DamageType);

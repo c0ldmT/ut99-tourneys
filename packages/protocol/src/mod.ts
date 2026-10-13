@@ -106,6 +106,60 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     pts: int,
     done: z.boolean(), // reached the exit before the time limit
   }),
+  /**
+   * Player statistics, sent right before `end` (n = 0) or `runend` (Monster Hunt, n = run): per
+   * player or bot one `ps` and one `px` line, `pw` lines for the weapons, then `pse` with the
+   * number of players. `i` links the lines of one player within the game.
+   */
+  z.object({
+    t: z.literal('ps'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    tk: str(64), // the player's join token ('' for bots)
+    bn: str(MAX_NAME_CHARS), // the bot's name ('' for players)
+    s: side,
+    k: int.nonnegative(), // kills
+    d: int.nonnegative(), // deaths
+    su: int.nonnegative(), // suicides
+    tm: int.nonnegative(), // team kills
+    sec: int.nonnegative(), // seconds in the game
+  }),
+  z.object({
+    t: z.literal('px'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    hs: int.nonnegative(), // headshots
+    fb: z.boolean(), // first blood
+    bs: int.nonnegative(), // best spree
+    sp: int.nonnegative(), // killing sprees (5 in a row)
+    m2: int.nonnegative(), // double kills
+    m3: int.nonnegative(), // multi kills
+    m4: int.nonnegative(), // ultra kills
+    m5: int.nonnegative(), // monster kills (multi kill level)
+    mk: int.nonnegative(), // Monster Hunt: monsters killed
+    mp: int, // Monster Hunt: monster points
+  }),
+  z.object({
+    t: z.literal('pw'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    w: str(32), // weapon name
+    c: int.positive(), // kills with it
+  }),
+  z.object({
+    t: z.literal('pse'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    c: int.nonnegative(), // number of players sent
+    sec: int.nonnegative(), // game (run) duration in seconds, pauses excluded
+  }),
   /** A chat command the bridge decides on, e.g. "start" (team captain starts with bots). */
   z.object({ t: z.literal('cmd'), pid, c: str(16) }),
   z.object({ t: z.literal('hb'), up: int.nonnegative() }), // heartbeat, uptime in seconds

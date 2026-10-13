@@ -24,6 +24,43 @@ export const ActorSchema = z.object({
   id: z.string().optional(),
 });
 
+const count = z.number().int().nonnegative();
+
+/**
+ * One player's (or bot's) statistics of a game (Monster Hunt: of a run), counted by the mod.
+ * Players are identified by their website user id, bots by their name.
+ */
+export const PlayerGameStatsSchema = z.object({
+  name: z.string().min(1).max(32),
+  userId: Id.optional(),
+  bot: z.boolean().optional(),
+  /** The entrant the player played for (side a or b of the match). */
+  entrantId: Id.optional(),
+  kills: count,
+  deaths: count,
+  suicides: count,
+  teamKills: count,
+  headshots: count,
+  firstBlood: z.boolean(),
+  /** Most kills in a row without dying. */
+  bestSpree: count,
+  /** Killing sprees (5 kills in a row). */
+  sprees: count,
+  /** Multi kills (kills less than 3 s apart): double (2), multi (3), ultra (4), monster (5+). */
+  multi2: count,
+  multi3: count,
+  multi4: count,
+  multi5: count,
+  /** Seconds in the game. */
+  timeSec: count,
+  /** Monster Hunt: monsters killed and monster points. */
+  monsters: count,
+  monsterPoints: z.number().int(),
+  /** Kills per weapon (weapon name -> kills). */
+  weapons: z.record(z.string().min(1).max(32), z.number().int().positive()),
+});
+export type PlayerGameStats = z.infer<typeof PlayerGameStatsSchema>;
+
 const event = <T extends string, D extends z.ZodType>(type: T, data: D) =>
   z.object({
     type: z.literal(type),
@@ -141,6 +178,23 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
       winnerId: Id,
       /** `race`: Monster Hunt, decided by the two runs (scores are the final times in ms). */
       endReason: z.enum(['fragLimit', 'timeLimit', 'suddenDeath', 'forfeit', 'admin', 'race']),
+    }),
+  ),
+  /**
+   * Player statistics of a game (Monster Hunt: of one run, `run` 1 or 2). Comes before the
+   * game's `match.gameFinished` (Monster Hunt: before the run's `match.runFinished`). Does not
+   * change the tournament state; the website builds its statistics from it.
+   */
+  event(
+    'match.playerStats',
+    z.object({
+      matchId: Id,
+      game: z.number().int().positive(),
+      run: z.number().int().min(1).max(2).optional(),
+      map: z.string(),
+      /** Seconds from the start of the game (run) to its end, pauses excluded. */
+      durationSec: count,
+      players: z.array(PlayerGameStatsSchema).max(64),
     }),
   ),
   event('match.result', z.object({ result: MatchResultSchema })),

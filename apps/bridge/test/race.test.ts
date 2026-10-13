@@ -72,6 +72,16 @@ describe('Monster Hunt time race against the simulated UT server', () => {
     expect(games[0].data.winnerId).toBe(order[0]);
     expect(games[0].data.scores).toEqual({ [order[0]]: 310_000, [order[1]]: 315_000 });
     expect(p.games[games[0].data.matchId]?.[0]?.runs).toHaveLength(2);
+    // Player statistics per run, before the run's end, for the running team only.
+    const stats = events(env, 'match.playerStats');
+    expect(stats).toHaveLength(6);
+    expect(stats.map((st) => st.data.run)).toEqual([1, 2, 1, 2, 1, 2]);
+    for (let i = 0; i < 6; i++) {
+      expect(
+        stats[i].data.players.every((pl: any) => pl.entrantId === runs[i].data.entrantId),
+      ).toBe(true);
+      expect(stats[i].data.durationSec).toBe(Math.round(runs[i].data.timeMs / 1000));
+    }
     // Two travels to the same map per game.
     expect(env.sim.travels).toHaveLength(6);
     expect(env.sim.travels[0]).toBe(env.sim.travels[1]);

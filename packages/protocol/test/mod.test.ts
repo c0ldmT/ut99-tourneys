@@ -60,6 +60,50 @@ describe('mod line protocol', () => {
     expect(line.length).toBeLessThanOrEqual(MAX_LINE_BYTES);
   });
 
+  it('worst-case statistics lines fit the line limit', () => {
+    const mid = 'X'.repeat(16);
+    const lines = [
+      encodeModLine({
+        t: 'ps',
+        mid,
+        g: 99,
+        n: 2,
+        i: 63,
+        tk: 'A'.repeat(24),
+        bn: wireName('\u00e4'.repeat(40)),
+        s: 'b',
+        k: 9999,
+        d: 9999,
+        su: 9999,
+        tm: 9999,
+        sec: 99999,
+      }),
+      encodeModLine({
+        t: 'px',
+        mid,
+        g: 99,
+        n: 2,
+        i: 63,
+        hs: 9999,
+        fb: false,
+        bs: 9999,
+        sp: 9999,
+        m2: 9999,
+        m3: 9999,
+        m4: 9999,
+        m5: 9999,
+        mk: 99999,
+        mp: -999999,
+      }),
+      encodeModLine({ t: 'pw', mid, g: 99, n: 2, i: 63, w: 'W'.repeat(32), c: 9999 }),
+      encodeModLine({ t: 'pse', mid, g: 99, n: 2, c: 64, sec: 99999 }),
+    ];
+    for (const line of lines) {
+      expect(line.length).toBeLessThanOrEqual(MAX_LINE_BYTES);
+      expect(decodeModToBridge(line).t).toMatch(/^p/);
+    }
+  });
+
   it('wireName respects char and byte budgets and drops emoji', () => {
     expect(wireName('a'.repeat(50))).toHaveLength(32);
     expect(wireName('ä'.repeat(20))).toHaveLength(8); // 8 * 6 bytes = 48

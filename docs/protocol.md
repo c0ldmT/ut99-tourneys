@@ -28,6 +28,7 @@ games, bracket via the bracket engine). Website and bridge run the same code, so
 | `match.mapSelected`               | bridge          | Map for a game, with method (`vote`, `random`, `loserPick`, `admin`) and vote details |
 | `match.started`                   | bridge          | Countdown over, game is live                                                          |
 | `match.runFinished`               | bridge          | Monster Hunt: one team's run of the game is over (time, deaths, penalty, points)      |
+| `match.playerStats`               | bridge          | Player statistics of a game (Monster Hunt: of a run), before its end; no state change |
 | `match.gameFinished`              | bridge          | One game of a series is over (scores, end reason)                                     |
 | `match.result`                    | bridge / admin  | Final result of a match; a later result for the same match overrides                  |
 | `tournament.paused` / `resumed`   | admin / bridge  |                                                                                       |
@@ -130,21 +131,25 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends 
 
 ### Mod → Bridge
 
-| `t`      | Fields                 | Meaning                                                                                                                             |
-| -------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `hello`  | `key pv mv eng lvl gm` | Shared secret, protocol version, mod version, engine version, current map, a game was started on this level (running or just ended) |
-| `join`   | `pid tk name role`     | Player connected; role (`a`/`b`/`s`) already decided by the mod from the access list                                                |
-| `leave`  | `pid`                  |                                                                                                                                     |
-| `reject` | `name why`             | Connection without a valid token was refused                                                                                        |
-| `ready`  | `pid`                  | Match player is ready (UWindow button or `!ready`)                                                                                  |
-| `vote`   | `pid m1 m2 m3`         | Ranked map choices (`""` = none)                                                                                                    |
-| `live`   | `mid g`                | Countdown over, players spawned                                                                                                     |
-| `score`  | `mid g sa sb tl ot`    | Periodic and on every frag                                                                                                          |
-| `end`    | `mid g sa sb w why`    | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                                                                           |
-| `lost`   | `mid s`                | 1v1: match player disconnected during a live game; mod paused the game                                                              |
-| `cmd`    | `pid c`                | Chat command the bridge decides on: `start` (team captain starts with bots for missing players)                                     |
-| `hb`     | `up`                   | Heartbeat every 5 s                                                                                                                 |
-| `err`    | `msg`                  |                                                                                                                                     |
+| `t`      | Fields                                    | Meaning                                                                                                                                                                  |
+| -------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `hello`  | `key pv mv eng lvl gm`                    | Shared secret, protocol version, mod version, engine version, current map, a game was started on this level (running or just ended)                                      |
+| `join`   | `pid tk name role`                        | Player connected; role (`a`/`b`/`s`) already decided by the mod from the access list                                                                                     |
+| `leave`  | `pid`                                     |                                                                                                                                                                          |
+| `reject` | `name why`                                | Connection without a valid token was refused                                                                                                                             |
+| `ready`  | `pid`                                     | Match player is ready (UWindow button or `!ready`)                                                                                                                       |
+| `vote`   | `pid m1 m2 m3`                            | Ranked map choices (`""` = none)                                                                                                                                         |
+| `live`   | `mid g`                                   | Countdown over, players spawned                                                                                                                                          |
+| `score`  | `mid g sa sb tl ot`                       | Periodic and on every frag                                                                                                                                               |
+| `end`    | `mid g sa sb w why`                       | Game over: `frag`, `time`, `sd` (sudden death), `forfeit`                                                                                                                |
+| `lost`   | `mid s`                                   | 1v1: match player disconnected during a live game; mod paused the game                                                                                                   |
+| `ps`     | `mid g n i tk bn s k d su tm sec`         | Statistics of player/bot `i` (before `end`/`runend`; `n` 0 = game, 1/2 = Monster Hunt run): token or bot name, side, kills, deaths, suicides, team kills, seconds played |
+| `px`     | `mid g n i hs fb bs sp m2 m3 m4 m5 mk mp` | More of `i`: headshots, first blood, best spree, sprees (5 in a row), double/multi/ultra/monster kills, Monster Hunt monsters killed and monster points                  |
+| `pw`     | `mid g n i w c`                           | Kills of `i` with weapon `w` (one line per weapon, up to 8)                                                                                                              |
+| `pse`    | `mid g n c sec`                           | End of the statistics: number of players, game (run) duration in seconds; the bridge appends `match.playerStats`                                                         |
+| `cmd`    | `pid c`                                   | Chat command the bridge decides on: `start` (team captain starts with bots for missing players)                                                                          |
+| `hb`     | `up`                                      | Heartbeat every 5 s                                                                                                                                                      |
+| `err`    | `msg`                                     |                                                                                                                                                                          |
 
 ### Bridge → Mod
 

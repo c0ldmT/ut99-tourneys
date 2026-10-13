@@ -1087,6 +1087,14 @@ export class TournamentPage {
       }
       case 'match.mapSelected':
         return `${d['matchId']} G${d['game']}: ${d['map']} (${d['method']})`;
+      case 'match.playerStats': {
+        const players = d['players'] as { name: string; kills: number; monsters: number }[];
+        const run = d['run'] ? ` R${d['run']}` : '';
+        const top = players
+          .map((p) => `${p.name} ${p.monsters ? `${p.monsters}M` : p.kills}`)
+          .join(', ');
+        return `${d['matchId']} G${d['game']}${run}: ${top}`;
+      }
       case 'match.called':
         return `${d['matchId']}: ${(d['entrants'] as string[]).map((x) => this.name(x)).join(' vs ')}`;
       case 'entrant.checkedIn':

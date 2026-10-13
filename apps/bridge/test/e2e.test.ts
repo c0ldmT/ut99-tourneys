@@ -45,6 +45,24 @@ describe('end to end against the simulated UT server', () => {
     expect(env.log.lines.filter((l) => /^(warn|error):/.test(l))).toEqual([]);
     // Bracket and standings reach the server after every result.
     expect(env.sim.received.filter((m) => m.t === 'brh').length).toBeGreaterThan(p.results.length);
+    // Player statistics: one event per game, right before it ends; humans by user id, bots by name.
+    const stats = events(env, 'match.playerStats');
+    expect(stats).toHaveLength(games.length);
+    const all = (env.director as any).events as { type: string; data: any }[];
+    for (const st of stats) {
+      const next = all[all.indexOf(st) + 1];
+      expect(next?.type).toBe('match.gameFinished');
+      expect(next?.data.game).toBe(st.data.game);
+      expect(st.data.run).toBeUndefined();
+      for (const pl of st.data.players) {
+        expect(pl.entrantId).toBeDefined();
+        if (pl.bot) expect(pl.userId).toBeUndefined();
+        else expect(pl.userId).toBeTruthy();
+      }
+    }
+    expect(stats.flatMap((st) => st.data.players).some((pl) => pl.weapons['Shock Rifle'] > 0)).toBe(
+      true,
+    );
   });
 
   it('announces the shutdown and emits it after postTournamentShutdownSec', async () => {

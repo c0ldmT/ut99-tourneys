@@ -102,6 +102,10 @@ export class ModSimulator {
   private dropped = new Set<string>();
   private rng: Rng;
   private stopped = false;
+  /** Bots of the current match (from the `bot` lines), for the statistics lines. */
+  private matchBots: { name: string; s: 'a' | 'b' }[] = [];
+  /** Statistics lines sent so far (tests look at them). */
+  readonly statsSent: ModToBridge[] = [];
   /** Every line received from the bridge (tests inspect it). */
   readonly received: BridgeToMod[] = [];
   readonly receivedAt: number[] = [];
@@ -205,6 +209,10 @@ export class ModSimulator {
       case 'match':
         this.match = { mid: msg.mid, g: msg.g, ts: msg.ts };
         this.race = undefined;
+        this.matchBots = [];
+        return;
+      case 'bot':
+        this.matchBots.push({ name: msg.name, s: msg.s });
         return;
       case 'race':
         this.race = { rs: msg.rs, n: msg.n };
@@ -367,6 +375,7 @@ export class ModSimulator {
       if (!this.inGame) return;
       this.inGame = false;
       this.clearGame();
+      this.sendStats(m, race.n, race.rs, Math.round(ms / 1000));
       this.send({
         t: 'runend',
         mid: m.mid,
@@ -423,6 +432,7 @@ export class ModSimulator {
       this.clearGame();
       const w = this.rng() < this.b.winChanceA ? 'a' : 'b';
       const loserScore = Math.floor(this.rng() * 20);
+      this.sendStats(m, 0, undefined, Math.round(this.b.gameDurationMs / 1000));
       this.send({
         t: 'end',
         mid: m.mid,
@@ -434,6 +444,70 @@ export class ModSimulator {
       });
     });
     this.endTimer = { handle, due: this.o.clock.now() + ms };
+  }
+
+  /**
+   * Player statistics like the mod sends them before `end`/`runend`: the match players (and the
+   * match's bots) of both sides, Monster Hunt: of the running side only.
+   */
+  private sendStats(
+    m: { mid: string; g: number },
+    n: number,
+    runSide: 'a' | 'b' | undefined,
+    sec: number,
+  ): void {
+    const who: { tk: string; bn: string; s: 'a' | 'b' }[] = [];
+    for (const j of this.matchPlayers()) {
+      const s = j.role === 'b' ? 'b' : 'a';
+      if (!runSide || s === runSide) who.push({ tk: j.token, bn: '', s });
+    }
+    for (const b of this.matchBots)
+      if (!runSide || b.s === runSide) who.push({ tk: '', bn: b.name, s: b.s });
+    who.forEach((p, i) => {
+      const k = Math.floor(this.rng() * 20);
+      const lines: ModToBridge[] = [
+        {
+          t: 'ps',
+          mid: m.mid,
+          g: m.g,
+          n,
+          i,
+          tk: p.tk,
+          bn: p.bn,
+          s: p.s,
+          k,
+          d: Math.floor(this.rng() * 20),
+          su: 0,
+          tm: 0,
+          sec,
+        },
+        {
+          t: 'px',
+          mid: m.mid,
+          g: m.g,
+          n,
+          i,
+          hs: Math.min(k, 2),
+          fb: i === 0,
+          bs: Math.min(k, 5),
+          sp: k >= 5 ? 1 : 0,
+          m2: k >= 2 ? 1 : 0,
+          m3: 0,
+          m4: 0,
+          m5: 0,
+          mk: runSide ? 10 + i : 0,
+          mp: runSide ? 100 + i : 0,
+        },
+      ];
+      if (k > 0) lines.push({ t: 'pw', mid: m.mid, g: m.g, n, i, w: 'Shock Rifle', c: k });
+      for (const l of lines) {
+        this.statsSent.push(l);
+        this.send(l);
+      }
+    });
+    const end: ModToBridge = { t: 'pse', mid: m.mid, g: m.g, n, c: who.length, sec };
+    this.statsSent.push(end);
+    this.send(end);
   }
 
   private setPaused(on: boolean): void {

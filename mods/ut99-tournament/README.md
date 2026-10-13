@@ -25,6 +25,9 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > proximity doors (MH-Trials' big doors) do not close again in front of them; the "turned back" log leaves out
 > doors that change direction on purpose (TriggerControl/TriggerToggle/TriggerPound).
 > Mod 0.5.9: join tokens are compared without regard to case (short codes typed in the UT console).
+> Mod 0.6.0: player statistics - kills, deaths, suicides, team kills, headshots, first blood, sprees, multi kills,
+> kills per weapon, time played, Monster Hunt monsters and points, per player and bot, sent to the bridge before
+> the end of every game (run).
 
 ## Classes
 
@@ -200,6 +203,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 46 | Bots | Bot-only team: server log `virtual captain: Attack for N bots, every 45 s`; the bots head through the map instead of wandering. With the waypoint fix: `bot waypoints (sorted): 1 2 3 ...` at every level start; switch it off in the tournament form if bots behave worse, and try it together with SmartStockBots |
 | 47 | Bot helpers | Bot-only Monster Hunt run, then `grep "UTTourney: bot" Tourney.log`: per order `order: Attack -> NAME` and a second later `ack: NAME follows Attack, ...`; at the level start `mover ... turns back on contact` and `movers watched: N, lifts: L`; then `goal waypoint N`, `waypoint N reached`, and per helper step `waits at ...`/`goes on`, `stuck ... jumps`/`detour`/`penalty-free respawn`, `only with a jump (JumpSpot)`. Nothing of it appears in the game or console. MH-Trials: the bots cross the lava after the rock (waypoints 7–10) instead of running to the start gate; MH-NaliVillage][: no endless lift loop; MH-Canyon: the bots wait in front of the castle bars until all have opened |
 | 48 | Bot helpers 2 | Level start: `map fix: MoverN ... it no longer turns back` (MH-Canyon: Mover9–16, MH-Trials: gateway, beams, final bars) and `key monster: ...` (MH-NaliVillage][: both titans). During the run: `stuck at closed MoverN (tag) ..., opened by: ... -> hunts/goes to/bumps X` and `errand for MoverN ends, ...`; `no route to waypoint N itself, goes via ...`; `makes room at lift ...`; `mover ... turned back ..., nearest pawn ...`; `objective active/completed: ...`; `key monster dead: ...`. MH-Canyon: the castle bars always open; MH-NaliVillage][: the bots kill the second titan; MH-Trials: the bots reach waypoint 10 or the trigger next to it |
+| 49 | Statistics | Play a game (or Monster Hunt run) to the end. Tournament page → Events (admin): a `match.playerStats` line right before the game's result with every player and bot and their kills (Monster Hunt: monsters, `12M`). Bridge log without `player statistics ... of ... players arrived` warnings |
 
 ## SmartStockBots (optional)
 

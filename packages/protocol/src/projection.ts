@@ -235,6 +235,9 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         delete cm.runner;
         break;
       }
+      case 'match.playerStats':
+        // statistics only (the website's stats); the tournament state does not change
+        break;
       case 'match.gameFinished': {
         const cm = requireCurrent(p, e.data.matchId, fail);
         const list = (p.games[e.data.matchId] ??= []);

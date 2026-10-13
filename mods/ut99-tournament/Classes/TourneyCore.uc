@@ -17,12 +17,14 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.5.9";
+const MOD_VERSION = "0.6.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
 const MAXACL = 64;
 const MAXTRACK = 64;
+const MAXST = 32;   // players and bots with statistics per game
+const MAXW = 8;     // weapons per player
 
 var DeathMatchPlus Game;          // the game this core drives (TournamentDM, TournamentTDM, TournamentMH)
 var BridgeLink Link;
@@ -89,8 +91,26 @@ var string SavedKey[16];           // 1v1: the side (a/b), team games: the playe
 var float SavedScore[16], SavedDeaths[16];
 var string PendingAddr;
 var string PendingEnd;
+var string PendingStat[260];       // statistics lines of the end, sent again with PendingEnd
+var int PendingStatCount;
 var bool bTokenFromAddress;
 var float ReleaseAt; // see ReleaseScoreboards
+// Player statistics of the current game (Monster Hunt: run), sent before its end (ps/px/pw/pse).
+// Players are kept by token, bots by name, so leaving and coming back keeps the counts.
+var string StKey[32];              // join token ("" for bots)
+var string StBot[32];              // bot name ("" for players)
+var Pawn StPawn[32];               // the pawn last seen for the slot (None after leaving)
+var byte StSide[32];               // 0 = side a, 1 = side b
+var int StKills[32], StDeaths[32], StSuicides[32], StTeamKills[32], StHead[32];
+var int StSpree[32], StBestSpree[32], StSprees[32], StMulti[32];
+var int StM2[32], StM3[32], StM4[32], StM5[32], StSec[32], StMon[32];
+var byte StFirst[32];
+var float StLastKill[32];
+var string StWName[256];           // MAXST * MAXW: weapon names per player
+var int StWCount[256];
+var int StCount;
+var int StGameSec;
+var bool bFirstBlood;
 
 //=============================================================================
 // Startup (from the game type)
@@ -167,6 +187,8 @@ function ConnectBridge()
 
 function OnBridgeOpened()
 {
+	local int i;
+
 	bJoinsSent = false;
 	OutMsg.Begin("hello");
 	OutMsg.AddStr("key", class'TournamentConfig'.default.SharedKey);
@@ -178,7 +200,12 @@ function OnBridgeOpened()
 	OutMsg.AddBool("gm", bGameLive);
 	Send();
 	if (PendingEnd != "")
-		Link.SendLine(PendingEnd); // result reported while the bridge was unreachable
+	{
+		// result reported while the bridge was unreachable: statistics first, then the end
+		for (i = 0; i < PendingStatCount; i++)
+			Link.SendLine(PendingStat[i]);
+		Link.SendLine(PendingEnd);
+	}
 }
 
 function Send()
@@ -237,6 +264,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			if (M.Get("mid") != MatchId || M.GetInt("g") != GameNo)
 			{
 				PendingEnd = "";
+				PendingStatCount = 0;
 				bTeamReadyA = false;
 				bTeamReadyB = false;
 			}
@@ -1247,6 +1275,7 @@ function LiveTick()
 	local int A, B;
 	if (Game.bGameEnded)
 		return;
+	StatTick();
 	A = SideScore(0);
 	B = SideScore(1);
 	ScoreTicks++;
@@ -1282,6 +1311,274 @@ function int SideScore(int Side)
 	return 0;
 }
 
+//-----------------------------------------------------------------------------
+// Player statistics
+
+// Once a second while the game is live: time in the game for everyone on a side.
+function StatTick()
+{
+	local Pawn P;
+	local int i;
+
+	if (!bGameLive || bEndReported || bTourneyPaused)
+		return;
+	StGameSec++;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		i = StatIndex(P, true);
+		if (i >= 0)
+			StSec[i]++;
+	}
+}
+
+// Side of a player or bot: team games by team, one on one by role (players) or bot side.
+function byte StatSide(Pawn P)
+{
+	local int i, t;
+
+	if (TeamSize > 1)
+		return Min(P.PlayerReplicationInfo.Team, 1);
+	if (PlayerPawn(P) != None)
+	{
+		t = FindTrack(PlayerPawn(P));
+		if (t >= 0 && TrackRole[t] == "b")
+			return 1;
+		return 0;
+	}
+	for (i = 0; i < BotCount; i++)
+		if (BotName[i] ~= P.PlayerReplicationInfo.PlayerName)
+			return BotSide[i];
+	return Min(P.PlayerReplicationInfo.Team, 1);
+}
+
+// Statistics slot of a player (by token) or bot (by name); -1 for spectators, monsters and
+// players without a tracked token. bCreate adds a slot.
+function int StatIndex(Pawn P, bool bCreate)
+{
+	local int i, t;
+	local string Key, BName;
+
+	if (P == None || P.bDeleteMe || !P.bIsPlayer || P.PlayerReplicationInfo == None || P.IsA('ScriptedPawn')
+		|| P.IsA('Spectator') || P.PlayerReplicationInfo.bIsSpectator)
+		return -1;
+	if (PlayerPawn(P) != None)
+	{
+		t = FindTrack(PlayerPawn(P));
+		if (t < 0 || TrackTok[t] == "" || TrackRole[t] == "s")
+			return -1;
+		Key = TrackTok[t];
+	}
+	else if (Bot(P) != None)
+		BName = P.PlayerReplicationInfo.PlayerName;
+	else
+		return -1;
+	for (i = 0; i < StCount; i++)
+		if ((Key != "" && StKey[i] == Key) || (Key == "" && StKey[i] == "" && StBot[i] ~= Left(BName, 32)))
+		{
+			StPawn[i] = P;
+			return i;
+		}
+	if (!bCreate || StCount >= MAXST)
+		return -1;
+	BName = Left(BName, 32); // the protocol's name limit
+	i = StCount;
+	StCount++;
+	StKey[i] = Key;
+	StBot[i] = BName;
+	StPawn[i] = P;
+	StSide[i] = StatSide(P);
+	return i;
+}
+
+// From the game's Killed (before Super): counts kills, deaths and the rest for both pawns.
+function OnKilled(Pawn Killer, Pawn Other, name DamageType)
+{
+	local int v, k;
+
+	if (!bGameLive || bEndReported || bTourneyPaused || Game.bGameEnded)
+		return;
+	v = StatIndex(Other, true);
+	if (v >= 0)
+	{
+		StDeaths[v]++;
+		StSpree[v] = 0;
+		StMulti[v] = 0;
+		StLastKill[v] = -1000; // a multi kill ends with the death, as in UT
+	}
+	if (Killer == None || Killer == Other)
+	{
+		if (v >= 0)
+			StSuicides[v]++;
+		return;
+	}
+	k = StatIndex(Killer, true);
+	if (k < 0)
+		return; // killed by a monster, a spectator's leftovers, ...
+	if (Other.IsA('ScriptedPawn'))
+	{
+		StMon[k]++; // Monster Hunt
+		AddWeaponKill(k, WeaponName(Killer, DamageType));
+		return;
+	}
+	if (v < 0)
+		return;
+	if (!bFirstBlood)
+	{
+		bFirstBlood = true; // like UT's message: any kill of another player, team kills too
+		StFirst[k] = 1;
+	}
+	if ((TeamSize > 1 || Game.bTeamGame) && Killer.PlayerReplicationInfo.Team == Other.PlayerReplicationInfo.Team)
+	{
+		StTeamKills[k]++;
+		return;
+	}
+	StKills[k]++;
+	if (DamageType == 'Decapitated')
+		StHead[k]++;
+	StSpree[k]++;
+	if (StSpree[k] > StBestSpree[k])
+		StBestSpree[k] = StSpree[k];
+	if (StSpree[k] == 5)
+		StSprees[k]++;
+	// UT's multi kill rule: kills less than 3 seconds apart
+	if (Level.TimeSeconds - StLastKill[k] < 3)
+	{
+		StMulti[k]++;
+		if (StMulti[k] == 1)
+			StM2[k]++;
+		else if (StMulti[k] == 2)
+			StM3[k]++;
+		else if (StMulti[k] == 3)
+			StM4[k]++;
+		else
+			StM5[k]++;
+	}
+	else
+		StMulti[k] = 0;
+	StLastKill[k] = Level.TimeSeconds;
+	AddWeaponKill(k, WeaponName(Killer, DamageType));
+}
+
+function string WeaponName(Pawn Killer, name DamageType)
+{
+	local string S;
+
+	if (Killer.Weapon != None)
+	{
+		S = Killer.Weapon.ItemName;
+		if (S == "")
+			S = string(Killer.Weapon.Class.Name);
+	}
+	else
+		S = string(DamageType);
+	return Left(S, 32);
+}
+
+function AddWeaponKill(int k, string W)
+{
+	local int j, Base;
+
+	if (W == "")
+		return;
+	Base = k * MAXW;
+	for (j = 0; j < MAXW; j++)
+	{
+		if (StWName[Base + j] == W)
+		{
+			StWCount[Base + j]++;
+			return;
+		}
+		if (StWName[Base + j] == "")
+		{
+			StWName[Base + j] = W;
+			StWCount[Base + j] = 1;
+			return;
+		}
+	}
+}
+
+// Sends the statistics of this game (N = 0) or Monster Hunt run (N = run), before end/runend.
+function SendStats(int N, int Sec)
+{
+	local int i, j;
+
+	PendingStatCount = 0;
+	for (i = 0; i < StCount; i++)
+	{
+		OutMsg.Begin("ps");
+		OutMsg.AddStr("mid", MatchId);
+		OutMsg.AddInt("g", GameNo);
+		OutMsg.AddInt("n", N);
+		OutMsg.AddInt("i", i);
+		OutMsg.AddStr("tk", StKey[i]);
+		OutMsg.AddStr("bn", StBot[i]);
+		OutMsg.AddStr("s", SideRole(StSide[i]));
+		OutMsg.AddInt("k", StKills[i]);
+		OutMsg.AddInt("d", StDeaths[i]);
+		OutMsg.AddInt("su", StSuicides[i]);
+		OutMsg.AddInt("tm", StTeamKills[i]);
+		OutMsg.AddInt("sec", StSec[i]);
+		SendStat();
+		OutMsg.Begin("px");
+		OutMsg.AddStr("mid", MatchId);
+		OutMsg.AddInt("g", GameNo);
+		OutMsg.AddInt("n", N);
+		OutMsg.AddInt("i", i);
+		OutMsg.AddInt("hs", StHead[i]);
+		OutMsg.AddBool("fb", StFirst[i] != 0);
+		OutMsg.AddInt("bs", StBestSpree[i]);
+		OutMsg.AddInt("sp", StSprees[i]);
+		OutMsg.AddInt("m2", StM2[i]);
+		OutMsg.AddInt("m3", StM3[i]);
+		OutMsg.AddInt("m4", StM4[i]);
+		OutMsg.AddInt("m5", StM5[i]);
+		OutMsg.AddInt("mk", StMon[i]);
+		OutMsg.AddInt("mp", StatPoints(i));
+		SendStat();
+		for (j = 0; j < MAXW; j++)
+		{
+			if (StWName[i * MAXW + j] == "")
+				break;
+			OutMsg.Begin("pw");
+			OutMsg.AddStr("mid", MatchId);
+			OutMsg.AddInt("g", GameNo);
+			OutMsg.AddInt("n", N);
+			OutMsg.AddInt("i", i);
+			OutMsg.AddStr("w", StWName[i * MAXW + j]);
+			OutMsg.AddInt("c", StWCount[i * MAXW + j]);
+			SendStat();
+		}
+	}
+	OutMsg.Begin("pse");
+	OutMsg.AddStr("mid", MatchId);
+	OutMsg.AddInt("g", GameNo);
+	OutMsg.AddInt("n", N);
+	OutMsg.AddInt("c", StCount);
+	OutMsg.AddInt("sec", Sec);
+	SendStat();
+}
+
+// Sends a statistics line and keeps it for a resend with PendingEnd.
+function SendStat()
+{
+	local string Line;
+
+	Line = OutMsg.Finish();
+	if (PendingStatCount < 260)
+	{
+		PendingStat[PendingStatCount] = Line;
+		PendingStatCount++;
+	}
+	if (Link != None)
+		Link.SendLine(Line);
+}
+
+// Monster points of a slot (Monster Hunt overrides it); 0 in deathmatch.
+function int StatPoints(int i)
+{
+	return 0;
+}
+
 // Called by the game's EndGame (after Super.EndGame).
 function OnEndGame(string Reason, bool bWasOvertime)
 {
@@ -1294,9 +1591,10 @@ function ReportEnd(string Reason, bool bWasOvertime)
 	local int A, B;
 	local string Why;
 
-	bEndReported = true;
 	A = SideScore(0);
 	B = SideScore(1);
+	SendStats(0, StGameSec); // before bEndReported: the last frag still counted
+	bEndReported = true;
 	if (bWasOvertime)
 		Why = "sd";
 	else if (Reason ~= "timelimit")

@@ -62,6 +62,15 @@ describe('team tournaments against the simulated UT server', () => {
     // The mod knows the team size and gets the bots with the countdown.
     expect(env.sim.received.find((m) => m.t === 'match')).toMatchObject({ ts: 2, ff: 0 });
     expect(env.sim.received.filter((m) => m.t === 'bot').length).toBeGreaterThanOrEqual(4);
+    // Statistics: members by user id for their team, bots by name.
+    const stats = events(env, 'match.playerStats');
+    expect(stats).toHaveLength(3);
+    const statPlayers = stats.flatMap((st) => st.data.players);
+    expect(statPlayers.find((pl: any) => pl.userId === 'mario')).toMatchObject({
+      name: 'Mario',
+      entrantId: 't1',
+    });
+    expect(statPlayers.some((pl: any) => pl.bot && pl.entrantId.startsWith('botteam'))).toBe(true);
     expect(env.log.lines.filter((l) => /^(warn|error):/.test(l))).toEqual([]);
   });
 
