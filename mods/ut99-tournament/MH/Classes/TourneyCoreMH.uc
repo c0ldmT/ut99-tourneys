@@ -23,13 +23,15 @@ var int LastRpDeaths, RpTicks;
 var int HuntLives;          // 0 = unlimited, -1 = not known (Monster Hunt's own setting)
 var int HuntMonsterSkill;   // -1 = not known
 var bool bHuntWeaponStay, bHuntHardcore;
-var bool bHuntWaypointFix;  // bots use TourneyMHBotExtension (sorted waypoints)
+var bool bHuntWaypointFix;  // bots use TourneyMHBotExtension (waypoint order, jump routes, mover guard, unstick)
 // Virtual captain: teams without a player on the server get "Attack" (as from the V menu) at
 // the start of the run and every CaptainSec seconds, so their bots follow the map's waypoints
 // (Monster Hunt gives bots of such teams no orders at all).
 var int CaptainSec;
 var int CaptainLeft;
 var bool bCaptainLogged;
+var Bot AckBot[32];         // bots that got the order: their confirmation goes to the log a second later
+var int NumAck;
 // Where the runners were when a pause began (a resume puts them back, not to the start).
 var Pawn SpotPawn[16];
 var vector SpotLoc[16];
@@ -102,7 +104,7 @@ function ApplyHuntSettings()
 		MHGame().MonsterSkill = HuntMonsterSkill;
 	Game.bMultiWeaponStay = bHuntWeaponStay;
 	Game.bHardCoreMode = bHuntHardcore;
-	// Monster Hunt spawns its bot extension in PostBeginPlay, after this.
+	// Monster Hunt spawns its bot extension in PreBeginPlay (spawnExtensions), after this.
 	if (bHuntWaypointFix)
 		MHGame().BotExtensionType = class'TourneyMHBotExtension';
 	Log("Monster Hunt: lives" @ MHGame().Lives @ "(0 = unlimited), monster skill" @ MHGame().MonsterSkill
@@ -165,6 +167,7 @@ function StartTournamentMatch()
 	LastRpDeaths = -1;
 	RpTicks = 0;
 	CaptainLeft = 1; // first orders right after the start
+	NumAck = 0;
 	Super.StartTournamentMatch();
 	if (RaceSide == 0)
 		Log("run started without a race line from the bridge", 'UTTourney');
@@ -214,12 +217,16 @@ function LiveTick()
 		SendProgress();
 }
 
-// Once a second while the run is live (not in a pause).
+// Once a second while the run is live (not in a pause). Every order and, a second later, what
+// each bot made of it go to the server log only (no voice message, nothing in the game).
 function CaptainTick()
 {
 	local Pawn P;
 	local int n;
+	local name Was;
 
+	if (NumAck > 0)
+		LogAcks();
 	CaptainLeft--;
 	if (CaptainLeft > 0)
 		return;
@@ -230,7 +237,15 @@ function CaptainTick()
 		if (Bot(P) != None && !P.bDeleteMe && P.Health > 0 && P.PlayerReplicationInfo != None
 			&& P.PlayerReplicationInfo.Team == 0 && !P.PlayerReplicationInfo.bIsSpectator)
 		{
+			Was = Bot(P).Orders;
 			Bot(P).SetOrders('Attack', None, true);
+			Log("bot" @ RunStamp() @ "order: Attack ->" @ P.PlayerReplicationInfo.PlayerName @ "(was" @ Was $ ")",
+				'UTTourney');
+			if (NumAck < 32)
+			{
+				AckBot[NumAck] = Bot(P);
+				NumAck++;
+			}
 			n++;
 		}
 	if (n > 0 && !bCaptainLogged)
@@ -238,6 +253,48 @@ function CaptainTick()
 		bCaptainLogged = true;
 		Log("virtual captain: Attack for" @ n @ "bots, every" @ CaptainSec @ "s", 'UTTourney');
 	}
+}
+
+function LogAcks()
+{
+	local int i;
+	local Bot B;
+	local string Goal;
+
+	for (i = 0; i < NumAck; i++)
+	{
+		B = AckBot[i];
+		AckBot[i] = None;
+		if (B == None || B.bDeleteMe || B.PlayerReplicationInfo == None)
+			continue;
+		if (B.Health <= 0)
+		{
+			Log("bot" @ RunStamp() @ "ack:" @ B.PlayerReplicationInfo.PlayerName @ "died before it could follow",
+				'UTTourney');
+			continue;
+		}
+		if (B.Orders != 'Attack')
+		{
+			Log("bot" @ RunStamp() @ "ack:" @ B.PlayerReplicationInfo.PlayerName @ "does NOT follow, orders"
+				@ B.Orders, 'UTTourney');
+			continue;
+		}
+		if (MHGame() != None && TourneyMHBotExtension(MHGame().botExtension) != None)
+			Goal = TourneyMHBotExtension(MHGame().botExtension).GoalText(B);
+		else if (B.MoveTarget != None)
+			Goal = string(B.MoveTarget.Name);
+		else
+			Goal = "nothing";
+		Log("bot" @ RunStamp() @ "ack:" @ B.PlayerReplicationInfo.PlayerName @ "follows Attack, state"
+			@ B.GetStateName() $ ", goal" @ Goal, 'UTTourney');
+	}
+	NumAck = 0;
+}
+
+// Run time for the bot log lines, e.g. "[2:05.3]".
+function string RunStamp()
+{
+	return "[" $ class'TourneyClient'.static.RaceTime(int(RunSec * 1000)) $ "]";
 }
 
 function SendProgress()
