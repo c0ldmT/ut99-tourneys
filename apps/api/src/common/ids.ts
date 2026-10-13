@@ -13,7 +13,20 @@ export function randomId(length = 12): string {
   return out.length === length ? out : out + randomId(length - out.length);
 }
 
-export const newJoinToken = () => randomId(24);
+/**
+ * Join token (the ?tk= option): 10 characters, lower case, no look-alikes (0/o, 1/l/i), so it can
+ * be typed in the UT console where pasting does not work (native Linux client). 31^10 = 8e14.
+ */
+const CODE_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+export function newJoinToken(): string {
+  const bytes = crypto.randomBytes(40);
+  let out = '';
+  for (let i = 0; out.length < 10 && i < bytes.length; i++) {
+    const b = bytes[i] as number;
+    if (b < 248) out += CODE_ALPHABET[b % 31];
+  }
+  return out.length === 10 ? out : newJoinToken();
+}
 export const newSessionId = () => randomId(43);
 export const newAgentToken = () => `agt_${randomId(40)}`;
 

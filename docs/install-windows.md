@@ -77,7 +77,9 @@ powershell -ExecutionPolicy Bypass -File C:\Tourney\deploy\windows\tourney.ps1 r
 ## 6. Connect the bridge
 
 1. Website → **Servers → Add a game server** → copy `agentId` and `token` into `C:\Tourney\config\bridge.json`.
-2. Check `server.publicAddress` (what players type after `open`) and `server.installDir`.
+2. Check `server.publicAddress` (what players type after `open`: this PC's LAN or internet address, e.g.
+   `192.168.0.105:7777`, never `127.0.0.1`) and `server.installDir`. You can connect to your own server with
+   that address too.
 3. Start it:
 
    ```powershell
@@ -86,6 +88,9 @@ powershell -ExecutionPolicy Bypass -File C:\Tourney\deploy\windows\tourney.ps1 r
    ```
 
 4. On the website click **Scan**.
+
+Players on Linux whose UT console cannot paste: see the "Linux: start UT with the address" box on the
+tournament page.
 
 ## HTTPS
 

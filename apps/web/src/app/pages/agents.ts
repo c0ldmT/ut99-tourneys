@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
+import { isLocalAddress } from '../core/connect';
 import { I18n, TPipe } from '../core/i18n';
 import type { AgentView } from '../core/types';
 
@@ -79,6 +80,9 @@ import type { AgentView } from '../core/types';
                 <div class="small muted">
                   {{ 'agents.address' | t }}: {{ p.publicAddress || ('agents.noAddress' | t) }}
                 </div>
+                @if (isLocal(p.publicAddress)) {
+                  <div class="small error">{{ 'agents.localAddress' | t }}</div>
+                }
               </div>
               <button (click)="rescan(a, p.id)" [disabled]="!a.online || busy()">
                 {{ 'agents.rescan' | t }}
@@ -168,6 +172,8 @@ export class AgentsPage {
     const ws = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/agent`;
     return JSON.stringify({ agentId: id, website: { url: ws, token } }, null, 2);
   }
+
+  protected readonly isLocal = isLocalAddress;
 
   private readonly copied = signal<'' | 'ok' | 'manual'>('');
   protected readonly copyLabel = computed(() =>

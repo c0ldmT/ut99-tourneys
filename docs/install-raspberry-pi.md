@@ -119,7 +119,8 @@ Open `http://<pi-address>:8080` and log in.
 ## 7. Connect the bridge
 
 1. On the website: **Servers → Add a game server**. It shows `agentId` and `token` once.
-2. Put both into the bridge settings and check `publicAddress` (what players type after `open`):
+2. Put both into the bridge settings and check `publicAddress` (what players type after `open`; the Pi's LAN or
+   internet address, never `127.0.0.1` – other PCs cannot reach that):
 
    ```sh
    sudo nano /etc/tourney/bridge.json
@@ -141,6 +142,10 @@ The website now shows the server as online. Click **Scan** there, so maps and bo
 - **If you compiled the mod on your own PC before:** delete `UTTourney_v1.u` from the `System` folder of your
   UT client. Otherwise your client has a different build than the server and UT refuses to connect
   ("package mismatch"); without the file it downloads the server's version.
+- **Linux players whose UT console cannot paste** (native client): the tournament page has a "Linux: start UT
+  with the address" box with a ready terminal command (`cd <folder with ut-bin> && ./ut-bin '<address>?tk=...'`).
+  Join tokens are short (10 lower-case characters) so they can also be typed; older long tokens are replaced
+  with "New token" in the profile.
 - Playing over the internet: forward **UDP 7777–7779** on your router to the Pi. For the website from outside
   you need HTTPS (see [install-linux.md](install-linux.md#https)).
 

@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
+import { isLocalAddress } from '../core/connect';
 import { MH_ADAPTER } from '../core/race';
 import type { AgentView, BotSpec, TournamentDetail } from '../core/types';
 
@@ -156,6 +157,9 @@ function toLocalInput(iso: string | null): string {
             [placeholder]="profileAddress() || 'ut.example.com:7777'"
           />
           <p class="muted small">{{ 'form.connectHint' | t }}</p>
+          @if (isLocal(f.connectAddress || profileAddress())) {
+            <p class="error small">{{ 'form.localAddress' | t }}</p>
+          }
         </div>
 
         <fieldset [disabled]="locked()">
@@ -600,6 +604,7 @@ export class TournamentFormPage {
     const f = this.m();
     return this.profiles().find((p) => p.id === f?.profileId);
   });
+  protected readonly isLocal = isLocalAddress;
   protected readonly profileAddress = computed(() => this.profile()?.publicAddress ?? '');
   protected readonly inventoryMaps = computed(() => this.profile()?.inventory?.maps ?? []);
   protected readonly inventoryBots = computed(() => this.profile()?.inventory?.bots ?? []);

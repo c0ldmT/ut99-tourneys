@@ -16,6 +16,7 @@ import { TeamPanel } from '../components/team-panel';
 import { TeamRoster } from '../components/team-roster';
 import { Api, errorText } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
+import { isLocalAddress, joinUrl, linuxStartCommand } from '../core/connect';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
@@ -116,13 +117,42 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
               <h2>{{ 'tp.join' | t }}</h2>
               @if (t.me.hasAccess) {
                 @if (t.connectAddress) {
+                  @if (localAddress(t)) {
+                    <p class="error small">
+                      {{ 'tp.localAddress' | t: { addr: t.connectAddress } }}
+                    </p>
+                  }
                   <p class="muted small">{{ 'tp.connectHint' | t }}</p>
                   <div class="connect">
                     <code #cmd>{{ connectCommand(t) }}</code>
-                    <button (click)="copy(connectCommand(t), cmd)">
-                      {{ copyLabel() | t }}
+                    <button (click)="copy('cmd', connectCommand(t), cmd)">
+                      {{ copyLabel('cmd') | t }}
                     </button>
                   </div>
+                  @if (longToken()) {
+                    <p class="muted small">
+                      {{ 'tp.longToken' | t }} <a routerLink="/profile">{{ 'tp.toProfile' | t }}</a>
+                    </p>
+                  }
+                  <details class="linux">
+                    <summary>{{ 'tp.linuxTitle' | t }}</summary>
+                    <p class="muted small">{{ 'tp.linuxHint' | t }}</p>
+                    <label class="small"
+                      >{{ 'tp.linuxDir' | t }}
+                      <input
+                        class="mono"
+                        [value]="utDir()"
+                        (input)="setUtDir($any($event.target).value)"
+                        placeholder="~/Games/UT99/System"
+                    /></label>
+                    <div class="connect">
+                      <code #lin>{{ linuxCommand(t) }}</code>
+                      <button (click)="copy('linux', linuxCommand(t), lin)">
+                        {{ copyLabel('linux') | t }}
+                      </button>
+                    </div>
+                    <p class="muted small">{{ 'tp.linuxNote' | t }}</p>
+                  </details>
                   <p class="muted small">
                     {{ (t.me.entrantId ? 'tp.asPlayer' : 'tp.asSpectator') | t }}
                   </p>
@@ -592,6 +622,16 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       flex: 1;
       white-space: nowrap;
     }
+    .linux {
+      margin: 8px 0;
+    }
+    .linux summary {
+      cursor: pointer;
+    }
+    .linux input {
+      width: 100%;
+      margin-top: 4px;
+    }
     .versus {
       display: grid;
       grid-template-columns: 1fr auto 1fr;
@@ -673,7 +713,10 @@ export class TournamentPage {
   protected readonly error = signal('');
   protected readonly actionError = signal('');
   protected readonly busy = signal(false);
-  protected readonly copied = signal<'' | 'ok' | 'manual'>('');
+  protected readonly copied = signal<{ which: string; state: '' | 'ok' | 'manual' }>({
+    which: '',
+    state: '',
+  });
   protected readonly tab = signal<'control' | 'seeding' | 'events'>('control');
   protected readonly events = signal<TournamentEventView[]>([]);
   protected message = '';
@@ -899,22 +942,43 @@ export class TournamentPage {
   }
 
   protected connectCommand(t: TournamentDetail): string {
-    return `open ${t.connectAddress}?tk=${this.auth.me()?.joinToken ?? ''}`;
+    return `open ${joinUrl(t.connectAddress ?? '', this.auth.me()?.joinToken ?? '')}`;
   }
 
-  protected readonly copyLabel = computed(() =>
-    this.copied() === 'ok'
-      ? 'common.copied'
-      : this.copied() === 'manual'
-        ? 'common.copyManual'
-        : 'common.copy',
-  );
+  protected linuxCommand(t: TournamentDetail): string {
+    return linuxStartCommand(this.utDir(), t.connectAddress ?? '', this.auth.me()?.joinToken ?? '');
+  }
 
-  protected async copy(text: string, el: Element) {
+  protected localAddress(t: TournamentDetail): boolean {
+    return isLocalAddress(t.connectAddress);
+  }
+
+  /** Tokens from before the short join codes are hard to type in the UT console. */
+  protected readonly longToken = computed(() => (this.auth.me()?.joinToken.length ?? 0) > 12);
+
+  /** The player's UT folder for the Linux start command, remembered in this browser only. */
+  protected readonly utDir = signal(readUtDir());
+
+  protected setUtDir(dir: string) {
+    this.utDir.set(dir);
+    try {
+      localStorage.setItem(UT_DIR_KEY, dir);
+    } catch {
+      // storage blocked: the folder is only kept until the page is left
+    }
+  }
+
+  protected copyLabel(which: string): string {
+    const c = this.copied();
+    if (c.which !== which || !c.state) return 'common.copy';
+    return c.state === 'ok' ? 'common.copied' : 'common.copyManual';
+  }
+
+  protected async copy(which: string, text: string, el: Element) {
     const ok = await copyText(text);
     if (!ok) selectText(el);
-    this.copied.set(ok ? 'ok' : 'manual');
-    setTimeout(() => this.copied.set(''), ok ? 1500 : 5000);
+    this.copied.set({ which, state: ok ? 'ok' : 'manual' });
+    setTimeout(() => this.copied.set({ which: '', state: '' }), ok ? 1500 : 5000);
   }
 
   protected async act(p: Promise<unknown>) {
@@ -1051,5 +1115,15 @@ export class TournamentPage {
       default:
         return '';
     }
+  }
+}
+
+const UT_DIR_KEY = 'tourney.utDir';
+
+function readUtDir(): string {
+  try {
+    return localStorage.getItem(UT_DIR_KEY) ?? '';
+  } catch {
+    return '';
   }
 }

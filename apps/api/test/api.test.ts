@@ -19,7 +19,7 @@ describe('auth', () => {
     const mario = await Client.login(api, 'Mario');
     const me = (await mario.get('/me')).body;
     expect(me).toMatchObject({ displayName: 'Mario', isAdmin: false });
-    expect(me.joinToken).toMatch(/^[A-Za-z0-9]{24}$/);
+    expect(me.joinToken).toMatch(/^[a-hj-km-np-z2-9]{10}$/);
 
     const rotated = (await mario.post('/me/token')).body;
     expect(rotated.joinToken).not.toBe(me.joinToken);

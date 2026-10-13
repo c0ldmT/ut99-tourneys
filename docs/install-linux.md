@@ -75,7 +75,7 @@ Hunt.
 ## 4. Connect the bridge
 
 1. Website: **Servers → Add a game server** → copy `agentId` and `token` into `/etc/tourney/bridge.json`.
-2. In the same file: `server.publicAddress` (e.g. `cup.example.com:7777`), `server.serverName`; if the website
+2. In the same file: `server.publicAddress` (e.g. `cup.example.com:7777`; never `127.0.0.1`, other PCs cannot reach it), `server.serverName`; if the website
    runs on another machine, `website.url` = `wss://cup.example.com/api/agent`.
 3. Optional for faster downloads: `server.maxClientRate`, `server.downloadRedirect` (see
    [apps/bridge/README.md](../apps/bridge/README.md#server-section-bridgejson)).

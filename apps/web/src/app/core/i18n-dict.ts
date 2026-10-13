@@ -109,6 +109,8 @@ const en = {
   'agents.unmanaged': 'started manually',
   'agents.address': 'Address for players',
   'agents.noAddress': 'not set (publicAddress in bridge.json)',
+  'agents.localAddress':
+    'Only the server PC itself can reach this address. Set the LAN or internet address as publicAddress in bridge.json and restart the bridge.',
   'agents.rescan': 'Scan maps and bots',
   'agents.inventory': '{maps} maps, {bots} bots',
   'agents.noInventory': 'Not scanned yet.',
@@ -134,6 +136,8 @@ const en = {
   'form.agent': 'Bridge',
   'form.profile': 'Server profile',
   'form.connectAddress': 'Address for players (optional)',
+  'form.localAddress':
+    'This address only works on the server PC itself; other players cannot connect with it. Enter the LAN or internet address, e.g. 192.168.0.105:7777.',
   'form.connectHint':
     'Overrides the address of the server profile, e.g. when players connect through a domain.',
   'form.bracket': 'Bracket',
@@ -214,6 +218,17 @@ const en = {
   'tp.registrationClosed': 'Registration is closed.',
   'tp.join': 'Join the server',
   'tp.connectHint': 'Open the console in UT99 (~ key) and enter:',
+  'tp.localAddress':
+    'The server address {addr} only works on the server PC itself - other players cannot connect with it. The organizer sets the real address (LAN or internet) as publicAddress in bridge.json or as "address for players" in the tournament.',
+  'tp.longToken':
+    'Your join token is long and hard to type. A new one is short (10 characters, lower case):',
+  'tp.toProfile': 'create a new token in your profile',
+  'tp.linuxTitle': 'Linux: start UT with the address (if the UT console cannot paste)',
+  'tp.linuxHint':
+    'Paste this command into a terminal: it starts the native UT99 client (OldUnreal 469) and connects right away. Enter the folder that contains ut-bin once (it is kept in this browser).',
+  'tp.linuxDir': 'Folder with ut-bin',
+  'tp.linuxNote':
+    'UT already running? Then quit it first, or type the command from above into the UT console.',
   'tp.asPlayer':
     'You play in this tournament. Connect for the check-in; the server tells you when your match starts.',
   'tp.asSpectator': 'You join as a spectator.',
@@ -507,6 +522,8 @@ const de: Record<TKey, string> = {
   'agents.unmanaged': 'manuell gestartet',
   'agents.address': 'Adresse für Spieler',
   'agents.noAddress': 'nicht gesetzt (publicAddress in der bridge.json)',
+  'agents.localAddress':
+    'Diese Adresse erreicht nur der Server-PC selbst. LAN- oder Internet-Adresse als publicAddress in der bridge.json eintragen und die Bridge neu starten.',
   'agents.rescan': 'Maps und Bots einlesen',
   'agents.inventory': '{maps} Maps, {bots} Bots',
   'agents.noInventory': 'Noch nicht eingelesen.',
@@ -532,6 +549,8 @@ const de: Record<TKey, string> = {
   'form.agent': 'Bridge',
   'form.profile': 'Serverprofil',
   'form.connectAddress': 'Adresse für Spieler (optional)',
+  'form.localAddress':
+    'Diese Adresse funktioniert nur auf dem Server-PC selbst; andere Spieler können damit nicht verbinden. LAN- oder Internet-Adresse eintragen, z. B. 192.168.0.105:7777.',
   'form.connectHint':
     'Ersetzt die Adresse aus dem Serverprofil, z. B. wenn Spieler über eine Domain verbinden.',
   'form.bracket': 'Turnierbaum',
@@ -612,6 +631,17 @@ const de: Record<TKey, string> = {
   'tp.registrationClosed': 'Die Anmeldung ist geschlossen.',
   'tp.join': 'Auf den Server',
   'tp.connectHint': 'Öffne in UT99 die Konsole (Taste ~) und gib ein:',
+  'tp.localAddress':
+    'Die Server-Adresse {addr} funktioniert nur auf dem Server-PC selbst – andere Spieler können damit nicht verbinden. Der Veranstalter trägt die echte Adresse (LAN oder Internet) als publicAddress in der bridge.json oder als „Adresse für Spieler“ im Turnier ein.',
+  'tp.longToken':
+    'Dein Beitritts-Token ist lang und schwer abzutippen. Ein neuer ist kurz (10 Zeichen, kleingeschrieben):',
+  'tp.toProfile': 'neuen Token im Profil erzeugen',
+  'tp.linuxTitle': 'Linux: UT direkt mit Adresse starten (wenn die UT-Konsole nicht einfügen kann)',
+  'tp.linuxHint':
+    'Diesen Befehl in ein Terminal einfügen: Er startet den nativen UT99-Client (OldUnreal 469) und verbindet sofort. Den Ordner mit ut-bin einmal eintragen (er bleibt in diesem Browser gespeichert).',
+  'tp.linuxDir': 'Ordner mit ut-bin',
+  'tp.linuxNote':
+    'Läuft UT schon? Dann vorher beenden oder den Befehl von oben in die UT-Konsole tippen.',
   'tp.asPlayer':
     'Du spielst mit. Verbinde dich zum Check-in; der Server sagt dir, wann dein Match beginnt.',
   'tp.asSpectator': 'Du kommst als Zuschauer auf den Server.',

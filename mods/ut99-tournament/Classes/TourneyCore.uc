@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.5.8";
+const MOD_VERSION = "0.5.9";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -411,13 +411,14 @@ function ApplyPhase()
 // Access list and players
 //=============================================================================
 
+// Case does not matter: short join codes are typed by hand in the UT console.
 function int FindAcl(string Tok)
 {
 	local int i;
 	if (Tok == "")
 		return -1;
 	for (i = 0; i < AclCount; i++)
-		if (AclTok[i] == Tok)
+		if (AclTok[i] ~= Tok)
 			return i;
 	return -1;
 }
@@ -567,6 +568,7 @@ function bool BeginLogin(string Options, out string Error, out class<PlayerPawn>
 		Error = "No valid tournament token.";
 		return false;
 	}
+	Tok = AclTok[i]; // as on the access list (the bridge compares it exactly)
 	SRole = AclRole[i];
 	if ((SRole != "a" && SRole != "b") || SideTaken(SRole))
 	{
