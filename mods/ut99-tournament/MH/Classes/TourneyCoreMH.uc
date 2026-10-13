@@ -418,14 +418,14 @@ function ReportRun(bool bDone)
 // and announces it; same rule: final time incl. penalty, a tie keeps the old record).
 function CheckMapRecord()
 {
-	local int Final;
+	local int FinalMs;
 
 	if (!bRecordCounts || RecordMs == -2 || TGRI == None)
 		return;
-	Final = int(RunSec * 1000) + RunDeaths * PenaltySec * 1000;
-	if (RecordMs >= 0 && Final >= RecordMs)
+	FinalMs = int(RunSec * 1000) + RunDeaths * PenaltySec * 1000;
+	if (RecordMs >= 0 && FinalMs >= RecordMs)
 		return;
-	RecordMs = Final;
+	RecordMs = FinalMs;
 	if (RaceSide == 2)
 		RecordBy = TGRI.NameB;
 	else

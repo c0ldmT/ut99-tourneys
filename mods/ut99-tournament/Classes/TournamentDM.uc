@@ -110,8 +110,8 @@ function Timer()
 // Statistics: the core counts kills, deaths and more per player (before the scoring).
 function Killed(Pawn Killer, Pawn Other, name DamageType)
 {
-	if (TCore != None)
-		TCore.OnKilled(Killer, Other, DamageType);
+	if (Core != None)
+		Core.OnKilled(Killer, Other, DamageType);
 	Super.Killed(Killer, Other, DamageType);
 }
 
