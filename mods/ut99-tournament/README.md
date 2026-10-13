@@ -7,6 +7,10 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > `TourneyCore`. Mod 0.5.0 adds Monster Hunt (package `UTTourneyMH_v1`, tested). Mod 0.5.1 only changes the
 > message when the organizer restarts a game, sets a winner or calls a match off (instead of "wins by forfeit").
 > Mod 0.5.2 shows its version in the game type name (scoreboard, server browser) and in the bracket title.
+> Mod 0.5.3: bot skills work as set (0–7 = Novice … Godlike; before, every bot played at most like "Skilled"),
+> message when the organizer ends a Monster Hunt run.
+> Mod 0.5.4: Monster Hunt lives, monster skill and weapon stay come from the tournament (before, Monster Hunt's
+> own defaults applied: 10 lives, monster skill 3).
 
 ## Classes
 
@@ -177,7 +181,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 42 | Run 2 | The same map loads again for the other team; the banner shows "Time to beat: <team> m:ss.t" |
 | 43 | Time limit | A run that does not reach the exit ends at the limit (`Run over: ...`); the website shows it as not finished; a team at the exit beats it |
 | 44 | Pause | `pause` from the website during a run: the run clock stops and continues on resume |
-| 45 | Lives | Unlimited lives (`Lives=0` in `[UTTourneyMH_v1.TournamentMH]` of `Tourney.ini`); if Monster Hunt still eliminates players, please tell me |
+| 45 | Lives | "Unlimited" in the form: nobody is ever "lost"; with a number, hunters are out after that many deaths and a team with everybody out has not reached the exit. Server log: `Monster Hunt: lives 0 (0 = unlimited), monster skill 5` |
 
 ## SmartStockBots (optional)
 
@@ -194,8 +198,6 @@ SmartStockBots makes the stock bots play much better. It runs on the server only
 
 ## Known limitations
 
-- Bot skill is mapped from 0–7 to UT's 0–3 bot skill; the global novice flag of DeathMatchPlus is not
-  changed per bot.
 - A tournament pause from the bridge holds the game only while a match is live; during the ready check
   the countdown still runs.
 - Players can rename themselves with the `name` command; the bridge identifies them by token anyway.

@@ -268,8 +268,10 @@ const en = {
   'form.runTimeLimit': 'Time limit per run (min)',
   'form.penalty': 'Penalty per death (s)',
   'form.monsterSkill': 'Monster difficulty (0-7)',
+  'form.lives': 'Lives per hunter',
+  'form.livesUnlimited': 'Unlimited',
   'form.mhRulesHint':
-    'Monster Hunt: both teams run the same map one after the other. Every death in the team (bots too) adds the penalty; unlimited lives. Not at the exit in time: monster points decide. Needs Monster Hunt 613 and UTTourneyMH_v1.u on the server.',
+    'Monster Hunt: both teams run the same map one after the other. Every death in the team (bots too) adds the penalty; with limited lives a team whose hunters are all out has not reached the exit. Not at the exit in time: monster points decide. Needs Monster Hunt 613 and UTTourneyMH_v1.u on the server.',
   'form.noInventoryMh':
     'The server was not scanned yet: add the MH- maps by name or scan the server on the servers page.',
   'race.mode': 'Monster Hunt',
@@ -350,6 +352,13 @@ const en = {
   'admin.pause': 'Pause',
   'admin.resume': 'Resume',
   'admin.abort': 'Abort tournament',
+  'form.allBotsSkill': 'Skill of all bots',
+  'form.allBotsMixed': 'individual (see list)',
+  'admin.forfeitRun': 'End run (not finished)',
+  'admin.forfeitRunConfirm':
+    'End the run of {team} in {match}? It counts as not at the exit (with the time, deaths and points so far); then the other team runs.',
+  'race.forfeit': 'ended',
+  'race.lives': '{n} lives',
   'admin.restartGame': 'Restart game',
   'admin.restartRun': 'Restart run',
   'admin.restartGameConfirm':
@@ -654,8 +663,10 @@ const de: Record<TKey, string> = {
   'form.runTimeLimit': 'Zeitlimit pro Lauf (Min.)',
   'form.penalty': 'Strafe pro Tod (s)',
   'form.monsterSkill': 'Monster-Stärke (0-7)',
+  'form.lives': 'Leben pro Jäger',
+  'form.livesUnlimited': 'Unendlich',
   'form.mhRulesHint':
-    'Monster Hunt: Beide Teams laufen nacheinander dieselbe Map. Jeder Tod im Team (auch Bots) kostet die Strafe; Leben sind unbegrenzt. Wer nicht rechtzeitig am Ausgang ist, wird nach Monsterpunkten gewertet. Auf dem Server müssen Monster Hunt 613 und UTTourneyMH_v1.u installiert sein.',
+    'Monster Hunt: Beide Teams laufen nacheinander dieselbe Map. Jeder Tod im Team (auch Bots) kostet die Strafe; bei begrenzten Leben gilt ein Team, dessen Jäger alle draußen sind, als nicht im Ziel. Wer nicht rechtzeitig am Ausgang ist, wird nach Monsterpunkten gewertet. Auf dem Server müssen Monster Hunt 613 und UTTourneyMH_v1.u installiert sein.',
   'form.noInventoryMh':
     'Der Server wurde noch nicht gescannt: MH-Maps per Namen hinzufügen oder den Server auf der Serverseite scannen.',
   'race.mode': 'Monster Hunt',
@@ -736,6 +747,13 @@ const de: Record<TKey, string> = {
   'admin.pause': 'Pause',
   'admin.resume': 'Fortsetzen',
   'admin.abort': 'Turnier abbrechen',
+  'form.allBotsSkill': 'Stärke aller Bots',
+  'form.allBotsMixed': 'einzeln (siehe Liste)',
+  'admin.forfeitRun': 'Lauf beenden (nicht im Ziel)',
+  'admin.forfeitRunConfirm':
+    'Den Lauf von {team} in {match} beenden? Er zählt als nicht im Ziel (mit der bisherigen Zeit, Toden und Punkten); danach läuft das andere Team.',
+  'race.forfeit': 'beendet',
+  'race.lives': '{n} Leben',
   'admin.restartGame': 'Spiel neu starten',
   'admin.restartRun': 'Lauf neu starten',
   'admin.restartGameConfirm':

@@ -42,6 +42,7 @@ describe('organizer tools', () => {
     await env.run(() => events(env!, 'match.result').length >= 1);
     expect(env.director.projection.games[cm.matchId]).toHaveLength(1);
     await expect(env.director.restartGame('nope')).rejects.toThrow('not running');
+    await expect(env.director.forfeitRun(cm.matchId)).rejects.toThrow('not a Monster Hunt');
     await env.run(finished(env));
   });
 

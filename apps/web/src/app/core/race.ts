@@ -21,6 +21,7 @@ export interface RunView {
   penaltyMs: number;
   points: number;
   finished: boolean;
+  forfeit?: boolean;
 }
 
 export const finalMs = (r: { timeMs: number; penaltyMs: number }) => r.timeMs + r.penaltyMs;

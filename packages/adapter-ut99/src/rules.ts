@@ -95,6 +95,11 @@ export const Ut99DmRulesSchema = z
     penaltySec: z.number().int().min(0).max(60).default(5),
     /** Monster Hunt: monster difficulty 0 (easy) .. 7 (hardest), Monster Hunt's MonsterSkill. */
     monsterSkill: z.number().int().min(0).max(7).default(5),
+    /**
+     * Monster Hunt: lives per hunter, 0 = unlimited (deaths only cost time). With a limit a team
+     * whose hunters are all out has not reached the exit.
+     */
+    lives: z.number().int().min(0).max(99).default(0),
 
     // Server-wide game settings (applied via ini at server start).
     weaponStay: z.boolean().default(true),

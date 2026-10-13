@@ -127,6 +127,8 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
       points: z.number().int(),
       /** Reached the exit before the time limit. */
       finished: z.boolean(),
+      /** The organizer ended the run (it counts as not finished). */
+      forfeit: z.boolean().optional(),
     }),
   ),
   event(

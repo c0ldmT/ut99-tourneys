@@ -234,6 +234,15 @@ export class MatchDirector extends EventEmitter {
   /** Team games: players out for the rest of a match (too many disconnects), per match id. */
   private benched = new Map<string, Set<string>>();
   private captainTimer?: TimerHandle;
+  /** Monster Hunt: the last progress of the run in progress (for a forfeit by the organizer). */
+  private lastProgress?: {
+    matchId: string;
+    game: number;
+    run: number;
+    ms: number;
+    d: number;
+    pts: number;
+  };
 
   constructor(private readonly o: DirectorOptions) {
     super();
@@ -777,6 +786,10 @@ export class MatchDirector extends EventEmitter {
         pd: prev?.deaths ?? 0,
         pp: prev?.points ?? 0,
         pf: prev?.finished ?? false,
+        lv: this.rules.lives,
+        mk: this.rules.monsterSkill,
+        ws: this.rules.weaponStay,
+        hc: this.rules.hardcore,
       });
     }
     return lines;
@@ -1735,6 +1748,14 @@ export class MatchDirector extends EventEmitter {
         if (!this.raceMode || s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g)
           return;
         if (!runner || msg.n !== this.raceRun()) return;
+        this.lastProgress = {
+          matchId: msg.mid,
+          game: msg.g,
+          run: msg.n,
+          ms: msg.ms,
+          d: msg.d,
+          pts: msg.pts,
+        };
         this.telemetry('live', {
           race: {
             runner,
@@ -2107,33 +2128,88 @@ export class MatchDirector extends EventEmitter {
     const runner = this.runner();
     if (!this.raceMode || s.kind !== 'live' || s.matchId !== msg.mid || s.game !== msg.g) return;
     if (!runner || msg.n !== this.raceRun()) return;
+    await this.recordRun(s.matchId, s.game, s.map, runner, {
+      ms: msg.ms,
+      d: msg.d,
+      pts: msg.pts,
+      done: msg.done,
+    });
+  }
+
+  /**
+   * Organizer: the running team gives up its run (bots stuck, a broken map). It counts as not at
+   * the exit with the time, deaths and points so far; then the other team runs, or the game is
+   * decided. Works from the ready check on (a team that cannot start gives up with nothing).
+   */
+  forfeitRun(matchId: string): Promise<void> {
+    return this.enqueueChecked(async () => {
+      const cm = this.proj.currentMatch;
+      const runner = this.runner();
+      if (!this.raceMode) throw new Error('this is not a Monster Hunt tournament');
+      if (!cm || cm.matchId !== matchId || !cm.map || !runner)
+        throw new Error(`no run of ${matchId} is in progress`);
+      if (this.proj.phase === 'paused')
+        throw new Error('the tournament is paused, resume it first');
+      const s = this.stage;
+      const onServer = s.kind === 'readyCheck' || s.kind === 'countdown' || s.kind === 'live';
+      if (!onServer || s.matchId !== matchId)
+        throw new Error(`no run of ${matchId} is in progress on the server`);
+      const p = this.lastProgress;
+      const progress =
+        s.kind === 'live' &&
+        p?.matchId === matchId &&
+        p.game === cm.game &&
+        p.run === this.raceRun()
+          ? p
+          : { ms: 0, d: 0, pts: 0 };
+      if (s.kind === 'live') {
+        this.send([{ t: 'abort', mid: matchId, w: this.sideOf(runner) ?? 'a', why: 'runforfeit' }]);
+      }
+      this.say(`The organizer ends the run of ${this.name(runner)}: it counts as not finished`);
+      this.o.log.info(`run of ${this.name(runner)} in ${matchId} given up (organizer)`);
+      await this.recordRun(matchId, cm.game, cm.map, runner, { ...progress, done: false }, true);
+    });
+  }
+
+  private async recordRun(
+    matchId: string,
+    game: number,
+    map: string,
+    runner: string,
+    r: { ms: number; d: number; pts: number; done: boolean },
+    forfeit = false,
+  ): Promise<void> {
+    const s = { matchId, game, map };
     this.clearTimer();
     this.resetGame();
-    const penaltyMs = msg.d * this.rules.penaltySec * 1000;
+    this.lastProgress = undefined;
+    const penaltyMs = r.d * this.rules.penaltySec * 1000;
     if (
       !(await this.append({
         type: 'match.runFinished',
         data: {
-          matchId: s.matchId,
-          game: s.game,
+          matchId,
+          game,
           entrantId: runner,
-          map: s.map,
-          timeMs: msg.ms,
-          deaths: msg.d,
+          map,
+          timeMs: r.ms,
+          deaths: r.d,
           penaltyMs,
-          points: msg.pts,
-          finished: msg.done,
+          points: r.pts,
+          finished: r.done,
+          ...(forfeit ? { forfeit: true } : {}),
         },
       }))
     ) {
       return;
     }
-    const total = formatRaceTime(msg.ms + penaltyMs);
-    this.say(
-      msg.done
-        ? `${this.name(runner)}: ${formatRaceTime(msg.ms)} + ${msg.d} deaths x ${this.rules.penaltySec}s = ${total}`
-        : `${this.name(runner)} did not reach the exit (${msg.pts} monster points, ${msg.d} deaths)`,
-    );
+    const total = formatRaceTime(r.ms + penaltyMs);
+    if (!forfeit)
+      this.say(
+        r.done
+          ? `${this.name(runner)}: ${formatRaceTime(r.ms)} + ${r.d} deaths x ${this.rules.penaltySec}s = ${total}`
+          : `${this.name(runner)} did not reach the exit (${r.pts} monster points, ${r.d} deaths)`,
+      );
     const cm = this.proj.currentMatch;
     const runs = cm?.runs ?? [];
     if (runs.length < 2) {

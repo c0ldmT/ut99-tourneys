@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.5.2";
+const MOD_VERSION = "0.5.4";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -1037,8 +1037,9 @@ function Bot SpawnSideBot(string BName, int BSkill, string BClass, int Side)
 	if (N >= 0)
 		Game.BotConfig.CHIndividualize(B, N, Game.NumBots);
 	Game.ChangeName(B, BName, false);
-	// UT bot skill is 0..3 (plus a global novice flag); the tournament uses 0..7.
-	B.InitializeSkill(FClamp(BSkill * 3.0 / 7.0, 0.0, 3.0));
+	// Tournament skill 0..7 = UT's Novice..Godlike: Bot.InitializeSkill takes exactly that range
+	// (0-3 novice skills, 4-7 the full AI with skill 0-3), as the bot menu does.
+	B.InitializeSkill(FClamp(BSkill, 0.0, 7.0));
 	B.ViewRotation = StartSpot.Rotation;
 	Game.BroadcastMessage(B.PlayerReplicationInfo.PlayerName $ Game.EnteredMessage, false);
 	Game.ModifyBehaviour(B);
@@ -1335,6 +1336,8 @@ function AbortGame(string Winner, string Why)
 	}
 	if (Why == "restart")
 		Game.BroadcastMessage("The organizer restarts this game", true);
+	else if (Why == "runforfeit")
+		Game.BroadcastMessage("The organizer ended this run: it counts as not finished", true);
 	else if (Why == "void")
 		Game.BroadcastMessage("The organizer called this match off", true);
 	else if (Why == "admin" && Winner == "a")

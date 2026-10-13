@@ -71,6 +71,8 @@ interface Model {
   friendlyFirePct: 0 | 50 | 100;
   penaltySec: number;
   monsterSkill: number;
+  /** Monster Hunt: lives per hunter, 0 = unlimited. */
+  lives: number;
   mapPool: string[];
   botPool: BotSpec[];
   notifyMode: 'default' | 'custom' | 'off';
@@ -233,6 +235,14 @@ function toLocalInput(iso: string | null): string {
               <div class="field">
                 <label>{{ 'form.penalty' | t }}</label
                 ><input type="number" name="pen" min="0" max="60" [(ngModel)]="f.penaltySec" />
+              </div>
+              <div class="field">
+                <label>{{ 'form.lives' | t }}</label>
+                <select name="lives" [(ngModel)]="f.lives">
+                  @for (n of livesChoices; track n) {
+                    <option [ngValue]="n">{{ n === 0 ? ('form.livesUnlimited' | t) : n }}</option>
+                  }
+                </select>
               </div>
               <div class="field">
                 <label>{{ 'form.monsterSkill' | t }}</label>
@@ -432,6 +442,15 @@ function toLocalInput(iso: string | null): string {
               {{ 'form.botPoolHint' | t: { size: f.size } }}
             }
           </p>
+          <div class="field all-skill">
+            <label>{{ 'form.allBotsSkill' | t }}</label>
+            <select name="allskill" [ngModel]="allSkill(f)" (ngModelChange)="setAllSkill($event)">
+              <option [ngValue]="null">{{ 'form.allBotsMixed' | t }}</option>
+              @for (s of skills; track s) {
+                <option [ngValue]="s">{{ s }} – {{ 'skill.' + s | t }}</option>
+              }
+            </select>
+          </div>
           <table>
             <tbody>
               @for (b of f.botPool; track $index) {
@@ -456,7 +475,9 @@ function toLocalInput(iso: string | null): string {
           <div class="row add">
             <button
               type="button"
-              (click)="f.botPool.push({ name: 'Bot' + (f.botPool.length + 1), skill: 3 })"
+              (click)="
+                f.botPool.push({ name: 'Bot' + (f.botPool.length + 1), skill: allSkill(f) ?? 3 })
+              "
             >
               {{ 'form.addBot' | t }}
             </button>
@@ -513,6 +534,10 @@ function toLocalInput(iso: string | null): string {
     .add input {
       max-width: 260px;
     }
+    .all-skill {
+      max-width: 320px;
+      margin-bottom: 8px;
+    }
     td.skill {
       width: 220px;
     }
@@ -539,6 +564,7 @@ export class TournamentFormPage {
   protected readonly busy = signal(false);
   protected readonly bestOf = [1, 3, 5, 7];
   protected readonly skills = [0, 1, 2, 3, 4, 5, 6, 7];
+  protected readonly livesChoices = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20];
   protected readonly teamSizes = [1, 2, 3, 5];
   protected newMap = '';
   private agentTick = signal(0);
@@ -660,6 +686,7 @@ export class TournamentFormPage {
       friendlyFirePct: 0,
       penaltySec: 5,
       monsterSkill: 5,
+      lives: 0,
       notifyMode: 'default',
       webhookUrl: '',
       mapPool: [...STOCK_POOL],
@@ -707,6 +734,7 @@ export class TournamentFormPage {
         r['friendlyFirePct'] === 50 || r['friendlyFirePct'] === 100 ? r['friendlyFirePct'] : 0,
       penaltySec: num('penaltySec', 5),
       monsterSkill: num('monsterSkill', 5),
+      lives: num('lives', 0),
       notifyMode: d.notify?.mode ?? 'default',
       webhookUrl: d.notify?.webhookUrl ?? '',
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
@@ -775,6 +803,20 @@ export class TournamentFormPage {
     this.agentTick.update((n) => n + 1);
   }
 
+  /** The skill every bot has, or null if they differ. */
+  protected allSkill(f: Model): number | null {
+    const first = f.botPool[0]?.skill;
+    return first !== undefined && f.botPool.every((b) => b.skill === first) ? first : null;
+  }
+
+  /** Sets every bot of the pool to one skill (Novice … Godlike). */
+  protected setAllSkill(skill: number | null) {
+    const f = this.m();
+    if (!f || skill === null) return;
+    for (const b of f.botPool) b.skill = skill;
+    this.agentTick.update((n) => n + 1);
+  }
+
   protected useInventoryBots() {
     const f = this.m();
     if (!f) return;
@@ -825,6 +867,7 @@ export class TournamentFormPage {
             friendlyFirePct: f.game === 'mh' ? 0 : f.friendlyFirePct,
             penaltySec: f.penaltySec,
             monsterSkill: f.monsterSkill,
+            lives: f.lives,
           },
         },
       },

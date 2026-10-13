@@ -35,6 +35,10 @@ var config string CachedBotName[10];
 var config int CachedBotSkill[10];
 var config string CachedBotCls[10];
 var config byte CachedBotSide[10];
+// Monster Hunt settings for the next level (-1 = not known yet, keep Monster Hunt's own).
+var config int CachedLives;
+var config int CachedMonsterSkill;
+var config byte CachedWeaponStay, CachedHardcore; // 0 = off, 1 = on
 
 // Fallback when a client reconnects without ?tk= after a map change: address -> token.
 var config string KnownAddr[64];
@@ -50,4 +54,8 @@ defaultproperties
 	CachedBestOf=1
 	CachedGameNo=1
 	CachedTeamSize=1
+	CachedLives=-1
+	CachedMonsterSkill=-1
+	CachedWeaponStay=1
+	CachedHardcore=1
 }

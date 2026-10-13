@@ -130,6 +130,8 @@ export const AgentCommandSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('tournament.resume'), tournamentId: Id }),
   z.object({ kind: z.literal('tournament.abort'), tournamentId: Id, reason: z.string().max(200) }),
   z.object({ kind: z.literal('match.restart'), tournamentId: Id, matchId: Id }),
+  /** Monster Hunt: the running team gives up its run (counts as not finished). */
+  z.object({ kind: z.literal('match.forfeitRun'), tournamentId: Id, matchId: Id }),
   z.object({ kind: z.literal('server.stop') }),
   /** Grants or revokes game server access (e.g. a spectator clicked "watch"). */
   z.object({

@@ -92,6 +92,8 @@ export const CommandBody = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('announce'), message: z.string().trim().min(1).max(200) }),
   /** Plays the current game (Monster Hunt: run) of the current match again. */
   z.object({ kind: z.literal('restart') }),
+  /** Monster Hunt: the running team gives up its run, the other team runs next. */
+  z.object({ kind: z.literal('forfeitRun') }),
 ]);
 export type Command = z.infer<typeof CommandBody>;
 
@@ -911,6 +913,15 @@ export class TournamentsService {
         if (!cm.map) throw conflict(`${cm.matchId} has no map yet (map vote)`);
         return this.connections.command(t.agentId, {
           kind: 'match.restart',
+          tournamentId: id,
+          matchId: cm.matchId,
+        });
+      }
+      case 'forfeitRun': {
+        const cm = this.log.projection(id)?.currentMatch;
+        if (!cm?.runOrder) throw conflict('no Monster Hunt run is being played right now');
+        return this.connections.command(t.agentId, {
+          kind: 'match.forfeitRun',
           tournamentId: id,
           matchId: cm.matchId,
         });

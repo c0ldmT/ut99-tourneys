@@ -357,16 +357,9 @@ describe('Monster Hunt race', () => {
       'mh',
       2,
     );
-    expect(ini).toContainEqual({
-      section: 'UTTourneyMH_v1.TournamentMH',
-      key: 'MonsterSkill',
-      value: '3',
-    });
-    expect(ini).toContainEqual({
-      section: 'UTTourneyMH_v1.TournamentMH',
-      key: 'Lives',
-      value: '0',
-    });
+    // MonsterHunt reads its config from MonsterHunt.ini: lives and monster skill go to the mod
+    // with the race line instead of into Tourney.ini.
+    expect(ini.some((c) => c.section === 'UTTourneyMH_v1.TournamentMH')).toBe(false);
     expect(ini).toContainEqual({
       section: 'Engine.GameEngine',
       key: 'ServerPackages',

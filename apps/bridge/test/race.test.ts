@@ -113,7 +113,7 @@ describe('Monster Hunt time race against the simulated UT server', () => {
     // The race line: run 2 knows the result of run 1.
     const raceLines = env.sim.received.filter((m) => m.t === 'race') as any[];
     const run2 = raceLines.find((l) => l.n === 2);
-    expect(run2).toMatchObject({ pen: 5, pf: true });
+    expect(run2).toMatchObject({ pen: 5, pf: true, lv: 0, mk: 5, ws: true, hc: true });
     expect(run2.pt).toBe(finalMs(events(env, 'match.runFinished')[0].data));
   });
 
@@ -158,6 +158,23 @@ describe('Monster Hunt time race against the simulated UT server', () => {
     const runs = events(env, 'match.runFinished');
     expect(runs[0].data.entrantId).not.toBe(runs[1].data.entrantId);
     expect(runs.slice(0, 2).every((r) => r.data.game === 1)).toBe(true);
+  });
+
+  it('lets the organizer end a stuck run: it counts as not finished, the other team runs', async () => {
+    env = await setup({ file: raceFile(), behaviour: { gameDurationMs: 60_000 } });
+    await env.run(() => env!.director.stageKind === 'live');
+    env.clock.advance(10_000);
+    await env.settle();
+    const cm = env.director.projection.currentMatch!;
+    await env.director.forfeitRun(cm.matchId);
+    await env.settle();
+    const run = events(env, 'match.runFinished')[0];
+    expect(run.data).toMatchObject({ finished: false, forfeit: true, entrantId: cm.runOrder![0] });
+    expect(env.sim.received.some((m) => m.t === 'abort' && m.why === 'runforfeit')).toBe(true);
+    await env.run(() => events(env!, 'match.gameFinished').length >= 1);
+    // The second team reached the exit: a finished run beats an ended one.
+    expect(events(env, 'match.gameFinished')[0].data.winnerId).toBe(cm.runOrder![1]);
+    await expect(env.director.forfeitRun('nope')).rejects.toThrow('no run');
   });
 
   it('simulates bot-only races', async () => {

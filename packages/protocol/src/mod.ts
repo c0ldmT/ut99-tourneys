@@ -185,6 +185,13 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     pd: int.nonnegative(),
     pp: int,
     pf: z.boolean(),
+    // Monster Hunt settings, applied by the mod when the next level loads (MonsterHunt reads its
+    // config from MonsterHunt.ini, not from Tourney.ini): lives (0 = unlimited), monster skill,
+    // weapon stay, hardcore.
+    lv: int.min(0).max(99),
+    mk: int.min(0).max(7),
+    ws: z.boolean(),
+    hc: z.boolean(),
   }),
   /** Team games: a stand-in bot leaves (the player is back). */
   z.object({ t: z.literal('botdel'), name: str(MAX_NAME_CHARS) }),

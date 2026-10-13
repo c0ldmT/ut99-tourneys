@@ -18,6 +18,11 @@ var float RunSec;           // game seconds of this run, pauses excluded
 var int RunDeaths;
 var bool bRunReported;
 var int LastRpDeaths, RpTicks;
+// Monster Hunt settings from the bridge (race line), applied when a level starts. MonsterHunt
+// reads its own config from MonsterHunt.ini, so the tournament sets them in code instead.
+var int HuntLives;          // 0 = unlimited, -1 = not known (Monster Hunt's own setting)
+var int HuntMonsterSkill;   // -1 = not known
+var bool bHuntWeaponStay, bHuntHardcore;
 // Where the runners were when a pause began (a resume puts them back, not to the start).
 var Pawn SpotPawn[16];
 var vector SpotLoc[16];
@@ -36,6 +41,11 @@ function HandleBridgeMessage(TourneyMsg M)
 	T = M.Get("t");
 	if (T == "race")
 	{
+		// Settings for the next levels (saved with the cache before every travel).
+		HuntLives = Max(0, M.GetInt("lv"));
+		HuntMonsterSkill = Clamp(M.GetInt("mk"), 0, 7);
+		bHuntWeaponStay = M.GetBool("ws");
+		bHuntHardcore = M.GetBool("hc");
 		// After the end of this run the bridge already describes the next one (other level).
 		if (bRunReported)
 			return;
@@ -63,6 +73,50 @@ function byte TeamOfRole(string SRole)
 	if (SRole == "a" || SRole == "b")
 		return 0;
 	return 255;
+}
+
+// Lives (0 = unlimited), monster skill, weapon stay and hardcore for this level. Runs in
+// InitGame: monsters get their skill in PreBeginPlay (MonsterHunt.IsRelevant), the lives go
+// into the GameReplicationInfo in PostBeginPlay (InitGameReplicationInfo).
+function OnInitGame()
+{
+	Super.OnInitGame();
+	ApplyHuntSettings();
+}
+
+function ApplyHuntSettings()
+{
+	if (MHGame() == None)
+		return;
+	if (HuntLives >= 0)
+		MHGame().Lives = HuntLives;
+	if (HuntMonsterSkill >= 0)
+		MHGame().MonsterSkill = HuntMonsterSkill;
+	Game.bMultiWeaponStay = bHuntWeaponStay;
+	Game.bHardCoreMode = bHuntHardcore;
+	Log("Monster Hunt: lives" @ MHGame().Lives @ "(0 = unlimited), monster skill" @ MHGame().MonsterSkill, 'UTTourney');
+}
+
+function SaveCache()
+{
+	class'TournamentConfig'.default.CachedLives = HuntLives;
+	class'TournamentConfig'.default.CachedMonsterSkill = HuntMonsterSkill;
+	class'TournamentConfig'.default.CachedWeaponStay = 0;
+	if (bHuntWeaponStay)
+		class'TournamentConfig'.default.CachedWeaponStay = 1;
+	class'TournamentConfig'.default.CachedHardcore = 0;
+	if (bHuntHardcore)
+		class'TournamentConfig'.default.CachedHardcore = 1;
+	Super.SaveCache(); // writes the ini
+}
+
+function LoadCache()
+{
+	Super.LoadCache();
+	HuntLives = class'TournamentConfig'.default.CachedLives;
+	HuntMonsterSkill = class'TournamentConfig'.default.CachedMonsterSkill;
+	bHuntWeaponStay = class'TournamentConfig'.default.CachedWeaponStay != 0;
+	bHuntHardcore = class'TournamentConfig'.default.CachedHardcore != 0;
 }
 
 function AssignTeam(Pawn P, int Side)
@@ -178,7 +232,8 @@ function bool ReachedExit(string Reason)
 {
 	local string R;
 	R = Caps(Reason);
-	return R != "TIMELIMIT" && R != "TEAMSCORELIMIT" && R != "FRAGLIMIT" && InStr(R, "HUNTERS") < 0;
+	return R != "TIMELIMIT" && R != "TEAMSCORELIMIT" && R != "FRAGLIMIT" && InStr(R, "HUNTERS") < 0
+		&& InStr(R, "ESCAPED") < 0;
 }
 
 function OnEndGame(string Reason, bool bWasOvertime)
@@ -314,4 +369,8 @@ defaultproperties
 {
 	PrevMs=-1
 	RaceRun=1
+	HuntLives=-1
+	HuntMonsterSkill=-1
+	bHuntWeaponStay=True
+	bHuntHardcore=True
 }

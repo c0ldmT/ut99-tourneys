@@ -1,7 +1,6 @@
 import type { ServerOs, ServerProfile } from '@tourney/protocol';
 import {
   MOD_GAME_CLASS,
-  MOD_MH_GAME_CLASS,
   MOD_PACKAGE,
   MOD_TEAM_GAME_CLASS,
   MONSTER_HUNT_PACKAGE,
@@ -118,8 +117,6 @@ export function iniChanges(
   const dm = 'Botpack.DeathMatchPlus';
   // Match players plus room for reconnects; bots do not count.
   const maxPlayers = String(Math.max(4, 2 * teamSize + 2));
-  // TournamentMH reads its config (also what it inherits from MonsterHunt) from Tourney.ini.
-  const mh = MOD_MH_GAME_CLASS;
   return [
     // Clients download the mod for the HUD, the vote window and spectator follow (milestone 6).
     { section: 'Engine.GameEngine', key: 'ServerPackages', ensure: MOD_PACKAGE },
@@ -152,7 +149,7 @@ export function iniChanges(
       : []),
     // Per-class config: written for DeathMatchPlus and for our subclasses, which read their own
     // sections.
-    ...[dm, MOD_GAME_CLASS, MOD_TEAM_GAME_CLASS, mh].flatMap((section) => [
+    ...[dm, MOD_GAME_CLASS, MOD_TEAM_GAME_CLASS].flatMap((section) => [
       { section, key: 'bMultiWeaponStay', value: bool(rules.weaponStay) },
       { section, key: 'bHardCoreMode', value: bool(rules.hardcore) },
       { section, key: 'MaxPlayers', value: maxPlayers },
@@ -161,10 +158,9 @@ export function iniChanges(
       ? [
           // Monster Hunt's client classes (HUD, scoreboard); usually already in the server's ini.
           { section: 'Engine.GameEngine', key: 'ServerPackages', ensure: MONSTER_HUNT_PACKAGE },
-          { section: mh, key: 'MonsterSkill', value: String(rules.monsterSkill) },
-          { section: mh, key: 'Lives', value: '0' }, // unlimited: deaths cost time instead
-          { section: mh, key: 'TimeLimit', value: String(rules.timeLimitMin) },
-          { section: mh, key: 'bUseTeamSkins', value: 'False' },
+          // Lives, monster skill, weapon stay and hardcore are not set here: TournamentMH inherits
+          // MonsterHunt's config(MonsterHunt), so they would have to go into MonsterHunt.ini. The
+          // bridge sends them with the race line and the mod applies them on every level.
         ]
       : []),
     { section: dm, key: 'bTournament', value: 'False' }, // our own ready check replaces it

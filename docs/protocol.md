@@ -54,7 +54,9 @@ override); the bridge re-projects and decides again. Admin actions therefore alw
 match, or a corrected earlier result changes the current match's pairing, the projection drops the current match;
 the bridge ends the game on the server (`abort` with `why` `admin`/`void`) and calls the next match. A match called
 again starts its series from game 1. The command `restart` (bridge: `match.restart`) loads the current game's map
-again (Monster Hunt: the current run); nothing goes into the log.
+again (Monster Hunt: the current run); nothing goes into the log. Monster Hunt: the command `forfeitRun` (bridge: `match.forfeitRun`) ends
+the running team's run as not finished (`match.runFinished` with `forfeit: true`, time/deaths/points so far);
+then the other team runs.
 
 **Overrides.** Correcting a result upstream can invalidate results further down. The engine does not throw; it
 ignores results whose pairing no longer matches and reports them as `stale_result` issues so the admin UI can
@@ -146,26 +148,26 @@ UnrealScript actors do not survive travel). The bridge owns all state and sends 
 
 ### Bridge → Mod
 
-| `t`                                  | Meaning                                                                                                                                                                  |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `welcome`                            | Handshake accepted                                                                                                                                                       |
-| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                                                                                                        |
-| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds                                                                            |
-| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit (a tie always goes to sudden death), `ts` players per side (1 = 1v1), `ff` friendly fire % |
-| `bot`                                | A bot playing for a side (name, skill, class). 1v1: the bot side. Team games: the bots of the game, with the countdown, and stand-ins                                    |
-| `botadd` / `botdel`                  | Team games: a stand-in bot joins the running game for a disconnected player / leaves when the player is back                                                             |
-| `tready`                             | Team games: the bridge declared a side ready (all ready, captain `!start`, bot team, time up)                                                                            |
-| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                                                                                                         |
-| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                                                                                                        |
-| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                                                                          |
-| `cd`                                 | Start countdown                                                                                                                                                          |
-| `pause`                              | Pause / unpause                                                                                                                                                          |
-| `abort`                              | End the current game without a result: `why` = `forfeit`, `admin` (organizer set the winner), `void` (match called off), `restart`                                       |
-| `brh` / `brm`                        | Bracket for the HUD                                                                                                                                                      |
-| `sth` / `ste`                        | Standings for the HUD                                                                                                                                                    |
-| `say`                                | Message to all (`pid: -1`) or one player                                                                                                                                 |
-| `title`                              | Tournament name (HUD), part of the snapshot                                                                                                                              |
-| `warn`                               | Big centered warning for one player (e.g. last reconnect before a forfeit)                                                                                               |
+| `t`                                  | Meaning                                                                                                                                                                   |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `welcome`                            | Handshake accepted                                                                                                                                                        |
+| `sync` (`begin`/`end`)               | Frames a snapshot; everything in between replaces the mod's state                                                                                                         |
+| `phase`                              | `lobby`, `vote`, `ready`, `countdown`, `live`, `paused`, `post`, `finished` + timeout seconds                                                                             |
+| `match`                              | Current match: id, game number, best-of, series score, names, frag/time limit (a tie always goes to sudden death), `ts` players per side (1 = 1v1), `ff` friendly fire %  |
+| `bot`                                | A bot playing for a side (name, skill, class). 1v1: the bot side. Team games: the bots of the game, with the countdown, and stand-ins                                     |
+| `botadd` / `botdel`                  | Team games: a stand-in bot joins the running game for a disconnected player / leaves when the player is back                                                              |
+| `tready`                             | Team games: the bridge declared a side ready (all ready, captain `!start`, bot team, time up)                                                                             |
+| `acl` / `acle` / `acladd` / `acldel` | Access list: token → name + role (`a`, `b`, `s`)                                                                                                                          |
+| `vopen` / `vmap` / `vclose`          | Map vote options and final choice                                                                                                                                         |
+| `travel`                             | Load map for a match (+ extra URL options); the mod performs the `ServerTravel`                                                                                           |
+| `cd`                                 | Start countdown                                                                                                                                                           |
+| `pause`                              | Pause / unpause                                                                                                                                                           |
+| `abort`                              | End the current game without a result: `why` = `forfeit`, `admin` (organizer set the winner), `void` (match called off), `restart`, `runforfeit` (Monster Hunt run ended) |
+| `brh` / `brm`                        | Bracket for the HUD                                                                                                                                                       |
+| `sth` / `ste`                        | Standings for the HUD                                                                                                                                                     |
+| `say`                                | Message to all (`pid: -1`) or one player                                                                                                                                  |
+| `title`                              | Tournament name (HUD), part of the snapshot                                                                                                                               |
+| `warn`                               | Big centered warning for one player (e.g. last reconnect before a forfeit)                                                                                                |
 
 ### Team games (2on2, 3on3, 5on5)
 
@@ -194,8 +196,11 @@ map twice, once per team:
 
 - **Roles.** Only the line-up of the running team has role `a`/`b`; the other team joins as spectators and
   watches. The running team plays in Monster Hunt's hunter team. Fill bots and stand-in bots as in team games.
-- **`race`** (bridge → mod, with `match`): `rs` running side, `n` run 1/2, `pen` seconds per death, and the other
-  team's finished run (`pt` final time in ms or -1, `pd` deaths, `pp` points, `pf` reached the exit).
+- **`race`** (bridge → mod, with `match`): `rs` running side, `n` run 1/2, `pen` seconds per death, the other
+  team's finished run (`pt` final time in ms or -1, `pd` deaths, `pp` points, `pf` reached the exit), and the
+  Monster Hunt settings `lv` (lives, 0 = unlimited), `mk` (monster skill), `ws` (weapon stay), `hc` (hardcore).
+  The mod caches them and sets them when the next level starts: `TournamentMH` inherits
+  `config(MonsterHunt)`, so Monster Hunt would read them from `MonsterHunt.ini`, not from `Tourney.ini`.
 - **`rp`** (mod → bridge): progress every few seconds and on every death: `ms` run time (pauses excluded), `d`
   deaths in the team (bots included), `pts` monster points.
 - **`runend`** (mod → bridge): the run is over (`done: true` at the exit, `false` at the time limit or with no

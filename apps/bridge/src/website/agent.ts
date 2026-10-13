@@ -219,6 +219,10 @@ export class WebsiteAgent {
         if (this.runtime?.tournamentId !== cmd.tournamentId)
           throw new Error(`tournament ${cmd.tournamentId} is not running here`);
         return this.runtime.director.restartGame(cmd.matchId);
+      case 'match.forfeitRun':
+        if (this.runtime?.tournamentId !== cmd.tournamentId)
+          throw new Error(`tournament ${cmd.tournamentId} is not running here`);
+        return this.runtime.director.forfeitRun(cmd.matchId);
       case 'inventory.rescan':
         return this.rescan(cmd.profileId);
     }

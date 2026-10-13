@@ -29,6 +29,8 @@ export interface RunRecord {
   penaltyMs: number;
   points: number;
   finished: boolean;
+  /** Ended by the organizer. */
+  forfeit?: boolean;
 }
 
 export interface GameRecord {
@@ -226,6 +228,7 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
           penaltyMs: d.penaltyMs,
           points: d.points,
           finished: d.finished,
+          ...(d.forfeit ? { forfeit: true } : {}),
         });
         // Back to the loaded map: the other team runs next (same map).
         cm.status = 'mapSelected';

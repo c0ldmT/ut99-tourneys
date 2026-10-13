@@ -288,7 +288,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                       <td class="num">+{{ raceTime(row.run.penaltyMs) }}</td>
                       <td class="num">
                         <b>{{
-                          row.run.finished ? raceTime(finalMs(row.run)) : ('race.dnf' | t)
+                          row.run.finished
+                            ? raceTime(finalMs(row.run))
+                            : ((row.run.forfeit ? 'race.forfeit' : 'race.dnf') | t)
                         }}</b>
                       </td>
                       <td class="num">{{ row.run.points }}</td>
@@ -461,6 +463,11 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                   @if (current()?.map && t.phase === 'running') {
                     <button (click)="restart()" [disabled]="busy()">
                       {{ (race() ? 'admin.restartRun' : 'admin.restartGame') | t }}
+                    </button>
+                  }
+                  @if (race() && current()?.map && t.phase === 'running') {
+                    <button (click)="forfeitRun()" [disabled]="busy()">
+                      {{ 'admin.forfeitRun' | t }}
                     </button>
                   }
                   <button class="danger" (click)="abort()" [disabled]="busy()">
@@ -847,7 +854,10 @@ export class TournamentPage {
   protected raceScore(id: string): string {
     const cm = this.current();
     const done = cm?.runs?.find((r) => r.entrantId === id);
-    if (done) return done.finished ? raceTime(finalMs(done), false) : this.i18n.t('race.dnf');
+    if (done)
+      return done.finished
+        ? raceTime(finalMs(done), false)
+        : this.i18n.t(done.forfeit ? 'race.forfeit' : 'race.dnf');
     const r = this.liveNow()?.race;
     if (r && r.runner === id) return raceTime(r.timeMs + r.penaltyMs, false);
     return '–';
@@ -873,13 +883,15 @@ export class TournamentPage {
       smartStockBots?: boolean;
       penaltySec?: number;
       monsterSkill?: number;
+      lives?: number;
     };
     if (isRace(t.settings)) {
-      return this.i18n.t('race.rules', {
+      const text = this.i18n.t('race.rules', {
         min: r.timeLimitMin ?? 20,
         s: r.penaltySec ?? 5,
         skill: r.monsterSkill ?? 5,
       });
+      return r.lives ? `${text} / ${this.i18n.t('race.lives', { n: r.lives })}` : text;
     }
     const text = this.i18n.t('tp.rules', { frags: r.fragLimit ?? 20, min: r.timeLimitMin ?? 10 });
     return r.smartStockBots ? `${text} · SmartStockBots` : text;
@@ -916,6 +928,19 @@ export class TournamentPage {
   protected pause() {
     const reason = prompt(this.i18n.t('admin.pauseReason'), this.i18n.t('admin.pauseDefault'));
     if (reason) void this.command({ kind: 'pause', reason });
+  }
+
+  /** Monster Hunt: the running team gives up its run (bots stuck); the other team runs next. */
+  protected forfeitRun() {
+    const cm = this.current();
+    const runner = this.runnerNow() ?? cm?.runOrder?.[cm.runs?.length ?? 0];
+    if (!cm || !runner) return;
+    if (
+      confirm(
+        this.i18n.t('admin.forfeitRunConfirm', { team: this.name(runner), match: cm.matchId }),
+      )
+    )
+      void this.command({ kind: 'forfeitRun' });
   }
 
   protected restart() {
@@ -984,7 +1009,7 @@ export class TournamentPage {
         const run = d as unknown as RunView;
         const time = run.finished
           ? `${raceTime(run.timeMs)} + ${raceTime(run.penaltyMs)} = ${raceTime(finalMs(run))}`
-          : `${this.i18n.t('race.dnf')} (${run.points})`;
+          : `${this.i18n.t(run.forfeit ? 'race.forfeit' : 'race.dnf')} (${run.points})`;
         return `${d['matchId']} G${d['game']} ${this.name(run.entrantId)}: ${time}`;
       }
       case 'match.mapSelected':
