@@ -201,6 +201,26 @@ export const AgentServerStatus = envelope(
   }),
 );
 
+/**
+ * Monster Hunt map records for the HUD: best final time (run time plus penalty) per map.
+ * `counts`: runs of this tournament count for the statistics, so a better finish here is a new
+ * record (the bridge then updates its copy and the mod announces it).
+ */
+export const MapRecordsSchema = z.object({
+  counts: z.boolean(),
+  maps: z
+    .array(
+      z.object({
+        map: z.string().min(1).max(64),
+        finalMs: z.number().int().nonnegative(),
+        /** Team (or player) that holds it. */
+        by: z.string().max(64),
+      }),
+    )
+    .max(1000),
+});
+export type MapRecords = z.infer<typeof MapRecordsSchema>;
+
 /** Full event log or delta for a tournament (website -> bridge). */
 export const TournamentSync = envelope(
   'tournament.sync',
@@ -210,6 +230,8 @@ export const TournamentSync = envelope(
     fromSeq: z.number().int().nonnegative(),
     events: z.array(TournamentEventSchema),
     access: z.array(AccessEntrySchema),
+    /** Monster Hunt: the map records shown in the HUD (statistics page). */
+    records: MapRecordsSchema.optional(),
   }),
 );
 

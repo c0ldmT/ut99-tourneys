@@ -8,6 +8,7 @@ import {
 } from '@tourney/adapter-ut99';
 import type {
   AccessEntry,
+  MapRecords,
   AgentCommand,
   AgentProfile,
   BotSpec,
@@ -54,6 +55,8 @@ export class WebsiteAgent {
   readonly link: WebsiteLink;
   readonly store: RemoteEventStore;
   private access = new Map<string, AccessEntry[]>();
+  /** Monster Hunt map records (statistics) per tournament, from the website. */
+  private records = new Map<string, MapRecords | undefined>();
   private runtime?: Runtime;
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
@@ -134,9 +137,13 @@ export class WebsiteAgent {
         const changed = this.store.applySync(p);
         const before = JSON.stringify(this.access.get(p.tournamentId) ?? []);
         this.access.set(p.tournamentId, p.access);
+        const recordsBefore = JSON.stringify(this.records.get(p.tournamentId));
+        this.records.set(p.tournamentId, p.records);
         const rt = this.runtime;
         if (rt && rt.tournamentId === p.tournamentId) {
           if (JSON.stringify(p.access) !== before) await rt.director.setAccess(p.access);
+          if (JSON.stringify(p.records) !== recordsBefore)
+            await rt.director.setMapRecords(p.records);
           if (changed) await rt.director.refresh();
         }
         return;
@@ -297,6 +304,7 @@ export class WebsiteAgent {
       access: this.access.get(tournamentId) ?? [],
       botPool,
       maps: this.maps,
+      ...(this.records.get(tournamentId) ? { mapRecords: this.records.get(tournamentId) } : {}),
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });
     director.on('live', (info: LiveInfo) => {

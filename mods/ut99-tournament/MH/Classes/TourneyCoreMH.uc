@@ -14,6 +14,9 @@ var int RaceRun;            // run 1 or 2 of the game
 var int PenaltySec;         // seconds per death (display only, the bridge adds it)
 var int PrevMs, PrevDeaths, PrevPoints; // the other team's finished run (PrevMs -1 = none)
 var bool bPrevDone;
+var int RecordMs;           // map record (statistics): final time in ms, -1 = none yet, -2 = not known
+var string RecordBy;
+var bool bRecordCounts;     // a better finish here is a new record (the tournament counts)
 var float RunSec;           // game seconds of this run, pauses excluded
 var int RunDeaths;
 var bool bRunReported;
@@ -72,8 +75,24 @@ function HandleBridgeMessage(TourneyMsg M)
 		UpdateRaceGRI();
 		return;
 	}
+	if (T == "mrec")
+	{
+		// The map's record, after the race line (same rule: after the run it is the next one's).
+		if (bRunReported)
+			return;
+		RecordMs = Max(-2, M.GetInt("ms"));
+		RecordBy = M.Get("by");
+		bRecordCounts = M.GetBool("rn");
+		UpdateRaceGRI();
+		return;
+	}
 	if (T == "match" && (M.Get("mid") != MatchId || M.GetInt("g") != GameNo))
+	{
 		RaceSide = 0; // a new game: its race line follows
+		RecordMs = -2; // and the map record (if the website sends records)
+		RecordBy = "";
+		bRecordCounts = false;
+	}
 	Super.HandleBridgeMessage(M);
 }
 
@@ -388,9 +407,30 @@ function ReportRun(bool bDone)
 	PendingEnd = OutMsg.Finish(); // sent again if the bridge reconnects before it travels
 	Send();
 	if (bDone)
+		CheckMapRecord();
+	if (bDone)
 		Game.BroadcastMessage("Exit reached:" @ RunText(), true, 'CriticalEvent');
 	else
 		Game.BroadcastMessage("Run over:" @ RunText(), true, 'CriticalEvent');
+}
+
+// A finished run that beats the map record shows as the record right away (the bridge decides
+// and announces it; same rule: final time incl. penalty, a tie keeps the old record).
+function CheckMapRecord()
+{
+	local int Final;
+
+	if (!bRecordCounts || RecordMs == -2 || TGRI == None)
+		return;
+	Final = int(RunSec * 1000) + RunDeaths * PenaltySec * 1000;
+	if (RecordMs >= 0 && Final >= RecordMs)
+		return;
+	RecordMs = Final;
+	if (RaceSide == 2)
+		RecordBy = TGRI.NameB;
+	else
+		RecordBy = TGRI.NameA;
+	UpdateRaceGRI();
 }
 
 function string RunText()
@@ -492,11 +532,15 @@ function UpdateRaceGRI()
 	TGRI.PrevMs = PrevMs;
 	TGRI.PrevDeaths = PrevDeaths;
 	TGRI.bPrevDone = bPrevDone;
+	TGRI.RecordMs = RecordMs;
+	TGRI.RecordBy = RecordBy;
+	TGRI.bRecordCounts = bRecordCounts;
 }
 
 defaultproperties
 {
 	PrevMs=-1
+	RecordMs=-2
 	RaceRun=1
 	HuntLives=-1
 	HuntMonsterSkill=-1

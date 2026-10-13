@@ -1,5 +1,6 @@
 import { TournamentFileSchema, bootstrapFromFile, type TournamentFile } from '../src/bootstrap.js';
 import { FakeClock } from '../src/clock.js';
+import type { MapRecords } from '@tourney/protocol';
 import { MatchDirector, type DirectorTiming } from '../src/director.js';
 import { LocalEventStore } from '../src/event-store.js';
 import { memoryLogger } from '../src/log.js';
@@ -60,6 +61,7 @@ export async function setup(opts: {
   file?: TournamentFile;
   behaviour?: Partial<SimBehaviour>;
   timing?: Partial<DirectorTiming>;
+  mapRecords?: MapRecords;
 }) {
   const clock = new FakeClock();
   const log = memoryLogger();
@@ -84,6 +86,7 @@ export async function setup(opts: {
       log,
       access: boot.access,
       botPool: boot.botPool,
+      ...(opts.mapRecords ? { mapRecords: opts.mapRecords } : {}),
       timing: {
         postGameDelayMs: 2_000,
         simulateDelayMs: 1_000,

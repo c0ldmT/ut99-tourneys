@@ -248,6 +248,12 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     hc: z.boolean(),
     wf: z.boolean(), // bots use the tournament's waypoint fix (TourneyMHBotExtension)
   }),
+  /**
+   * Monster Hunt, after `race`: the map's record (final time in ms, -1 = none, -2 = no records:
+   * the HUD hides the line) and who holds it.
+   * `rn`: a better finish in this run is a new record (the tournament counts for the statistics).
+   */
+  z.object({ t: z.literal('mrec'), ms: int.min(-2), by: str(MAX_NAME_CHARS), rn: z.boolean() }),
   /** Team games: a stand-in bot leaves (the player is back). */
   z.object({ t: z.literal('botdel'), name: str(MAX_NAME_CHARS) }),
   /** Team games: the bridge declared a side ready (all ready, captain start, bot team). */

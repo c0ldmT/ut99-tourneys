@@ -13,6 +13,7 @@ import {
   type AccessEntry,
   type BotSpec,
   type Entrant,
+  type MapRecords,
   type NewTournamentEvent,
   type TeamEntrant,
   type TournamentProjection,
@@ -31,6 +32,7 @@ import { AgentsService } from '../agents/agents.service.js';
 import type { User } from '../auth/users.service.js';
 import { isWebhookUrl } from '../notify/discord-out.js';
 import { NotificationsService } from '../notify/notifications.service.js';
+import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
 import { assignBots, fits, formTeams, joinRole, type TeamShape } from './teams.js';
@@ -140,6 +142,7 @@ export class TournamentsService {
     @Inject(LOGGER) private readonly logger: ApiLogger,
     @Inject(TeamsService) private readonly teams: TeamsService,
     @Inject(NotificationsService) private readonly notify: NotificationsService,
+    @Inject(StatsService) private readonly stats: StatsService,
   ) {}
 
   private now() {
@@ -845,8 +848,28 @@ export class TournamentsService {
         fromSeq: from,
         events: log.slice(from),
         access: this.access(t),
+        records: this.mapRecordsFor(t),
       },
     });
+  }
+
+  /** Monster Hunt: the map records (statistics) for the HUD; undefined for other games. */
+  private mapRecordsFor(t: TournamentRow): MapRecords | undefined {
+    if (this.settings(t).game.adapter !== 'ut99-mh') return undefined;
+    try {
+      return {
+        counts: t.statsEnabled,
+        maps: this.stats.mapRecords().map((r) => ({
+          map: r.map.slice(0, 64),
+          finalMs: Math.max(0, Math.round(r.finalMs)),
+          by: (r.team || r.members.map((m) => m.name).join(', ')).slice(0, 64),
+        })),
+      };
+    } catch (err) {
+      // The HUD line is a nicety: a broken log elsewhere must not stop the sync.
+      this.logger.warn(`map records for ${t.id}: ${String(err)}`);
+      return { counts: t.statsEnabled, maps: [] };
+    }
   }
 
   async run(id: string): Promise<void> {

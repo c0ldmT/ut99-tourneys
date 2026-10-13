@@ -23,6 +23,11 @@ var string PauseReason;
 var byte RaceSide, RaceRun;
 var int RaceMs, RaceDeaths, RacePen, RaceLimit, PrevMs, PrevDeaths;
 var bool bPrevDone;
+// Monster Hunt map record (statistics, from the bridge): final time in ms (-1 = none yet,
+// -2 = not known), who holds it, whether a better finish in this tournament is a new record.
+var int RecordMs;
+var string RecordBy;
+var bool bRecordCounts;
 
 // Bracket: one line per match "side|round|index|id|nameA|nameB|scoreA|scoreB|status|winner"
 var string Lines[64];
@@ -46,6 +51,7 @@ replication
 		ScoreA, ScoreB, ReadyA, ReadyB, bBotA, bBotB, bPaused, PauseReason,
 		TeamSize, PresentA, PresentB, TeamReadyA, TeamReadyB,
 		RaceSide, RaceRun, RaceMs, RaceDeaths, RacePen, RaceLimit, PrevMs, PrevDeaths, bPrevDone,
+		RecordMs, RecordBy, bRecordCounts,
 		Lines, LineCount, BracketRev, Fmt, Stand, StandCount, StandRev, VoteMaps, VoteCount;
 }
 
@@ -53,6 +59,7 @@ defaultproperties
 {
 	TeamSize=1
 	PrevMs=-1
+	RecordMs=-2
 	bAlwaysRelevant=True
 	RemoteRole=ROLE_SimulatedProxy
 	NetUpdateFrequency=4

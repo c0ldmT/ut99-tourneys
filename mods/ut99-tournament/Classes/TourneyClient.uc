@@ -436,7 +436,7 @@ static function string RaceTime(int Ms)
 // Monster Hunt: who runs, the running time with the penalty, and the time to beat.
 simulated function DrawRaceBanner(Canvas C)
 {
-	local string Runner, Other, S, Info, Beat;
+	local string Runner, Other, S, Info, Beat, Rec;
 	local float XL, YL, Y2;
 	local int Pen;
 
@@ -462,17 +462,39 @@ simulated function DrawRaceBanner(Canvas C)
 		Beat = "Time to beat:" @ Other @ RaceTime(GRI.PrevMs);
 	else if (GRI.PrevMs >= 0)
 		Beat = Other @ "did not reach the exit: reach it to win";
+	Rec = RecordText();
 	DrawCentered(C, S, 6, 240, 163, 43, MediumFont(C));
 	C.Font = MediumFont(C);
 	C.StrLen(S, XL, YL);
 	Y2 = 6 + YL + 16;
 	DrawCentered(C, Info, Y2, 160, 170, 185, SmallFont(C));
+	C.Font = SmallFont(C);
+	C.StrLen(Info, XL, YL);
 	if (Beat != "")
 	{
-		C.Font = SmallFont(C);
-		C.StrLen(Info, XL, YL);
-		DrawCentered(C, Beat, Y2 + YL + 12, 230, 237, 243, SmallFont(C));
+		Y2 += YL + 12;
+		DrawCentered(C, Beat, Y2, 230, 237, 243, SmallFont(C));
 	}
+	if (Rec != "")
+		DrawCentered(C, Rec, Y2 + YL + 12, 212, 175, 55, SmallFont(C));
+}
+
+// Monster Hunt: the map record from the statistics ("" = not known).
+simulated function string RecordText()
+{
+	local string S;
+
+	if (GRI.RecordMs < -1)
+		return "";
+	if (GRI.RecordMs < 0)
+		S = "Map record: none yet";
+	else
+		S = "Map record:" @ RaceTime(GRI.RecordMs) @ "by" @ GRI.RecordBy;
+	if (!GRI.bRecordCounts)
+		S = S @ "(this tournament does not count)";
+	else if (GRI.RecordMs < 0)
+		S = S @ "- reach the exit to set it";
+	return S;
 }
 
 // Team games: "READY", or how many of the team are ready / here.

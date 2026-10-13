@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
 import { users } from '../src/db/schema.js';
+import { TournamentsService } from '../src/tournaments/tournaments.service.js';
 import type { DiscordOut } from '../src/notify/discord-out.js';
 import { Client, startApi, tournamentBody } from './helpers.js';
 import { eq } from 'drizzle-orm';
@@ -194,6 +195,33 @@ describe('website + bridge + simulated UT server', () => {
     expect(detail.recent.length).toBeGreaterThan(0);
     const rec = (await mario!.get('/stats/records')).body;
     expect(rec.records.map((r: { id: string }) => r.id)).toContain('game.frags');
+  });
+
+  it('sends the Monster Hunt map records with the log (HUD)', async () => {
+    const env = await setup({ players: ['Mario'] });
+    const body = tournamentBody({ name: 'Hunt' }, { teamSize: 2 });
+    const rules = { mapPool: ['MH-NaliVillage'], timeLimitMin: 20, fragLimit: 0 };
+    const created = await env.admin.post('/tournaments', {
+      ...body,
+      settings: { ...body.settings, game: { adapter: 'ut99-mh', rules } },
+    });
+    expect(created.status).toBe(201);
+    const id: string = created.body.id;
+    const service = env.api.app.get(TournamentsService);
+    const records = () => (env.agent as any).records.get(id);
+    service.syncToAgent(service.get(id)!, 0);
+    await until(() => records() !== undefined);
+    expect(records()).toEqual({ counts: true, maps: [] });
+    // Not counted for the statistics: records are shown, a better time is no new record.
+    expect(
+      (await env.admin.req('PATCH', `/tournaments/${id}`, { statsEnabled: false })).status,
+    ).toBe(200);
+    service.syncToAgent(service.get(id)!, 0);
+    await until(() => records()?.counts === false);
+    // Other games carry no records.
+    service.syncToAgent(service.get(env.id)!, 0);
+    await new Promise((r) => setTimeout(r, 50));
+    expect((env.agent as any).records.get(env.id)).toBeUndefined();
   });
 
   it('runs a whole tournament started from the website', async () => {

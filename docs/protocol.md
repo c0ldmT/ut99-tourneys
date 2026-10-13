@@ -87,7 +87,7 @@ token (`Authorization: Bearer …`). Every frame is an envelope:
 | --------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | B → W     | `agent.hello`                        | Agent id, version, OS/arch, supported adapters, last known seq per tournament, server profiles, active tournament                                                       |
 | W → B     | `agent.welcome`                      | Accepted, server time                                                                                                                                                   |
-| W → B     | `tournament.sync`                    | Full log (`fromSeq: 0`) or delta, plus the access list (tokens)                                                                                                         |
+| W → B     | `tournament.sync`                    | Full log (`fromSeq: 0`) or delta, plus the access list (tokens) and, for Monster Hunt, the map records (`records`)                                                      |
 | B → W     | `events.append` / W → B `events.ack` | See concurrency above                                                                                                                                                   |
 | W → B     | `command`                            | `inventory.rescan`, `tournament.run`, `tournament.forceStart`, `pause`, `resume`, `abort`, `match.restart`, `server.stop`, `access.upsert`, `access.revoke`, `announce` |
 | B → W     | `command.ack`                        | Result of a command                                                                                                                                                     |
@@ -207,6 +207,11 @@ map twice, once per team:
   `wf` (bots use the tournament's waypoint fix).
   The mod caches them and sets them when the next level starts: `TournamentMH` inherits
   `config(MonsterHunt)`, so Monster Hunt would read them from `MonsterHunt.ini`, not from `Tourney.ini`.
+- **`mrec`** (bridge → mod, after `race`): the map record from the statistics, shown in the HUD under the run
+  info: `ms` best final time (run time plus penalty) in ms or -1 for none (-2: no records, the HUD hides the line), `by` the team that holds it, `rn` a
+  better finish in this tournament counts (`stats_enabled`). The website sends the records with
+  `tournament.sync` (`records`, Monster Hunt only); the bridge keeps its copy current with the runs it records,
+  announces a new record in the game and sends the new line with the next run.
 - **`rp`** (mod → bridge): progress every few seconds and on every death: `ms` run time (pauses excluded), `d`
   deaths in the team (bots included), `pts` monster points.
 - **`runend`** (mod → bridge): the run is over (`done: true` at the exit, `false` at the time limit or with no

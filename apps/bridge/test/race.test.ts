@@ -127,6 +127,42 @@ describe('Monster Hunt time race against the simulated UT server', () => {
     expect(run2.pt).toBe(finalMs(events(env, 'match.runFinished')[0].data));
   });
 
+  it('shows the map record in the HUD and announces a new one', async () => {
+    env = await setup({
+      file: raceFile({ rules: { mapPool: ['MH-NaliVillage'] } }),
+      behaviour: {
+        // 5:00 + 2 deaths = 5:10 beats the record of 5:12; 4:50 + 5 deaths = 5:15 does not.
+        runs: [
+          { ms: 300_000, deaths: 2 },
+          { ms: 290_000, deaths: 5 },
+        ],
+      },
+      mapRecords: {
+        counts: true,
+        maps: [{ map: 'mh-nalivillage', finalMs: 312_000, by: 'Old Guard' }],
+      },
+    });
+    await env.run(() => events(env!, 'match.runFinished').length >= 2);
+    const mrec = env.sim.received.filter((m) => m.t === 'mrec') as any[];
+    // Each line follows the race line; run 2 already sees the record set by run 1.
+    expect(mrec[0]).toEqual({ t: 'mrec', ms: 312_000, by: 'Old Guard', rn: true });
+    expect(mrec.at(-1)).toMatchObject({ ms: 310_000, rn: true });
+    const runner = events(env, 'match.runFinished')[0].data.entrantId;
+    const name = env.director.projection.entrants[runner]!.displayName;
+    expect(mrec.at(-1).by).toBe(name);
+    const said = env.sim.received.filter((m) => m.t === 'say').map((m: any) => m.msg as string);
+    expect(said.filter((m) => m.startsWith('New map record'))).toEqual([
+      `New map record on MH-NaliVillage: 5:10.0 by ${name} (was 5:12.0 by Old Guard)`,
+    ]);
+
+    // Tournaments that do not count show the record but never set one.
+    await env.director.setMapRecords({ counts: false, maps: [] });
+    const mrecs = () => env!.sim.received.filter((m) => m.t === 'mrec') as any[];
+    const seen = mrecs().length;
+    await env.run(() => mrecs().length > seen);
+    expect(mrecs().at(-1)).toEqual({ t: 'mrec', ms: -1, by: '', rn: false });
+  });
+
   it('a team at the exit beats a team that ran out of time', async () => {
     env = await setup({
       file: raceFile(),

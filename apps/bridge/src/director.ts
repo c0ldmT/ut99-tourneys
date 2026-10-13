@@ -12,6 +12,8 @@ import {
   type BotSpec,
   type BridgeToMod,
   type MapInfo,
+  MAX_NAME_CHARS,
+  type MapRecords,
   type ModPhase,
   type ModToBridge,
   type NewTournamentEvent,
@@ -92,6 +94,17 @@ const DEFAULT_TIMING: DirectorTiming = {
 /** Events from the website that do not change the course of the tournament (applied in passing). */
 const PASSIVE_EVENTS = new Set<string>(['team.lineupSet']);
 
+const cloneRecords = (r: MapRecords): MapRecords => ({
+  counts: r.counts,
+  maps: r.maps.map((m) => ({ ...m })),
+});
+
+/** The record of a map (UT map names are case-insensitive). */
+function recordFor(r: MapRecords | undefined, map: string) {
+  const k = map.toLowerCase();
+  return r?.maps.find((m) => m.map.toLowerCase() === k);
+}
+
 export interface DirectorOptions {
   tournamentId: string;
   agentId: string;
@@ -103,6 +116,8 @@ export interface DirectorOptions {
   botPool: BotSpec[];
   /** Map metadata from the inventory, used for vote titles. */
   maps?: MapInfo[];
+  /** Monster Hunt: map records from the statistics (shown in the HUD). */
+  mapRecords?: MapRecords;
   timing?: Partial<DirectorTiming>;
 }
 
@@ -222,6 +237,8 @@ export class MatchDirector extends EventEmitter {
   private readonly timing: DirectorTiming;
   /** Who may join the server; replaced by the website while the tournament runs. */
   private access: AccessEntry[];
+  /** Monster Hunt: map records (statistics); kept current with the runs of this tournament. */
+  private mapRecords?: MapRecords;
   /**
    * Team games: line-up of the current game (user ids per entrant), fixed before the map loads.
    * Monster Hunt: per run, only the running team has a line-up.
@@ -256,6 +273,7 @@ export class MatchDirector extends EventEmitter {
     super();
     this.timing = { ...DEFAULT_TIMING, ...o.timing };
     this.access = [...o.access];
+    if (o.mapRecords) this.mapRecords = cloneRecords(o.mapRecords);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -444,6 +462,27 @@ export class MatchDirector extends EventEmitter {
       this.access = [...entries];
       this.send(this.aclFor(this.proj.currentMatch?.entrants));
     });
+  }
+
+  /** Monster Hunt: new map records from the website; the HUD of a running race is updated. */
+  setMapRecords(records: MapRecords | undefined): Promise<void> {
+    return this.enqueue(() => {
+      this.mapRecords = records ? cloneRecords(records) : undefined;
+      const cm = this.proj.currentMatch;
+      if (this.raceMode && cm?.map && this.runner()) this.send([this.mrecLine(cm.map)]);
+    });
+  }
+
+  /** The `mrec` line for a map: its record (or none) and whether a better finish counts. */
+  private mrecLine(map: string): BridgeToMod {
+    if (!this.mapRecords) return { t: 'mrec', ms: -2, by: '', rn: false }; // the HUD hides it
+    const rec = recordFor(this.mapRecords, map);
+    return {
+      t: 'mrec',
+      ms: rec ? rec.finalMs : -1,
+      by: rec ? rec.by.slice(0, MAX_NAME_CHARS) : '',
+      rn: this.mapRecords.counts,
+    };
   }
 
   /**
@@ -802,6 +841,7 @@ export class MatchDirector extends EventEmitter {
         hc: this.rules.hardcore,
         wf: this.rules.botWaypointFix,
       });
+      if (this.mapRecords && cm.map) lines.push(this.mrecLine(cm.map));
     }
     return lines;
   }
@@ -2279,6 +2319,23 @@ export class MatchDirector extends EventEmitter {
     });
   }
 
+  /**
+   * Monster Hunt: a finished run that beats the map record (statistics) is the new record, if
+   * this tournament counts. Same rule as the statistics page: final time incl. penalty, the
+   * earlier run keeps a tie.
+   */
+  private checkMapRecord(map: string, finalTime: number, runner: string): void {
+    const recs = this.mapRecords;
+    if (!recs?.counts) return;
+    const old = recordFor(recs, map);
+    if (old && old.finalMs <= finalTime) return;
+    const by = this.name(runner);
+    const was = old ? ` (was ${formatRaceTime(old.finalMs)} by ${old.by})` : '';
+    if (old) Object.assign(old, { finalMs: finalTime, by });
+    else recs.maps.push({ map, finalMs: finalTime, by });
+    this.say(`New map record on ${map}: ${formatRaceTime(finalTime)} by ${by}${was}`);
+  }
+
   private async recordRun(
     matchId: string,
     game: number,
@@ -2318,6 +2375,7 @@ export class MatchDirector extends EventEmitter {
           ? `${this.name(runner)}: ${formatRaceTime(r.ms)} + ${r.d} deaths x ${this.rules.penaltySec}s = ${total}`
           : `${this.name(runner)} did not reach the exit (${r.pts} monster points, ${r.d} deaths)`,
       );
+    if (!forfeit && r.done) this.checkMapRecord(map, r.ms + penaltyMs, runner);
     const cm = this.proj.currentMatch;
     const runs = cm?.runs ?? [];
     if (runs.length < 2) {
