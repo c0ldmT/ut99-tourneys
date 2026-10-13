@@ -12,6 +12,14 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tournament-list').then((m) => m.TournamentListPage),
       },
       {
+        path: 'stats',
+        loadComponent: () => import('./pages/stats').then((m) => m.StatsPage),
+      },
+      {
+        path: 'stats/p/:key',
+        loadComponent: () => import('./pages/stats-player').then((m) => m.StatsPlayerPage),
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./pages/profile').then((m) => m.ProfilePage),
       },

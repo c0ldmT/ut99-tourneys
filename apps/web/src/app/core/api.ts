@@ -5,8 +5,13 @@ import type {
   AgentView,
   InvitePreview,
   Me,
+  MapRecord,
   PublicUser,
   SiteConfig,
+  StatMode,
+  StatsPlayerDetail,
+  StatsPlayerRow,
+  StatsRecord,
   TournamentDetail,
   TournamentEventView,
   TournamentSummary,
@@ -65,6 +70,19 @@ export class Api {
   users = () => this.call<PublicUser[]>('GET', '/users');
   setAdmin = (id: string, isAdmin: boolean) =>
     this.call<PublicUser>('PATCH', `/users/${id}`, { isAdmin });
+
+  statsPlayers = (mode: StatMode | '', bots: boolean) =>
+    this.call<StatsPlayerRow[]>(
+      'GET',
+      `/stats/players?${mode ? `mode=${mode}&` : ''}bots=${bots ? 1 : 0}`,
+    );
+  statsPlayer = (key: string) =>
+    this.call<StatsPlayerDetail>('GET', `/stats/players/${encodeURIComponent(key)}`);
+  statsRecords = (mode: StatMode | '') =>
+    this.call<{ records: StatsRecord[]; maps: MapRecord[] }>(
+      'GET',
+      `/stats/records${mode ? `?mode=${mode}` : ''}`,
+    );
 
   tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);

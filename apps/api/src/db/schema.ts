@@ -68,6 +68,8 @@ export const tournaments = sqliteTable('tournaments', {
   /** When "registration open" was posted, and when registered players were reminded. */
   announcedAt: text('announced_at'),
   remindedAt: text('reminded_at'),
+  /** Counts for the statistics page. */
+  statsEnabled: integer('stats_enabled', { mode: 'boolean' }).notNull().default(true),
 });
 
 export const teams = sqliteTable('teams', {

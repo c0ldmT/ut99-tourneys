@@ -101,6 +101,8 @@ export interface TournamentDetail {
   settings: TournamentSettings;
   botPool: BotSpec[];
   registrationOpen: boolean;
+  /** Counts for the statistics page. */
+  statsEnabled: boolean;
   scheduledAt: string | null;
   createdAt: string;
   registrations: {
@@ -185,4 +187,101 @@ export interface TournamentEventView {
   at: string;
   actor: { kind: string; id?: string };
   data: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Statistics (see apps/api/src/stats/aggregate.ts)
+
+export type StatMode = 'dm' | 'tdm' | 'mh';
+
+export interface StatsPlayerRow {
+  key: string;
+  name: string;
+  bot: boolean;
+  userId?: string;
+  tournaments: number;
+  titles: number;
+  matches: number;
+  matchesWon: number;
+  games: number;
+  gamesWon: number;
+  statGames: number;
+  kills: number;
+  deaths: number;
+  suicides: number;
+  teamKills: number;
+  frags: number;
+  kd: number;
+  efficiency: number;
+  headshots: number;
+  firstBloods: number;
+  bestSpree: number;
+  sprees: number;
+  multiKills: number;
+  timeSec: number;
+  favoriteWeapon?: { name: string; kills: number };
+  runs: number;
+  runsFinished: number;
+  monsters: number;
+  monsterPoints: number;
+}
+
+export interface RecordHolder {
+  key: string;
+  name: string;
+  bot: boolean;
+}
+
+export interface StatsRecord {
+  id: string;
+  mode: StatMode | 'all';
+  value: number;
+  unit: 'count' | 'ratio' | 'sec' | 'ms';
+  holders: RecordHolder[];
+  label: string;
+  tournamentId?: string;
+  tournamentName?: string;
+  matchId?: string;
+  map?: string;
+  at?: string;
+}
+
+export interface MapRecord {
+  map: string;
+  finalMs: number;
+  timeMs: number;
+  deaths: number;
+  penaltyMs: number;
+  monsterSkill: number;
+  team: string;
+  members: RecordHolder[];
+  tournamentId: string;
+  tournamentName: string;
+  at: string;
+}
+
+export interface StatsPlayerDetail {
+  row: StatsPlayerRow;
+  byMode: Partial<Record<StatMode, StatsPlayerRow>>;
+  weapons: { name: string; kills: number }[];
+  recent: {
+    tournamentId: string;
+    tournamentName: string;
+    matchId: string;
+    mode: StatMode;
+    at: string;
+    won: boolean;
+    team: string;
+    opponent: string;
+  }[];
+  mapBests: {
+    map: string;
+    finalMs: number;
+    deaths: number;
+    team: string;
+    tournamentName: string;
+    at: string;
+  }[];
+  records: StatsRecord[];
+  mapRecords: MapRecord[];
 }

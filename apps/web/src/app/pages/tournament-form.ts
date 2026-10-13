@@ -79,6 +79,8 @@ interface Model {
   mapPool: string[];
   botPool: BotSpec[];
   notifyMode: 'default' | 'custom' | 'off';
+  /** Counts for the statistics page. */
+  statsEnabled: boolean;
   webhookUrl: string;
 }
 
@@ -444,6 +446,15 @@ function toLocalInput(iso: string | null): string {
           </p>
         </fieldset>
 
+        <fieldset>
+          <legend>{{ 'form.stats' | t }}</legend>
+          <label class="row"
+            ><input type="checkbox" name="stats" [(ngModel)]="f.statsEnabled" />
+            {{ 'form.statsEnabled' | t }}</label
+          >
+          <p class="muted small">{{ 'form.statsHint' | t }}</p>
+        </fieldset>
+
         <fieldset [disabled]="botsLocked()">
           <legend>{{ 'form.botPool' | t: { n: f.botPool.length } }}</legend>
           <p class="muted small">
@@ -702,6 +713,7 @@ export class TournamentFormPage {
       botWaypointFix: true,
       notifyMode: 'default',
       webhookUrl: '',
+      statsEnabled: true,
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -751,6 +763,7 @@ export class TournamentFormPage {
       botWaypointFix: r['botWaypointFix'] !== false,
       notifyMode: d.notify?.mode ?? 'default',
       webhookUrl: d.notify?.webhookUrl ?? '',
+      statsEnabled: d.statsEnabled,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
@@ -852,6 +865,7 @@ export class TournamentFormPage {
       registrationOpen: f.registrationOpen,
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
+      statsEnabled: f.statsEnabled,
       botPool: f.botPool
         .filter((b) => b.name.trim())
         .map((b) => ({ name: b.name.trim(), skill: b.skill })),
@@ -905,6 +919,7 @@ export class TournamentFormPage {
           registrationOpen: body.registrationOpen,
           notifyMode: body.notifyMode,
           webhookUrl: body.webhookUrl,
+          statsEnabled: body.statsEnabled,
         };
         if (!this.locked())
           Object.assign(patch, {

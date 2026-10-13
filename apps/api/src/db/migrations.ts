@@ -102,4 +102,11 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE tournaments ADD COLUMN announced_at TEXT;
   ALTER TABLE tournaments ADD COLUMN reminded_at TEXT;
   `,
+  // 4: statistics. A tournament counts for the statistics page when stats_enabled is set (new
+  // tournaments: yes). Tournaments that exist before this update start excluded; an admin can
+  // include them in the tournament form.
+  `
+  ALTER TABLE tournaments ADD COLUMN stats_enabled INTEGER NOT NULL DEFAULT 1;
+  UPDATE tournaments SET stats_enabled = 0;
+  `,
 ];

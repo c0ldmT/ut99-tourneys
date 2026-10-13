@@ -20,6 +20,7 @@ import type { Lang } from './core/i18n-dict';
               [routerLinkActiveOptions]="{ exact: true }"
               >{{ 'nav.tournaments' | t }}</a
             >
+            <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
             @if (me.isAdmin) {
               <a routerLink="/new" routerLinkActive="active">{{ 'nav.new' | t }}</a>
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
@@ -72,7 +73,8 @@ import type { Lang } from './core/i18n-dict';
     }
     nav {
       display: flex;
-      gap: 12px;
+      flex-wrap: wrap;
+      gap: 4px 12px;
     }
     nav a {
       color: var(--muted);

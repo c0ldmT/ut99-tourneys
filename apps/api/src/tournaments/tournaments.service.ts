@@ -54,6 +54,8 @@ const TournamentFields = z.object({
   scheduledAt: z.iso.datetime().nullable().optional(),
   /** Discord channel for this tournament: the default webhook, its own, or none. */
   notifyMode: z.enum(['default', 'custom', 'off']).optional(),
+  /** Counts for the statistics page (test tournaments: off). */
+  statsEnabled: z.boolean().optional(),
   webhookUrl: z
     .string()
     .trim()
@@ -217,6 +219,7 @@ export class TournamentsService {
         scheduledAt: body.scheduledAt ?? null,
         notifyMode: body.notifyMode ?? 'default',
         webhookUrl: body.webhookUrl || null,
+        statsEnabled: body.statsEnabled ?? true,
         createdBy: by.id,
         createdAt: this.now(),
       })
@@ -258,6 +261,7 @@ export class TournamentsService {
     }
     if (body.notifyMode !== undefined) set.notifyMode = body.notifyMode;
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
+    if (body.statsEnabled !== undefined) set.statsEnabled = body.statsEnabled;
     const oldTeamSize = this.settings(t).teamSize;
     if (Object.keys(set).length) {
       this.db.update(tournaments).set(set).where(eq(tournaments.id, id)).run();
@@ -1039,6 +1043,7 @@ export class TournamentsService {
       settings: this.settings(t),
       botPool: this.botPool(t),
       registrationOpen: t.registrationOpen,
+      statsEnabled: t.statsEnabled,
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
       registrations: regs.map((u) => ({

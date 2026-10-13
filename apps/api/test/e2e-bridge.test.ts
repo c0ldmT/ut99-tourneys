@@ -178,6 +178,22 @@ describe('website + bridge + simulated UT server', () => {
       true,
     );
     expect(env.blog.lines.some((l) => l.includes('re-planning'))).toBe(false);
+
+    // Statistics: team players with kills from the mod; the champion team's players got a title.
+    const stats = (await mario!.get('/stats/players?mode=tdm')).body as any[];
+    // (who is in the list comes from the server's statistics: players who really played)
+    const marioRow = stats.find((r) => r.name === 'Jonas');
+    expect(marioRow).toMatchObject({ tournaments: 1, bot: false });
+    expect(marioRow.statGames).toBeGreaterThan(0);
+    expect(stats.some((r) => r.bot)).toBe(false); // bots only on request
+    const withBots = (await mario!.get('/stats/players?mode=tdm&bots=1')).body as any[];
+    expect(withBots.length).toBeGreaterThanOrEqual(stats.length);
+    expect(withBots.reduce((n, r) => n + r.titles, 0)).toBe(2); // the two players of the winning team
+    const detail = (await mario!.get(`/stats/players/${encodeURIComponent(marioRow.key)}`)).body;
+    expect(detail.row.key).toBe(marioRow.key);
+    expect(detail.recent.length).toBeGreaterThan(0);
+    const rec = (await mario!.get('/stats/records')).body;
+    expect(rec.records.map((r: { id: string }) => r.id)).toContain('game.frags');
   });
 
   it('runs a whole tournament started from the website', async () => {
@@ -217,6 +233,11 @@ describe('website + bridge + simulated UT server', () => {
     expect(events.filter((e) => e.actor.kind === 'bridge').every((e) => e.actor.id === 'pi')).toBe(
       true,
     );
+    // A tournament counts for the statistics unless switched off.
+    expect(d.statsEnabled).toBe(true);
+    expect(((await admin.get('/stats/players?mode=dm')).body as any[]).length).toBeGreaterThan(0);
+    await admin.req('PATCH', `/tournaments/${id}`, { statsEnabled: false });
+    expect((await admin.get('/stats/players?mode=dm')).body).toEqual([]);
     // The agent reported its status.
     const agents = (await admin.get('/agents')).body;
     expect(agents[0].status.modConnected).toBe(true);
