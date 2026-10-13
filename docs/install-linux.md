@@ -58,7 +58,9 @@ sudo bash /opt/tourney/deploy/linux/install-ut.sh ~/OldUnreal-UTPatch469f-Linux-
 
 It unpacks the patch, creates `UnrealTournament.ini`, builds the tournament mod (`mod/build.sh` with `ucc`) and
 hands the folder to the user `tourney`. Run it again (`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99`) after adding maps or Monster
-Hunt.
+Hunt. If the mod build fails or hangs (stopped after 15 minutes), build `UTTourney_v1.u`/`UTTourneyMH_v1.u` on another
+PC from the same version and install them with a third argument, the folder that holds them:
+`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99 ~/`.
 
 ## 3. Settings
 

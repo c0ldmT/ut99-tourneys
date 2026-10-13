@@ -86,9 +86,20 @@ tournament mod with `ucc` (`UTTourney_v1.u`, plus `UTTourneyMH_v1.u` if Monster 
 command for a quick test of the server alone. If that test stops with `Illegal instruction`, the patch build
 does not run on this CPU (Pi 3 = Cortex-A53).
 
+**If the mod build hangs** (`ucc` stays at `Analyzing...` with one core at 100 %, seen on a Pi): the script stops
+it after 15 minutes. The packages are the same on every platform, so build them on your PC instead
+(`mod/build.ps1` on Windows, `build.sh` on Linux, from the **same** version as this bundle), copy
+`UTTourney_v1.u` and `UTTourneyMH_v1.u` to the Pi (e.g. with `scp` into your home folder) and install them:
+
+```sh
+sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99 ~/
+```
+
+Your own UT client then has exactly the server's files (no "package mismatch").
+
 More maps or Monster Hunt later: copy them into `/opt/ut99/Maps` (and `System`), then run
-`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99` again (rebuilds the mod) and rescan the server on the
-website.
+`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99` again (rebuilds the mod; with the PC-built files:
+`... /opt/ut99 ~/`) and rescan the server on the website. A new mod version (update) is installed the same way.
 
 ## 6. Website settings
 
@@ -173,3 +184,6 @@ The website now shows the server as online. Click **Scan** there, so maps and bo
   website). Monster Hunt needs `MonsterHunt.u` and `UTTourneyMH_v1.u` in `/opt/ut99/System`.
 - **The server does not start:** `/opt/ut99/System/Tourney.log`; run the quick test from the end of
   `install-ut.sh`.
+- **Mod build hangs or fails:** see step 5 (build on the PC, install with the third argument). Check the version:
+  `journalctl -u tourney-bridge | grep "mod connected"` shows `mod 0.x.y`, which must match
+  `grep MOD_VERSION /opt/tourney/mod/Classes/TourneyCore.uc`.

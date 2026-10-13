@@ -3,6 +3,8 @@
 # Usage: ./build.sh /path/to/UnrealTournament
 # Result: <UT>/System/UTTourney_v1.u, and UTTourneyMH_v1.u (Monster Hunt) if MonsterHunt.u is installed.
 # Does not modify your UnrealTournament.ini.
+# ucc make is stopped after UCC_TIMEOUT_MIN minutes (default 15): the ARM64 build of 469f was seen hanging at
+# "Analyzing..." on a Raspberry Pi. Then build on a PC and copy the .u files (see install-ut.sh, third argument).
 set -euo pipefail
 
 PKG="UTTourney_v1"
@@ -50,7 +52,19 @@ awk -v pkg="$PKG" -v mhpkg="$MHPKG" -v withmh="$WITH_MH" '
   END { if (insec && !done) add() }
 ' "$SRCINI" > "$SYSDIR/TourneyMake.ini"
 
-(cd "$SYSDIR" && "$UCC" make ini=TourneyMake.ini)
+TIMEOUT_MIN="${UCC_TIMEOUT_MIN:-15}"
+set +e
+if command -v timeout >/dev/null; then
+  (cd "$SYSDIR" && timeout -k 10 "${TIMEOUT_MIN}m" "$UCC" make ini=TourneyMake.ini)
+else
+  (cd "$SYSDIR" && "$UCC" make ini=TourneyMake.ini)
+fi
+RC=$?
+set -e
+if [ "$RC" = 124 ]; then
+  echo "ucc make did not finish within $TIMEOUT_MIN minutes and was stopped (more time: UCC_TIMEOUT_MIN=30)." >&2
+  exit 1
+fi
 
 [ -f "$SYSDIR/$PKG.u" ] || { echo "build failed, see output above" >&2; exit 1; }
 echo "built $SYSDIR/$PKG.u"
