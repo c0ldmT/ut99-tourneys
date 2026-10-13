@@ -14,9 +14,22 @@
 // 3. Movers (lifts, doors, gates) that turn back when they hit somebody: a bot
 //    keeps its distance while such a mover moves or waits to move, and while a
 //    lift is above it, and goes on when the mover is ready (lift on its level).
+//    Bots that wait for a lift wait away from it, so they never block the way
+//    out for a bot under it; bots standing close to such a lift make room.
 // 4. Stuck bots: 3 s without progress -> jump to the side, 8 s -> detour over a
 //    nearby path point, 20 s -> penalty-free respawn (moved to a start spot, no
 //    death counted).
+// 5. Map bug fix: a mover that opens only once and turns back when it hits a
+//    pawn would stay closed for good after one touch (MH-Canyon's castle bars).
+//    Such movers no longer turn back (they move on); each one is logged.
+// 6. Closed doors: a bot stuck at a closed mover follows the map's events back
+//    to what opens it - hunts the monster whose death opens it (MH-NaliVillage's
+//    second titan), walks to an unused trigger (via counters and dispatchers,
+//    MH-Trials' last switch) or bumps an unused button.
+// 7. Waypoints without a route: when the route search finds no way to a waypoint,
+//    the bot heads for the path point right next to it and walks the last bit.
+// Debug log: also which pawn made a mover turn back, objectives and the death
+// of monsters whose death triggers an event.
 // Every step is written to the server log only (tag UTTourney, lines start
 // with "bot [run time]"); nothing is shown in the game.
 //=============================================================================
@@ -37,8 +50,38 @@ var float SHoldSince[32], SRestSince[32], SNoPlaceLog[32];
 var Mover SCoolMover[32];       // mover the bot waited for last: not again for 10 s after that
 var float SCoolUntil[32];
 
+var Actor SErrand[32];          // what the bot does to open a closed mover (monster, trigger, button)
+var Mover SErrandFor[32];
+var float SErrandSince[32];
+var float SResolveAt[32];       // last time a closed mover was looked into for this bot
+var Actor SFailOpener[32];      // opener that did not open SFailMover: not chosen again for 120 s
+var Mover SFailMover[32];
+var float SFailUntil[32];
+var Mover SErrandMover[32];     // failed errands per mover: after 2 for the same mover, no more
+var int SErrandCount[32];
+var float SErrandUsedAt[32];    // when the target was first seen used (the door may open delayed)
+var int SNearWP[32];            // waypoint tried via the path point next to it, since SNearSince
+var float SNearSince[32];
+var byte SCoolKind[32];
+var int SNearLog[32];           // waypoint position last logged as "via the path point next to it"
+var Actor NearGoal[16];         // PathNear cache: goal -> path point next to it
+var NavigationPoint NearNode[16];
+var int NumNear;
+
 var Mover Lifts[32];            // movers with a LiftCenter that turn back or stop on contact
 var int NumLifts;
+var Mover Watched[64];          // movers that turn back on contact (for the "turned back" log)
+var byte WOpening[64];
+var float WFlip[64];
+var int NumWatched;
+var MonsterHuntObjective Objectives[32];
+var byte ObjState[32];          // 0 inactive, 1 active, 2 completed
+var int NumObjectives;
+var ScriptedPawn KeyMonsters[32]; // monsters whose death triggers an event
+var name KeyEvent[32];
+var name KeyName[32];
+var byte KeyDead[32];
+var int NumKeyMonsters;
 var bool bMoversLogged;
 var byte VisitedLogged[128];
 var int TickCount;
@@ -117,6 +160,8 @@ function string GoalText(Bot B)
 		return "none yet, moving to" @ What(B.MoveTarget);
 	if (SHoldKind[k] != 0 && SHoldMover[k] != None)
 		return What(SGoal[k]) $ ", waiting for" @ SHoldMover[k].Name;
+	if (SErrand[k] != None)
+		return What(SGoal[k]) $ ", first" @ ErrandVerb(SErrand[k]) @ SErrand[k].Name @ "to open" @ What(SErrandFor[k]);
 	return What(SGoal[k]) $ ", next path point" @ What(B.MoveTarget);
 }
 
@@ -162,7 +207,14 @@ function ClearSlot(int k)
 	SGoal[k] = None;
 	SNoPath[k] = -1;
 	SJumpLog[k] = -1;
+	SNearLog[k] = -1;
+	SNearWP[k] = -1;
 	SStill[k] = 0;
+	SErrand[k] = None;
+	SErrandFor[k] = None;
+	SFailOpener[k] = None;
+	SErrandMover[k] = None;
+	SErrandCount[k] = 0;
 	ClearHold(k);
 }
 
@@ -172,6 +224,7 @@ function ClearHold(int k)
 	{
 		SCoolMover[k] = SHoldMover[k];
 		SCoolUntil[k] = Level.TimeSeconds + 10;
+		SCoolKind[k] = SHoldKind[k];
 	}
 	SHoldMover[k] = None;
 	SHoldPoint[k] = None;
@@ -228,13 +281,21 @@ function FindWaypoints()
 
 function bool FindSpecialAttractionFor(Bot aBot)
 {
-	local int k;
+	local int k, Errand;
 
 	if (aBot != None && aBot.Health > 0)
 	{
 		k = FindSlot(aBot);
 		if (k >= 0 && SHoldKind[k] != 0 && HoldBot(aBot, k))
 			return true;
+		if (k >= 0 && SErrand[k] != None)
+		{
+			Errand = DoErrand(aBot, k);
+			if (Errand == 1)
+				return true;
+			if (Errand == 2)
+				return false; // fighting the monster that opens the door
+		}
 	}
 	return Super.FindSpecialAttractionFor(aBot);
 }
@@ -244,9 +305,11 @@ function bool FindNextWaypoint(Bot aBot)
 	local int i, lastVisited, k;
 	local Actor Hop, AT;
 	local byte bJump;
+	local bool bFirst;
 
 	lastVisited = -1;
 	k = Slot(aBot);
+	bFirst = true;
 
 	if ((aBot.Orders == 'Attack') || ((aBot.Orders == 'Freelance') && (FRand() > 0.2)))
 	{
@@ -257,7 +320,11 @@ function bool FindNextWaypoint(Bot aBot)
 
 			if (!waypoints[i].bVisited && waypoints[i].bEnabled)
 			{
+				// only the next waypoint in line may be reached via the path point next to it, for 20 s
 				Hop = PathTo(aBot, waypoints[i], bJump);
+				if (Hop == None && bFirst && NearAllowed(aBot, k, waypoints[i]))
+					Hop = PathNear(aBot, waypoints[i]);
+				bFirst = false;
 				// no path to the next waypoint in line: Monster Hunt tries the next one
 				if (Hop == None)
 				{
@@ -316,11 +383,11 @@ function bool FindNextWaypoint(Bot aBot)
 // First path point toward Goal. When there is no normal route, the search is repeated with
 // JumpSpots allowed (they cost too much for a bot without translocator, jump boots or low
 // gravity). Only the search sees the higher JumpZ: it is restored right after, so the jump
-// at the JumpSpot (JumpSpot.PendingJump -> Bot.BigJump, next tick) is a normal jump.
-function Actor PathTo(Bot B, Actor Goal, out byte bJump)
+// at the JumpSpot (JumpSpot.PendingJump -> Bot.BigJump, next tick) is a normal jump. Without
+// any route, PathNear tries the path point next to Goal.
+function Actor PathTo(Bot B, Actor Goal, out byte bJump, optional bool bNear)
 {
 	local Actor A;
-	local float OldJumpZ;
 
 	bJump = 0;
 	if (B.ActorReachable(Goal))
@@ -328,20 +395,121 @@ function Actor PathTo(Bot B, Actor Goal, out byte bJump)
 	A = B.FindPathToward(Goal);
 	if (A != None)
 		return A;
+	A = PathWithJumps(B, Goal);
+	if (A == None)
+	{
+		if (bNear)
+			return PathNear(B, Goal);
+		return None;
+	}
+	bJump = 1;
+	return A;
+}
+
+// The path point next to a waypoint is tried for 20 s per bot and waypoint; after that Monster
+// Hunt's rule (skip it) applies again.
+function bool NearAllowed(Bot B, int k, MonsterWaypoint WP)
+{
+	if (k < 0)
+		return false;
+	if (SNearWP[k] != WP.Position)
+	{
+		SNearWP[k] = WP.Position;
+		SNearSince[k] = Level.TimeSeconds;
+		return true;
+	}
+	if (Level.TimeSeconds - SNearSince[k] <= 20)
+		return true;
+	if (SNearLog[k] == WP.Position)
+	{
+		SNearLog[k] = -1;
+		BotLog(BName(B) $ ": did not reach waypoint" @ WP.Position @ "via the path point next to it in 20 s, skips it");
+	}
+	return false;
+}
+
+function Actor PathWithJumps(Bot B, Actor Goal)
+{
+	local Actor A;
+	local float OldJumpZ;
+
 	OldJumpZ = B.JumpZ;
 	B.JumpZ = FMax(OldJumpZ, 1.6 * B.Default.JumpZ);
 	A = B.FindPathToward(Goal);
 	B.JumpZ = OldJumpZ;
-	if (A == None)
-		return None;
-	// A jump higher than a normal jump can reach is left out (it is meant for a translocator).
 	if (JumpSpot(A) != None && A.Location.Z - B.Location.Z
 		> Square(B.JumpZ) / (2 * FMax(1, Abs(B.Region.Zone.ZoneGravity.Z))) + B.MaxStepHeight)
 	{
+		// higher than a normal jump can reach (meant for a translocator)
 		JumpSpot(A).PendingBot = None;
 		return None;
 	}
-	bJump = 1;
+	return A;
+}
+
+// The path point next to A (within 250 units, in sight), cached per goal.
+function NavigationPoint NodeNear(Actor A)
+{
+	local int i;
+	local NavigationPoint N, Best;
+	local float D, BestD;
+
+	for (i = 0; i < NumNear; i++)
+		if (NearGoal[i] == A)
+			return NearNode[i];
+	for (N = Level.NavigationPointList; N != None; N = N.nextNavigationPoint)
+	{
+		if (LiftCenter(N) != None || Teleporter(N) != None)
+			continue;
+		D = VSize(N.Location - A.Location);
+		if (D < 250 && (Best == None || D < BestD) && FastTrace(A.Location, N.Location))
+		{
+			Best = N;
+			BestD = D;
+		}
+	}
+	if (NumNear < 16)
+	{
+		NearGoal[NumNear] = A;
+		NearNode[NumNear] = Best;
+		NumNear++;
+	}
+	return Best;
+}
+
+// No route to Goal itself (a waypoint or trigger right at a switch, for example): head for the
+// path point next to it; once there (or close and in sight), walk straight to Goal.
+function Actor PathNear(Bot B, Actor Goal)
+{
+	local NavigationPoint Best;
+	local float BestD;
+	local Actor A;
+	local int k;
+
+	// close, in sight and on about the same height: walk straight there
+	if (VSize(Goal.Location - B.Location) < 250 && FastTrace(Goal.Location, B.Location)
+		&& Abs(Goal.Location.Z - B.Location.Z) < B.CollisionHeight + B.MaxStepHeight + 30)
+		return Goal;
+	Best = NodeNear(Goal);
+	if (Best == None)
+		return None;
+	if (VSize(Best.Location - B.Location) < 48)
+		return None; // standing on it and the goal is still out of reach
+	BestD = VSize(Best.Location - Goal.Location);
+	A = B.FindPathToward(Best);
+	if (A == None)
+		A = PathWithJumps(B, Best);
+	k = FindSlot(B);
+	if (k >= 0 && MonsterWaypoint(Goal) != None && SNearLog[k] != MonsterWaypoint(Goal).Position)
+	{
+		SNearLog[k] = MonsterWaypoint(Goal).Position;
+		if (A != None)
+			BotLog(BName(B) $ ": no route to" @ What(Goal) @ "itself, goes via" @ Best.Name @ "next to it ("
+				$ int(BestD) @ "away)");
+		else
+			BotLog(BName(B) $ ": no route to" @ What(Goal) @ "and none to" @ Best.Name @ "next to it either, from"
+				@ Where(B.Location));
+	}
 	return A;
 }
 
@@ -382,7 +550,7 @@ function Timer()
 	local bool bSecond;
 
 	if (!bMoversLogged)
-		LogMovers();
+		InitMap();
 	if (!RunActive())
 	{
 		// before the start, in a pause, after the end: nothing to watch, start fresh later
@@ -397,8 +565,12 @@ function Timer()
 	}
 	TickCount++;
 	bSecond = (TickCount % 4) == 0;
+	WatchMovers();
 	if (bSecond)
+	{
 		LogVisited();
+		LogObjectives();
+	}
 	for (P = Level.PawnList; P != None; P = P.NextPawn)
 	{
 		B = Bot(P);
@@ -461,11 +633,14 @@ function Pawn NearestHunter(vector V)
 
 // After waiting for M (or giving up), the bot does not wait for it again for 10 s - movers that
 // never rest (pounding, looping) cannot hold a bot forever, and the stuck check can take over.
-function bool Cooling(Bot B, Mover M)
+// Making room at a lift (kind 3) does not keep the bot from stepping away from under it (kind 1).
+function bool Cooling(Bot B, Mover M, byte Kind)
 {
 	local int k;
 	k = FindSlot(B);
-	return k >= 0 && SCoolMover[k] == M && Level.TimeSeconds < SCoolUntil[k];
+	if (k < 0 || SCoolMover[k] != M || Level.TimeSeconds >= SCoolUntil[k])
+		return false;
+	return Kind != 1 || SCoolKind[k] == 1;
 }
 
 // Movers that turn back (or stop) when they hit somebody; the others (crush, ignore) are left alone.
@@ -503,18 +678,40 @@ function vector LiftSpot(Mover M)
 	return M.myMarker.Location;
 }
 
-function LogMovers()
+// Once, right at the level start (before the countdown): map bug fix, then the movers, objectives
+// and key monsters to watch.
+function InitMap()
 {
 	local Mover M;
-	local int n;
+	local MonsterHuntObjective O;
+	local ScriptedPawn SP;
+	local int n, Fixed;
 	local string S;
 
 	bMoversLogged = true;
 	foreach AllActors(class'Mover', M)
 	{
+		if (OnceOnlyTurnsBack(M))
+		{
+			// After turning back it waits for its trigger again, which fired already (once only).
+			M.SetPropertyText("MoverEncroachType", "ME_IgnoreWhenEncroach");
+			Fixed++;
+			BotLog("map fix:" @ M.Name @ "tag" @ M.Tag @ "state" @ M.InitialState
+				@ "opens only once and would stay closed after a touch: it no longer turns back");
+			continue;
+		}
 		if (!Guards(M))
 			continue;
 		n++;
+		if (NumWatched < 64)
+		{
+			Watched[NumWatched] = M;
+			WOpening[NumWatched] = 0;
+			if (M.bOpening)
+				WOpening[NumWatched] = 1;
+			WFlip[NumWatched] = -100;
+			NumWatched++;
+		}
 		S = "";
 		if (LiftCenter(M.myMarker) != None)
 		{
@@ -529,7 +726,136 @@ function LogMovers()
 			BotLog("mover" @ M.Name @ "tag" @ M.Tag @ "state" @ M.InitialState @ "group" @ M.ReturnGroup $ S
 				$ ": turns back on contact, bots keep their distance while it moves");
 	}
-	BotLog("movers watched:" @ n $ ", lifts:" @ NumLifts);
+	BotLog("movers watched:" @ n $ ", lifts:" @ NumLifts $ ", map fixes:" @ Fixed);
+
+	foreach AllActors(class'MonsterHuntObjective', O)
+		if (NumObjectives < 32)
+		{
+			Objectives[NumObjectives] = O;
+			ObjState[NumObjectives] = ObjectiveState(O);
+			NumObjectives++;
+		}
+	foreach AllActors(class'ScriptedPawn', SP)
+		if (SP.Event != '' && SP.Health > 0 && NumKeyMonsters < 32 && !SP.IsA('Nali') && !SP.IsA('Cow'))
+		{
+			KeyMonsters[NumKeyMonsters] = SP;
+			KeyEvent[NumKeyMonsters] = SP.Event;
+			KeyName[NumKeyMonsters] = SP.Name;
+			NumKeyMonsters++;
+			BotLog("key monster:" @ SP.Name @ "- its death triggers" @ SP.Event);
+		}
+}
+
+// The map bug pattern: a TriggerOpenTimed mover that opens once (bTriggerOnceOnly) and turns back
+// when it hits a pawn (Mover's default). After turning back it waits for a trigger that already
+// fired. Movers that hurt (EncroachDamage, traps) keep their behaviour; bump and stand movers can
+// simply be opened again.
+function bool OnceOnlyTurnsBack(Mover M)
+{
+	return M.bTriggerOnceOnly && int(M.MoverEncroachType) == 1 && M.EncroachDamage <= 0
+		&& M.InitialState == 'TriggerOpenTimed';
+}
+
+function byte ObjectiveState(MonsterHuntObjective O)
+{
+	if (O.bCompleted)
+		return 2;
+	if (O.bActive)
+		return 1;
+	return 0;
+}
+
+function LogObjectives()
+{
+	local int i;
+	local byte St;
+
+	for (i = 0; i < NumObjectives; i++)
+	{
+		if (Objectives[i] == None)
+			continue;
+		St = ObjectiveState(Objectives[i]);
+		if (St == ObjState[i])
+			continue;
+		ObjState[i] = St;
+		if (St == 2)
+			BotLog("objective completed:" @ Objectives[i].Message);
+		else if (St == 1)
+			BotLog("objective active:" @ Objectives[i].Message);
+	}
+	for (i = 0; i < NumKeyMonsters; i++)
+		if (KeyDead[i] == 0 && (KeyMonsters[i] == None || KeyMonsters[i].bDeleteMe || KeyMonsters[i].Health <= 0))
+		{
+			KeyDead[i] = 1;
+			BotLog("key monster dead:" @ KeyName[i] @ "- triggers" @ KeyEvent[i]);
+		}
+}
+
+// Logs a mover that changes direction before its move is done (it hit somebody), with the
+// nearest pawn - a bot, a player or a monster.
+function WatchMovers()
+{
+	local int i;
+	local Mover M;
+	local byte Op;
+	local Pawn P;
+	local float D;
+	local string S;
+
+	for (i = 0; i < NumWatched; i++)
+	{
+		M = Watched[i];
+		if (M == None)
+			continue;
+		Op = 0;
+		if (M.bOpening)
+			Op = 1;
+		if (Op == WOpening[i])
+			continue;
+		if (M.MoveTime >= 0.5 && Level.TimeSeconds - WFlip[i] < M.MoveTime - 0.1)
+		{
+			P = NearestPawn(M.Location, D);
+			if (Op == 0)
+				S = "while opening";
+			else
+				S = "while closing";
+			BotLog("mover" @ M.Name @ "(" $ M.Tag $ ") turned back" @ S $ ", nearest pawn" @ PawnText(P) @ int(D)
+				@ "away");
+		}
+		WOpening[i] = Op;
+		WFlip[i] = Level.TimeSeconds;
+	}
+}
+
+function Pawn NearestPawn(vector V, out float BestD)
+{
+	local Pawn P, Best;
+	local float D;
+
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		if (P.Health <= 0 || P.IsA('Spectator')
+			|| (P.PlayerReplicationInfo != None && P.PlayerReplicationInfo.bIsSpectator))
+			continue;
+		D = VSize(P.Location - V);
+		if (Best == None || D < BestD)
+		{
+			Best = P;
+			BestD = D;
+		}
+	}
+	return Best;
+}
+
+function string PawnText(Pawn P)
+{
+	if (P == None)
+		return "none";
+	if (ScriptedPawn(P) != None)
+		return "monster" @ P.Name;
+	if (Bot(P) != None)
+		return "bot" @ BName(P);
+	return "player" @ BName(P);
 }
 
 function GuardBot(Bot B, int k)
@@ -552,9 +878,47 @@ function GuardBot(Bot B, int k)
 		StartHold(B, k, M, 1, Danger);
 		return;
 	}
+	M = LiftCrowded(B, k);
+	if (M != None)
+	{
+		Danger = LiftSpot(M);
+		Danger.Z = B.Location.Z;
+		StartHold(B, k, M, 3, Danger);
+		return;
+	}
 	M = MoverAhead(B, Danger);
 	if (M != None)
 		StartHold(B, k, M, 2, Danger);
+}
+
+// Another bot is held under lift M and wants out; this bot stands close to the lift (e.g. waiting
+// at its exit) and could block the way: it makes room.
+function Mover LiftCrowded(Bot B, int k)
+{
+	local int i;
+	local Mover M;
+
+	for (i = 0; i < NumLifts; i++)
+	{
+		M = Lifts[i];
+		if (M == None || B.Base == M || Cooling(B, M, 3))
+			continue;
+		if (VSize(Flat(LiftSpot(M) - B.Location)) < 180 && SomeoneUnder(M, k))
+			return M;
+	}
+	return None;
+}
+
+// A bot (other than slot k) held because lift M is above it, still in the lift's shaft.
+function bool SomeoneUnder(Mover M, int k)
+{
+	local int j;
+
+	for (j = 0; j < 32; j++)
+		if (j != k && SHoldKind[j] == 1 && SHoldMover[j] == M && SBot[j] != None && SBot[j].Health > 0
+			&& VSize(Flat(LiftSpot(M) - SBot[j].Location)) < 130)
+			return true;
+	return false;
 }
 
 // A lift right above the bot that can come down on it: it moves, or the bot wants to ride it.
@@ -569,7 +933,7 @@ function Mover LiftAbove(Bot B)
 	for (i = 0; i < NumLifts; i++)
 	{
 		M = Lifts[i];
-		if (M == None || M.myMarker == None || B.Base == M || Cooling(B, M))
+		if (M == None || M.myMarker == None || B.Base == M || Cooling(B, M, 1))
 			continue;
 		if (VSize(Flat(LiftSpot(M) - B.Location)) > 400)
 			continue;
@@ -602,7 +966,7 @@ function Mover MoverAhead(Bot B, out vector Danger)
 	{
 		Start = B.Location + vect(0,0,1) * ((i - 0.5) * B.CollisionHeight);
 		A = B.Trace(HitLoc, HitNorm, Start + Dir * (B.CollisionRadius + 48), Start, true);
-		if (Mover(A) != None && A != B.Base && Guards(Mover(A)) && !Cooling(B, Mover(A)) && MoverBusy(Mover(A)))
+		if (Mover(A) != None && A != B.Base && Guards(Mover(A)) && !Cooling(B, Mover(A), 2) && MoverBusy(Mover(A)))
 		{
 			Danger = HitLoc;
 			return Mover(A);
@@ -633,6 +997,8 @@ function StartHold(Bot B, int k, Mover M, byte Kind, vector Danger)
 	if (Kind == 1)
 		BotLog(BName(B) $ ": under lift" @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location) $ ", waits at" @ N.Name
 			@ "until it is on this level");
+	else if (Kind == 3)
+		BotLog(BName(B) $ ": makes room at lift" @ M.Name @ "(" $ M.Tag $ ") for a bot under it, waits at" @ N.Name);
 	else
 		BotLog(BName(B) $ ":" @ M.Name @ "(" $ M.Tag $ ") moves in front of it at" @ Where(B.Location) $ ", waits at"
 			@ N.Name @ "until it has stopped");
@@ -647,8 +1013,27 @@ function NavigationPoint FindHoldPoint(Bot B, Mover M, byte Kind, vector Danger)
 	local float D, BestD;
 	local vector Away;
 
-	if (Kind == 1)
+	if (Kind == 1 || Kind == 3)
 	{
+		// first choice: a free path point on this level, 250-700 units from the lift, so nobody
+		// waiting there blocks the way out of the shaft
+		for (N = Level.NavigationPointList; N != None; N = N.nextNavigationPoint)
+		{
+			if (LiftCenter(N) != None || Teleporter(N) != None || HoldPointTaken(N))
+				continue;
+			D = VSize(N.Location - B.Location);
+			if (D > 700 || Abs(N.Location.Z - B.Location.Z) > 80 || VSize(Flat(N.Location - Danger)) < 250)
+				continue;
+			if (!FastTrace(N.Location, B.Location))
+				continue;
+			if (Best == None || D < BestD)
+			{
+				Best = N;
+				BestD = D;
+			}
+		}
+		if (Best != None)
+			return Best;
 		for (N = Level.NavigationPointList; N != None; N = N.nextNavigationPoint)
 			if (LiftExit(N) != None && LiftExit(N).LiftTag == M.Tag && Abs(N.Location.Z - B.Location.Z) < 80)
 			{
@@ -686,6 +1071,15 @@ function NavigationPoint FindHoldPoint(Bot B, Mover M, byte Kind, vector Danger)
 		}
 	}
 	return Best;
+}
+
+function bool HoldPointTaken(NavigationPoint N)
+{
+	local int j;
+	for (j = 0; j < 32; j++)
+		if (SHoldKind[j] != 0 && SHoldPoint[j] == N)
+			return true;
+	return false;
 }
 
 // While held: walk to the waiting point, then stand there (re-checked twice a second).
@@ -730,6 +1124,17 @@ function CheckRelease(Bot B, int k)
 	{
 		BotLog(BName(B) $ ": stops waiting for" @ M.Name @ "after 30 s");
 		ClearHold(k);
+		return;
+	}
+	if (SHoldKind[k] == 3)
+	{
+		if (SomeoneUnder(M, k))
+			return;
+		BotLog(BName(B) $ ": nobody under lift" @ M.Name @ "any more after" @ int(Level.TimeSeconds - SHoldSince[k])
+			@ "s, goes on");
+		ClearHold(k);
+		B.SpecialPause = 0;
+		SRefLoc[k] = B.Location;
 		return;
 	}
 	if (MoverBusy(M))
@@ -804,6 +1209,8 @@ function StuckCheck(Bot B, int k)
 	if (B.Physics == PHYS_Falling || !MayBeStuck(B, k))
 		return;
 	SStill[k]++;
+	if (SStill[k] == 3 && SErrand[k] == None && Level.TimeSeconds - SResolveAt[k] > 10 && ClosedDoorErrand(B, k))
+		return;
 	if (SStill[k] == 3 || SStill[k] == 5)
 		JumpAside(B, k);
 	else if (SStill[k] == 8 || SStill[k] == 14)
@@ -946,6 +1353,294 @@ function FreeRespawn(Bot B, int k)
 	BotLog(BName(B) $ ": stuck for 20 s at" @ Where(Was) $ ", penalty-free respawn at" @ N.Name @ "(no death counted)");
 	if (B.IsInState('Roaming') || B.IsInState('Wandering') || B.IsInState('FallBack'))
 		B.GotoState('Roaming', 'RunAway');
+}
+
+//-----------------------------------------------------------------------------
+// 6. Closed doors: what opens them
+
+// Called when a bot is stuck: a closed mover at rest right in front of it? The stuck count goes on
+// (an errand that does not help still ends in the respawn).
+function bool ClosedDoorErrand(Bot B, int k)
+{
+	local Mover M;
+	local Actor T;
+	local string Chain;
+	local int Budget;
+
+	SResolveAt[k] = Level.TimeSeconds;
+	M = ClosedMoverAhead(B);
+	if (M == None)
+		return false;
+	if (SErrandMover[k] == M && SErrandCount[k] >= 2)
+		return false; // tried twice for this door: leave it to jumps, detours and the respawn
+	Budget = 12;
+	T = FindOpener(B, k, M, M.Tag, 0, Chain, Budget);
+	if (T == None)
+	{
+		BotLog(BName(B) $ ": stuck at closed" @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location)
+			$ ", nothing found that could still open it");
+		return false;
+	}
+	if (SErrandMover[k] != M)
+	{
+		SErrandMover[k] = M;
+		SErrandCount[k] = 0;
+	}
+	SErrandUsedAt[k] = -1;
+	SErrand[k] = T;
+	SErrandFor[k] = M;
+	SErrandSince[k] = Level.TimeSeconds;
+	BotLog(BName(B) $ ": stuck at closed" @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location) $ ", opened by:" @ Chain
+		$ " ->" @ ErrandVerb(T) @ T.Name);
+	return true;
+}
+
+function string ErrandVerb(Actor T)
+{
+	if (ScriptedPawn(T) != None)
+		return "hunts";
+	if (Mover(T) != None)
+		return "bumps";
+	return "goes to";
+}
+
+// A mover at rest in its closed position (first key) right in front of the bot.
+function Mover ClosedMoverAhead(Bot B)
+{
+	local vector Dir, Start, HitLoc, HitNorm;
+	local Actor A;
+	local Mover M;
+	local int i;
+
+	Dir = MoveDir(B);
+	for (i = 0; i < 2; i++)
+	{
+		Start = B.Location + vect(0,0,1) * ((i - 0.5) * B.CollisionHeight);
+		A = B.Trace(HitLoc, HitNorm, Start + Dir * (B.CollisionRadius + 80), Start, true);
+		M = Mover(A);
+		if (M != None && M != B.Base && M.KeyNum == 0 && !M.bInterpolating && !M.bDelaying)
+			return M;
+	}
+	return None;
+}
+
+// What can still open the movers with tag T, nearest to the bot: a living monster whose death
+// triggers T, a trigger the bot can still fire, a button mover not pressed yet. Relays (counters,
+// special events, closed movers that fire an event when open, dispatchers, round robins) are
+// followed back, at most 4 steps and 12 actor scans in all.
+function Actor FindOpener(Bot B, int k, Mover Door, name T, int Depth, out string Chain, out int Budget)
+{
+	local Actor A, R, Best;
+	local Dispatcher Dsp;
+	local RoundRobin RR;
+	local float D, BestD;
+	local string Sub, BestChain;
+	local int i;
+
+	if (T == '' || T == 'None' || Depth > 3 || Budget <= 0)
+		return None;
+	Budget--;
+	foreach AllActors(class'Actor', A)
+	{
+		if (A.Event != T || A.bDeleteMe || A == Door)
+			continue;
+		R = None;
+		Sub = "";
+		if (ScriptedPawn(A) != None)
+		{
+			if (Pawn(A).Health > 0 && Huntable(ScriptedPawn(A), B))
+				R = A;
+		}
+		else if (Trigger(A) != None)
+		{
+			if (A.bCollideActors && Trigger(A).IsRelevant(B))
+				R = A;
+		}
+		else if (Mover(A) != None)
+		{
+			if (Mover(A).KeyNum == 0 && !Mover(A).bInterpolating)
+			{
+				if (A.IsInState('BumpOpenTimed') || A.IsInState('BumpButton') || A.IsInState('StandOpenTimed'))
+					R = A;
+				else
+					R = FindOpener(B, k, Door, A.Tag, Depth + 1, Sub, Budget); // a door that opens a door
+			}
+		}
+		else if (A.IsA('Counter') || A.IsA('SpecialEvent'))
+			R = FindOpener(B, k, Door, A.Tag, Depth + 1, Sub, Budget);
+		if (R == None || Failed(k, Door, R))
+			continue;
+		D = VSize(R.Location - B.Location);
+		if (Best == None || D < BestD)
+		{
+			Best = R;
+			BestD = D;
+			if (Sub != "")
+				BestChain = A.Name @ "<-" @ Sub;
+			else
+				BestChain = string(A.Name);
+		}
+	}
+	if (Budget > 0)
+		foreach AllActors(class'Dispatcher', Dsp)
+			for (i = 0; i < 8; i++)
+				if (Dsp.OutEvents[i] == T)
+				{
+					Sub = "";
+					R = FindOpener(B, k, Door, Dsp.Tag, Depth + 1, Sub, Budget);
+					if (R != None && !Failed(k, Door, R))
+					{
+						D = VSize(R.Location - B.Location);
+						if (Best == None || D < BestD)
+						{
+							Best = R;
+							BestD = D;
+							BestChain = Dsp.Name @ "<-" @ Sub;
+						}
+					}
+					break;
+				}
+	if (Budget > 0)
+		foreach AllActors(class'RoundRobin', RR)
+			for (i = 0; i < 16; i++)
+				if (RR.OutEvents[i] == T)
+				{
+					Sub = "";
+					R = FindOpener(B, k, Door, RR.Tag, Depth + 1, Sub, Budget);
+					if (R != None && !Failed(k, Door, R))
+					{
+						D = VSize(R.Location - B.Location);
+						if (Best == None || D < BestD)
+						{
+							Best = R;
+							BestD = D;
+							BestChain = RR.Name @ "<-" @ Sub;
+						}
+					}
+					break;
+				}
+	Chain = BestChain;
+	return Best;
+}
+
+function bool Failed(int k, Mover Door, Actor R)
+{
+	return SFailOpener[k] == R && SFailMover[k] == Door && Level.TimeSeconds < SFailUntil[k];
+}
+
+// The errand did not open the door: that opener is not chosen again for this door for 120 s.
+function EndErrand(Bot B, int k, string Why, bool bFailed)
+{
+	BotLog(BName(B) $ ": errand for" @ What(SErrandFor[k]) @ "ends," @ Why);
+	if (bFailed && SErrandMover[k] == SErrandFor[k])
+		SErrandCount[k]++;
+	if (bFailed && SErrand[k] != None && SErrandFor[k] != None)
+	{
+		SFailOpener[k] = SErrand[k];
+		SFailMover[k] = SErrandFor[k];
+		SFailUntil[k] = Level.TimeSeconds + 120;
+	}
+	SErrand[k] = None;
+	SErrandFor[k] = None;
+}
+
+// While the bot has an errand: go there; a monster in sight is attacked.
+// 0 = no errand (any more), 1 = the bot was sent, 2 = it fights the target (normal combat goes on).
+function int DoErrand(Bot B, int k)
+{
+	local Actor T, Hop;
+	local Mover M;
+	local byte bJump;
+
+	T = SErrand[k];
+	M = SErrandFor[k];
+	if (M == None || M.KeyNum != 0 || M.bInterpolating || M.bDelaying)
+	{
+		EndErrand(B, k, "the door opens", false);
+		return 0;
+	}
+	if (T == None || T.bDeleteMe)
+	{
+		EndErrand(B, k, "its target is gone", false);
+		return 0;
+	}
+	if (Pawn(T) != None && Pawn(T).Health <= 0)
+	{
+		EndErrand(B, k, T.Name @ "is dead", false);
+		return 0;
+	}
+	if ((Trigger(T) != None && !T.bCollideActors)
+		|| (Mover(T) != None && (Mover(T).KeyNum != 0 || Mover(T).bInterpolating)))
+	{
+		// used: give the door 5 s (delayed events), then it counts as a failure
+		if (SErrandUsedAt[k] < 0)
+			SErrandUsedAt[k] = Level.TimeSeconds;
+		else if (Level.TimeSeconds - SErrandUsedAt[k] > 5)
+		{
+			EndErrand(B, k, T.Name @ "was used, the door stays closed", true);
+			return 0;
+		}
+		B.LastAttractCheck = Level.TimeSeconds;
+		B.MoveTarget = T;
+		if (VSize(Flat(T.Location - B.Location)) < 60)
+			B.SpecialPause = 0.5;
+		SetAttractionStateFor(B);
+		return 1;
+	}
+	if (Level.TimeSeconds - SErrandSince[k] > 90)
+	{
+		EndErrand(B, k, "no success after 90 s", true);
+		return 0;
+	}
+	if (Pawn(T) != None && B.LineOfSightTo(T))
+	{
+		if (B.Enemy != T)
+			B.SetEnemy(Pawn(T));
+		if (B.Enemy == T)
+		{
+			if (B.IsInState('Roaming') || B.IsInState('Wandering') || B.IsInState('FallBack'))
+			{
+				B.GotoState('Attacking');
+				return 1;
+			}
+			return 2;
+		}
+	}
+	B.LastAttractCheck = Level.TimeSeconds;
+	Hop = PathTo(B, T, bJump, true);
+	if (Hop == None)
+	{
+		EndErrand(B, k, "no route to" @ T.Name @ "from" @ Where(B.Location), true);
+		return 0;
+	}
+	B.MoveTarget = Hop;
+	SetAttractionStateFor(B);
+	return 1;
+}
+
+// Not friendly Nali or cows (unless Monster Hunt says they are evil), not sitting titan statues.
+function bool Huntable(ScriptedPawn P, Bot B)
+{
+	if ((P.IsA('Nali') || P.IsA('Cow')) && (game == None || !game.MaybeEvilFriendlyPawn(P, B)))
+		return false;
+	return !(P.IsA('Titan') && P.GetStateName() == 'Sitting');
+}
+
+// Monster Hunt lets bots fear big monsters (75+ units tall). A monster whose death opens the way
+// is hunted instead, or bot-only teams never get past it.
+function byte AssessBotAttitude(Bot aBot, Pawn Other)
+{
+	local int i;
+
+	if (ScriptedPawn(Other) != None && Other.Health > 0 && Huntable(ScriptedPawn(Other), aBot))
+		for (i = 0; i < NumKeyMonsters; i++)
+			if (KeyMonsters[i] == Other)
+			{
+				if (aBot.LineOfSightTo(Other))
+					return 1; // ATTITUDE_Hate
+				break;
+			}
+	return Super.AssessBotAttitude(aBot, Other);
 }
 
 defaultproperties

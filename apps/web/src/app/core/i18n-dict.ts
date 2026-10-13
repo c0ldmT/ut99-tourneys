@@ -271,7 +271,7 @@ const en = {
   'form.lives': 'Lives per hunter',
   'form.botWaypointFix': 'Bot helpers (recommended)',
   'form.botWaypointFixHint':
-    'Bots follow the map\'s waypoints in the right order, also use the jumps the map marks for them, keep their distance from moving lifts and gates, and free themselves when they get stuck (last resort: back to the start without a death). Teams without players always get the "Attack" order every 45 s.',
+    'Bots follow the map\'s waypoints in the right order, also use the jumps the map marks for them, keep their distance from moving lifts and gates, find out what opens a closed gate (a monster to kill, a switch) and free themselves when they get stuck (last resort: back to the start without a death). Gates that open only once no longer turn back when touched (map bug, e.g. MH-Canyon). Teams without players always get the "Attack" order every 45 s.',
   'form.livesUnlimited': 'Unlimited',
   'form.mhRulesHint':
     'Monster Hunt: both teams run the same map one after the other. Every death in the team (bots too) adds the penalty; with limited lives a team whose hunters are all out has not reached the exit. Not at the exit in time: monster points decide. Needs Monster Hunt 613 and UTTourneyMH_v1.u on the server.',
@@ -669,7 +669,7 @@ const de: Record<TKey, string> = {
   'form.lives': 'Leben pro Jäger',
   'form.botWaypointFix': 'Bot-Hilfen (empfohlen)',
   'form.botWaypointFixHint':
-    'Bots laufen die Wegpunkte der Map in der richtigen Reihenfolge ab, nutzen auch die Sprünge, die die Map für sie markiert, halten Abstand zu fahrenden Liften und Gittern und befreien sich, wenn sie hängen bleiben (zuletzt: zurück zum Start ohne Tod). Teams ohne Spieler bekommen zusätzlich immer alle 45 s den Befehl „Attack“.',
+    'Bots laufen die Wegpunkte der Map in der richtigen Reihenfolge ab, nutzen auch die Sprünge, die die Map für sie markiert, halten Abstand zu fahrenden Liften und Gittern, finden heraus, was ein geschlossenes Tor öffnet (ein Monster, ein Schalter), und befreien sich, wenn sie hängen bleiben (zuletzt: zurück zum Start ohne Tod). Tore, die sich nur einmal öffnen, kehren bei Berührung nicht mehr um (Map-Bug, z. B. MH-Canyon). Teams ohne Spieler bekommen zusätzlich immer alle 45 s den Befehl „Attack“.',
   'form.livesUnlimited': 'Unendlich',
   'form.mhRulesHint':
     'Monster Hunt: Beide Teams laufen nacheinander dieselbe Map. Jeder Tod im Team (auch Bots) kostet die Strafe; bei begrenzten Leben gilt ein Team, dessen Jäger alle draußen sind, als nicht im Ziel. Wer nicht rechtzeitig am Ausgang ist, wird nach Monsterpunkten gewertet. Auf dem Server müssen Monster Hunt 613 und UTTourneyMH_v1.u installiert sein.',
