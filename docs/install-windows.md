@@ -58,6 +58,9 @@ powershell -ExecutionPolicy Bypass -File C:\Tourney\mod\build.ps1 -UT "C:\Unreal
 Builds `UTTourney_v1.u` (and `UTTourneyMH_v1.u` if `MonsterHunt.u` is there) into `C:\UnrealTournament\System`.
 If you also play on this PC with the same UT folder, your client uses exactly this build, which is fine.
 
+Optional: SmartStockBots, bots from another PC, tick rate – see [server-extras.md](server-extras.md). Network
+settings for players: [client-settings.md](client-settings.md).
+
 ## 5. Settings
 
 `C:\Tourney\config\website.env` (open with Notepad):

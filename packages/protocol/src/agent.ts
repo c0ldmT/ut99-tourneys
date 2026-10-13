@@ -64,8 +64,13 @@ export const ServerProfileSchema = z.object({
    * compressed .uz files (ucc compress). Without it clients download from the game server itself.
    */
   downloadRedirect: z.url().max(256).optional(),
-  /** Optional bandwidth per client in bytes/s (also the download speed from the game server). */
-  maxClientRate: z.number().int().min(5_000).max(1_000_000).optional(),
+  /**
+   * Bandwidth per client in bytes/s (the highest netspeed the server accepts; also the download
+   * speed from the game server). Default as in the 469f patch.
+   */
+  maxClientRate: z.number().int().min(5_000).max(1_000_000).default(20_000),
+  /** Server ticks per second (internet and LAN). Default as in the 469f patch. */
+  tickRate: z.number().int().min(10).max(200).default(50),
 });
 export type ServerProfile = z.infer<typeof ServerProfileSchema>;
 

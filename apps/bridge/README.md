@@ -61,11 +61,16 @@ bridge restart the website tells it to resume the running tournament.
   the map, Monster Hunt, the tournament mod and the map's own packages (`AllowDownloads=True`, no size limit,
   `IpDrv.HTTPDownload` then `Engine.ChannelDownload`). Without more setup they download from the game server
   itself, which is slow for big maps. Faster:
-  - `"maxClientRate": 100000` (bytes/s per client) raises the speed of downloads from the game server;
+  - `"maxClientRate": 40000` (bytes/s per client, default 20000) raises the speed of downloads from the game
+    server; it is also the highest netspeed players get;
   - `"downloadRedirect": "https://files.example.com/ut/"` lets clients fetch compressed `.uz` files from a
     web server (create them with `ucc compress ../Maps/MH-Example.unr`, put them in that folder).
     Clients still need the same version of a package as the server (UT refuses a different file with the same
     name).
+- **Tick rate:** `"tickRate"` (default 50, the 469f value) sets `NetServerMaxTickRate` and
+  `LanServerMaxTickRate` in `Tourney.ini`; `maxClientRate` (default 20000) sets `MaxClientRate`. Both are written
+  on every start, whatever the installation's `UnrealTournament.ini` says. See
+  [docs/server-extras.md](../../docs/server-extras.md#tick-rate-and-client-rate).
 - `"manage": false` keeps the old behaviour: you start the server yourself.
 - The bridge needs write access to the UT `System` folder (not the case under `C:\Program Files` without
   admin rights).

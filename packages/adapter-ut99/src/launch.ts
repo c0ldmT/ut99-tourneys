@@ -141,9 +141,11 @@ export function iniChanges(
           { section: 'IpDrv.HTTPDownload', key: 'UseCompression', value: 'True' },
         ]
       : []),
-    ...(profile.maxClientRate
-      ? [{ section: NET, key: 'MaxClientRate', value: String(profile.maxClientRate) }]
-      : []),
+    // Tick rate and client rate: always from the bridge settings (469f defaults 50 / 20000), so
+    // an old UnrealTournament.ini (20/35 ticks) does not decide them.
+    { section: NET, key: 'MaxClientRate', value: String(profile.maxClientRate ?? 20_000) },
+    { section: NET, key: 'NetServerMaxTickRate', value: String(profile.tickRate ?? 50) },
+    { section: NET, key: 'LanServerMaxTickRate', value: String(profile.tickRate ?? 50) },
     ...(profile.serverName
       ? [{ section: 'Engine.GameReplicationInfo', key: 'ServerName', value: profile.serverName }]
       : []),

@@ -7,6 +7,7 @@ import { parseRules } from '@tourney/adapter-ut99';
 import { ServerProfileSchema } from '@tourney/protocol';
 import { FakeClock } from '../src/clock.js';
 import { memoryLogger } from '../src/log.js';
+import { importBots, importBotsIntoInstallation } from '../src/ut99/import-bots.js';
 import { IniFile } from '../src/ut99/ini.js';
 import { scanInventory } from '../src/ut99/inventory.js';
 import { prepareServer, resolveBinary, ServerSetupError } from '../src/ut99/prepare.js';
@@ -215,6 +216,71 @@ describe('inventory', () => {
     const inv = scanInventory({ installDir: tmp() });
     expect(inv.maps).toEqual([]);
     expect(inv.warnings.join(' ')).toMatch(/no Maps folder.*no bots configured/);
+  });
+});
+
+describe('bot import', () => {
+  const pcIni = [
+    '[Engine.Input]',
+    'F1=ShowScores',
+    '[Botpack.ChallengeBotInfo]',
+    'Difficulty=4',
+    'BotNames[0]=Mayu',
+    'BotClasses[0]=MultiMesh.TSkaarjBot',
+    'BotSkins[0]=tskmskins.MekS',
+    'BotFaces[0]=tskmskins.Firewall',
+    'BotSkills[0]=1.000000',
+    'BotNames[1]=Rex',
+    'BotClasses[1]=BotPack.TMale1Bot',
+    'BotSkins[1]=CustomSkins.Rex',
+    'BotNames[2]=',
+    '',
+    '[Engine.Player]',
+    'ConfiguredInternetSpeed=20000',
+    '',
+  ].join('\r\n');
+
+  it('replaces only the bot section of the server User.ini and reports missing packages', () => {
+    const root = tmp();
+    for (const d of ['System', 'Textures']) fs.mkdirSync(path.join(root, d));
+    for (const f of ['Botpack.u', 'MultiMesh.u'])
+      fs.writeFileSync(path.join(root, 'System', f), '');
+    fs.writeFileSync(path.join(root, 'Textures', 'TSkMSkins.utx'), '');
+    const server = path.join(root, 'System', 'User.ini');
+    fs.writeFileSync(
+      server,
+      '[URL]\r\nName=Player\r\n\r\n[Botpack.ChallengeBotInfo]\r\nDifficulty=1\r\nBotNames[0]=Xan\r\nBotNames[5]=Old\r\n\r\n[Engine.Player]\r\nConfiguredInternetSpeed=10000\r\n',
+    );
+    const pc = path.join(tmp(), 'User.ini');
+    fs.writeFileSync(pc, pcIni);
+    const out = importBotsIntoInstallation(pc, root, new Date('2026-10-14T10:00:00Z'));
+    expect(out[0]).toMatch(/backup: .*User\.ini\.bak-2026-10-14T10-00-00$/);
+    expect(out[1]).toMatch(/^2 bots imported .*: Mayu, Rex$/);
+    expect(out.filter((l) => l.startsWith('warning'))).toEqual([
+      expect.stringContaining('Rex needs package CustomSkins (BotSkins)'),
+    ]);
+    const ini = IniFile.parse(fs.readFileSync(server, 'latin1'));
+    expect(ini.get('URL', 'Name')).toBe('Player');
+    expect(ini.get('Engine.Player', 'ConfiguredInternetSpeed')).toBe('10000'); // the server's own
+    expect(ini.get('Botpack.ChallengeBotInfo', 'Difficulty')).toBe('4');
+    expect(ini.get('Botpack.ChallengeBotInfo', 'BotNames[5]')).toBeUndefined();
+    expect(ini.get('Engine.Input', 'F1')).toBeUndefined(); // nothing else from the PC
+    expect(scanInventory({ installDir: root }).bots.map((b) => b.name)).toEqual(['Mayu', 'Rex']);
+    // the backup is the old file
+    const backup = out[0]!.slice('backup: '.length);
+    expect(fs.readFileSync(backup, 'latin1')).toContain('BotNames[0]=Xan');
+  });
+
+  it('adds the section when the server has none, refuses a User.ini without bots', () => {
+    const r = importBots(pcIni, '[URL]\r\nName=Player\r\n');
+    expect(r.bots).toEqual(['Mayu', 'Rex']);
+    expect(r.text).toMatch(
+      /^\[URL\]\r\nName=Player\r\n\r\n\[Botpack\.ChallengeBotInfo\]\r\nDifficulty=4/,
+    );
+    expect(() => importBots('[URL]\r\nName=x\r\n', '')).toThrow(/no \[Botpack.ChallengeBotInfo\]/);
+    expect(() => importBots('[Botpack.ChallengeBotInfo]\r\nBotNames[0]=\r\n', '')).toThrow(
+      /no bot names/,
+    );
   });
 });
 

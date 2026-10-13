@@ -14,6 +14,7 @@ interface Line {
 }
 
 const eq = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+const isHeader = (l: Line) => l.key === undefined && l.raw.trim().startsWith('[');
 
 export class IniFile {
   private lines: Line[] = [];
@@ -57,6 +58,41 @@ export class IniFile {
     return this.lines
       .filter((l) => l.key !== undefined && eq(l.section ?? '', section))
       .map((l) => [l.key as string, l.value as string]);
+  }
+
+  /**
+   * Raw lines of a section without its header, trailing blank lines dropped (undefined if the
+   * section does not exist). Several headers of the same section are merged.
+   */
+  sectionLines(section: string): string[] | undefined {
+    if (!this.hasSection(section)) return undefined;
+    const out = this.lines
+      .filter((l) => l.section !== undefined && eq(l.section, section) && !isHeader(l))
+      .map((l) => l.raw);
+    while (out.length && out[out.length - 1]?.trim() === '') out.pop();
+    return out;
+  }
+
+  /** Replaces a whole section (where it was, or at the end of the file) with these raw lines. */
+  replaceSection(section: string, rawLines: readonly string[]): void {
+    const first = this.lines.findIndex(
+      (l) => l.section !== undefined && eq(l.section, section) && isHeader(l),
+    );
+    const parsed = IniFile.parse(`[${section}]\n${rawLines.join('\n')}\n`).lines;
+    // Keep one blank line before the next section.
+    parsed.push({ raw: '' });
+    if (first < 0) {
+      if (this.lines.length && this.lines[this.lines.length - 1]?.raw.trim() !== '') {
+        this.lines.push({ raw: '' });
+      }
+      this.lines.push(...parsed);
+      return;
+    }
+    const kept = this.lines.filter(
+      (l, i) => i < first || !(l.section !== undefined && eq(l.section, section)),
+    );
+    kept.splice(first, 0, ...parsed);
+    this.lines = kept;
   }
 
   hasSection(section: string): boolean {

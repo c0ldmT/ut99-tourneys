@@ -60,7 +60,9 @@ It unpacks the patch, creates `UnrealTournament.ini`, builds the tournament mod 
 hands the folder to the user `tourney`. Run it again (`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99`) after adding maps or Monster
 Hunt. If the mod build fails or hangs (stopped after 15 minutes), build `UTTourney_v1.u`/`UTTourneyMH_v1.u` on another
 PC from the same version and install them with a third argument, the folder that holds them:
-`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99 ~/`.
+`sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99 ~/ut-import`. The same folder can hold
+SmartStockBots and a `User.ini` with your bots: see [server-extras.md](server-extras.md) (also tick rate and client
+rate). Network settings for players: [client-settings.md](client-settings.md).
 
 ## 3. Settings
 

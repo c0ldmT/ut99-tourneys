@@ -122,6 +122,11 @@ for (const f of fs.readdirSync(path.join(out, 'docs')).filter((f) => f.endsWith(
       .replaceAll('../apps/bridge/README.md', '../bridge/README.md'),
   );
 }
+// The app and mod READMEs sit one level higher in the bundle than in the repository.
+for (const f of ['website/README.md', 'bridge/README.md', 'mod/README.md']) {
+  const file = path.join(out, f);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('../../docs/', '../docs/'));
+}
 copy('LICENSE', 'LICENSE');
 write('VERSION', `${version}\n`);
 write(

@@ -95,7 +95,8 @@ it after 15 minutes. The packages are the same on every platform, so build them 
 sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99 ~/
 ```
 
-Your own UT client then has exactly the server's files (no "package mismatch").
+Your own UT client then has exactly the server's files (no "package mismatch"). The same folder can also hold
+SmartStockBots and your `User.ini` with your bots: see [server-extras.md](server-extras.md).
 
 More maps or Monster Hunt later: copy them into `/opt/ut99/Maps` (and `System`), then run
 `sudo bash /opt/tourney/deploy/linux/install-ut.sh "" /opt/ut99` again (rebuilds the mod; with the PC-built files:
@@ -147,6 +148,10 @@ Open `http://<pi-address>:8080` and log in.
 The website now shows the server as online. Click **Scan** there, so maps and bots appear in the tournament form.
 
 ## 8. Players
+
+- Optional on the server: SmartStockBots, your own bots from the PC, tick rate – see
+  [server-extras.md](server-extras.md). The default tick rate is 50 (469f); on a Pi 3 do not raise it.
+- Network settings for players (netspeed): [client-settings.md](client-settings.md).
 
 - Players connect with the command from the tournament page (`open <pi-address>:7777?tk=...`). Missing files
   (the map, Monster Hunt, the tournament mod) are downloaded automatically when they connect.

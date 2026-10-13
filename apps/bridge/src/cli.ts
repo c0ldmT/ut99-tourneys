@@ -15,6 +15,7 @@ import { MatchDirector } from './director.js';
 import { LocalEventStore } from './event-store.js';
 import { consoleLogger, type Logger } from './log.js';
 import { ModServer } from './mod-server.js';
+import { importBotsIntoInstallation } from './ut99/import-bots.js';
 import { scanInventory } from './ut99/inventory.js';
 import { prepareServer } from './ut99/prepare.js';
 import { ServerProcess } from './ut99/server-process.js';
@@ -32,6 +33,9 @@ Commands:
         Console commands while running: start (force start), pause [reason], resume, status, quit
   inventory -c <bridge.json> [--fast]
         List the maps and bots of the UT installation from the "server" section (--fast: no map titles)
+  import-bots <User.ini> --ut <UT folder>
+        Copy the bots ([Botpack.ChallengeBotInfo]) from a User.ini, e.g. from your PC, into the
+        server's System/User.ini (backup next to it). Then scan the server on the website.
   example
         Print example bridge.json and tournament.json
 `;
@@ -58,6 +62,7 @@ async function main(): Promise<void> {
       config: { type: 'string', short: 'c' },
       tournament: { type: 'string', short: 't' },
       fast: { type: 'boolean', default: false },
+      ut: { type: 'string' },
     },
   });
   const cmd = positionals[0];
@@ -67,6 +72,17 @@ async function main(): Promise<void> {
     console.log(JSON.stringify(EXAMPLE_CONFIG, null, 2));
     console.log('\n// tournament.json');
     console.log(JSON.stringify(EXAMPLE_TOURNAMENT, null, 2));
+    return;
+  }
+
+  if (cmd === 'import-bots') {
+    const source = positionals[1];
+    if (!source || !values.ut) {
+      console.log(HELP);
+      process.exitCode = 1;
+      return;
+    }
+    for (const line of importBotsIntoInstallation(source, values.ut)) console.log(line);
     return;
   }
 

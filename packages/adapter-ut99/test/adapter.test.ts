@@ -411,4 +411,22 @@ describe('downloads', () => {
       value: '100000',
     });
   });
+
+  it('sets tick rate and client rate from the bridge settings (469f defaults)', () => {
+    const value = (ini: ReturnType<typeof iniChanges>, key: string) =>
+      ini.find((c) => c.section === 'IpDrv.TcpNetDriver' && c.key === key && 'value' in c);
+    const defaults = iniChanges(rules, ServerProfileSchema.parse(base), mod);
+    expect(value(defaults, 'NetServerMaxTickRate')).toMatchObject({ value: '50' });
+    expect(value(defaults, 'LanServerMaxTickRate')).toMatchObject({ value: '50' });
+    expect(value(defaults, 'MaxClientRate')).toMatchObject({ value: '20000' });
+    const custom = iniChanges(
+      rules,
+      ServerProfileSchema.parse({ ...base, tickRate: 65, maxClientRate: 40000 }),
+      mod,
+    );
+    expect(value(custom, 'NetServerMaxTickRate')).toMatchObject({ value: '65' });
+    expect(value(custom, 'LanServerMaxTickRate')).toMatchObject({ value: '65' });
+    expect(value(custom, 'MaxClientRate')).toMatchObject({ value: '40000' });
+    expect(() => ServerProfileSchema.parse({ ...base, tickRate: 500 })).toThrow();
+  });
 });

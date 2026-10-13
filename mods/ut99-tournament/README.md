@@ -210,6 +210,9 @@ the test quicker. "You + bot" against a bot team is enough.
 ## SmartStockBots (optional)
 
 SmartStockBots makes the stock bots play much better. It runs on the server only; clients need nothing.
+Download: [moddb.com/mods/smartstockbots](https://www.moddb.com/mods/smartstockbots/downloads/smartstockbots).
+Installation on Linux/Pi (also straight from the zip) and the settings worth a look for tournaments:
+[docs/server-extras.md](../../docs/server-extras.md#smartstockbots).
 
 1. Copy `SmartStockBots.u`, `SmartStockBots.int` and `SmartStockBots.ini` into the `System` folder of the
    server installation, then scan the server on the website (Servers → Scan maps and bots).
