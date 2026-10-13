@@ -23,6 +23,13 @@ var int LastRpDeaths, RpTicks;
 var int HuntLives;          // 0 = unlimited, -1 = not known (Monster Hunt's own setting)
 var int HuntMonsterSkill;   // -1 = not known
 var bool bHuntWeaponStay, bHuntHardcore;
+var bool bHuntWaypointFix;  // bots use TourneyMHBotExtension (sorted waypoints)
+// Virtual captain: teams without a player on the server get "Attack" (as from the V menu) at
+// the start of the run and every CaptainSec seconds, so their bots follow the map's waypoints
+// (Monster Hunt gives bots of such teams no orders at all).
+var int CaptainSec;
+var int CaptainLeft;
+var bool bCaptainLogged;
 // Where the runners were when a pause began (a resume puts them back, not to the start).
 var Pawn SpotPawn[16];
 var vector SpotLoc[16];
@@ -46,6 +53,7 @@ function HandleBridgeMessage(TourneyMsg M)
 		HuntMonsterSkill = Clamp(M.GetInt("mk"), 0, 7);
 		bHuntWeaponStay = M.GetBool("ws");
 		bHuntHardcore = M.GetBool("hc");
+		bHuntWaypointFix = M.GetBool("wf");
 		// After the end of this run the bridge already describes the next one (other level).
 		if (bRunReported)
 			return;
@@ -94,7 +102,11 @@ function ApplyHuntSettings()
 		MHGame().MonsterSkill = HuntMonsterSkill;
 	Game.bMultiWeaponStay = bHuntWeaponStay;
 	Game.bHardCoreMode = bHuntHardcore;
-	Log("Monster Hunt: lives" @ MHGame().Lives @ "(0 = unlimited), monster skill" @ MHGame().MonsterSkill, 'UTTourney');
+	// Monster Hunt spawns its bot extension in PostBeginPlay, after this.
+	if (bHuntWaypointFix)
+		MHGame().BotExtensionType = class'TourneyMHBotExtension';
+	Log("Monster Hunt: lives" @ MHGame().Lives @ "(0 = unlimited), monster skill" @ MHGame().MonsterSkill
+		@ "bot extension" @ MHGame().BotExtensionType, 'UTTourney');
 }
 
 function SaveCache()
@@ -107,6 +119,9 @@ function SaveCache()
 	class'TournamentConfig'.default.CachedHardcore = 0;
 	if (bHuntHardcore)
 		class'TournamentConfig'.default.CachedHardcore = 1;
+	class'TournamentConfig'.default.CachedWaypointFix = 0;
+	if (bHuntWaypointFix)
+		class'TournamentConfig'.default.CachedWaypointFix = 1;
 	Super.SaveCache(); // writes the ini
 }
 
@@ -117,6 +132,7 @@ function LoadCache()
 	HuntMonsterSkill = class'TournamentConfig'.default.CachedMonsterSkill;
 	bHuntWeaponStay = class'TournamentConfig'.default.CachedWeaponStay != 0;
 	bHuntHardcore = class'TournamentConfig'.default.CachedHardcore != 0;
+	bHuntWaypointFix = class'TournamentConfig'.default.CachedWaypointFix != 0;
 }
 
 function AssignTeam(Pawn P, int Side)
@@ -148,6 +164,7 @@ function StartTournamentMatch()
 	bRunReported = false;
 	LastRpDeaths = -1;
 	RpTicks = 0;
+	CaptainLeft = 1; // first orders right after the start
 	Super.StartTournamentMatch();
 	if (RaceSide == 0)
 		Log("run started without a race line from the bridge", 'UTTourney');
@@ -191,9 +208,36 @@ function LiveTick()
 {
 	if (!RunActive())
 		return;
+	CaptainTick();
 	RpTicks++;
 	if (RpTicks >= 3 || RunDeaths != LastRpDeaths)
 		SendProgress();
+}
+
+// Once a second while the run is live (not in a pause).
+function CaptainTick()
+{
+	local Pawn P;
+	local int n;
+
+	CaptainLeft--;
+	if (CaptainLeft > 0)
+		return;
+	CaptainLeft = CaptainSec;
+	if (RaceSide == 0 || SideCount(SideRole(RaceSide - 1)) > 0)
+		return; // a player leads the team (bots follow them, they give orders themselves)
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (Bot(P) != None && !P.bDeleteMe && P.Health > 0 && P.PlayerReplicationInfo != None
+			&& P.PlayerReplicationInfo.Team == 0 && !P.PlayerReplicationInfo.bIsSpectator)
+		{
+			Bot(P).SetOrders('Attack', None, true);
+			n++;
+		}
+	if (n > 0 && !bCaptainLogged)
+	{
+		bCaptainLogged = true;
+		Log("virtual captain: Attack for" @ n @ "bots, every" @ CaptainSec @ "s", 'UTTourney');
+	}
 }
 
 function SendProgress()
@@ -373,4 +417,6 @@ defaultproperties
 	HuntMonsterSkill=-1
 	bHuntWeaponStay=True
 	bHuntHardcore=True
+	bHuntWaypointFix=True
+	CaptainSec=45
 }

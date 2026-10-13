@@ -192,6 +192,7 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     mk: int.min(0).max(7),
     ws: z.boolean(),
     hc: z.boolean(),
+    wf: z.boolean(), // bots use the tournament's waypoint fix (TourneyMHBotExtension)
   }),
   /** Team games: a stand-in bot leaves (the player is back). */
   z.object({ t: z.literal('botdel'), name: str(MAX_NAME_CHARS) }),

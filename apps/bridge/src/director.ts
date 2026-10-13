@@ -790,6 +790,7 @@ export class MatchDirector extends EventEmitter {
         mk: this.rules.monsterSkill,
         ws: this.rules.weaponStay,
         hc: this.rules.hardcore,
+        wf: this.rules.botWaypointFix,
       });
     }
     return lines;

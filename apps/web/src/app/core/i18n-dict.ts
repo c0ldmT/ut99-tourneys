@@ -269,6 +269,9 @@ const en = {
   'form.penalty': 'Penalty per death (s)',
   'form.monsterSkill': 'Monster difficulty (0-7)',
   'form.lives': 'Lives per hunter',
+  'form.botWaypointFix': 'Waypoint fix for bots (recommended)',
+  'form.botWaypointFixHint':
+    'Bots follow the map\'s waypoints in the right order (Monster Hunt\'s own sorting can skip or repeat waypoints on some maps). Teams without players always get the "Attack" order every 45 s.',
   'form.livesUnlimited': 'Unlimited',
   'form.mhRulesHint':
     'Monster Hunt: both teams run the same map one after the other. Every death in the team (bots too) adds the penalty; with limited lives a team whose hunters are all out has not reached the exit. Not at the exit in time: monster points decide. Needs Monster Hunt 613 and UTTourneyMH_v1.u on the server.',
@@ -664,6 +667,9 @@ const de: Record<TKey, string> = {
   'form.penalty': 'Strafe pro Tod (s)',
   'form.monsterSkill': 'Monster-Stärke (0-7)',
   'form.lives': 'Leben pro Jäger',
+  'form.botWaypointFix': 'Wegpunkt-Korrektur für Bots (empfohlen)',
+  'form.botWaypointFixHint':
+    'Bots laufen die Wegpunkte der Map in der richtigen Reihenfolge ab (Monster Hunts eigene Sortierung kann auf manchen Maps Wegpunkte überspringen oder doppeln). Teams ohne Spieler bekommen zusätzlich immer alle 45 s den Befehl „Attack“.',
   'form.livesUnlimited': 'Unendlich',
   'form.mhRulesHint':
     'Monster Hunt: Beide Teams laufen nacheinander dieselbe Map. Jeder Tod im Team (auch Bots) kostet die Strafe; bei begrenzten Leben gilt ein Team, dessen Jäger alle draußen sind, als nicht im Ziel. Wer nicht rechtzeitig am Ausgang ist, wird nach Monsterpunkten gewertet. Auf dem Server müssen Monster Hunt 613 und UTTourneyMH_v1.u installiert sein.',

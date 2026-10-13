@@ -100,6 +100,11 @@ export const Ut99DmRulesSchema = z
      * whose hunters are all out has not reached the exit.
      */
     lives: z.number().int().min(0).max(99).default(0),
+    /**
+     * Monster Hunt: the tournament's bot extension, which sorts the map's bot waypoints correctly
+     * (Monster Hunt 613's own sorting can lose or repeat waypoints). Off = Monster Hunt's original.
+     */
+    botWaypointFix: z.boolean().default(true),
 
     // Server-wide game settings (applied via ini at server start).
     weaponStay: z.boolean().default(true),

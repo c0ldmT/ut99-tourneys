@@ -73,6 +73,8 @@ interface Model {
   monsterSkill: number;
   /** Monster Hunt: lives per hunter, 0 = unlimited. */
   lives: number;
+  /** Monster Hunt: the tournament's bot waypoint fix. */
+  botWaypointFix: boolean;
   mapPool: string[];
   botPool: BotSpec[];
   notifyMode: 'default' | 'custom' | 'off';
@@ -289,6 +291,11 @@ function toLocalInput(iso: string | null): string {
             }
           </div>
           @if (f.game === 'mh') {
+            <label class="row"
+              ><input type="checkbox" name="wpfix" [(ngModel)]="f.botWaypointFix" />
+              {{ 'form.botWaypointFix' | t }}</label
+            >
+            <p class="muted small">{{ 'form.botWaypointFixHint' | t }}</p>
             <p class="muted small">{{ 'form.mhRulesHint' | t }}</p>
           } @else if (f.teamSize > 1) {
             <p class="muted small">{{ 'form.teamRulesHint' | t }}</p>
@@ -687,6 +694,7 @@ export class TournamentFormPage {
       penaltySec: 5,
       monsterSkill: 5,
       lives: 0,
+      botWaypointFix: true,
       notifyMode: 'default',
       webhookUrl: '',
       mapPool: [...STOCK_POOL],
@@ -735,6 +743,7 @@ export class TournamentFormPage {
       penaltySec: num('penaltySec', 5),
       monsterSkill: num('monsterSkill', 5),
       lives: num('lives', 0),
+      botWaypointFix: r['botWaypointFix'] !== false,
       notifyMode: d.notify?.mode ?? 'default',
       webhookUrl: d.notify?.webhookUrl ?? '',
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
@@ -868,6 +877,7 @@ export class TournamentFormPage {
             penaltySec: f.penaltySec,
             monsterSkill: f.monsterSkill,
             lives: f.lives,
+            botWaypointFix: f.botWaypointFix,
           },
         },
       },

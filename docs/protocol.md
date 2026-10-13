@@ -198,7 +198,8 @@ map twice, once per team:
   watches. The running team plays in Monster Hunt's hunter team. Fill bots and stand-in bots as in team games.
 - **`race`** (bridge → mod, with `match`): `rs` running side, `n` run 1/2, `pen` seconds per death, the other
   team's finished run (`pt` final time in ms or -1, `pd` deaths, `pp` points, `pf` reached the exit), and the
-  Monster Hunt settings `lv` (lives, 0 = unlimited), `mk` (monster skill), `ws` (weapon stay), `hc` (hardcore).
+  Monster Hunt settings `lv` (lives, 0 = unlimited), `mk` (monster skill), `ws` (weapon stay), `hc` (hardcore),
+  `wf` (bots use the tournament's waypoint fix).
   The mod caches them and sets them when the next level starts: `TournamentMH` inherits
   `config(MonsterHunt)`, so Monster Hunt would read them from `MonsterHunt.ini`, not from `Tourney.ini`.
 - **`rp`** (mod → bridge): progress every few seconds and on every death: `ms` run time (pauses excluded), `d`

@@ -113,7 +113,7 @@ describe('Monster Hunt time race against the simulated UT server', () => {
     // The race line: run 2 knows the result of run 1.
     const raceLines = env.sim.received.filter((m) => m.t === 'race') as any[];
     const run2 = raceLines.find((l) => l.n === 2);
-    expect(run2).toMatchObject({ pen: 5, pf: true, lv: 0, mk: 5, ws: true, hc: true });
+    expect(run2).toMatchObject({ pen: 5, pf: true, lv: 0, mk: 5, ws: true, hc: true, wf: true });
     expect(run2.pt).toBe(finalMs(events(env, 'match.runFinished')[0].data));
   });
 

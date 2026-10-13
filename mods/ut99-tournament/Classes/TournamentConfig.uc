@@ -39,6 +39,7 @@ var config byte CachedBotSide[10];
 var config int CachedLives;
 var config int CachedMonsterSkill;
 var config byte CachedWeaponStay, CachedHardcore; // 0 = off, 1 = on
+var config byte CachedWaypointFix;                // 1 = TourneyMHBotExtension
 
 // Fallback when a client reconnects without ?tk= after a map change: address -> token.
 var config string KnownAddr[64];
@@ -58,4 +59,5 @@ defaultproperties
 	CachedMonsterSkill=-1
 	CachedWeaponStay=1
 	CachedHardcore=1
+	CachedWaypointFix=1
 }

@@ -11,6 +11,9 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > message when the organizer ends a Monster Hunt run.
 > Mod 0.5.4: Monster Hunt lives, monster skill and weapon stay come from the tournament (before, Monster Hunt's
 > own defaults applied: 10 lives, monster skill 3).
+> Mod 0.5.5: Monster Hunt bots – a virtual captain gives teams without players "Attack" every 45 s (they then
+> follow the map's waypoints), and the waypoint fix (tournament option, on by default) sorts the waypoints
+> correctly.
 
 ## Classes
 
@@ -21,6 +24,7 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 | `TourneyCoreTDM` | Core for team games: puts players and bots into the red/blue team, team scores |
 | `TournamentTDM` | Team deathmatch (extends `TournamentDM`): red = side a, blue = side b; team scores, friendly fire, team skins, end of game and bot attitude taken over from `TeamGamePlus`; teams come from the access list |
 | `TourneyCoreMH` (package `UTTourneyMH_v1`) | Core for the Monster Hunt time race: the running team are the hunters, run clock without pauses, deaths of the team (bots included), time limit, `rp`/`runend` to the bridge, race state for the HUD |
+| `TourneyMHBotExtension` (package `UTTourneyMH_v1`) | Monster Hunt's bot extension with correctly sorted bot waypoints (tournament rule "waypoint fix", on by default) |
 | `TournamentMH` (package `UTTourneyMH_v1`) | Game type (extends `MonsterHunt.MonsterHunt`, Monster Hunt 613): spawns the core and forwards the engine events like `TournamentDM`; hunters only, counts deaths (`Killed`) |
 | `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
 | `TourneyMsg` | Flat JSON line parser/writer |
@@ -182,6 +186,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 43 | Time limit | A run that does not reach the exit ends at the limit (`Run over: ...`); the website shows it as not finished; a team at the exit beats it |
 | 44 | Pause | `pause` from the website during a run: the run clock stops and continues on resume |
 | 45 | Lives | "Unlimited" in the form: nobody is ever "lost"; with a number, hunters are out after that many deaths and a team with everybody out has not reached the exit. Server log: `Monster Hunt: lives 0 (0 = unlimited), monster skill 5` |
+| 46 | Bots | Bot-only team: server log `virtual captain: Attack for N bots, every 45 s`; the bots head through the map instead of wandering. With the waypoint fix: `bot waypoints (sorted): 1 2 3 ...` at every level start; switch it off in the tournament form if bots behave worse, and try it together with SmartStockBots |
 
 ## SmartStockBots (optional)
 
