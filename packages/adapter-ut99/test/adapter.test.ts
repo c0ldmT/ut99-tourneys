@@ -35,6 +35,11 @@ const vote = (over: Partial<MapVoteInput> = {}): MapVoteInput => ({
 });
 
 describe('rules', () => {
+  it('ignores the former botWaypointFix option (bot AI enhancements are always on)', () => {
+    const r = parseRules({ mapPool: ['MH-NaliVillage'], botWaypointFix: false });
+    expect('botWaypointFix' in r).toBe(false);
+  });
+
   it('applies the agreed defaults', () => {
     const r = parseRules({ mapPool: pool });
     expect(r).toMatchObject({

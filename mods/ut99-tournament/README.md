@@ -17,6 +17,8 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > Mod 0.5.6: the waypoint fix becomes the bot helpers (same option): jump routes over JumpSpots, bots keep
 > their distance from lifts and gates that turn back on contact, a 3-step unstick, and a bot debug log (server
 > log only: every order, each bot's confirmation, goals, waypoints, every helper step).
+> Since platform 0.9.0 the Monster Hunt bot AI enhancements (waypoint fix and bot helpers) are always on; the
+> tournament option is gone (the bridge always sends `wf: true`, no change in the mod).
 > Mod 0.5.7: map bug fix (movers that open only once no longer turn back on contact), bots find out what opens a
 > closed gate (monster, trigger, button) and hunt key monsters instead of fearing them, route to the path point
 > next to an unreachable waypoint, bots make room at lifts; log shows who made a mover turn back, objectives and key
@@ -39,7 +41,7 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 | `TourneyCoreTDM` | Core for team games: puts players and bots into the red/blue team, team scores |
 | `TournamentTDM` | Team deathmatch (extends `TournamentDM`): red = side a, blue = side b; team scores, friendly fire, team skins, end of game and bot attitude taken over from `TeamGamePlus`; teams come from the access list |
 | `TourneyCoreMH` (package `UTTourneyMH_v1`) | Core for the Monster Hunt time race: the running team are the hunters, run clock without pauses, deaths of the team (bots included), time limit, `rp`/`runend` to the bridge, race state for the HUD |
-| `TourneyMHBotExtension` (package `UTTourneyMH_v1`) | Monster Hunt's bot extension with correctly sorted bot waypoints (tournament rule "waypoint fix", on by default) |
+| `TourneyMHBotExtension` (package `UTTourneyMH_v1`) | Monster Hunt's bot extension with the bot AI enhancements that fix bot behaviour in Monster Hunt (sorted waypoints, jump routes, movers, closed doors, unstick); always on |
 | `TournamentMH` (package `UTTourneyMH_v1`) | Game type (extends `MonsterHunt.MonsterHunt`, Monster Hunt 613): spawns the core and forwards the engine events like `TournamentDM`; hunters only, counts deaths (`Killed`) |
 | `BridgeLink` | `TcpLink` client to the bridge, line buffering, heartbeat |
 | `TourneyMsg` | Flat JSON line parser/writer |
@@ -201,7 +203,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 43 | Time limit | A run that does not reach the exit ends at the limit (`Run over: ...`); the website shows it as not finished; a team at the exit beats it |
 | 44 | Pause | `pause` from the website during a run: the run clock stops and continues on resume |
 | 45 | Lives | "Unlimited" in the form: nobody is ever "lost"; with a number, hunters are out after that many deaths and a team with everybody out has not reached the exit. Server log: `Monster Hunt: lives 0 (0 = unlimited), monster skill 5` |
-| 46 | Bots | Bot-only team: server log `virtual captain: Attack for N bots, every 45 s`; the bots head through the map instead of wandering. With the waypoint fix: `bot waypoints (sorted): 1 2 3 ...` at every level start; switch it off in the tournament form if bots behave worse, and try it together with SmartStockBots |
+| 46 | Bots | Bot-only team: server log `virtual captain: Attack for N bots, every 45 s`; the bots head through the map instead of wandering. With the waypoint fix: `bot waypoints (sorted): 1 2 3 ...` at every level start; also together with SmartStockBots |
 | 47 | Bot helpers | Bot-only Monster Hunt run, then `grep "UTTourney: bot" Tourney.log`: per order `order: Attack -> NAME` and a second later `ack: NAME follows Attack, ...`; at the level start `mover ... turns back on contact` and `movers watched: N, lifts: L`; then `goal waypoint N`, `waypoint N reached`, and per helper step `waits at ...`/`goes on`, `stuck ... jumps`/`detour`/`penalty-free respawn`, `only with a jump (JumpSpot)`. Nothing of it appears in the game or console. MH-Trials: the bots cross the lava after the rock (waypoints 7–10) instead of running to the start gate; MH-NaliVillage][: no endless lift loop; MH-Canyon: the bots wait in front of the castle bars until all have opened |
 | 48 | Bot helpers 2 | Level start: `map fix: MoverN ... it no longer turns back` (MH-Canyon: Mover9–16, MH-Trials: gateway, beams, final bars) and `key monster: ...` (MH-NaliVillage][: both titans). During the run: `stuck at closed MoverN (tag) ..., opened by: ... -> hunts/goes to/bumps X` and `errand for MoverN ends, ...`; `no route to waypoint N itself, goes via ...`; `makes room at lift ...`; `mover ... turned back ..., nearest pawn ...`; `objective active/completed: ...`; `key monster dead: ...`. MH-Canyon: the castle bars always open; MH-NaliVillage][: the bots kill the second titan; MH-Trials: the bots reach waypoint 10 or the trigger next to it |
 | 49 | Statistics | Play a game (or Monster Hunt run) to the end. Tournament page → Events (admin): a `match.playerStats` line right before the game's result with every player and bot and their kills (Monster Hunt: monsters, `12M`). Bridge log without `player statistics ... of ... players arrived` warnings |

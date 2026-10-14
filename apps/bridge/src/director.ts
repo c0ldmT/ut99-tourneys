@@ -839,7 +839,7 @@ export class MatchDirector extends EventEmitter {
         mk: this.rules.monsterSkill,
         ws: this.rules.weaponStay,
         hc: this.rules.hardcore,
-        wf: this.rules.botWaypointFix,
+        wf: true, // Monster Hunt bot AI enhancements, always on (mod 0.6.0 still reads the flag)
       });
       if (this.mapRecords && cm.map) lines.push(this.mrecLine(cm.map));
     }

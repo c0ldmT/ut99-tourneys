@@ -204,7 +204,7 @@ map twice, once per team:
 - **`race`** (bridge → mod, with `match`): `rs` running side, `n` run 1/2, `pen` seconds per death, the other
   team's finished run (`pt` final time in ms or -1, `pd` deaths, `pp` points, `pf` reached the exit), and the
   Monster Hunt settings `lv` (lives, 0 = unlimited), `mk` (monster skill), `ws` (weapon stay), `hc` (hardcore),
-  `wf` (bots use the tournament's waypoint fix).
+  `wf` (bots use the bot AI enhancements; always `true` since the option was removed).
   The mod caches them and sets them when the next level starts: `TournamentMH` inherits
   `config(MonsterHunt)`, so Monster Hunt would read them from `MonsterHunt.ini`, not from `Tourney.ini`.
 - **`mrec`** (bridge → mod, after `race`): the map record from the statistics, shown in the HUD under the run

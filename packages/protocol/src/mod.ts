@@ -246,7 +246,7 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     mk: int.min(0).max(7),
     ws: z.boolean(),
     hc: z.boolean(),
-    wf: z.boolean(), // bots use the tournament's waypoint fix (TourneyMHBotExtension)
+    wf: z.boolean(), // bots use the bot AI enhancements (TourneyMHBotExtension); always true now
   }),
   /**
    * Monster Hunt, after `race`: the map's record (final time in ms, -1 = none, -2 = no records:

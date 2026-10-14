@@ -3,6 +3,15 @@
 All notable changes to Tourney. Versions of the whole platform (website, bridge, install scripts) are listed
 here; the UT mod has its own version (shown in the game type name and the bracket title), listed per release.
 
+## [Unreleased]
+
+### Changed
+
+- Monster Hunt: the bot AI enhancements (waypoint order, jump routes, keeping clear of movers, opening closed
+  doors, unstick, the fix for once-only movers) are always on; the option "Bot helpers" is gone from the
+  tournament form, which explains them in a note instead. Older tournaments with the option switched off now use
+  them too. No change in the mod.
+
 ## [0.9.0] – 2026-10-14
 
 First complete version, tested on 469f with 1v1, team deathmatch and Monster Hunt tournaments, in a LAN, from
