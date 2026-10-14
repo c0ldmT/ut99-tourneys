@@ -128,6 +128,7 @@ for (const f of ['website/README.md', 'bridge/README.md', 'mod/README.md']) {
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replaceAll('../../docs/', '../docs/'));
 }
 copy('LICENSE', 'LICENSE');
+copy('CHANGELOG.md', 'CHANGELOG.md');
 write('VERSION', `${version}\n`);
 write(
   'README.md',

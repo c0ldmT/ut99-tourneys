@@ -59,4 +59,5 @@ For frontend work: `pnpm --filter @tourney/api dev` (API with tsx) and `pnpm --f
 - [Architecture](docs/architecture.md)
 - [Protocol](docs/protocol.md)
 - [Decisions](docs/decisions.md)
+- [Changelog](CHANGELOG.md)
 - Installation: [Raspberry Pi](docs/install-raspberry-pi.md), [Linux](docs/install-linux.md), [Windows](docs/install-windows.md)
