@@ -25,9 +25,9 @@ export type RaceDecision = 'time' | 'finish' | 'points' | 'deaths' | 'lot';
 /**
  * Winner of a game:
  * 1. a team at the exit beats a team that is not;
- * 2. both at the exit: the lower final time (compared in whole seconds);
- * 3. otherwise (same second, or nobody at the exit): more monster points, then fewer deaths,
- *    then the lot.
+ * 2. both at the exit: the lower final time (raw time plus penalty, to the millisecond);
+ * 3. otherwise (exactly the same final time, or nobody at the exit): more monster points, then
+ *    fewer deaths, then the lot.
  */
 export function raceWinner(
   a: RunResult,
@@ -37,9 +37,9 @@ export function raceWinner(
   if (a.finished !== b.finished)
     return { winnerId: a.finished ? a.entrantId : b.entrantId, decidedBy: 'finish' };
   if (a.finished) {
-    const sa = Math.floor(finalMs(a) / 1000);
-    const sb = Math.floor(finalMs(b) / 1000);
-    if (sa !== sb) return { winnerId: sa < sb ? a.entrantId : b.entrantId, decidedBy: 'time' };
+    const fa = finalMs(a);
+    const fb = finalMs(b);
+    if (fa !== fb) return { winnerId: fa < fb ? a.entrantId : b.entrantId, decidedBy: 'time' };
   }
   if (a.points !== b.points)
     return { winnerId: a.points > b.points ? a.entrantId : b.entrantId, decidedBy: 'points' };

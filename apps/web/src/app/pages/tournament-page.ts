@@ -275,6 +275,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             [live]="liveNow()"
             [myEntrantId]="t.me.entrantId"
             [race]="race()"
+            [currentRuns]="t.projection!.currentMatch?.runs ?? []"
           />
         </div>
         @if (race() && raceRows().length) {

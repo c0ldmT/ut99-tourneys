@@ -42,7 +42,7 @@ nobody fills. Teams made of bots only have no members. Brackets of 4, 8 and 16 t
 it one after the other. `match.mapSelected.runOrder` fixes the order (game 1 by lot, then whoever ran second
 starts), `match.started.runner` names the running team, `match.runFinished` records each run. After the second
 run `match.gameFinished` (`endReason: "race"`, `scores` = final times in ms) names the winner: a team at the exit
-beats one that is not; otherwise the lower time plus `penaltySec` per death (whole seconds), then monster points,
+beats one that is not; otherwise the lower time plus `penaltySec` per death (to the millisecond), then monster points,
 fewer deaths, lot.
 
 **Concurrency.** The bridge sends `events.append` with `baseSeq` (the head it based its decision on). The

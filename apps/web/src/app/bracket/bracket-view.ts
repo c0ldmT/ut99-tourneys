@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import type { BracketState, Entrant, LiveInfo, MatchState } from '../core/types';
 import { I18n } from '../core/i18n';
-import { BOX_H, BOX_W, layoutBracket, matchScore } from './layout';
+import type { RunView } from '../core/race';
+import { BOX_H, BOX_W, BOX_W_RACE, layoutBracket, matchScore, rowFit } from './layout';
 
 type GameRec = { winnerId: string; scores: Record<string, number> };
 
@@ -54,9 +55,12 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
                     <title>{{ name(id) }}: {{ list }}</title>
                   }
                   <rect class="row" [attr.width]="boxW" [attr.height]="boxH / 2" rx="6" />
-                  <text class="name" x="10" [attr.y]="boxH / 4 + 5">{{ name(id) }}</text>
+                  @let fit = rowFit(sc[slot], isBot(id));
+                  <text class="name" x="10" [attr.y]="boxH / 4 + 5">
+                    {{ name(id, fit.nameChars) }}
+                  </text>
                   @if (isBot(id)) {
-                    <text class="bot" [attr.x]="boxW - 64" [attr.y]="boxH / 4 + 4">BOT</text>
+                    <text class="bot" [attr.x]="fit.botX" [attr.y]="boxH / 4 + 4">BOT</text>
                   }
                   <text
                     class="score"
@@ -162,18 +166,26 @@ export class BracketView {
   readonly myEntrantId = input<string | null>(null);
   /** Monster Hunt: scores are run times. */
   readonly race = input(false);
+  /** Monster Hunt: finished runs of the game in progress (current match). */
+  readonly currentRuns = input<readonly RunView[]>([]);
 
   private readonly i18n = inject(I18n);
-  protected readonly boxW = BOX_W;
   protected readonly boxH = BOX_H;
+  protected get boxW(): number {
+    return this.race() ? BOX_W_RACE : BOX_W;
+  }
 
   protected readonly layout = computed(() =>
-    layoutBracket(this.bracket(), {
-      W: this.i18n.t('bracket.winners'),
-      L: this.i18n.t('bracket.losers'),
-      GF: this.i18n.t('bracket.grandFinal'),
-      SE: this.i18n.t('bracket.bracket'),
-    }),
+    layoutBracket(
+      this.bracket(),
+      {
+        W: this.i18n.t('bracket.winners'),
+        L: this.i18n.t('bracket.losers'),
+        GF: this.i18n.t('bracket.grandFinal'),
+        SE: this.i18n.t('bracket.bracket'),
+      },
+      this.boxW,
+    ),
   );
 
   protected readonly gfX = computed(() => {
@@ -181,10 +193,14 @@ export class BracketView {
     return gf ? gf.x : 0;
   });
 
-  protected name(id: string | null): string {
+  protected name(id: string | null, max = 16): string {
     if (!id) return this.i18n.t('bracket.tbd');
     const n = this.entrants()[id]?.displayName ?? id;
-    return n.length > 16 ? `${n.slice(0, 15)}…` : n;
+    return n.length > max ? `${n.slice(0, max - 1)}…` : n;
+  }
+
+  protected rowFit(score: string, bot: boolean) {
+    return rowFit(score, bot, this.boxW);
   }
 
   protected isBot(id: string | null): boolean {
@@ -205,6 +221,7 @@ export class BracketView {
   }
 
   protected score(m: MatchState): [string, string] {
-    return matchScore(m, this.games()[m.id] ?? [], this.live(), this.race());
+    const runs = m.id === this.currentMatchId() ? this.currentRuns() : [];
+    return matchScore(m, this.games()[m.id] ?? [], this.live(), this.race(), runs);
   }
 }

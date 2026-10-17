@@ -318,11 +318,24 @@ describe('Monster Hunt race', () => {
     expect(
       raceWinner(run('a', { finished: false, points: 80 }), run('b', { finished: false }), rng),
     ).toEqual({ winnerId: 'a', decidedBy: 'points' });
-    // Same second: points, then deaths.
-    expect(raceWinner(run('a', { timeMs: 300_400 }), run('b', { deaths: 1 }), rng).decidedBy).toBe(
-      'deaths',
-    );
+    // Same final time: points, then deaths.
+    expect(raceWinner(run('a'), run('b', { deaths: 1 }), rng).decidedBy).toBe('deaths');
     expect(raceWinner(run('a'), run('b'), rng).decidedBy).toBe('lot');
+  });
+
+  it('compares the final time to the millisecond, penalty included', () => {
+    const rng = createRng(1);
+    // Real case (MH-Revenge][): 4:47.6 + 30 x 5 s = 7:17.6 loses against 4:52.3 + 29 x 5 s = 7:17.3,
+    // although the raw time and the monster points (16 vs 6) are better.
+    const a = run('a', { timeMs: 287_600, deaths: 30, penaltyMs: 150_000, points: 16 });
+    const b = run('b', { timeMs: 292_300, deaths: 29, penaltyMs: 145_000, points: 6 });
+    expect(raceWinner(a, b, rng)).toEqual({ winnerId: 'b', decidedBy: 'time' });
+    expect(raceWinner(b, a, rng)).toEqual({ winnerId: 'b', decidedBy: 'time' });
+    // One millisecond is enough.
+    expect(raceWinner(run('a', { timeMs: 300_001 }), run('b'), rng)).toEqual({
+      winnerId: 'b',
+      decidedBy: 'time',
+    });
   });
 
   it('alternates the start after game 1', () => {

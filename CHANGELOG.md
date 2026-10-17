@@ -5,6 +5,13 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ## [Unreleased]
 
+### Fixed
+
+- Monster Hunt: the final time (run time plus penalty) now decides to the millisecond. Before, it was compared in
+  whole seconds, so a team 0.3 s faster (7:17.3 against 7:17.6) could lose on monster points.
+- Monster Hunt: the bracket shows the final time of a run as soon as it is over, not only the run in progress; run
+  times in the bracket show tenths of a second.
+
 ### Changed
 
 - Monster Hunt: the bot AI enhancements (waypoint order, jump routes, keeping clear of movers, opening closed

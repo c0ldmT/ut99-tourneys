@@ -1,6 +1,13 @@
 import { computeBracket, type MatchResult } from '@tourney/bracket';
 import { describe, expect, it } from 'vitest';
-import { BOX_H, BOX_W, layoutBracket, matchScore } from '../src/app/bracket/layout';
+import {
+  BOX_H,
+  BOX_W,
+  BOX_W_RACE,
+  layoutBracket,
+  matchScore,
+  rowFit,
+} from '../src/app/bracket/layout';
 
 const titles = { W: 'W', L: 'L', GF: 'GF', SE: 'SE' };
 const slots = (n: number) => Array.from({ length: n }, (_, i) => `e${i + 1}`);
@@ -99,7 +106,12 @@ describe('bracket layout', () => {
       matchId: 'W1-1',
       race: { runner: 'e2', timeMs: 61_000, penaltyMs: 5_000 },
     };
-    expect(matchScore(m, [], live, true)).toEqual(['', '▶ 1:06']);
+    expect(matchScore(m, [], live, true)).toEqual(['', '▶ 1:06.0']);
+    // The first run is over, the second team runs: both times are in the bracket.
+    const firstRun = [{ entrantId: 'e1', timeMs: 287_600, penaltyMs: 150_000 }];
+    expect(matchScore(m, [], live, true, firstRun)).toEqual(['7:17.6', '▶ 1:06.0']);
+    // Between the runs (no live run yet): the finished run stays.
+    expect(matchScore(m, [], null, true, firstRun)).toEqual(['7:17.6', '']);
     const done = computeBracket(def, [
       {
         matchId: 'W1-1',
@@ -109,7 +121,15 @@ describe('bracket layout', () => {
         games: [{ winnerId: 'e1', scores: { e1: 310_000, e2: 315_400 } }],
       },
     ]).byId['W1-1']!;
-    expect(matchScore(done, [], null, true)).toEqual(['5:10', '5:15']);
+    expect(matchScore(done, [], null, true)).toEqual(['5:10.0', '5:15.4']);
+    // Bo3: games won, then the times of the game in progress.
+    const bo3 = computeBracket({ ...def, bestOf: { default: 3 } }, []).byId['W1-1']!;
+    const played = [{ winnerId: 'e1', scores: { e1: 310_000, e2: 315_400 } }];
+    const run2 = [{ entrantId: 'e2', timeMs: 200_000, penaltyMs: 10_000 }];
+    const live1 = { matchId: 'W1-1', race: { runner: 'e1', timeMs: 30_000, penaltyMs: 0 } };
+    expect(matchScore(bo3, played, live1, true, run2)).toEqual(['1 ▶ 0:30.0', '0 3:30.0']);
+    // Runs of a finished match are ignored (the result decides).
+    expect(matchScore(done, [], live, true, firstRun)).toEqual(['5:10.0', '5:15.4']);
   });
 });
 
@@ -122,3 +142,26 @@ function assertNoOverlap(boxes: { x: number; y: number; match: { id: string } }[
       expect(overlap, `${a.match.id} overlaps ${b.match.id}`).toBe(false);
     }
 }
+
+describe('bracket row', () => {
+  it('keeps the BOT tag and the name clear of long scores', () => {
+    // Short scores: the usual place and up to 16 characters.
+    expect(rowFit('20', true)).toEqual({ botX: BOX_W - 64, nameChars: 16 });
+    // A Monster Hunt series score moves the tag left and shortens the name.
+    const fit = rowFit('1 ▶ 12:17.3', true);
+    expect(fit.botX).toBeLessThan(BOX_W - 64);
+    expect(10 + fit.nameChars * 6.8).toBeLessThanOrEqual(fit.botX);
+    // Monster Hunt boxes are wider: a run time leaves room for a full name and the tag.
+    expect(rowFit('▶ 17:17.3', true, BOX_W_RACE).nameChars).toBe(16);
+    const wide = layoutBracket(computeBracket(def8(), []), titles, BOX_W_RACE);
+    expect(wide.width).toBeGreaterThan(layoutBracket(computeBracket(def8(), []), titles).width);
+  });
+});
+
+const def8 = () => ({
+  format: 'single' as const,
+  size: 8 as const,
+  slots: slots(8),
+  grandFinalReset: false,
+  bestOf: { default: 1 },
+});
