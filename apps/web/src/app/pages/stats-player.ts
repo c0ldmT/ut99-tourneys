@@ -11,6 +11,7 @@ import {
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { TPipe } from '../core/i18n';
+import { NeuroPipe } from '../core/neuro';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
 import { defaultScope, parseScope, startedSeasons } from '../core/season';
@@ -21,11 +22,12 @@ import type {
   StatScope,
   StatsPlayerDetail,
   StatsPlayerRow,
+  UserBets,
 } from '../core/types';
 
 @Component({
   selector: 'app-stats-player',
-  imports: [TPipe, RouterLink, DatePipe],
+  imports: [TPipe, RouterLink, DatePipe, NeuroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -45,7 +47,7 @@ import type {
         </select>
       </label>
     </div>
-    @if (error()) {
+    @if (error() && !neuro()?.wallet?.bets) {
       <p class="error">{{ error() }}</p>
     }
     @if (d(); as d) {
@@ -270,8 +272,90 @@ import type {
         }
       </div>
     }
+    @if (neuro(); as n) {
+      @if (n.wallet && n.season) {
+        @if (!d() && n.name) {
+          <h1>{{ n.name }}</h1>
+        }
+        <h2>{{ 'bets.profileTitle' | t: { n: n.season } }}</h2>
+        <div class="tiles">
+          <div class="card tile">
+            <div class="value neuro">{{ n.wallet.balance | neuro }}</div>
+            <div class="muted small">{{ 'bets.balance' | t }}</div>
+          </div>
+          <div class="card tile">
+            <div class="value">{{ n.wallet.won }}–{{ n.wallet.lost }}</div>
+            <div class="muted small">{{ 'bets.wonLost' | t }}</div>
+          </div>
+          <div class="card tile">
+            <div class="value">{{ n.wallet.peak | neuro }}</div>
+            <div class="muted small">{{ 'bets.col.peak' | t }}</div>
+          </div>
+          <div class="card tile">
+            <div class="value">{{ n.wallet.bestWin | neuro }}</div>
+            <div class="muted small">{{ 'bets.rec.bestWin' | t }}</div>
+          </div>
+          @if (n.wallet.bailouts) {
+            <div class="card tile">
+              <div class="value">{{ n.wallet.bailouts }}</div>
+              <div class="muted small">{{ 'bets.col.bailouts' | t }}</div>
+            </div>
+          }
+        </div>
+        @if (n.recent.length) {
+          <div class="card table-wrap">
+            <table class="bets">
+              <tbody>
+                @for (b of n.recent; track b.tournamentId + b.matchId) {
+                  <tr>
+                    <td>
+                      <a [routerLink]="['/t', b.tournamentId]">{{ b.tournamentName }}</a>
+                      <span class="muted small"> · {{ b.matchId }}</span>
+                    </td>
+                    <td>{{ b.pick }}</td>
+                    <td class="num">{{ b.amount | neuro }}</td>
+                    <td class="num" [class]="b.status">
+                      @switch (b.status) {
+                        @case ('won') {
+                          +{{ b.payout - b.amount | neuro }}
+                        }
+                        @case ('lost') {
+                          −{{ b.amount | neuro }}
+                        }
+                        @case ('refunded') {
+                          {{ 'bets.status.refunded' | t }}
+                        }
+                        @default {
+                          {{ 'bets.status.open' | t }}
+                        }
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
+    }
   `,
   styles: `
+    .table-wrap {
+      overflow-x: auto;
+    }
+    .value.neuro {
+      color: var(--accent);
+    }
+    table.bets td.won {
+      color: var(--live);
+    }
+    table.bets td.lost {
+      color: var(--danger);
+    }
+    table.bets .num {
+      text-align: right;
+      white-space: nowrap;
+    }
     .profile-link {
       margin-left: 10px;
       font-weight: 400;
@@ -381,6 +465,8 @@ export class StatsPlayerPage {
   protected readonly ratings = signal<PlayerRatings | null>(null);
   /** A bot of the control center: link to its profile. */
   protected readonly botId = signal<string | null>(null);
+  /** Players: Neuro of the season (betting), visible to everybody. */
+  protected readonly neuro = signal<UserBets | null>(null);
 
   protected readonly ratingModes = computed(() => {
     const r = this.ratings();
@@ -466,6 +552,12 @@ export class StatsPlayerPage {
       this.api.playerRatings(key, scope).then(
         (r) => this.ratings.set(r),
         () => this.ratings.set(null),
+      );
+    this.neuro.set(null);
+    if (key.startsWith('u:'))
+      this.api.userBets(key.slice(2), scope === 'lifetime' ? undefined : scope).then(
+        (n) => this.neuro.set(n),
+        () => undefined,
       );
     try {
       this.d.set(await this.api.statsPlayer(key, scope));

@@ -3,6 +3,8 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   AgentView,
+  BetBoard,
+  BetRecordView,
   BotAssets,
   BotClan,
   BotProfile,
@@ -24,7 +26,9 @@ import type {
   StatsRecord,
   TournamentDetail,
   TournamentEventView,
+  TournamentBets,
   TournamentSummary,
+  UserBets,
   WebsiteSettings,
 } from './types';
 
@@ -111,6 +115,27 @@ export class Api {
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/rating', body);
+  setBettingSettings = (body: Partial<WebsiteSettings['betting']>) =>
+    this.call<WebsiteSettings>('PUT', '/settings/betting', body);
+
+  tournamentBets = (id: string) => this.call<TournamentBets>('GET', `/bets/tournaments/${id}`);
+  placeBet = (id: string, matchId: string, pick: string, amount: number) =>
+    this.call<TournamentBets>('PUT', `/bets/tournaments/${id}/${matchId}`, { pick, amount });
+  withdrawBet = (id: string, matchId: string) =>
+    this.call<TournamentBets>('DELETE', `/bets/tournaments/${id}/${matchId}`);
+  betBoard = (season?: number) =>
+    this.call<BetBoard>('GET', `/bets/leaderboard${season ? `?season=${season}` : ''}`);
+  betRecords = (season?: number) =>
+    this.call<{ season: number | null; records: BetRecordView[] }>(
+      'GET',
+      `/bets/records${season ? `?season=${season}` : ''}`,
+    );
+  userBets = (userId: string, season?: number) =>
+    this.call<UserBets>(
+      'GET',
+      `/bets/users/${encodeURIComponent(userId)}${season ? `?season=${season}` : ''}`,
+    );
+
   setTeamNames = (names: string[]) =>
     this.call<WebsiteSettings>('PUT', '/settings/team-names', { names });
 

@@ -10,6 +10,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { BetPanel } from '../components/bet-panel';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
@@ -27,7 +28,16 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
 
 @Component({
   selector: 'app-tournament-page',
-  imports: [FormsModule, RouterLink, TPipe, BracketView, SeedingEditor, TeamPanel, TeamRoster],
+  imports: [
+    FormsModule,
+    RouterLink,
+    TPipe,
+    BracketView,
+    SeedingEditor,
+    TeamPanel,
+    TeamRoster,
+    BetPanel,
+  ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -280,8 +290,10 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             [race]="race()"
             [currentRuns]="t.projection!.currentMatch?.runs ?? []"
             [ratings]="t.projection!.seedRatings"
+            [betOpen]="betOpen()"
           />
         </div>
+        <app-bet-panel [tournament]="t" (openIds)="betOpen.set($event)" />
         @if (race() && raceRows().length) {
           <div class="card">
             <h2>{{ 'race.results' | t }}</h2>
@@ -780,6 +792,8 @@ export class TournamentPage {
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
   private readonly stream = inject(TournamentStream);
+  /** Matches that take bets now (from the bets panel). */
+  protected readonly betOpen = signal<string[]>([]);
   private readonly router = inject(Router);
 
   protected readonly t = signal<TournamentDetail | null>(null);

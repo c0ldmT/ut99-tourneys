@@ -162,6 +162,34 @@ import type { Season, SeasonsOverview } from '../core/types';
       </div>
     </form>
 
+    <form class="card" (ngSubmit)="saveBetting()">
+      <h2>{{ 'bets.settings' | t }}</h2>
+      <p class="muted small">{{ 'bets.settingsHint' | t }}</p>
+      <div class="row gap">
+        <label
+          >{{ 'bets.startBalance' | t }}
+          <input
+            type="number"
+            name="startBalance"
+            min="10"
+            step="10"
+            class="narrow"
+            [(ngModel)]="startBalance"
+          />
+        </label>
+        <label
+          >{{ 'bets.floor' | t }}
+          <input type="number" name="floor" min="0" step="10" class="narrow" [(ngModel)]="floor" />
+        </label>
+      </div>
+      <div class="row">
+        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
+        @if (savedBetting()) {
+          <span class="muted small">{{ 'settings.saved' | t }}</span>
+        }
+      </div>
+    </form>
+
     <section class="card danger-zone">
       <h2>⚠ {{ 'reset.title' | t }}</h2>
       <p>{{ 'reset.what' | t }}</p>
@@ -207,6 +235,10 @@ import type { Season, SeasonsOverview } from '../core/types';
   styles: `
     .card {
       max-width: 820px;
+    }
+    .row.gap {
+      gap: 16px;
+      align-items: flex-end;
     }
     .danger-zone {
       border: 2px solid var(--danger);
@@ -305,6 +337,9 @@ export class SettingsPage {
   protected editFrom = '';
   protected editTo = '';
   protected newFrom = '';
+  protected startBalance = 1000;
+  protected floor = 100;
+  protected readonly savedBetting = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
   protected readonly resetWord = 'RESET';
   protected readonly resetOpen = signal(false);
@@ -343,6 +378,8 @@ export class SettingsPage {
       const [s, o] = await Promise.all([this.api.settings(), this.api.seasons()]);
       this.botGames.set(s.rating.botGames);
       this.levelPoints.set(s.rating.levelPoints);
+      this.startBalance = s.betting.startBalance;
+      this.floor = s.betting.floor;
       this.o.set(o);
       this.saved.set(false);
     } catch (e) {
@@ -394,6 +431,25 @@ export class SettingsPage {
   protected remove(s: Season) {
     if (!confirm(this.i18n.t('season.deleteConfirm', { n: s.number }))) return;
     void this.run(() => this.api.deleteSeason(s.number));
+  }
+
+  protected async saveBetting() {
+    this.busy.set(true);
+    this.error.set('');
+    this.savedBetting.set(false);
+    try {
+      const s = await this.api.setBettingSettings({
+        startBalance: Math.round(Number(this.startBalance)),
+        floor: Math.round(Number(this.floor)),
+      });
+      this.startBalance = s.betting.startBalance;
+      this.floor = s.betting.floor;
+      this.savedBetting.set(true);
+    } catch (e) {
+      this.error.set(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected openReset() {

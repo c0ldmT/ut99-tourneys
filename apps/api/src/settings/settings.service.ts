@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { BOT_TEAM_NAMES } from '@tourney/protocol';
 import { z } from 'zod';
+import { badRequest } from '../common/http.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { settings } from '../db/schema.js';
@@ -19,6 +20,18 @@ export const RatingSettingsSchema = z.object({
 });
 export type RatingSettings = z.infer<typeof RatingSettingsSchema>;
 
+/** Betting with Neuro: start balance of a season and the floor rescues top up to. */
+export const BettingFieldsSchema = z.object({
+  startBalance: z.number().int().min(10).max(1_000_000).default(1000),
+  floor: z.number().int().min(0).max(1_000_000).default(100),
+});
+export const BettingSettingsSchema = BettingFieldsSchema.refine(
+  (b) => b.floor <= b.startBalance,
+  'the floor must not exceed the start balance',
+);
+export type BettingSettings = z.infer<typeof BettingSettingsSchema>;
+export const DEFAULT_BETTING: BettingSettings = { startBalance: 1000, floor: 100 };
+
 /** Rating settings are the defaults for new seasons; each season keeps a copy (seasons table). */
 /** Names for teams made of bots only (bot control center), in the order they are used. */
 export const TeamNamesSchema = z
@@ -30,6 +43,7 @@ export const TeamNamesSchema = z
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
   teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
+  betting: BettingSettingsSchema.default(DEFAULT_BETTING),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -55,7 +69,9 @@ export class SettingsService {
     }
     const rating = RatingSettingsSchema.safeParse(raw['rating'] ?? {});
     const teamNames = TeamNamesSchema.safeParse(raw['teamNames']);
+    const betting = BettingSettingsSchema.safeParse(raw['betting'] ?? {});
     return {
+      betting: betting.success ? betting.data : { ...DEFAULT_BETTING },
       rating: rating.success ? rating.data : RatingSettingsSchema.parse({}),
       teamNames: teamNames.success ? teamNames.data : [...BOT_TEAM_NAMES],
     };
@@ -63,6 +79,13 @@ export class SettingsService {
 
   setRating(value: Partial<RatingSettings>): WebsiteSettings {
     this.put('rating', RatingSettingsSchema.parse({ ...this.get().rating, ...value }));
+    return this.get();
+  }
+
+  setBetting(value: Partial<BettingSettings>): WebsiteSettings {
+    const next = BettingSettingsSchema.safeParse({ ...this.get().betting, ...value });
+    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    this.put('betting', next.data);
     return this.get();
   }
 

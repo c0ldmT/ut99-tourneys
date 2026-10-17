@@ -5,8 +5,11 @@ import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { seasons } from '../db/schema.js';
 import {
+  BettingSettingsSchema,
+  DEFAULT_BETTING,
   RatingSettingsSchema,
   SettingsService,
+  type BettingSettings,
   type RatingSettings,
 } from '../settings/settings.service.js';
 import {
@@ -25,6 +28,8 @@ export interface Season {
   endedAt: string | null;
   /** Rating settings the season runs with (kept when it ends). */
   rating: RatingSettings;
+  /** Betting settings the season runs with (kept when it ends). */
+  betting: BettingSettings;
 }
 
 export interface SeasonView extends Season {
@@ -71,12 +76,16 @@ export class SeasonsService {
       .all()
       .map((r) => {
         const rating = RatingSettingsSchema.safeParse(JSON.parse(r.ratingJson));
+        const betting = BettingSettingsSchema.safeParse(
+          r.bettingJson ? JSON.parse(r.bettingJson) : {},
+        );
         return {
           number: r.number,
           startDate: r.startDate,
           endDate: r.endDate,
           endedAt: r.endedAt,
           rating: rating.success ? rating.data : RatingSettingsSchema.parse({}),
+          betting: betting.success ? betting.data : { ...DEFAULT_BETTING },
         };
       });
   }
@@ -144,6 +153,7 @@ export class SeasonsService {
         startDate: body.startDate,
         endDate: body.endDate,
         ratingJson: JSON.stringify(this.settings.get().rating),
+        bettingJson: JSON.stringify(this.settings.get().betting),
         createdAt: new Date(this.clock.now()).toISOString(),
       })
       .run();
@@ -211,6 +221,19 @@ export class SeasonsService {
         this.db
           .update(seasons)
           .set({ ratingJson: JSON.stringify(rating) })
+          .where(eq(seasons.number, s.number))
+          .run();
+    this.version++;
+  }
+
+  /** New betting settings apply to the running and the planned season, not to ended ones. */
+  applyBetting(betting: BettingSettings): void {
+    const now = this.clock.now();
+    for (const s of this.list())
+      if (seasonStatus(s, now, this.timeZone) !== 'ended')
+        this.db
+          .update(seasons)
+          .set({ bettingJson: JSON.stringify(betting) })
           .where(eq(seasons.number, s.number))
           .run();
     this.version++;

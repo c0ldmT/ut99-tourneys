@@ -2,6 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
+import { Auth } from '../core/auth';
+import { BetBoardView } from '../components/bet-board';
 import { TPipe } from '../core/i18n';
 import { raceTime } from '../core/race';
 import { defaultScope, parseScope, startedSeasons } from '../core/season';
@@ -16,7 +18,7 @@ import type {
   StatsRecord,
 } from '../core/types';
 
-type Tab = 'ratings' | 'players' | 'records';
+type Tab = 'ratings' | 'players' | 'records' | 'bets';
 type SortKey = keyof StatsPlayerRow | 'record' | 'runs';
 
 interface Column {
@@ -30,7 +32,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 
 @Component({
   selector: 'app-stats',
-  imports: [TPipe, RouterLink, DatePipe],
+  imports: [TPipe, RouterLink, DatePipe, BetBoardView],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'stats.title' | t }}</h1>
@@ -63,11 +65,14 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
           <button [class.active]="tab() === 'records'" (click)="setTab('records')">
             {{ 'stats.records' | t }}
           </button>
+          <button [class.active]="tab() === 'bets'" (click)="setTab('bets')">
+            {{ 'bets.tab' | t }}
+          </button>
         }
       </div>
     </div>
 
-    <div class="filters">
+    <div class="filters" [style.display]="tab() === 'bets' ? 'none' : null">
       <label class="small"
         >{{ 'stats.mode' | t }}
         <select
@@ -218,6 +223,8 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
         {{ 'stats.playersHint' | t }}
         {{ (scope() === 'lifetime' ? 'stats.lifetimeHint' : 'stats.seasonHint') | t }}
       </p>
+    } @else if (tab() === 'bets') {
+      <app-bet-board [season]="seasonNo()" [meId]="auth.me()?.id ?? null" />
     } @else {
       @if (records().length === 0 && maps().length === 0) {
         <div class="card">
@@ -469,8 +476,15 @@ export class StatsPage {
   protected readonly overview = signal<SeasonsOverview | null>(null);
   protected readonly scope = signal<StatScope>('lifetime');
   protected readonly tab = signal<Tab>(
-    (['ratings', 'players', 'records'] as const).find((x) => x === readPref('tab')) ?? 'ratings',
+    (['ratings', 'players', 'records', 'bets'] as const).find((x) => x === readPref('tab')) ??
+      'ratings',
   );
+  protected readonly auth = inject(Auth);
+  /** The season shown (betting exists per season only). */
+  protected readonly seasonNo = computed(() => {
+    const s = this.scope();
+    return s === 'lifetime' ? undefined : s;
+  });
   protected readonly mode = signal<StatMode | ''>((readPref('mode') as StatMode | '') ?? '');
   protected readonly bots = signal(readPref('bots') === '1');
   protected readonly query = signal('');

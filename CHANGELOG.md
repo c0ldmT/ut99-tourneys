@@ -19,6 +19,11 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   strong. The rating at the seeding shows in the bracket tooltip.
 - Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
 - Tournaments of bots only: seeding works without registered players (everybody can watch).
+- Betting with Neuro (€), the website's virtual currency: bet on the winner of a match in season tournaments
+  (never on your own match), change or withdraw until the first game starts; pools stay hidden until then and are
+  shared pari-mutuel; stakes come back when no game was played. Wallets start fresh every season (start balance and
+  rescue floor in the settings). Tournament page: bets panel, bracket marks open matches with €. Statistics: tab
+  "Bets" with the Neuro ranking and betting records; player page: Neuro of the season.
 - Settings: "danger zone" to reset the website - deletes all tournaments, statistics and seasons (users, bots,
   servers and settings stay), protected by a checkbox, the typed word RESET and a last confirmation.
 - Bot control center (admin page "Bots"): the website's own bots without the ini's limit of 32 - name, model, skin,

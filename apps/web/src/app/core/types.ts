@@ -362,6 +362,8 @@ export interface WebsiteSettings {
   rating: { botGames: boolean; levelPoints: number };
   /** Names for bot teams (team tournaments), in order. */
   teamNames: string[];
+  /** Betting with Neuro: start balance per season, rescue floor. */
+  betting: { startBalance: number; floor: number };
 }
 
 // --- Bot control center ---------------------------------------------------------------------
@@ -454,4 +456,91 @@ export interface BotProfile extends LibraryBot {
   clan: BotClan | null;
   rivals: (BotRival & { name: string; key: string; record: { games: number; wins: number } })[];
   rivalOf: { id: string; name: string }[];
+}
+
+// --- Betting with Neuro (€) ----------------------------------------------------------------
+
+export type BookState = 'waiting' | 'open' | 'closed' | 'settled' | 'refunded';
+export type BetStatus = 'open' | 'won' | 'lost' | 'refunded';
+
+export interface NeuroWalletView {
+  balance: number;
+  staked: number;
+  free: number;
+  floor: number;
+  startBalance: number;
+}
+
+export interface BetMatchView {
+  matchId: string;
+  entrants: [string, string];
+  state: BookState;
+  closedAt?: string;
+  winnerId?: string;
+  playing: boolean;
+  mine: { pick: string; amount: number; status: BetStatus; payout: number } | null;
+  pools: Record<string, { amount: number; bettors: number }> | null;
+  bettors: number;
+}
+
+export interface TournamentBets {
+  open: boolean;
+  reason: 'notSeasonal' | 'noSeason' | 'phase' | null;
+  season: number | null;
+  wallet: NeuroWalletView | null;
+  matches: BetMatchView[];
+}
+
+export interface NeuroWallet {
+  userId: string;
+  balance: number;
+  staked: number;
+  free: number;
+  peak: number;
+  bets: number;
+  won: number;
+  lost: number;
+  refunded: number;
+  open: number;
+  profit: number;
+  bailouts: number;
+  bailedOut: number;
+  bestWin: number;
+  worstLoss: number;
+  bestOdds: number;
+  winStreak: number;
+  loseStreak: number;
+  allInWin: number;
+}
+
+export interface BetBoard {
+  season: number | null;
+  startBalance?: number;
+  rows: (NeuroWallet & { name: string })[];
+}
+
+export interface BetRecordView {
+  key: string;
+  userId?: string;
+  name?: string;
+  value: number;
+  tournamentId?: string;
+  tournamentName?: string;
+  matchId?: string;
+}
+
+export interface UserBets {
+  season: number | null;
+  name: string | null;
+  wallet: NeuroWallet | null;
+  recent: {
+    tournamentId: string;
+    tournamentName: string;
+    matchId: string;
+    pick: string;
+    amount: number;
+    status: BetStatus;
+    payout: number;
+    at: string;
+  }[];
 }

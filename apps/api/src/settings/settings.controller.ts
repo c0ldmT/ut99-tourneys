@@ -5,9 +5,11 @@ import { ZodPipe } from '../common/http.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
 import {
+  BettingFieldsSchema,
   RatingSettingsSchema,
   SettingsService,
   TeamNamesSchema,
+  type BettingSettings,
   type RatingSettings,
 } from './settings.service.js';
 
@@ -41,6 +43,17 @@ export class SettingsController {
     const next = this.settings.setRating(body);
     // The running and the planned season use the new settings; ended seasons keep theirs.
     this.seasons.applyRating(next.rating);
+    return next;
+  }
+
+  /** Betting with Neuro: start balance and rescue floor (running and planned season too). */
+  @Put('betting')
+  betting(
+    @Body(new ZodPipe(BettingFieldsSchema.partial()))
+    body: Partial<BettingSettings>,
+  ) {
+    const next = this.settings.setBetting(body);
+    this.seasons.applyBetting(next.betting);
     return next;
   }
 

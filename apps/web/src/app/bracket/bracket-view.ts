@@ -42,6 +42,9 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
                 @if (m.bestOf > 1) {
                   · Bo{{ m.bestOf }}
                 }
+                @if (betOpen().includes(m.id)) {
+                  <tspan class="bet">· €</tspan>
+                }
               </text>
               @for (slot of [0, 1]; track slot) {
                 @let id = m.entrants[slot];
@@ -80,6 +83,10 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
     }
   `,
   styles: `
+    .bet {
+      fill: var(--accent);
+      font-weight: 700;
+    }
     :host {
       display: block;
     }
@@ -170,6 +177,8 @@ export class BracketView {
   readonly currentRuns = input<readonly RunView[]>([]);
   /** Rating of each entrant at the seeding (tooltip). */
   readonly ratings = input<Record<string, number> | undefined>(undefined);
+  /** Matches that take bets right now (marked with €). */
+  readonly betOpen = input<readonly string[]>([]);
 
   private readonly i18n = inject(I18n);
   protected readonly boxH = BOX_H;

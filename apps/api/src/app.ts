@@ -28,6 +28,8 @@ import { DISCORD_OUT, discordOut, type DiscordOut } from './notify/discord-out.j
 import { NotificationsService } from './notify/notifications.service.js';
 import { StatsController } from './stats/stats.controller.js';
 import { StatsService } from './stats/stats.service.js';
+import { BetsController } from './bets/bets.controller.js';
+import { BetsService } from './bets/bets.service.js';
 import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
 import { SeasonsController } from './seasons/seasons.controller.js';
@@ -68,6 +70,7 @@ class AppModule {
         SettingsController,
         SeasonsController,
         BotsController,
+        BetsController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -100,6 +103,7 @@ class AppModule {
         SettingsService,
         SeasonsService,
         BotsService,
+        BetsService,
         AgentGateway,
       ],
     };

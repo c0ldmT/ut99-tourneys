@@ -171,4 +171,33 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX bots_clan ON bots(clan_id);
   `,
+  // 8: betting with Neuro (virtual currency, per season). Bets on the winner of a match; the
+  // settlement is derived from the event log (like the statistics). Rescues (bailouts) are
+  // stored because they happen at a point in time. Each season keeps its betting settings.
+  `
+  ALTER TABLE seasons ADD COLUMN betting_json TEXT;
+  CREATE TABLE bets (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    match_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    pick TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    all_in INTEGER NOT NULL DEFAULT 0,
+    placed_at TEXT NOT NULL,
+    UNIQUE (tournament_id, match_id, kind, user_id)
+  );
+  CREATE INDEX bets_season ON bets(season);
+  CREATE INDEX bets_user ON bets(user_id, season);
+  CREATE TABLE bet_bailouts (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL REFERENCES seasons(number) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    at TEXT NOT NULL
+  );
+  CREATE INDEX bet_bailouts_season ON bet_bailouts(season);
+  `,
 ];

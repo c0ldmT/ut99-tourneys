@@ -115,6 +115,8 @@ export const seasons = sqliteTable('seasons', {
   endDate: text('end_date').notNull(),
   /** Rating settings of the season (frozen when it ends). */
   ratingJson: text('rating_json').notNull(),
+  /** Betting settings of the season (start balance, rescue floor); null: the defaults. */
+  bettingJson: text('betting_json'),
   /** Set when an admin ended the season before its last day ("end now"). */
   endedAt: text('ended_at'),
   createdAt: text('created_at').notNull(),
@@ -172,3 +174,26 @@ export const events = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.tournamentId, t.seq] })],
 );
+
+/** Bets with Neuro (virtual currency, per season); settled from the event log. */
+export const bets = sqliteTable('bets', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  tournamentId: text('tournament_id').notNull(),
+  matchId: text('match_id').notNull(),
+  kind: text('kind').notNull(),
+  userId: text('user_id').notNull(),
+  pick: text('pick').notNull(),
+  amount: integer('amount').notNull(),
+  allIn: integer('all_in', { mode: 'boolean' }).notNull().default(false),
+  placedAt: text('placed_at').notNull(),
+});
+
+/** Rescues: Neuro topped up to the season's floor before a bet. */
+export const betBailouts = sqliteTable('bet_bailouts', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  userId: text('user_id').notNull(),
+  amount: integer('amount').notNull(),
+  at: text('at').notNull(),
+});
