@@ -36,6 +36,7 @@ import { NotificationsService } from '../notify/notifications.service.js';
 import { botKey, statMode, userKey } from '../stats/facts.js';
 import type { RatedGame } from '../stats/ratings.js';
 import { StatsService } from '../stats/stats.service.js';
+import { SeasonsService } from '../seasons/seasons.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
 import {
@@ -66,10 +67,11 @@ const TournamentFields = z.object({
   scheduledAt: z.iso.datetime().nullable().optional(),
   /** Discord channel for this tournament: the default webhook, its own, or none. */
   notifyMode: z.enum(['default', 'custom', 'off']).optional(),
-  /** Counts for the statistics page (test tournaments: off). */
-  statsEnabled: z.boolean().optional(),
-  /** Counts for the ratings (fun tournaments: off). */
-  ranked: z.boolean().optional(),
+  /**
+   * Season tournament: counts for the ratings and the season statistics and records (lifetime
+   * statistics count every tournament). Can only be switched on while a season runs.
+   */
+  seasonal: z.boolean().optional(),
   webhookUrl: z
     .string()
     .trim()
@@ -156,6 +158,7 @@ export class TournamentsService {
     @Inject(TeamsService) private readonly teams: TeamsService,
     @Inject(NotificationsService) private readonly notify: NotificationsService,
     @Inject(StatsService) private readonly stats: StatsService,
+    @Inject(SeasonsService) private readonly seasons: SeasonsService,
   ) {}
 
   private now() {
@@ -216,6 +219,8 @@ export class TournamentsService {
 
   create(body: CreateTournament, by: User): TournamentRow {
     this.checkFields(body);
+    const inSeason = !!this.seasons.current();
+    if (body.seasonal && !inSeason) throw conflict('no season is running');
     let id = body.id ?? slugify(body.name);
     if (this.get(id)) {
       if (body.id) throw conflict(`tournament ${id} exists`);
@@ -235,8 +240,7 @@ export class TournamentsService {
         scheduledAt: body.scheduledAt ?? null,
         notifyMode: body.notifyMode ?? 'default',
         webhookUrl: body.webhookUrl || null,
-        statsEnabled: body.statsEnabled ?? true,
-        ranked: body.ranked ?? true,
+        seasonal: body.seasonal ?? inSeason,
         createdBy: by.id,
         createdAt: this.now(),
       })
@@ -278,8 +282,10 @@ export class TournamentsService {
     }
     if (body.notifyMode !== undefined) set.notifyMode = body.notifyMode;
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
-    if (body.statsEnabled !== undefined) set.statsEnabled = body.statsEnabled;
-    if (body.ranked !== undefined) set.ranked = body.ranked;
+    if (body.seasonal !== undefined && body.seasonal !== t.seasonal) {
+      if (body.seasonal && !this.seasons.current()) throw conflict('no season is running');
+      set.seasonal = body.seasonal;
+    }
     const oldTeamSize = this.settings(t).teamSize;
     if (Object.keys(set).length) {
       this.db.update(tournaments).set(set).where(eq(tournaments.id, id)).run();
@@ -939,10 +945,27 @@ export class TournamentsService {
     return { slots, entrants };
   }
 
-  /** Rating changes per game of a ranked tournament. */
+  /** Rating changes per game of a season tournament. */
   ratings(id: string): RatedGame[] {
     const t = this.require(id);
-    return t.ranked ? this.stats.tournamentRatings(id) : [];
+    return t.seasonal ? this.stats.tournamentRatings(id) : [];
+  }
+
+  /**
+   * The season a tournament counts for: the season of its first game; before the first game the
+   * running season (where it would count if it started now). Undefined: no season tournament.
+   */
+  seasonOf(t: TournamentRow): number | undefined {
+    if (!t.seasonal) return undefined;
+    try {
+      const played = this.stats.seasonOfTournament(t.id);
+      if (played !== undefined) return played;
+      if (this.stats.facts().some((f) => f.tournamentId === t.id && f.games.length + f.runs.length))
+        return undefined; // played outside every season
+    } catch (err) {
+      this.logger.warn(`season of ${t.id}: ${String(err)}`);
+    }
+    return this.seasons.current()?.number;
   }
 
   /** Throws away the seeding (allowed until check-in opens). */
@@ -974,22 +997,35 @@ export class TournamentsService {
     });
   }
 
-  /** Monster Hunt: the map records (statistics) for the HUD; undefined for other games. */
+  /**
+   * Monster Hunt: the map records for the HUD (season records for the tournament's monster
+   * skill); undefined for other games. A tournament that counts for no season shows the records
+   * of the running or last season, but cannot set new ones.
+   */
   private mapRecordsFor(t: TournamentRow): MapRecords | undefined {
-    if (this.settings(t).game.adapter !== 'ut99-mh') return undefined;
+    const settings = this.settings(t);
+    if (settings.game.adapter !== 'ut99-mh') return undefined;
+    const counts = this.seasonOf(t) !== undefined;
     try {
+      const season =
+        this.seasonOf(t) ?? (this.seasons.current() ?? this.seasons.latestStarted())?.number;
+      const skillRule = (settings.game.rules as { monsterSkill?: unknown }).monsterSkill;
+      const skill = typeof skillRule === 'number' ? skillRule : 5;
+      const maps = season === undefined ? [] : this.stats.mapRecords(season);
       return {
-        counts: t.statsEnabled,
-        maps: this.stats.mapRecords().map((r) => ({
-          map: r.map.slice(0, 64),
-          finalMs: Math.max(0, Math.round(r.finalMs)),
-          by: (r.team || r.members.map((m) => m.name).join(', ')).slice(0, 64),
-        })),
+        counts,
+        maps: maps
+          .filter((r) => r.monsterSkill === skill)
+          .map((r) => ({
+            map: r.map.slice(0, 64),
+            finalMs: Math.max(0, Math.round(r.finalMs)),
+            by: (r.team || r.members.map((m) => m.name).join(', ')).slice(0, 64),
+          })),
       };
     } catch (err) {
       // The HUD line is a nicety: a broken log elsewhere must not stop the sync.
       this.logger.warn(`map records for ${t.id}: ${String(err)}`);
-      return { counts: t.statsEnabled, maps: [] };
+      return { counts, maps: [] };
     }
   }
 
@@ -1187,8 +1223,8 @@ export class TournamentsService {
       settings: this.settings(t),
       botPool: this.botPool(t),
       registrationOpen: t.registrationOpen,
-      statsEnabled: t.statsEnabled,
-      ranked: t.ranked,
+      seasonal: t.seasonal,
+      season: this.seasonOf(t) ?? null,
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
       registrations: regs.map((u) => ({

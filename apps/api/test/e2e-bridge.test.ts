@@ -12,7 +12,7 @@ import { DB, type Db } from '../src/db/database.js';
 import { users } from '../src/db/schema.js';
 import { TournamentsService } from '../src/tournaments/tournaments.service.js';
 import type { DiscordOut } from '../src/notify/discord-out.js';
-import { Client, startApi, tournamentBody } from './helpers.js';
+import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 import { eq } from 'drizzle-orm';
 
 const KEY = 'test-shared-key';
@@ -38,6 +38,8 @@ async function setup(
     env?: Record<string, string>;
     discordOut?: DiscordOut;
     beforeCreate?: (api: RunningApi) => void;
+    /** Out of season: no season is started before the tournament is created. */
+    noSeason?: boolean;
   } = {},
 ) {
   const clock = new FakeClock();
@@ -89,6 +91,7 @@ async function setup(
   const names = opts.players ?? ['Mario', 'Anna', 'Jonas'];
   const players = await Promise.all(names.map((n) => Client.login(api, n)));
   opts.beforeCreate?.(api);
+  if (!opts.noSeason) await startSeason(admin);
   const created = await admin.post(
     '/tournaments',
     tournamentBody({}, { ...(opts.size ? { size: opts.size } : {}), ...opts.settings }),
@@ -213,9 +216,9 @@ describe('website + bridge + simulated UT server', () => {
     await until(() => records() !== undefined);
     expect(records()).toEqual({ counts: true, maps: [] });
     // Not counted for the statistics: records are shown, a better time is no new record.
-    expect(
-      (await env.admin.req('PATCH', `/tournaments/${id}`, { statsEnabled: false })).status,
-    ).toBe(200);
+    expect((await env.admin.req('PATCH', `/tournaments/${id}`, { seasonal: false })).status).toBe(
+      200,
+    );
     service.syncToAgent(service.get(id)!, 0);
     await until(() => records()?.counts === false);
     // Other games carry no records.
@@ -262,12 +265,11 @@ describe('website + bridge + simulated UT server', () => {
       true,
     );
     // A tournament counts for the statistics unless switched off.
-    expect(d.statsEnabled).toBe(true);
+    expect(d.seasonal).toBe(true);
+    expect(d.season).toBe(1);
     expect(((await admin.get('/stats/players?mode=dm')).body as any[]).length).toBeGreaterThan(0);
-    await admin.req('PATCH', `/tournaments/${id}`, { statsEnabled: false });
-    expect((await admin.get('/stats/players?mode=dm')).body).toEqual([]);
     // Ranked: every game played on the server changed ratings (simulated bot games do not).
-    expect(d.ranked).toBe(true);
+
     const rated = (await admin.get(`/tournaments/${id}/ratings`)).body as any[];
     expect(rated.length).toBeGreaterThan(0);
     expect(rated.every((g) => g.changes.length === 2)).toBe(true);
@@ -284,8 +286,21 @@ describe('website + bridge + simulated UT server', () => {
         g.changes.every((c: { bot: boolean }) => !c.bot),
       ),
     ).toBe(true);
-    await admin.req('PATCH', `/tournaments/${id}`, { ranked: false });
+    // No season tournament: out of the season statistics, records and ratings; lifetime keeps it.
+    await admin.req('PUT', '/settings/rating', { botGames: true });
+    await admin.req('PATCH', `/tournaments/${id}`, { seasonal: false });
     expect((await admin.get('/stats/ratings?mode=dm')).body).toEqual([]);
+    expect((await admin.get('/stats/players?mode=dm')).body).toEqual([]);
+    expect((await admin.get('/stats/records')).body.records).toEqual([]);
+    const lifetime = (await admin.get('/stats/players?mode=dm&season=lifetime')).body as any[];
+    expect(lifetime.length).toBeGreaterThan(0);
+    expect((await admin.get('/stats/records?season=lifetime')).body).toEqual({
+      records: [],
+      maps: [],
+    });
+    // Out of season it cannot be switched on again.
+    await admin.post('/seasons/1/end');
+    expect((await admin.req('PATCH', `/tournaments/${id}`, { seasonal: true })).status).toBe(409);
     // The agent reported its status.
     const agents = (await admin.get('/agents')).body;
     expect(agents[0].status.modConnected).toBe(true);

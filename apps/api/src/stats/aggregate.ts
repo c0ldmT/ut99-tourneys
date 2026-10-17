@@ -417,7 +417,10 @@ export function records(
   return { records: out, maps: mapRecords(ts, opts.names) };
 }
 
-/** Best final time (time plus penalty) of a finished run per map; map names compared case-insensitively. */
+/**
+ * Best final time (time plus penalty) of a finished run per map and monster skill (a record on
+ * easier monsters is no record on harder ones); map names compared case-insensitively.
+ */
 export function mapRecords(
   all: readonly TournamentFacts[],
   names?: ReadonlyMap<string, string>,
@@ -427,7 +430,7 @@ export function mapRecords(
     if (t.mode !== 'mh') continue;
     for (const r of t.runs) {
       if (!r.finished || r.forfeit) continue;
-      const k = r.map.toLowerCase();
+      const k = `${r.map.toLowerCase()}|${r.monsterSkill}`;
       const cur = bestBy.get(k);
       if (!cur || r.finalMs < cur.r.finalMs || (r.finalMs === cur.r.finalMs && r.at < cur.r.at))
         bestBy.set(k, { r, t });
@@ -447,7 +450,7 @@ export function mapRecords(
       tournamentName: t.name,
       at: r.at,
     }))
-    .sort((a, b) => a.map.localeCompare(b.map));
+    .sort((a, b) => a.map.localeCompare(b.map) || a.monsterSkill - b.monsterSkill);
 }
 
 export interface PlayerDetail {

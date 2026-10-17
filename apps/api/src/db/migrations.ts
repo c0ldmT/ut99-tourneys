@@ -121,4 +121,22 @@ export const MIGRATIONS: string[] = [
     updated_at TEXT NOT NULL
   );
   `,
+  // 6: seasons. Lifetime statistics count every tournament; a "season tournament" (seasonal)
+  // counts for the ratings and the season statistics and records of the season in which its
+  // first game is played. One switch replaces stats_enabled and ranked. A season keeps the
+  // rating settings it ran with (rating_json), so later changes do not alter its archive.
+  `
+  ALTER TABLE tournaments ADD COLUMN seasonal INTEGER NOT NULL DEFAULT 1;
+  UPDATE tournaments SET seasonal = ranked;
+  ALTER TABLE tournaments DROP COLUMN ranked;
+  ALTER TABLE tournaments DROP COLUMN stats_enabled;
+  CREATE TABLE seasons (
+    number INTEGER PRIMARY KEY,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL,
+    rating_json TEXT NOT NULL,
+    ended_at TEXT,
+    created_at TEXT NOT NULL
+  );
+  `,
 ];

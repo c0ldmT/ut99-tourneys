@@ -129,3 +129,13 @@ export function tournamentBody(
     ...over,
   };
 }
+
+/** Starts a season today (30 days) as admin; returns its number. */
+export async function startSeason(admin: Client, days = 30): Promise<number> {
+  const { today } = (await admin.get('/seasons')).body as { today: string };
+  const [y, m, d] = today.split('-').map(Number) as [number, number, number];
+  const endDate = new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+  const res = await admin.post('/seasons', { startDate: today, endDate });
+  if (res.status !== 201) throw new Error(`season: ${JSON.stringify(res.body)}`);
+  return (res.body as { number: number }).number;
+}

@@ -8,7 +8,7 @@ import {
   ratingSlots,
   type RatedBot,
 } from '../src/tournaments/rating-seed.js';
-import { Client, startApi, tournamentBody } from './helpers.js';
+import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 const bot = (name: string, strength: number, skill = 4): RatedBot => ({
   spec: { name, skill },
@@ -104,7 +104,7 @@ afterEach(async () => {
 });
 
 describe('ratings on the website', () => {
-  it('keeps the rating settings (admins only) and a ranked flag per tournament', async () => {
+  it('keeps the rating settings (admins only) and a season flag per tournament', async () => {
     ({ api } = await startApi());
     const admin = await Client.login(api, 'Boss', true);
     const mario = await Client.login(api, 'Mario');
@@ -118,13 +118,84 @@ describe('ratings on the website', () => {
     expect((await admin.req('PUT', '/settings/rating', { levelPoints: 999 })).status).toBe(400);
 
     await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    // Out of season: a tournament cannot be a season tournament.
+    const out = await admin.post('/tournaments', tournamentBody({}, { size: 4 }));
+    expect(out.body.seasonal).toBe(false);
+    expect(out.body.season).toBeNull();
+    const refused = await admin.post('/tournaments', {
+      ...tournamentBody({}, { size: 4 }),
+      seasonal: true,
+    });
+    expect(refused.status).toBe(409);
+    expect(
+      (await admin.req('PATCH', `/tournaments/${out.body.id}`, { seasonal: true })).status,
+    ).toBe(409);
+    // In season: new tournaments are season tournaments by default.
+    expect(await startSeason(admin)).toBe(1);
     const created = await admin.post('/tournaments', tournamentBody({}, { size: 4 }));
     const id = created.body.id as string;
-    expect((await admin.get(`/tournaments/${id}`)).body.ranked).toBe(true);
-    await admin.req('PATCH', `/tournaments/${id}`, { ranked: false });
-    expect((await admin.get(`/tournaments/${id}`)).body.ranked).toBe(false);
+    expect(created.body).toMatchObject({ seasonal: true, season: 1 });
+    await admin.req('PATCH', `/tournaments/${id}`, { seasonal: false });
+    expect((await admin.get(`/tournaments/${id}`)).body).toMatchObject({
+      seasonal: false,
+      season: null,
+    });
     expect((await admin.get(`/tournaments/${id}/ratings`)).body).toEqual([]);
     expect((await mario.get('/stats/ratings?mode=dm')).body).toEqual([]);
+  });
+
+  it('runs seasons: plan, move, end now, delete; settings stay with ended seasons', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    const overview = async () => (await mario.get('/seasons')).body;
+    const { today } = await overview();
+    const day = (n: number) => {
+      const [y, m, d] = (today as string).split('-').map(Number) as [number, number, number];
+      return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+    };
+    expect(await overview()).toMatchObject({ seasons: [], current: null });
+    expect((await mario.post('/seasons', { startDate: today, endDate: day(7) })).status).toBe(403);
+    expect((await admin.post('/seasons', { startDate: day(-1), endDate: day(7) })).status).toBe(
+      400,
+    );
+    expect((await admin.post('/seasons', { startDate: day(7), endDate: day(1) })).status).toBe(400);
+    // Season 1 now, season 2 planned after it; no overlap.
+    expect(
+      (await admin.post('/seasons', { startDate: today, endDate: day(7) })).body,
+    ).toMatchObject({
+      number: 1,
+      status: 'running',
+    });
+    expect((await admin.post('/seasons', { startDate: day(7), endDate: day(9) })).status).toBe(409);
+    expect(
+      (await admin.post('/seasons', { startDate: day(8), endDate: day(20) })).body,
+    ).toMatchObject({
+      number: 2,
+      status: 'planned',
+    });
+    expect(await overview()).toMatchObject({ current: 1, planned: 2 });
+    // Move: season 1 cannot run into season 2; its first day is fixed once it runs.
+    expect((await admin.req('PATCH', '/seasons/1', { endDate: day(8) })).status).toBe(409);
+    expect((await admin.req('PATCH', '/seasons/1', { startDate: day(1) })).status).toBe(409);
+    expect(
+      ((await admin.req('PATCH', '/seasons/1', { endDate: day(5) })).body as any).endDate,
+    ).toBe(day(5));
+    // Only the newest season can be deleted.
+    expect((await admin.req('DELETE', '/seasons/1')).status).toBe(409);
+    expect((await admin.req('DELETE', '/seasons/2')).status).toBe(204);
+    // Settings changes reach the running season, not an ended one.
+    await admin.req('PUT', '/settings/rating', { levelPoints: 120 });
+    expect((await overview()).seasons[0].rating.levelPoints).toBe(120);
+    expect((await admin.post('/seasons/1/end')).body.status).toBe('ended');
+    expect(await overview()).toMatchObject({ current: null });
+    await admin.req('PUT', '/settings/rating', { levelPoints: 80 });
+    expect((await overview()).seasons[0].rating.levelPoints).toBe(120);
+    // Ended today: the next season starts tomorrow at the earliest.
+    expect((await admin.post('/seasons', { startDate: today, endDate: day(3) })).status).toBe(409);
+    expect((await admin.post('/seasons', { startDate: day(1), endDate: day(3) })).body.number).toBe(
+      2,
+    );
   });
 
   it('seeds a team tournament without any team (bots only)', async () => {

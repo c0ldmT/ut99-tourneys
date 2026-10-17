@@ -18,7 +18,7 @@ export const RatingSettingsSchema = z.object({
 });
 export type RatingSettings = z.infer<typeof RatingSettingsSchema>;
 
-/** Seasons come later (statistics milestone): the ratings already take a time window. */
+/** Rating settings are the defaults for new seasons; each season keeps a copy (seasons table). */
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
 });

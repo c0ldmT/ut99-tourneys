@@ -50,6 +50,18 @@ export const ApiConfigSchema = z
     NOTIFY_LANG: z.string().default('de'),
     /** Minutes before the scheduled start when registered players get a reminder (0 = none). */
     NOTIFY_REMIND_MIN: z.string().default('30'),
+    /** Time zone of the season dates (a season runs from its first to its last day, inclusive). */
+    SEASON_TZ: z
+      .string()
+      .default('Europe/Berlin')
+      .refine((tz) => {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: tz });
+          return true;
+        } catch {
+          return false;
+        }
+      }, 'unknown time zone'),
   })
   .transform((c) => ({
     host: c.HOST,
@@ -70,6 +82,7 @@ export const ApiConfigSchema = z
     sessionDays: c.SESSION_DAYS,
     logLevel: c.LOG_LEVEL,
     secureCookies: c.PUBLIC_URL.startsWith('https://'),
+    seasonTimeZone: c.SEASON_TZ,
     notify: {
       webhookUrl: c.DISCORD_WEBHOOK_URL.trim(),
       botToken: c.DISCORD_BOT_TOKEN.trim(),

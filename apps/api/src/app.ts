@@ -30,6 +30,8 @@ import { StatsController } from './stats/stats.controller.js';
 import { StatsService } from './stats/stats.service.js';
 import { SettingsController } from './settings/settings.controller.js';
 import { SettingsService } from './settings/settings.service.js';
+import { SeasonsController } from './seasons/seasons.controller.js';
+import { SeasonsService } from './seasons/seasons.service.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
@@ -62,6 +64,7 @@ class AppModule {
         AgentsController,
         StatsController,
         SettingsController,
+        SeasonsController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -92,6 +95,7 @@ class AppModule {
         TournamentsService,
         StatsService,
         SettingsService,
+        SeasonsService,
         AgentGateway,
       ],
     };

@@ -68,10 +68,23 @@ export const tournaments = sqliteTable('tournaments', {
   /** When "registration open" was posted, and when registered players were reminded. */
   announcedAt: text('announced_at'),
   remindedAt: text('reminded_at'),
-  /** Counts for the statistics page. */
-  statsEnabled: integer('stats_enabled', { mode: 'boolean' }).notNull().default(true),
-  /** Counts for the ratings. */
-  ranked: integer('ranked', { mode: 'boolean' }).notNull().default(true),
+  /**
+   * Season tournament: counts for the ratings and the season statistics and records of the
+   * season of its first game. Lifetime statistics count every tournament.
+   */
+  seasonal: integer('seasonal', { mode: 'boolean' }).notNull().default(true),
+});
+
+/** Seasons, numbered from 1; dates are days (YYYY-MM-DD) in the season time zone, inclusive. */
+export const seasons = sqliteTable('seasons', {
+  number: integer('number').primaryKey(),
+  startDate: text('start_date').notNull(),
+  endDate: text('end_date').notNull(),
+  /** Rating settings of the season (frozen when it ends). */
+  ratingJson: text('rating_json').notNull(),
+  /** Set when an admin ended the season before its last day ("end now"). */
+  endedAt: text('ended_at'),
+  createdAt: text('created_at').notNull(),
 });
 
 /** Website settings: one JSON value per key (e.g. "rating"). */
