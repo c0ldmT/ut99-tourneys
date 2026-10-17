@@ -146,14 +146,6 @@ interface Draft {
             @for (m of doneMatches(); track m.matchId) {
               <div class="match">
                 <div class="label muted small">{{ m.matchId }}</div>
-                <div class="pair">
-                  @for (e of m.entrants; track e) {
-                    <span [class.winner]="m.winnerId === e">{{ name(e) }}</span>
-                    @if ($first) {
-                      <span class="vs">vs</span>
-                    }
-                  }
-                </div>
                 @if (m.mine; as b) {
                   <p class="small result" [class]="b.status">
                     @switch (b.status) {
@@ -182,72 +174,50 @@ interface Draft {
     }
 
     <ng-template #poolAndBets let-m>
-      @for (e of m.entrants; track e) {
-        <div class="pool">
-          <span class="nm" [class.winner]="m.winnerId === e">{{ name(e) }}</span>
-          <span class="bar"><span [style.width.%]="share(m, e)"></span></span>
-          <span class="mono small"
-            >{{ m.pools?.[e]?.amount ?? 0 | neuro }}
-            @if (m.odds?.[e]; as o) {
-              · ×{{ oddsText(o) }}
+      <div class="sides2">
+        @for (e of m.entrants; track e; let side = $index) {
+          <div class="col" [class.b]="side === 1" [class.won]="m.winnerId === e">
+            <div class="head">
+              <span class="nm">{{ name(e) }}</span>
+              <span class="sum mono">
+                {{ m.pools?.[e]?.amount ?? 0 | neuro }}
+                @if (m.odds?.[e]; as o) {
+                  · ×{{ oddsText(o) }}
+                }
+              </span>
+            </div>
+            <div class="bar"><span [style.width.%]="share(m, e)"></span></div>
+            @for (x of sideBets(m, e); track x.id) {
+              <div class="bet" [class.me]="!x.bot && x.id === meId()">
+                <span class="amt mono">{{ x.amount | neuro }}</span>
+                <span class="who">
+                  @if (x.bot) {
+                    <a [routerLink]="['/bots', x.id]">{{ x.name }}</a>
+                    <span class="badge">BOT</span>
+                  } @else {
+                    <a [routerLink]="['/stats/p', 'u:' + x.id]">{{ x.name }}</a>
+                  }
+                </span>
+                <span class="res mono" [class]="x.status">
+                  @switch (x.status) {
+                    @case ('won') {
+                      +{{ x.payout - x.amount | neuro }}
+                    }
+                    @case ('lost') {
+                      −{{ x.amount | neuro }}
+                    }
+                    @case ('refunded') {
+                      {{ 'bets.status.refunded' | t }}
+                    }
+                  }
+                </span>
+              </div>
+            } @empty {
+              <div class="muted small none">{{ 'bets.noSideBets' | t }}</div>
             }
-          </span>
-        </div>
-      }
-      @if (m.bets.length) {
-        <div class="scroll">
-          <table class="bets">
-            <thead>
-              <tr>
-                <th>{{ 'bets.col.bettor' | t }}</th>
-                <th>{{ 'bets.col.pick' | t }}</th>
-                <th class="num">{{ 'bets.col.stake' | t }}</th>
-                <th class="num">{{ 'bets.col.odds' | t }}</th>
-                <th class="num">{{ 'bets.col.result' | t }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (x of m.bets; track x.id) {
-                <tr [class.me]="!x.bot && x.id === meId()">
-                  <td>
-                    @if (x.bot) {
-                      <a [routerLink]="['/bots', x.id]">{{ x.name }}</a>
-                      <span class="badge">BOT</span>
-                    } @else {
-                      <a [routerLink]="['/stats/p', 'u:' + x.id]">{{ x.name }}</a>
-                    }
-                  </td>
-                  <td>{{ name(x.pick) }}</td>
-                  <td class="num">{{ x.amount | neuro }}</td>
-                  <td class="num">
-                    @if (m.odds?.[x.pick]; as o) {
-                      ×{{ oddsText(o) }}
-                    } @else {
-                      –
-                    }
-                  </td>
-                  <td class="num" [class]="x.status">
-                    @switch (x.status) {
-                      @case ('won') {
-                        +{{ x.payout - x.amount | neuro }}
-                      }
-                      @case ('lost') {
-                        −{{ x.amount | neuro }}
-                      }
-                      @case ('refunded') {
-                        {{ 'bets.status.refunded' | t }}
-                      }
-                      @default {
-                        {{ 'bets.status.open' | t }}
-                      }
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
+          </div>
+        }
+      </div>
     </ng-template>
   `,
   styles: `
@@ -305,13 +275,6 @@ interface Draft {
       font-weight: 700;
       color: var(--live);
     }
-    .pool {
-      display: grid;
-      grid-template-columns: minmax(80px, 200px) minmax(48px, 1fr) auto;
-      gap: 8px;
-      align-items: center;
-      margin: 3px 0;
-    }
     .bar {
       height: 8px;
       background: var(--panel-2);
@@ -332,36 +295,94 @@ interface Draft {
     .ok {
       color: var(--live);
     }
-    .scroll {
-      overflow-x: auto;
+    .sides2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
       margin-top: 6px;
-    }
-    table.bets {
-      white-space: nowrap;
       font-size: 0.9rem;
     }
-    table.bets th,
-    table.bets td {
-      padding: 4px 8px;
+    .col {
+      min-width: 0;
+      border-top: 3px solid var(--danger);
+      background: rgba(248, 81, 73, 0.05);
+      border-radius: 6px;
+      padding: 6px 8px;
     }
-    table.bets .num {
-      text-align: right;
+    .col.b {
+      border-top-color: var(--info);
+      background: rgba(88, 166, 255, 0.05);
     }
-    table.bets td.won {
+    .col.won {
+      box-shadow: inset 0 0 0 1px var(--live);
+    }
+    .col .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 6px;
+      align-items: baseline;
+      flex-wrap: wrap;
+      font-weight: 600;
+    }
+    .col.won .head .nm {
       color: var(--live);
     }
-    table.bets td.lost {
-      color: var(--danger);
+    .col .sum {
+      font-weight: 400;
+      font-size: 0.8rem;
+      color: var(--accent);
+      white-space: nowrap;
     }
-    table.bets td.refunded,
-    table.bets td.open {
-      color: var(--muted);
+    .col .bar {
+      margin: 4px 0 6px;
     }
-    table.bets tr.me td {
+    .col .bar span {
+      background: var(--danger);
+    }
+    .col.b .bar span {
+      background: var(--info);
+    }
+    .bet {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 6px;
+      align-items: baseline;
+      padding: 2px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    .bet.me {
       background: var(--me-bg);
     }
+    .bet .amt {
+      color: var(--live);
+      white-space: nowrap;
+      font-size: 0.85rem;
+    }
+    .bet .who {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .bet .res {
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+    .res.won {
+      color: var(--live);
+    }
+    .res.lost {
+      color: var(--danger);
+    }
+    .res.refunded {
+      color: var(--muted);
+    }
+    .none {
+      padding: 2px 0;
+    }
     .badge {
-      margin-left: 6px;
+      margin-left: 4px;
+      font-size: 0.65rem;
+      padding: 0 5px;
     }
     .expert {
       color: var(--info);
@@ -495,6 +516,11 @@ export class BetPanel {
 
   protected withdraw(m: BetMatchView) {
     void this.run(() => this.api.withdrawBet(this.tournament().id, m.matchId), m.matchId);
+  }
+
+  /** The bets on one side, biggest first. */
+  protected sideBets(m: BetMatchView, e: string) {
+    return m.bets.filter((b) => b.pick === e);
   }
 
   /** Odds with two decimals in the language's format (×1,31 / ×1.31). */

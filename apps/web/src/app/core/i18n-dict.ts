@@ -778,6 +778,7 @@ const en = {
   'bets.col.stake': 'Stake',
   'bets.col.odds': 'Odds',
   'bets.col.result': 'Result',
+  'bets.noSideBets': 'No bets',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -1568,6 +1569,7 @@ const de: Record<TKey, string> = {
   'bets.col.stake': 'Einsatz',
   'bets.col.odds': 'Quote',
   'bets.col.result': 'Ergebnis',
+  'bets.noSideBets': 'Keine Wetten',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

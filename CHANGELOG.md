@@ -29,8 +29,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   player who beat them most. "Expert tip" while bets are open, bot bets shown after the window; bot records apart
   from the players'; "man vs. machine" bar; betting type and Neuro on the bot profile. New bot lines "bet won" and
   "bet lost" ({amount}, {pick}) said at the start of the bot's next game (mod 0.7.1).
-- Bets panel: once bets close, every bet of the match (players and bots) is listed in a table with stake, odds and
-  result; the odds per side stay visible after the match, so a small payout is explained.
+- Bets panel: once bets close, every bet of the match (players and bots) is listed with stake and
+  result in two columns, one per side (like Salty Bet), with pool and odds on top; the odds stay visible after the
+  match, so a small payout is explained.
 - Settings: "danger zone" to reset the website - deletes all tournaments, statistics and seasons (users, bots,
   servers and settings stay), protected by a checkbox, the typed word RESET and a last confirmation.
 - Bot control center (admin page "Bots"): the website's own bots without the ini's limit of 32 - name, model, skin,
