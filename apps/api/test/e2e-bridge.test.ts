@@ -292,6 +292,29 @@ describe('website + bridge + simulated UT server', () => {
     expect(env.blog.lines.filter((l) => /^error:/.test(l))).toEqual([]);
   });
 
+  it('runs a tournament of bots only (nobody registered)', async () => {
+    const env = await setup({ players: [], size: 4 });
+    const { admin, id } = env;
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 'b' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    const entrants = Object.values(seeded.body.projection.entrants) as { kind: string }[];
+    expect(entrants).toHaveLength(4);
+    expect(entrants.every((e) => e.kind === 'bot')).toBe(true);
+    // By rating works too (strengths come from the bots' difficulty).
+    expect(
+      (await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', humanOrder: 'rating' })).status,
+    ).toBe(200);
+    expect((await admin.post(`/tournaments/${id}/run`)).status).toBe(204);
+    env.startSim();
+    await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
+    const d = (await admin.get(`/tournaments/${id}`)).body;
+    expect(d.projection.championId).toMatch(/^bot-/);
+    expect(d.projection.results.some((r: { outcome: string }) => r.outcome === 'played')).toBe(
+      true,
+    );
+    expect(env.blog.lines.filter((l) => /^error:/.test(l))).toEqual([]);
+  });
+
   it('pauses, resumes and aborts through admin commands; spectators get access by watching', async () => {
     const env = await setup({ players: ['Mario', 'Anna'] });
     const { admin, id } = env;

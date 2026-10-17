@@ -714,7 +714,7 @@ export class TournamentsService {
         if (!bots.some((b) => b.id === e.id)) bots.push(e);
       }
     }
-    if (!humans.length) throw badRequest('nobody is registered');
+    // Nobody registered: a tournament of bots only (everybody can watch).
     if (humans.length > settings.size) {
       const what = teamMode ? 'teams' : 'players';
       throw badRequest(`${humans.length} ${what} do not fit into a bracket of ${settings.size}`);

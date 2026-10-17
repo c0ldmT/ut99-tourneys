@@ -470,19 +470,19 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 <div class="row">
                   <button
                     (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'random' }))"
-                    [disabled]="busy() || !t.registrations.length"
+                    [disabled]="busy()"
                   >
                     {{ 'admin.seedRandom' | t }}
                   </button>
                   <button
                     (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'seeded' }))"
-                    [disabled]="busy() || !t.registrations.length"
+                    [disabled]="busy()"
                   >
                     {{ 'admin.seedOrder' | t }}
                   </button>
                   <button
                     (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'rating' }))"
-                    [disabled]="busy() || !t.registrations.length"
+                    [disabled]="busy()"
                     [title]="'admin.seedRatingHint' | t"
                   >
                     {{ 'admin.seedRating' | t }}

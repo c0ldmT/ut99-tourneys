@@ -105,7 +105,7 @@ const en = {
   'rec.run.fewestDeaths': 'Fewest deaths in a finished run',
   'rec.run.points': 'Most monster points in a run',
   'rec.run.monsters': 'Most monsters killed in a run',
-  'form.stats': 'Statistics',
+  'form.options': 'Options',
   'form.statsEnabled': 'Counts for the statistics',
   'form.statsHint':
     'Switch it off for test tournaments. Tournaments from before the statistics are off; switch them on to count them.',
@@ -619,7 +619,7 @@ const de: Record<TKey, string> = {
   'rec.run.fewestDeaths': 'Wenigste Tode in einem geschafften Lauf',
   'rec.run.points': 'Meiste Monster-Punkte in einem Lauf',
   'rec.run.monsters': 'Meiste getötete Monster in einem Lauf',
-  'form.stats': 'Statistiken',
+  'form.options': 'Optionen',
   'form.statsEnabled': 'Zählt für die Statistiken',
   'form.statsHint':
     'Für Testturniere ausschalten. Turniere von vor den Statistiken sind aus; zum Mitzählen einschalten.',

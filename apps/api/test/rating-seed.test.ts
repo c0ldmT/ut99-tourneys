@@ -127,6 +127,21 @@ describe('ratings on the website', () => {
     expect((await mario.get('/stats/ratings?mode=dm')).body).toEqual([]);
   });
 
+  it('seeds a team tournament without any team (bots only)', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    const body = tournamentBody({ name: 'Bot Cup' }, { size: 4, teamSize: 2, format: 'single' });
+    const id = (await admin.post('/tournaments', body)).body.id as string;
+    for (const humanOrder of ['random', 'rating']) {
+      const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', humanOrder });
+      expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+      const teams = Object.values(seeded.body.projection.entrants) as any[];
+      expect(teams).toHaveLength(4);
+      expect(teams.every((t) => t.members.length === 0 && t.bots.length === 2)).toBe(true);
+    }
+  });
+
   it('seeds a team tournament by rating with balanced bot teams', async () => {
     ({ api } = await startApi());
     const admin = await Client.login(api, 'Boss', true);

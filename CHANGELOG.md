@@ -15,6 +15,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 - Seeding "by rating": the strongest meet late, bots are chosen and spread so that the teams come out about equally
   strong. The rating at the seeding shows in the bracket tooltip.
 - Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
+- Tournaments of bots only: seeding works without registered players (everybody can watch).
 
 ### Fixed
 
@@ -29,6 +30,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   doors, unstick, the fix for once-only movers) are always on; the option "Bot helpers" is gone from the
   tournament form, which explains them in a note instead. Older tournaments with the option switched off now use
   them too. No change in the mod.
+- Tournament form: SmartStockBots is in the panel "Options" with the statistics and ranked switches.
 
 ## [0.9.0] – 2026-10-14
 

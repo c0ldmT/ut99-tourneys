@@ -304,24 +304,6 @@ function toLocalInput(iso: string | null): string {
           } @else if (f.teamSize > 1) {
             <p class="muted small">{{ 'form.teamRulesHint' | t }}</p>
           }
-          <label class="row"
-            ><input type="checkbox" name="ssb" [(ngModel)]="f.smartStockBots" />
-            {{ 'form.smartStockBots' | t }}</label
-          >
-          <p class="muted small">
-            {{ 'form.smartStockBotsHint' | t }}
-            @switch (ssbInstalled()) {
-              @case (true) {
-                <span class="ok">{{ 'form.ssbInstalled' | t }}</span>
-              }
-              @case (false) {
-                <span class="error-text">{{ 'form.ssbMissing' | t }}</span>
-              }
-              @default {
-                {{ 'form.ssbUnknown' | t }}
-              }
-            }
-          </p>
           <label>{{ 'form.mapPool' | t: { n: f.mapPool.length } }}</label>
           <div class="chips">
             @for (map of mapChoices(); track map.id) {
@@ -445,7 +427,7 @@ function toLocalInput(iso: string | null): string {
         </fieldset>
 
         <fieldset>
-          <legend>{{ 'form.stats' | t }}</legend>
+          <legend>{{ 'form.options' | t }}</legend>
           <label class="row"
             ><input type="checkbox" name="stats" [(ngModel)]="f.statsEnabled" />
             {{ 'form.statsEnabled' | t }}</label
@@ -456,6 +438,29 @@ function toLocalInput(iso: string | null): string {
             {{ 'form.ranked' | t }}</label
           >
           <p class="muted small">{{ 'form.rankedHint' | t }}</p>
+          <label class="row"
+            ><input
+              type="checkbox"
+              name="ssb"
+              [(ngModel)]="f.smartStockBots"
+              [disabled]="locked()"
+            />
+            {{ 'form.smartStockBots' | t }}</label
+          >
+          <p class="muted small">
+            {{ 'form.smartStockBotsHint' | t }}
+            @switch (ssbInstalled()) {
+              @case (true) {
+                <span class="ok">{{ 'form.ssbInstalled' | t }}</span>
+              }
+              @case (false) {
+                <span class="error-text">{{ 'form.ssbMissing' | t }}</span>
+              }
+              @default {
+                {{ 'form.ssbUnknown' | t }}
+              }
+            }
+          </p>
         </fieldset>
 
         <fieldset [disabled]="botsLocked()">
