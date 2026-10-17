@@ -19,6 +19,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   strong. The rating at the seeding shows in the bracket tooltip.
 - Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
 - Tournaments of bots only: seeding works without registered players (everybody can watch).
+- Settings: "danger zone" to reset the website - deletes all tournaments, statistics and seasons (users, bots,
+  servers and settings stay), protected by a checkbox, the typed word RESET and a last confirmation.
 - Bot control center (admin page "Bots"): the website's own bots without the ini's limit of 32 - name, model, skin,
   face, voice, favourite weapon and play style, bio and colour; active or retired; random bots and import from a
   server's bot configuration. Clans with a tag in front of the name in the game; in team tournaments clans can play
@@ -29,6 +31,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Bots of the control center show with their current name everywhere (statistics, records, ranking, tournament
+  pages); bot profiles are linked from the standings and team lists.
+- Manual seeding could not place bots of the control center (wrong entrant id).
 - Monster Hunt: the final time (run time plus penalty) now decides to the millisecond. Before, it was compared in
   whole seconds, so a team 0.3 s faster (7:17.3 against 7:17.6) could lose on monster points.
 - Monster Hunt: the bracket shows the final time of a run as soon as it is over, not only the run in progress; run

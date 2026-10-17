@@ -131,6 +131,9 @@ export class Api {
   updateClan = (id: string, body: unknown) => this.call<BotClan>('PATCH', `/bot-clans/${id}`, body);
   deleteClan = (id: string) => this.call<void>('DELETE', `/bot-clans/${id}`);
 
+  /** Deletes all tournaments, statistics and seasons (the word RESET must be typed). */
+  resetAll = (confirm: string) =>
+    this.call<{ tournaments: number; seasons: number }>('POST', '/settings/reset', { confirm });
   seasons = () => this.call<SeasonsOverview>('GET', '/seasons');
   createSeason = (startDate: string, endDate: string) =>
     this.call<Season>('POST', '/seasons', { startDate, endDate });

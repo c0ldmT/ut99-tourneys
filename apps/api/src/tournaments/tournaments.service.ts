@@ -350,6 +350,47 @@ export class TournamentsService {
     this.hub.clearLive(id);
   }
 
+  /**
+   * Website reset (settings page): deletes every tournament with its log, registrations and
+   * teams, and every season; statistics, ratings and records are gone with them. Users, bots,
+   * clans, servers and settings stay. Not while a tournament is checking in or running.
+   */
+  resetAll(): { tournaments: number; seasons: number } {
+    const all = this.db.select().from(tournaments).all();
+    const active = all.filter((t) => ACTIVE_PHASES.includes(t.phase));
+    if (active.length)
+      throw conflict(
+        `abort the running tournaments first: ${active.map((t) => t.name).join(', ')}`,
+      );
+    for (const t of all) this.remove(t.id);
+    const seasons = this.seasons.clearAll();
+    this.stats.clearCache();
+    this.logger.warn(`website reset: ${all.length} tournaments and ${seasons} seasons deleted`);
+    return { tournaments: all.length, seasons };
+  }
+
+  /**
+   * The projection with the current names of the control center's bots (renamed or moved to
+   * another clan after the seeding); the event log keeps the names of the time.
+   */
+  private withCurrentBotNames<T extends { entrants: Record<string, Entrant> }>(proj: T): T {
+    const names = this.bots.gameNames();
+    if (!names.size) return proj;
+    const entrants: Record<string, Entrant> = {};
+    for (const [id, e] of Object.entries(proj.entrants)) {
+      if (e.kind === 'bot' && e.bot.id && names.has(e.bot.id)) {
+        const name = names.get(e.bot.id)!;
+        entrants[id] = { ...e, displayName: name, bot: { ...e.bot, name } };
+      } else if (e.kind === 'team' && e.bots.some((b) => b.id && names.has(b.id))) {
+        entrants[id] = {
+          ...e,
+          bots: e.bots.map((b) => (b.id && names.has(b.id) ? { ...b, name: names.get(b.id)! } : b)),
+        };
+      } else entrants[id] = e;
+    }
+    return { ...proj, entrants };
+  }
+
   private notifyDraft(id: string) {
     const t = this.require(id);
     this.hub.publish(id, { type: 'change', headSeq: t.headSeq, phase: t.phase });
@@ -1257,7 +1298,8 @@ export class TournamentsService {
       .all();
     return rows.map(({ t, registered, mine, teamCount }) => {
       const s = this.settings(t);
-      const proj = t.phase === 'finished' ? this.log.projection(t.id) : undefined;
+      const finished = t.phase === 'finished' ? this.log.projection(t.id) : undefined;
+      const proj = finished ? this.withCurrentBotNames(finished) : undefined;
       return {
         id: t.id,
         name: t.name,
@@ -1352,7 +1394,7 @@ export class TournamentsService {
           : myEntrant?.kind === 'team' && myEntrant.captainUserId === user.id,
         hasAccess: inAccess,
       },
-      projection: proj ?? null,
+      projection: proj ? this.withCurrentBotNames(proj) : null,
       live: this.hub.latestLive(id) ?? null,
       agent: { online: this.connections.isOnline(t.agentId) },
     };

@@ -682,6 +682,21 @@ const en = {
   'form.clanTeams': 'Clans play as teams',
   'form.clanTeamsHint':
     'Bot teams are formed from the clans in the pool first (enough members needed), the other bots fill the remaining teams.',
+  'reset.title': 'Danger zone: reset the website',
+  'reset.what':
+    'Deletes every tournament (with brackets, results and logs), all statistics, ratings and records, and all seasons. This cannot be undone.',
+  'reset.keeps':
+    'Kept: users, bots and clans of the control center, servers and settings. Running tournaments must be aborted first. Tip: copy the database file (data folder) before.',
+  'reset.open': 'Delete tournaments, statistics and seasons…',
+  'reset.warning':
+    'Everything listed above will be gone for good - there is no undo and no backup on the website.',
+  'reset.understood':
+    'I understand that all tournaments, statistics and seasons are deleted irrevocably.',
+  'reset.typeWord': 'Type {word} to confirm',
+  'reset.confirm': 'Delete irrevocably',
+  'reset.lastChance':
+    'Last chance: really delete all tournaments, statistics and seasons for good?',
+  'reset.done': 'Done: {t} tournaments and {s} seasons deleted.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -1375,6 +1390,21 @@ const de: Record<TKey, string> = {
   'form.clanTeams': 'Clans spielen als Teams',
   'form.clanTeamsHint':
     'Bot-Teams werden zuerst aus den Clans im Pool gebildet (genug Mitglieder nötig), die übrigen Bots füllen die restlichen Teams.',
+  'reset.title': 'Gefahrenzone: Website zurücksetzen',
+  'reset.what':
+    'Löscht alle Turniere (mit Brackets, Ergebnissen und Logs), alle Statistiken, Ratings und Rekorde sowie alle Seasons. Das lässt sich nicht rückgängig machen.',
+  'reset.keeps':
+    'Bleiben erhalten: Benutzer, Bots und Clans des Kontrollzentrums, Server und Einstellungen. Laufende Turniere müssen vorher abgebrochen werden. Tipp: vorher die Datenbankdatei (Datenordner) sichern.',
+  'reset.open': 'Turniere, Statistiken und Seasons löschen…',
+  'reset.warning':
+    'Alles oben Genannte ist danach endgültig weg – es gibt kein Rückgängig und kein Backup auf der Website.',
+  'reset.understood':
+    'Ich verstehe, dass alle Turniere, Statistiken und Seasons unwiderruflich gelöscht werden.',
+  'reset.typeWord': 'Zum Bestätigen {word} eintippen',
+  'reset.confirm': 'Unwiderruflich löschen',
+  'reset.lastChance':
+    'Letzte Chance: Wirklich alle Turniere, Statistiken und Seasons endgültig löschen?',
+  'reset.done': 'Erledigt: {t} Turniere und {s} Seasons gelöscht.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

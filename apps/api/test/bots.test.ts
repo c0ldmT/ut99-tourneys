@@ -6,7 +6,8 @@ import { randomBot, randomName } from '../src/bots/bot-random.js';
 import { BotsService, spreadLines } from '../src/bots/bots.service.js';
 import { headToHead } from '../src/stats/aggregate.js';
 import { extractFacts } from '../src/stats/facts.js';
-import { Client, startApi, tournamentBody } from './helpers.js';
+import { StatsService } from '../src/stats/stats.service.js';
+import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
 afterEach(async () => {
@@ -304,5 +305,45 @@ describe('bot control center', () => {
       ).toBe(false);
       expect(teams.flatMap((t) => t.bots).every((b: { id?: string }) => b.id)).toBe(true);
     }
+  });
+});
+
+describe('current bot names and the website reset', () => {
+  it('shows renamed bots everywhere and resets tournaments, statistics and seasons', async () => {
+    const { admin, mario } = await setup();
+    await startSeason(admin);
+    const ids: string[] = [];
+    for (const name of ['Ali', 'Cem', 'Dan', 'Eva'])
+      ids.push((await admin.post('/bots', { name, skill: 3 })).body.id);
+    const created = await admin.post('/tournaments', {
+      ...tournamentBody({ name: 'Rename Cup' }, { size: 4, format: 'single' }),
+      botPool: ids.map((id) => ({ id, name: 'x', skill: 3 })),
+    });
+    const id = created.body.id as string;
+    expect(
+      (await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' })).status,
+    ).toBe(200);
+    await admin.req('PATCH', `/bots/${ids[0]}`, { name: 'Bert' });
+    // The seeded bracket and the statistics' names follow the control center.
+    const entrants = Object.values(
+      (await mario.get(`/tournaments/${id}`)).body.projection.entrants,
+    );
+    const names = entrants.map((e: any) => e.displayName);
+    expect(names).toContain('Bert');
+    expect(names).not.toContain('Ali');
+    expect(api!.app.get(StatsService).names().get(`b:${ids[0]!.toLowerCase()}`)).toBe('Bert');
+
+    // Reset: admins only, only with the typed word.
+    expect((await mario.post('/settings/reset', { confirm: 'RESET' })).status).toBe(403);
+    expect((await admin.post('/settings/reset', { confirm: 'reset' })).status).toBe(400);
+    expect((await admin.post('/settings/reset', {})).status).toBe(400);
+    const res = await admin.post('/settings/reset', { confirm: 'RESET' });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ tournaments: 1, seasons: 1 });
+    expect((await admin.get('/tournaments')).body).toEqual([]);
+    expect((await admin.get('/seasons')).body.seasons).toEqual([]);
+    expect((await admin.get(`/tournaments/${id}`)).status).toBe(404);
+    // Bots, clans and settings stay.
+    expect((await admin.get('/bots')).body.bots).toHaveLength(4);
   });
 });

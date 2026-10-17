@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Inject, Put } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Inject, Post, Put } from '@nestjs/common';
 import { z } from 'zod';
 import { AdminOnly } from '../auth/guard.js';
 import { ZodPipe } from '../common/http.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
+import { TournamentsService } from '../tournaments/tournaments.service.js';
 import {
   RatingSettingsSchema,
   SettingsService,
@@ -17,7 +18,18 @@ export class SettingsController {
   constructor(
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
+    @Inject(TournamentsService) private readonly tournaments: TournamentsService,
   ) {}
+
+  /**
+   * Deletes all tournaments, statistics and seasons for good. The body must carry the word
+   * RESET (typed by the admin), so that no stray request can do it.
+   */
+  @Post('reset')
+  @HttpCode(200)
+  reset(@Body(new ZodPipe(z.object({ confirm: z.literal('RESET') }))) _body: { confirm: 'RESET' }) {
+    return this.tournaments.resetAll();
+  }
 
   @Get()
   get() {

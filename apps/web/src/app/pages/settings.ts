@@ -161,10 +161,78 @@ import type { Season, SeasonsOverview } from '../core/types';
         }
       </div>
     </form>
+
+    <section class="card danger-zone">
+      <h2>⚠ {{ 'reset.title' | t }}</h2>
+      <p>{{ 'reset.what' | t }}</p>
+      <p class="muted small">{{ 'reset.keeps' | t }}</p>
+      @if (resetDone(); as r) {
+        <p class="notice">{{ 'reset.done' | t: { t: r.tournaments, s: r.seasons } }}</p>
+      }
+      @if (!resetOpen()) {
+        <button class="danger" (click)="openReset()">{{ 'reset.open' | t }}</button>
+      } @else {
+        <div class="reset-box">
+          <p class="warn">
+            <b>{{ 'reset.warning' | t }}</b>
+          </p>
+          <label class="row"
+            ><input type="checkbox" name="resetOk" [(ngModel)]="resetUnderstood" />
+            {{ 'reset.understood' | t }}</label
+          >
+          <label
+            >{{ 'reset.typeWord' | t: { word: resetWord } }}
+            <input
+              name="resetWord"
+              class="word"
+              autocomplete="off"
+              [(ngModel)]="resetTyped"
+              [placeholder]="resetWord"
+            />
+          </label>
+          <div class="row">
+            <button
+              class="danger solid"
+              [disabled]="busy() || !resetUnderstood || resetTyped !== resetWord"
+              (click)="reset()"
+            >
+              {{ 'reset.confirm' | t }}
+            </button>
+            <button (click)="resetOpen.set(false)">{{ 'common.cancel' | t }}</button>
+          </div>
+        </div>
+      }
+    </section>
   `,
   styles: `
     .card {
       max-width: 820px;
+    }
+    .danger-zone {
+      border: 2px solid var(--danger);
+      background: rgba(248, 81, 73, 0.05);
+      margin-top: 40px;
+    }
+    .danger-zone h2 {
+      color: var(--danger);
+    }
+    .reset-box {
+      border-top: 1px solid rgba(248, 81, 73, 0.4);
+      padding-top: 12px;
+    }
+    .warn {
+      color: var(--danger);
+    }
+    input.word {
+      max-width: 200px;
+      display: block;
+      margin-top: 4px;
+      font-family: ui-monospace, monospace;
+    }
+    button.danger.solid:not(:disabled) {
+      background: var(--danger);
+      color: #fff;
+      font-weight: 700;
     }
     .state {
       display: flex;
@@ -237,6 +305,12 @@ export class SettingsPage {
   protected editFrom = '';
   protected editTo = '';
   protected newFrom = '';
+  /** Website reset: opened, ticked and the word typed before the button works. */
+  protected readonly resetWord = 'RESET';
+  protected readonly resetOpen = signal(false);
+  protected readonly resetDone = signal<{ tournaments: number; seasons: number } | null>(null);
+  protected resetUnderstood = false;
+  protected resetTyped = '';
   protected newTo = '';
 
   protected readonly running = computed(
@@ -320,6 +394,29 @@ export class SettingsPage {
   protected remove(s: Season) {
     if (!confirm(this.i18n.t('season.deleteConfirm', { n: s.number }))) return;
     void this.run(() => this.api.deleteSeason(s.number));
+  }
+
+  protected openReset() {
+    this.resetUnderstood = false;
+    this.resetTyped = '';
+    this.resetDone.set(null);
+    this.resetOpen.set(true);
+  }
+
+  protected async reset() {
+    if (!this.resetUnderstood || this.resetTyped !== this.resetWord) return;
+    if (!confirm(this.i18n.t('reset.lastChance'))) return;
+    this.busy.set(true);
+    this.error.set('');
+    try {
+      this.resetDone.set(await this.api.resetAll(this.resetTyped));
+      this.resetOpen.set(false);
+      this.o.set(await this.api.seasons());
+    } catch (e) {
+      this.error.set(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected async save() {

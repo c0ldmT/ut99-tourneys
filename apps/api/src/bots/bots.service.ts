@@ -203,6 +203,11 @@ export class BotsService {
 
   // --- bots -----------------------------------------------------------------------------------
 
+  /** Current names in the game (clan tag + name) by bot id. */
+  gameNames(): Map<string, string> {
+    return new Map(this.list().map((b) => [b.id, b.gameName]));
+  }
+
   list(): LibraryBot[] {
     const clans = new Map(this.clans().map((c) => [c.id, c]));
     return this.db

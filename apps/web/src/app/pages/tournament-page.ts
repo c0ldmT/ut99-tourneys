@@ -388,7 +388,11 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 <tr [class.me]="s.entrantId === t.me.entrantId">
                   <td>{{ s.placement ?? '–' }}</td>
                   <td>
-                    {{ name(s.entrantId) }}
+                    @if (libraryBotId(s.entrantId); as bid) {
+                      <a [routerLink]="['/bots', bid]">{{ name(s.entrantId) }}</a>
+                    } @else {
+                      {{ name(s.entrantId) }}
+                    }
                     @if (isBot(s.entrantId)) {
                       <span class="muted small"> BOT</span>
                     }
@@ -968,6 +972,12 @@ export class TournamentPage {
   protected name(id: string | null | undefined): string {
     if (!id) return this.i18n.t('bracket.tbd');
     return this.t()?.projection?.entrants[id]?.displayName ?? id;
+  }
+
+  /** Bot of the control center: its profile is linked by id (names can change). */
+  protected libraryBotId(id: string): string | null {
+    const e = this.t()?.projection?.entrants[id];
+    return e?.kind === 'bot' ? (e.bot.id ?? null) : null;
   }
 
   protected isBot(id: string): boolean {

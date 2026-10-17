@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TPipe } from '../core/i18n';
-import type { TournamentDetail } from '../core/types';
+import type { BotSpec, TournamentDetail } from '../core/types';
 
 interface Option {
   id: string;
@@ -115,7 +115,8 @@ export class SeedingEditor {
     const seen = new Set<string>();
     return this.tournament()
       .botPool.map((b) => ({
-        id: `bot-${b.name.replace(/[^A-Za-z0-9_-]/g, '_')}`,
+        // Same id as the website gives the bot entrant (library bots: bot-<id>).
+        id: botSpecEntrantId(b),
         label: `${b.name} (${b.skill})`,
       }))
       .filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true)));
@@ -162,4 +163,9 @@ export class SeedingEditor {
   protected clear() {
     this.slots.set(Array(this.tournament().settings.size).fill(null));
   }
+}
+
+/** Entrant id of a bot as the website gives it (protocol botSpecEntrantId): library id, else name. */
+function botSpecEntrantId(b: BotSpec): string {
+  return `bot-${(b.id ?? b.name).replace(/[^A-Za-z0-9_-]/g, '_')}`;
 }

@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { Api, errorText } from '../core/api';
+import { RouterLink } from '@angular/router';
 import { TPipe } from '../core/i18n';
 import type { Entrant, TournamentDetail } from '../core/types';
 
@@ -19,7 +20,7 @@ type Team = Extract<Entrant, { kind: 'team' }>;
  */
 @Component({
   selector: 'app-team-roster',
-  imports: [TPipe],
+  imports: [TPipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h2>{{ 'roster.title' | t }}</h2>
@@ -65,7 +66,14 @@ type Team = Extract<Entrant, { kind: 'team' }>;
             }
             @for (b of team.bots; track b.name) {
               <li class="muted">
-                <span>{{ b.name }} <span class="bot">BOT</span></span>
+                <span>
+                  @if (b.id) {
+                    <a [routerLink]="['/bots', b.id]">{{ b.name }}</a>
+                  } @else {
+                    {{ b.name }}
+                  }
+                  <span class="bot">BOT</span></span
+                >
               </li>
             }
           </ul>

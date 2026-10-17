@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { TournamentSettingsSchema } from '@tourney/protocol';
 import { UsersService } from '../auth/users.service.js';
+import { BotsService } from '../bots/bots.service.js';
 import { DB, type Db } from '../db/database.js';
 import { tournaments } from '../db/schema.js';
 import { seasonAt } from '../seasons/season-time.js';
@@ -18,7 +19,7 @@ import {
   type PlayerRow,
   type RecordEntry,
 } from './aggregate.js';
-import { extractFacts, userKey, type StatMode, type TournamentFacts } from './facts.js';
+import { botKey, extractFacts, userKey, type StatMode, type TournamentFacts } from './facts.js';
 import {
   computeRatings,
   levelBonusMu,
@@ -66,7 +67,14 @@ export class StatsService {
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
+    @Inject(BotsService) private readonly bots: BotsService,
   ) {}
+
+  /** Forgets the cached facts and ratings (after the tournaments were cleared). */
+  clearCache(): void {
+    this.cache.clear();
+    this.ratingCache.clear();
+  }
 
   /** Facts of the tournaments in a scope, oldest first. */
   facts(scope: StatScope = 'lifetime'): TournamentFacts[] {
@@ -235,9 +243,14 @@ export class StatsService {
     return headToHead(this.facts('lifetime'), key, others);
   }
 
-  /** Current display names of website users (they can rename themselves). */
+  /**
+   * Current names: website users (they can rename themselves) and the bots of the control
+   * center (`b:<id>`, renamed or moved to another clan there).
+   */
   names(): Map<string, string> {
-    return new Map(this.users.list().map((u) => [userKey(u.id), u.displayName]));
+    const m = new Map(this.users.list().map((u) => [userKey(u.id), u.displayName]));
+    for (const [id, name] of this.bots.gameNames()) m.set(botKey(id), name);
+    return m;
   }
 
   players(scope: StatScope, mode: StatMode | undefined, bots: boolean): PlayerRow[] {

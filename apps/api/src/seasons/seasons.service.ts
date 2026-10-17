@@ -55,6 +55,14 @@ export class SeasonsService {
     return this.config.seasonTimeZone;
   }
 
+  /** Deletes every season (website reset). */
+  clearAll(): number {
+    const n = this.list().length;
+    this.db.delete(seasons).run();
+    this.version++;
+    return n;
+  }
+
   list(): Season[] {
     return this.db
       .select()
