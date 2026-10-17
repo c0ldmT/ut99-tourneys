@@ -6,7 +6,7 @@ import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { isLocalAddress } from '../core/connect';
 import { MH_ADAPTER } from '../core/race';
-import type { AgentView, BotSpec, TournamentDetail } from '../core/types';
+import type { AgentView, BotSpec, LibraryBot, TournamentDetail } from '../core/types';
 
 const STOCK_POOL = [
   'DM-Deck16][',
@@ -76,6 +76,8 @@ interface Model {
   lives: number;
   mapPool: string[];
   botPool: BotSpec[];
+  /** Team games: bots of a clan play together as a team. */
+  clanTeams: boolean;
   notifyMode: 'default' | 'custom' | 'off';
   /** Season tournament: ratings and season statistics (only while a season runs). */
   seasonal: boolean;
@@ -490,7 +492,16 @@ function toLocalInput(iso: string | null): string {
             <tbody>
               @for (b of f.botPool; track $index) {
                 <tr>
-                  <td><input [name]="'bn' + $index" [(ngModel)]="b.name" maxlength="32" /></td>
+                  <td>
+                    @if (b.id) {
+                      <a class="lib-name" [routerLink]="['/bots', b.id]" target="_blank">{{
+                        libraryName(b)
+                      }}</a>
+                      <span class="badge">{{ 'form.libraryBot' | t }}</span>
+                    } @else {
+                      <input [name]="'bn' + $index" [(ngModel)]="b.name" maxlength="32" />
+                    }
+                  </td>
                   <td class="skill">
                     <select [name]="'bs' + $index" [(ngModel)]="b.skill">
                       @for (s of skills; track s) {
@@ -521,7 +532,35 @@ function toLocalInput(iso: string | null): string {
                 {{ 'form.useInventoryBots' | t: { n: inventoryBots().length } }}
               </button>
             }
+            @if (activeLibrary().length) {
+              <button type="button" (click)="useLibrary()">
+                {{ 'form.useLibrary' | t: { n: activeLibrary().length } }}
+              </button>
+            }
           </div>
+          @if (activeLibrary().length) {
+            <div class="row add">
+              <select name="libAdd" [(ngModel)]="libraryPick" class="lib-pick">
+                <option value="">{{ 'form.pickLibraryBot' | t }}</option>
+                @for (b of activeLibrary(); track b.id) {
+                  @if (!inPool(f, b.id)) {
+                    <option [value]="b.id">{{ b.gameName }} ({{ b.skill }})</option>
+                  }
+                }
+              </select>
+              <button type="button" (click)="addLibraryBot()" [disabled]="!libraryPick">
+                {{ 'form.addBot' | t }}
+              </button>
+            </div>
+          }
+          <p class="muted small">{{ 'form.libraryHint' | t }}</p>
+          @if (f.teamSize > 1) {
+            <label class="row"
+              ><input type="checkbox" name="clanTeams" [(ngModel)]="f.clanTeams" />
+              {{ 'form.clanTeams' | t }}</label
+            >
+            <p class="muted small">{{ 'form.clanTeamsHint' | t }}</p>
+          }
         </fieldset>
 
         @if (error()) {
@@ -568,6 +607,13 @@ function toLocalInput(iso: string | null): string {
     }
     .add input {
       max-width: 260px;
+    }
+    .lib-pick {
+      max-width: 320px;
+      width: auto;
+    }
+    .lib-name {
+      margin-right: 6px;
     }
     .all-skill {
       max-width: 320px;
@@ -634,6 +680,10 @@ export class TournamentFormPage {
   protected readonly profileAddress = computed(() => this.profile()?.publicAddress ?? '');
   protected readonly inventoryMaps = computed(() => this.profile()?.inventory?.maps ?? []);
   protected readonly inventoryBots = computed(() => this.profile()?.inventory?.bots ?? []);
+  /** The website's bots (control center). */
+  protected readonly library = signal<LibraryBot[]>([]);
+  protected readonly activeLibrary = computed(() => this.library().filter((b) => b.active));
+  protected libraryPick = '';
   /** true/false once the server was scanned, null if unknown. */
   protected readonly ssbInstalled = computed(() => {
     const pk = this.profile()?.inventory?.packages;
@@ -674,6 +724,7 @@ export class TournamentFormPage {
   private async init() {
     try {
       this.agents.set(await this.api.agents());
+      this.library.set((await this.api.bots()).bots);
       this.currentSeason.set((await this.api.seasons()).current);
       const id = this.id();
       if (id) {
@@ -730,9 +781,14 @@ export class TournamentFormPage {
       webhookUrl: '',
       seasonal: this.currentSeason() !== null,
       mapPool: [...STOCK_POOL],
-      botPool: a?.profiles[0]?.inventory?.bots.length
-        ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
-        : DEFAULT_BOTS.map((b) => ({ ...b })),
+      botPool: this.activeLibrary().length
+        ? this.activeLibrary()
+            .slice(0, 64)
+            .map((b) => ({ id: b.id, name: b.gameName, skill: b.skill }))
+        : a?.profiles[0]?.inventory?.bots.length
+          ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
+          : DEFAULT_BOTS.map((b) => ({ ...b })),
+      clanTeams: false,
     };
   }
 
@@ -780,6 +836,7 @@ export class TournamentFormPage {
       seasonal: d.seasonal,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
+      clanTeams: s.clanTeams ?? false,
     };
   }
 
@@ -858,6 +915,30 @@ export class TournamentFormPage {
     this.agentTick.update((n) => n + 1);
   }
 
+  protected libraryName(b: BotSpec): string {
+    return this.library().find((x) => x.id === b.id)?.gameName ?? b.name;
+  }
+
+  protected inPool(f: Model, id: string): boolean {
+    return f.botPool.some((b) => b.id === id);
+  }
+
+  protected addLibraryBot() {
+    const f = this.m();
+    const b = this.library().find((x) => x.id === this.libraryPick);
+    if (!f || !b || this.inPool(f, b.id)) return;
+    f.botPool.push({ id: b.id, name: b.gameName, skill: b.skill });
+    this.libraryPick = '';
+  }
+
+  protected useLibrary() {
+    const f = this.m();
+    if (!f) return;
+    f.botPool = this.activeLibrary()
+      .slice(0, 64)
+      .map((b) => ({ id: b.id, name: b.gameName, skill: b.skill }));
+  }
+
   protected useInventoryBots() {
     const f = this.m();
     if (!f) return;
@@ -882,7 +963,7 @@ export class TournamentFormPage {
       seasonal: f.seasonal,
       botPool: f.botPool
         .filter((b) => b.name.trim())
-        .map((b) => ({ name: b.name.trim(), skill: b.skill })),
+        .map((b) => ({ ...(b.id ? { id: b.id } : {}), name: b.name.trim(), skill: b.skill })),
       settings: {
         format: f.format,
         size: f.size,
@@ -895,6 +976,7 @@ export class TournamentFormPage {
         maxReconnects: f.maxReconnects,
         botMatchMode: f.botMatchMode,
         botPlacement: f.botPlacement,
+        clanTeams: f.teamSize > 1 && f.clanTeams,
         postTournamentShutdownSec: f.postTournamentShutdownSec,
         game: {
           adapter: f.game === 'mh' ? MH_ADAPTER : 'ut99-dm',

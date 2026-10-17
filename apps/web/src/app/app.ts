@@ -24,6 +24,7 @@ import type { Lang } from './core/i18n-dict';
             @if (me.isAdmin) {
               <a routerLink="/new" routerLinkActive="active">{{ 'nav.new' | t }}</a>
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
+              <a routerLink="/admin/bots" routerLinkActive="active">{{ 'nav.bots' | t }}</a>
               <a routerLink="/admin/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
               <a routerLink="/admin/settings" routerLinkActive="active">{{ 'nav.settings' | t }}</a>
             }

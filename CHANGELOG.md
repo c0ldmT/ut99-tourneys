@@ -19,6 +19,13 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   strong. The rating at the seeding shows in the bracket tooltip.
 - Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
 - Tournaments of bots only: seeding works without registered players (everybody can watch).
+- Bot control center (admin page "Bots"): the website's own bots without the ini's limit of 32 - name, model, skin,
+  face, voice, favourite weapon and play style, bio and colour; active or retired; random bots and import from a
+  server's bot configuration. Clans with a tag in front of the name in the game; in team tournaments clans can play
+  as bot teams; the names of bot teams are editable. Personality: chat lines on occasions (start, kill, death, win,
+  loss, rival kill/death) with placeholders and talkativeness; rivals and a nemesis (players or bots) the bot goes
+  after. Bot profile page for everybody with the head-to-head record against its rivals. Statistics and ratings
+  follow the bot, not its name. Needs mod 0.7.0 for look, play style and personality in the game.
 
 ### Fixed
 

@@ -59,9 +59,19 @@ export class BotsController {
     const rivalKey = (r: { kind: 'user' | 'bot'; id: string }) =>
       r.kind === 'user' ? userKey(r.id) : botKey(r.id);
     const h2h = this.stats.headToHead(botKey(b.id), b.personality.rivals.map(rivalKey));
+    const assets = this.bots.assets();
+    const label = (list: { name: string; label: string }[], n: string | null | undefined) =>
+      n ? (list.find((x) => x.name.toLowerCase() === n.toLowerCase())?.label ?? null) : null;
     return {
       ...b,
       statsKey: botKey(b.id),
+      /** Display names of the look (stock material and scanned servers). */
+      labels: {
+        botClass: label(assets.botClasses, b.botClass),
+        face: label(assets.faces, b.face),
+        voice: label(assets.voices, b.traits.voice),
+        weapon: label(assets.weapons, b.traits.favoriteWeapon),
+      },
       clan: b.clanId ? this.bots.clans().find((c) => c.id === b.clanId) : null,
       rivals: b.personality.rivals.map((r) => ({
         ...r,

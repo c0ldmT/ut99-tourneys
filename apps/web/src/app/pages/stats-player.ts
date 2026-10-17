@@ -54,6 +54,11 @@ import type {
         @if (d.row.bot) {
           <span class="badge">{{ 'stats.bot' | t }}</span>
         }
+        @if (botId(); as id) {
+          <a class="profile-link small" [routerLink]="['/bots', id]">{{
+            'bots.profileLink' | t
+          }}</a>
+        }
       </h1>
       <div class="tiles">
         <div class="card tile">
@@ -267,6 +272,10 @@ import type {
     }
   `,
   styles: `
+    .profile-link {
+      margin-left: 10px;
+      font-weight: 400;
+    }
     .top {
       display: flex;
       justify-content: space-between;
@@ -370,6 +379,8 @@ export class StatsPlayerPage {
   protected readonly d = signal<StatsPlayerDetail | null>(null);
   protected readonly error = signal('');
   protected readonly ratings = signal<PlayerRatings | null>(null);
+  /** A bot of the control center: link to its profile. */
+  protected readonly botId = signal<string | null>(null);
 
   protected readonly ratingModes = computed(() => {
     const r = this.ratings();
@@ -412,6 +423,16 @@ export class StatsPlayerPage {
       const key = this.key();
       const season = this.season();
       void this.init(key, season);
+    });
+    effect(() => {
+      const key = this.key();
+      this.botId.set(null);
+      // Bots of the server's ini have no profile: the request just fails.
+      if (key.startsWith('b:'))
+        this.api.botProfile(key.slice(2)).then(
+          (b) => this.botId.set(b.id),
+          () => undefined,
+        );
     });
   }
 

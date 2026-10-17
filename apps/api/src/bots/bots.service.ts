@@ -235,7 +235,9 @@ export class BotsService {
   }
 
   get(id: string): LibraryBot | undefined {
-    return this.list().find((b) => b.id === id);
+    // Statistics keys carry the id in lower case (`b:<id>`): links from there work too.
+    const all = this.list();
+    return all.find((b) => b.id === id) ?? all.find((b) => b.id.toLowerCase() === id.toLowerCase());
   }
 
   require(id: string): LibraryBot {

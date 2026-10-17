@@ -360,4 +360,98 @@ export type StatScope = 'lifetime' | number;
 
 export interface WebsiteSettings {
   rating: { botGames: boolean; levelPoints: number };
+  /** Names for bot teams (team tournaments), in order. */
+  teamNames: string[];
+}
+
+// --- Bot control center ---------------------------------------------------------------------
+
+export const BOT_LINE_KINDS = [
+  'start',
+  'kill',
+  'death',
+  'win',
+  'loss',
+  'rivalKill',
+  'rivalDeath',
+] as const;
+export type BotLineKind = (typeof BOT_LINE_KINDS)[number];
+
+export interface BotRival {
+  kind: 'user' | 'bot';
+  id: string;
+  level: 'rival' | 'nemesis';
+}
+
+export interface BotPersonality {
+  talk: number;
+  lines: { kind: BotLineKind; text: string }[];
+  rivals: BotRival[];
+}
+
+export interface BotTraitsView {
+  accuracy?: number;
+  alertness?: number;
+  combatStyle?: number;
+  camping?: number;
+  strafing?: number;
+  jumpy?: boolean;
+  favoriteWeapon?: string;
+  voice?: string;
+}
+
+export interface LibraryBot {
+  id: string;
+  name: string;
+  /** Name in the game: clan tag + name. */
+  gameName: string;
+  clanId: string | null;
+  skill: number;
+  botClass: string | null;
+  skin: string | null;
+  face: string | null;
+  traits: BotTraitsView;
+  personality: BotPersonality;
+  bio: string | null;
+  color: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BotClan {
+  id: string;
+  name: string;
+  tag: string;
+  color: string | null;
+  description: string | null;
+}
+
+export interface AssetItem {
+  name: string;
+  label: string;
+}
+
+export interface BotAssets {
+  botClasses: AssetItem[];
+  textures: AssetItem[];
+  voices: AssetItem[];
+  weapons: AssetItem[];
+  skins: AssetItem[];
+  faces: (AssetItem & { pkg: string })[];
+  /** Skin package per stock bot class. */
+  packages: Record<string, string>;
+}
+
+export interface BotProfile extends LibraryBot {
+  statsKey: string;
+  labels: {
+    botClass: string | null;
+    face: string | null;
+    voice: string | null;
+    weapon: string | null;
+  };
+  clan: BotClan | null;
+  rivals: (BotRival & { name: string; key: string; record: { games: number; wins: number } })[];
+  rivalOf: { id: string; name: string }[];
 }

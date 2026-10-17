@@ -3,7 +3,11 @@ import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
   AgentView,
+  BotAssets,
+  BotClan,
+  BotProfile,
   InvitePreview,
+  LibraryBot,
   Me,
   MapRecord,
   PlayerRatings,
@@ -107,6 +111,26 @@ export class Api {
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/rating', body);
+  setTeamNames = (names: string[]) =>
+    this.call<WebsiteSettings>('PUT', '/settings/team-names', { names });
+
+  bots = () => this.call<{ bots: LibraryBot[]; clans: BotClan[] }>('GET', '/bots');
+  botAssets = () => this.call<BotAssets>('GET', '/bots/assets');
+  botProfile = (id: string) => this.call<BotProfile>('GET', `/bots/${encodeURIComponent(id)}`);
+  createBot = (body: unknown) => this.call<LibraryBot>('POST', '/bots', body);
+  updateBot = (id: string, body: unknown) => this.call<LibraryBot>('PATCH', `/bots/${id}`, body);
+  deleteBot = (id: string) => this.call<void>('DELETE', `/bots/${id}`);
+  randomBots = (body: { count: number; clanId?: string; skill?: number }) =>
+    this.call<LibraryBot[]>('POST', '/bots-random', body);
+  importBots = (agentId: string, profileId?: string) =>
+    this.call<{ created: LibraryBot[]; skipped: string[] }>('POST', '/bots-import', {
+      agentId,
+      ...(profileId ? { profileId } : {}),
+    });
+  createClan = (body: unknown) => this.call<BotClan>('POST', '/bot-clans', body);
+  updateClan = (id: string, body: unknown) => this.call<BotClan>('PATCH', `/bot-clans/${id}`, body);
+  deleteClan = (id: string) => this.call<void>('DELETE', `/bot-clans/${id}`);
+
   seasons = () => this.call<SeasonsOverview>('GET', '/seasons');
   createSeason = (startDate: string, endDate: string) =>
     this.call<Season>('POST', '/seasons', { startDate, endDate });

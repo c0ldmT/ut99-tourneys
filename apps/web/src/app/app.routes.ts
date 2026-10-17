@@ -20,6 +20,10 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/stats-player').then((m) => m.StatsPlayerPage),
       },
       {
+        path: 'bots/:id',
+        loadComponent: () => import('./pages/bot-profile').then((m) => m.BotProfilePage),
+      },
+      {
         path: 'profile',
         loadComponent: () => import('./pages/profile').then((m) => m.ProfilePage),
       },
@@ -41,6 +45,11 @@ export const routes: Routes = [
         path: 'admin/agents',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/agents').then((m) => m.AgentsPage),
+      },
+      {
+        path: 'admin/bots',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./pages/bots').then((m) => m.BotsPage),
       },
       {
         path: 'admin/settings',
