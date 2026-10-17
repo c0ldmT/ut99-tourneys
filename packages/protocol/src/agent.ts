@@ -175,6 +175,19 @@ export const AgentWelcome = envelope(
   z.object({ agentId: Id, serverTime: z.number().int() }),
 );
 
+const AssetSchema = z.object({ name: z.string().min(1).max(128), label: z.string().max(64) });
+/**
+ * What the game installation offers for bots (UT99: `Object=` lines of the System/*.int files):
+ * bot classes, textures with a description (skins and faces), voice packs, weapons.
+ */
+export const GameAssetsSchema = z.object({
+  botClasses: z.array(AssetSchema).max(500).default([]),
+  textures: z.array(AssetSchema).max(5000).default([]),
+  voices: z.array(AssetSchema).max(500).default([]),
+  weapons: z.array(AssetSchema).max(500).default([]),
+});
+export type GameAssets = z.infer<typeof GameAssetsSchema>;
+
 export const AgentInventory = envelope(
   'agent.inventory',
   z.object({
@@ -184,6 +197,8 @@ export const AgentInventory = envelope(
     bots: z.array(BotSpecSchema),
     /** UnrealScript packages in System (e.g. "SmartStockBots"), to check optional server mods. */
     packages: z.array(z.string().max(64)).max(1000).default([]),
+    /** Bot classes, skins and faces, voices and weapons installed (from the .int files). */
+    assets: GameAssetsSchema.optional(),
     scannedAt: z.iso.datetime(),
     warnings: z.array(z.string()).default([]),
   }),
@@ -226,6 +241,41 @@ export const MapRecordsSchema = z.object({
 });
 export type MapRecords = z.infer<typeof MapRecordsSchema>;
 
+/** Occasions a bot says something in the chat. */
+export const BOT_LINE_KINDS = [
+  'start',
+  'kill',
+  'death',
+  'win',
+  'loss',
+  'rivalKill',
+  'rivalDeath',
+] as const;
+export type BotLineKind = (typeof BOT_LINE_KINDS)[number];
+export const BotLineKindSchema = z.enum(BOT_LINE_KINDS);
+
+/**
+ * A website bot's personality for the game: chat lines per occasion (placeholders {me},
+ * {victim}, {killer}, {map}), how talkative it is, and its rivals (players or bots by their name
+ * in the game; a nemesis is hunted down as well).
+ */
+export const BotPersonalitySchema = z.object({
+  /** The bot's name in the game. */
+  name: z.string().min(1).max(32),
+  /** Chance to say something on an occasion, 0..100. */
+  talk: z.number().int().min(0).max(100),
+  lines: z.array(z.object({ kind: BotLineKindSchema, text: z.string().min(1).max(120) })).max(64),
+  rivals: z
+    .array(
+      z.object({
+        name: z.string().min(1).max(32),
+        level: z.enum(['rival', 'nemesis']),
+      }),
+    )
+    .max(16),
+});
+export type BotPersonality = z.infer<typeof BotPersonalitySchema>;
+
 /** Full event log or delta for a tournament (website -> bridge). */
 export const TournamentSync = envelope(
   'tournament.sync',
@@ -237,6 +287,8 @@ export const TournamentSync = envelope(
     access: z.array(AccessEntrySchema),
     /** Monster Hunt: the map records shown in the HUD (statistics page). */
     records: MapRecordsSchema.optional(),
+    /** Personalities of the tournament's website bots (chat lines, rivals). */
+    bots: z.array(BotPersonalitySchema).max(256).optional(),
   }),
 );
 

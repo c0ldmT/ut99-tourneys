@@ -1,4 +1,4 @@
-import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -73,6 +73,39 @@ export const tournaments = sqliteTable('tournaments', {
    * season of its first game. Lifetime statistics count every tournament.
    */
   seasonal: integer('seasonal', { mode: 'boolean' }).notNull().default(true),
+});
+
+/** Bot clans: their tag is put in front of the members' names in the game. */
+export const botClans = sqliteTable('bot_clans', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  nameKey: text('name_key').notNull().unique(),
+  tag: text('tag').notNull(),
+  color: text('color'),
+  description: text('description'),
+  createdAt: text('created_at').notNull(),
+});
+
+/** Website bots (bot control center). */
+export const bots = sqliteTable('bots', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  nameKey: text('name_key').notNull().unique(),
+  clanId: text('clan_id'),
+  /** Default difficulty when the bot is added to a tournament's pool (0..7). */
+  skill: real('skill').notNull().default(4),
+  botClass: text('bot_class'),
+  skin: text('skin'),
+  face: text('face'),
+  /** BotTraits (accuracy, alertness, combat style, camping, strafing, jumpy, weapon, voice). */
+  traitsJson: text('traits_json').notNull(),
+  /** BotPersonality of the website: talk, lines, rivals (by user/bot id). */
+  personalityJson: text('personality_json').notNull(),
+  bio: text('bio'),
+  color: text('color'),
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
 });
 
 /** Seasons, numbered from 1; dates are days (YYYY-MM-DD) in the season time zone, inclusive. */

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
+import { BOT_TEAM_NAMES } from '@tourney/protocol';
 import { z } from 'zod';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
@@ -19,8 +20,16 @@ export const RatingSettingsSchema = z.object({
 export type RatingSettings = z.infer<typeof RatingSettingsSchema>;
 
 /** Rating settings are the defaults for new seasons; each season keeps a copy (seasons table). */
+/** Names for teams made of bots only (bot control center), in the order they are used. */
+export const TeamNamesSchema = z
+  .array(z.string().trim().min(1).max(40))
+  .min(1)
+  .max(200)
+  .refine((l) => new Set(l.map((n) => n.toLowerCase())).size === l.length, 'names must differ');
+
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
+  teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -45,14 +54,27 @@ export class SettingsService {
       }
     }
     const rating = RatingSettingsSchema.safeParse(raw['rating'] ?? {});
-    return { rating: rating.success ? rating.data : RatingSettingsSchema.parse({}) };
+    const teamNames = TeamNamesSchema.safeParse(raw['teamNames']);
+    return {
+      rating: rating.success ? rating.data : RatingSettingsSchema.parse({}),
+      teamNames: teamNames.success ? teamNames.data : [...BOT_TEAM_NAMES],
+    };
   }
 
   setRating(value: Partial<RatingSettings>): WebsiteSettings {
-    const next = RatingSettingsSchema.parse({ ...this.get().rating, ...value });
-    const row = { key: 'rating', valueJson: JSON.stringify(next), updatedAt: this.now() };
-    const exists = this.db.select().from(settings).where(eq(settings.key, 'rating')).get();
-    if (exists) this.db.update(settings).set(row).where(eq(settings.key, 'rating')).run();
+    this.put('rating', RatingSettingsSchema.parse({ ...this.get().rating, ...value }));
+    return this.get();
+  }
+
+  setTeamNames(names: string[]): WebsiteSettings {
+    this.put('teamNames', TeamNamesSchema.parse(names));
+    return this.get();
+  }
+
+  private put(key: string, value: unknown) {
+    const row = { key, valueJson: JSON.stringify(value), updatedAt: this.now() };
+    const exists = this.db.select().from(settings).where(eq(settings.key, key)).get();
+    if (exists) this.db.update(settings).set(row).where(eq(settings.key, key)).run();
     else this.db.insert(settings).values(row).run();
     this.version++;
     return this.get();

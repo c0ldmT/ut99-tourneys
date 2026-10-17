@@ -547,3 +547,34 @@ export function playerDetail(
     mapRecords: rec.maps.filter((r) => r.members.some((x) => x.key === key)),
   };
 }
+
+/**
+ * Head to head: games in which `key` and each of `others` played on opposite sides, and how
+ * many of them `key` won.
+ */
+export function headToHead(
+  all: readonly TournamentFacts[],
+  key: string,
+  others: readonly string[],
+): Record<string, { games: number; wins: number }> {
+  const out: Record<string, { games: number; wins: number }> = {};
+  for (const o of others) out[o] = { games: 0, wins: 0 };
+  for (const f of all) {
+    const byGame = new Map<string, TournamentFacts['players']>();
+    for (const p of f.players) {
+      const g = `${p.matchId}/${p.game}`;
+      byGame.set(g, [...(byGame.get(g) ?? []), p]);
+    }
+    for (const rows of byGame.values()) {
+      const me = rows.find((r) => r.key === key);
+      if (!me) continue;
+      for (const o of others) {
+        const them = rows.find((r) => r.key === o);
+        if (!them || them.entrantId === me.entrantId) continue;
+        out[o]!.games++;
+        if (me.won) out[o]!.wins++;
+      }
+    }
+  }
+  return out;
+}

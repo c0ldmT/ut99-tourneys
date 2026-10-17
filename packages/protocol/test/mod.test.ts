@@ -9,6 +9,8 @@ import {
   ModLineError,
   splitText,
   wireName,
+  wireText,
+  BOT_REF_CHARS,
   type BridgeToMod,
 } from '../src/index.js';
 
@@ -130,5 +132,23 @@ describe('mod line protocol', () => {
       '{"t":"hb","up":2}',
     ]);
     expect(() => s.push('x'.repeat(MAX_LINE_BYTES * 5))).toThrow(ModLineError);
+  });
+
+  it('fits the website bot lines into one wire line each', () => {
+    const name = wireName('\u00e4'.repeat(40));
+    const ref = 'x'.repeat(BOT_REF_CHARS);
+    const lines = [
+      { t: 'bcfg', name, skn: ref, fac: ref, vc: ref },
+      { t: 'btr', name, fw: ref, acc: -100, alt: -100, cs: -100, cmp: 100, str: -100, jmp: true },
+      { t: 'bpers', name, tk: 100 },
+      { t: 'bsay', name, k: 'rdeath', x: wireText('\u00e4'.repeat(200), 120) },
+      { t: 'brv', name, r: name, lv: 2 },
+    ] as const;
+    for (const l of lines) {
+      const wire = encodeModLine(l as never);
+      expect(wire.length).toBeLessThanOrEqual(MAX_LINE_BYTES);
+      expect(decodeBridgeToMod(wire)).toEqual(l);
+    }
+    expect(wireText('abc\u00e4def', 6)).toBe('abc');
   });
 });

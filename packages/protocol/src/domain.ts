@@ -52,14 +52,37 @@ export const MatchResultSchema = z.object({
 /** Bot skill as in UT99: 0 (Novice) .. 7 (Godlike). */
 export const BotSkill = z.number().min(0).max(7);
 
+/**
+ * How a bot plays (UT99 ChallengeBotInfo values): accuracy, alertness, strafing -1..1 (0 =
+ * normal), combat style -1 (avoidant) .. 1 (berserk), camping 0..1, plus favourite weapon and
+ * voice (class names).
+ */
+export const BotTraitsSchema = z.object({
+  accuracy: z.number().min(-1).max(1).optional(),
+  alertness: z.number().min(-1).max(1).optional(),
+  combatStyle: z.number().min(-1).max(1).optional(),
+  camping: z.number().min(0).max(1).optional(),
+  strafing: z.number().min(-1).max(1).optional(),
+  jumpy: z.boolean().optional(),
+  favoriteWeapon: z.string().max(64).optional(),
+  voice: z.string().max(64).optional(),
+});
+export type BotTraits = z.infer<typeof BotTraitsSchema>;
+
 export const BotSpecSchema = z.object({
-  /** Name as configured in the server installation. */
+  /**
+   * Name in the game (with the clan tag of a website bot). Bots without `id` are looked up by
+   * this name in the server's bot configuration.
+   */
   name: z.string().min(1).max(32),
   skill: BotSkill,
+  /** Website bot library id: statistics and ratings follow it, not the name. */
+  id: z.string().min(1).max(40).optional(),
   /** Game-specific class/character, e.g. "BotPack.TMale1Bot" for UT99. */
   botClass: z.string().max(128).optional(),
   skin: z.string().max(128).optional(),
   face: z.string().max(128).optional(),
+  traits: BotTraitsSchema.optional(),
 });
 export type BotSpec = z.infer<typeof BotSpecSchema>;
 
@@ -115,7 +138,11 @@ export type Entrant = z.infer<typeof EntrantSchema>;
 /** Entrant id of a bot, derived from its name (stable, safe for file names and URLs). */
 export const botEntrantId = (name: string) => `bot-${name.replace(/[^A-Za-z0-9_-]/g, '_')}`;
 
-export function botEntrant(spec: BotSpec, id = botEntrantId(spec.name)): Entrant {
+/** Entrant id of a bot: its library id, else its name. */
+export const botSpecEntrantId = (spec: BotSpec) =>
+  spec.id ? botEntrantId(spec.id) : botEntrantId(spec.name);
+
+export function botEntrant(spec: BotSpec, id = botSpecEntrantId(spec)): Entrant {
   return { id, kind: 'bot', displayName: spec.name, bot: spec };
 }
 
@@ -185,6 +212,8 @@ export const TournamentSettingsSchema = z.object({
   botMatchMode: z.enum(['watch', 'simulate']).default('watch'),
   /** How bots fill empty slots when seeding automatically. */
   botPlacement: z.enum(['byes', 'random']).default('byes'),
+  /** Team games: clans with enough bots in the pool play as bot teams of their own. */
+  clanTeams: z.boolean().default(false),
   /** Seconds the server keeps running after the final (standings on screen), then it is stopped. */
   postTournamentShutdownSec: z.number().int().min(0).max(7200).default(30),
   game: z.object({

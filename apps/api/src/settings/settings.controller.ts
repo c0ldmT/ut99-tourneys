@@ -1,8 +1,14 @@
 import { Body, Controller, Get, Inject, Put } from '@nestjs/common';
+import { z } from 'zod';
 import { AdminOnly } from '../auth/guard.js';
 import { ZodPipe } from '../common/http.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
-import { RatingSettingsSchema, SettingsService, type RatingSettings } from './settings.service.js';
+import {
+  RatingSettingsSchema,
+  SettingsService,
+  TeamNamesSchema,
+  type RatingSettings,
+} from './settings.service.js';
 
 /** Website settings (admins). */
 @AdminOnly()
@@ -24,5 +30,11 @@ export class SettingsController {
     // The running and the planned season use the new settings; ended seasons keep theirs.
     this.seasons.applyRating(next.rating);
     return next;
+  }
+
+  /** Names for teams made of bots only. */
+  @Put('team-names')
+  teamNames(@Body(new ZodPipe(z.object({ names: TeamNamesSchema }))) body: { names: string[] }) {
+    return this.settings.setTeamNames(body.names);
   }
 }

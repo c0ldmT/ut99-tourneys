@@ -8,6 +8,7 @@ import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import {
+  headToHead,
   mapRecords,
   playerDetail,
   playerTable,
@@ -221,6 +222,17 @@ export class StatsService {
       }
     }
     return shownRating((mu ?? 25) + levelBonusMu(skill, levelPoints));
+  }
+
+  /**
+   * Head to head (lifetime): games in which `key` and each of `others` played on opposite sides,
+   * and how many of them `key` won.
+   */
+  headToHead(
+    key: string,
+    others: readonly string[],
+  ): Record<string, { games: number; wins: number }> {
+    return headToHead(this.facts('lifetime'), key, others);
   }
 
   /** Current display names of website users (they can rename themselves). */

@@ -108,13 +108,13 @@ describe('ratings on the website', () => {
     ({ api } = await startApi());
     const admin = await Client.login(api, 'Boss', true);
     const mario = await Client.login(api, 'Mario');
-    expect((await admin.get('/settings')).body).toEqual({
+    expect((await admin.get('/settings')).body).toMatchObject({
       rating: { botGames: true, levelPoints: 100 },
     });
     expect((await mario.get('/settings')).status).toBe(403);
     expect((await mario.req('PUT', '/settings/rating', { botGames: false })).status).toBe(403);
     const put = await admin.req('PUT', '/settings/rating', { levelPoints: 150 });
-    expect(put.body).toEqual({ rating: { botGames: true, levelPoints: 150 } });
+    expect(put.body).toMatchObject({ rating: { botGames: true, levelPoints: 150 } });
     expect((await admin.req('PUT', '/settings/rating', { levelPoints: 999 })).status).toBe(400);
 
     await admin.post('/agents', { id: 'pi', name: 'Raspberry' });

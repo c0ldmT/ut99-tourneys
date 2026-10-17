@@ -139,4 +139,36 @@ export const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  // 7: bot control center. The website keeps its own bots (no limit, ids that statistics and
+  // ratings follow) and bot clans (a tag in front of the name in the game). Look and play style
+  // as in UT's bot configuration, plus personality (chat lines, rivals), bio, active/retired.
+  `
+  CREATE TABLE bot_clans (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL UNIQUE,
+    tag TEXT NOT NULL,
+    color TEXT,
+    description TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE bots (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL UNIQUE,
+    clan_id TEXT REFERENCES bot_clans(id) ON DELETE SET NULL,
+    skill REAL NOT NULL DEFAULT 4,
+    bot_class TEXT,
+    skin TEXT,
+    face TEXT,
+    traits_json TEXT NOT NULL,
+    personality_json TEXT NOT NULL,
+    bio TEXT,
+    color TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE INDEX bots_clan ON bots(clan_id);
+  `,
 ];

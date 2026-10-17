@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
-import { buildSlots, createRng, fillEmptySlots, type Rng } from '@tourney/bracket';
+import { buildSlots, createRng, fillEmptySlots, shuffle, type Rng } from '@tourney/bracket';
 import {
   BotSpecSchema,
   MAX_SUBS,
@@ -37,6 +37,8 @@ import { botKey, statMode, userKey } from '../stats/facts.js';
 import type { RatedGame } from '../stats/ratings.js';
 import { StatsService } from '../stats/stats.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
+import { BotsService } from '../bots/bots.service.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
 import {
@@ -159,6 +161,8 @@ export class TournamentsService {
     @Inject(NotificationsService) private readonly notify: NotificationsService,
     @Inject(StatsService) private readonly stats: StatsService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
+    @Inject(BotsService) private readonly bots: BotsService,
+    @Inject(SettingsService) private readonly settingsSvc: SettingsService,
   ) {}
 
   private now() {
@@ -183,8 +187,42 @@ export class TournamentsService {
     return TournamentSettingsSchema.parse(JSON.parse(t.settingsJson));
   }
 
+  /** The bot pool; website bots with their current name, look and play style. */
   botPool(t: TournamentRow): BotSpec[] {
-    return z.array(BotSpecSchema).parse(JSON.parse(t.botPoolJson));
+    return z
+      .array(BotSpecSchema)
+      .parse(JSON.parse(t.botPoolJson))
+      .map((b) => this.bots.resolveSpec(b));
+  }
+
+  /**
+   * Clan teams (team tournaments with `clanTeams`): every clan with enough bots in the pool
+   * plays as a bot team of its own (clan name, a random line-up of its bots).
+   */
+  private clanTeams(
+    pool: BotSpec[],
+    teamSize: number,
+    rng: Rng,
+  ): { name: string; tag: string; bots: BotSpec[] }[] {
+    const byClan = new Map<string, { name: string; tag: string; bots: BotSpec[] }>();
+    for (const b of pool) {
+      const clan = this.bots.clanOf(b.id);
+      if (!clan) continue;
+      const entry = byClan.get(clan.id) ?? { name: clan.name, tag: clan.tag, bots: [] };
+      if (!entry.bots.some((x) => x.id === b.id)) entry.bots.push(b);
+      byClan.set(clan.id, entry);
+    }
+    return shuffle([...byClan.values()], rng)
+      .filter((c) => c.bots.length >= teamSize)
+      .map((c) => ({ ...c, bots: shuffle(c.bots, rng).slice(0, teamSize) }));
+  }
+
+  /** The pool without the bots that already play in a clan team (if enough bots are left). */
+  private fillPool(pool: BotSpec[], teams: TeamEntrant[], need: number): BotSpec[] {
+    const used = new Set(teams.flatMap((e) => e.bots.map((b) => b.name.toLowerCase())));
+    const rest = pool.filter((b) => !used.has(b.name.toLowerCase()));
+    const distinct = new Set(rest.map((b) => b.name.toLowerCase())).size;
+    return distinct >= need ? rest : pool;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -217,7 +255,9 @@ export class TournamentsService {
     }
   }
 
-  create(body: CreateTournament, by: User): TournamentRow {
+  create(input: CreateTournament, by: User): TournamentRow {
+    // Website bots get their current name (with clan tag) for the checks and the stored pool.
+    const body = { ...input, botPool: input.botPool.map((b) => this.bots.resolveSpec(b)) };
     this.checkFields(body);
     const inSeason = !!this.seasons.current();
     if (body.seasonal && !inSeason) throw conflict('no season is running');
@@ -250,8 +290,11 @@ export class TournamentsService {
     return this.require(id);
   }
 
-  update(id: string, body: UpdateTournament): TournamentRow {
+  update(id: string, input: UpdateTournament): TournamentRow {
     const t = this.require(id);
+    const body = input.botPool
+      ? { ...input, botPool: input.botPool.map((b) => this.bots.resolveSpec(b)) }
+      : input;
     const structural =
       body.settings !== undefined || body.agentId !== undefined || body.profileId !== undefined;
     if (structural && t.phase !== 'draft') {
@@ -705,8 +748,20 @@ export class TournamentsService {
         this.applyFormTeams(t, settings, rng);
       }
       humans = this.teams.list(id).map((v) => this.teamEntrant(v, settings.teamSize));
+      const needed = Math.max(0, settings.size - humans.length);
+      const clans = settings.clanTeams
+        ? this.clanTeams(this.botPool(t), settings.teamSize, rng).slice(0, needed)
+        : [];
       for (let n = 1; n <= settings.size; n++) {
-        bots.push({ id: botTeamId(n), kind: 'team', displayName: 'Bots', members: [], bots: [] });
+        const clan = clans[n - 1];
+        bots.push({
+          id: botTeamId(n),
+          kind: 'team',
+          displayName: clan?.name ?? 'Bots',
+          ...(clan ? { tag: clan.tag } : {}),
+          members: [],
+          bots: clan?.bots ?? [],
+        });
       }
     } else {
       humans = this.registered(id).map((u) => ({
@@ -737,7 +792,8 @@ export class TournamentsService {
         slots = buildSlots({
           size: settings.size,
           humans: humanIds,
-          botPool: botIds,
+          // Teams: bot teams are interchangeable, the clan teams (first) always play.
+          botPool: teamMode ? botIds.slice(0, settings.size - humanIds.length) : botIds,
           humanOrder: body.humanOrder === 'seeded' ? 'seeded' : 'random',
           botPlacement: settings.botPlacement,
           rng,
@@ -829,8 +885,9 @@ export class TournamentsService {
     rng: Rng,
   ): TeamEntrant[] {
     const ordered = slots.map((id) => entrants.find((e) => e.id === id) as TeamEntrant);
-    const need = ordered.map((e) => Math.max(0, teamSize - e.members.length));
-    return this.nameBotTeams(ordered, assignBots(need, this.botPool(t), rng));
+    const need = ordered.map((e) => Math.max(0, teamSize - e.members.length - e.bots.length));
+    const pool = this.fillPool(this.botPool(t), ordered, Math.max(0, ...need));
+    return this.nameBotTeams(ordered, assignBots(need, pool, rng));
   }
 
   /** Adds the bots to the teams and names the teams made of bots only. */
@@ -838,17 +895,21 @@ export class TournamentsService {
     const taken = new Set(
       teams.filter((e) => e.members.length).map((e) => e.displayName.toLowerCase()),
     );
+    for (const e of teams) if (e.bots.length) taken.add(e.displayName.toLowerCase());
+    const names = this.settingsSvc.get().teamNames;
     let next = 0;
+    const nameAt = (i: number) => names[i] ?? botTeamName(i);
     const botName = () => {
-      let name = botTeamName(next++);
-      while (taken.has(name.toLowerCase())) name = botTeamName(next++);
+      let name = nameAt(next++);
+      while (taken.has(name.toLowerCase())) name = nameAt(next++);
       taken.add(name.toLowerCase());
       return name;
     };
     return teams.map((e, i) => ({
       ...e,
-      ...(e.members.length ? {} : { displayName: botName() }),
-      bots: fills[i] ?? [],
+      // Clan teams keep their name; other teams of bots get one from the list.
+      ...(e.members.length || e.bots.length ? {} : { displayName: botName() }),
+      bots: [...e.bots, ...(fills[i] ?? [])],
     }));
   }
 
@@ -906,14 +967,26 @@ export class TournamentsService {
     let botIds: string[];
     if (settings.teamSize > 1) {
       const teams = [...humans, ...bots.slice(0, missing)] as TeamEntrant[];
+      const need = teams.map((e) =>
+        Math.max(0, settings.teamSize - e.members.length - e.bots.length),
+      );
+      const free = this.fillPool(
+        pool.map((p) => p.spec),
+        teams,
+        Math.max(0, ...need),
+      );
       const fills = balanceBots(
-        teams.map((e) => ({
-          humans: teamStarters(e, settings.teamSize).map((m) =>
-            this.strengthOf(settings, { userId: m.userId }),
-          ),
-          need: Math.max(0, settings.teamSize - e.members.length),
+        teams.map((e, i) => ({
+          // Players and the clan bots already in the team.
+          humans: [
+            ...teamStarters(e, settings.teamSize).map((m) =>
+              this.strengthOf(settings, { userId: m.userId }),
+            ),
+            ...e.bots.map((b) => this.strengthOf(settings, { bot: b })),
+          ],
+          need: need[i]!,
         })),
-        pool,
+        pool.filter((p) => free.includes(p.spec)),
         settings.teamSize,
         rng,
       );
@@ -993,8 +1066,24 @@ export class TournamentsService {
         events: log.slice(from),
         access: this.access(t),
         records: this.mapRecordsFor(t),
+        bots: this.botPersonalities(t),
       },
     });
+  }
+
+  /** Personalities (chat lines, rivals) of the website bots of the pool and the entrants. */
+  private botPersonalities(t: TournamentRow) {
+    try {
+      const ids = this.botPool(t).flatMap((b) => (b.id ? [b.id] : []));
+      for (const e of Object.values(this.log.projection(t.id)?.entrants ?? {})) {
+        if (e.kind === 'bot' && e.bot.id) ids.push(e.bot.id);
+        if (e.kind === 'team') for (const b of e.bots) if (b.id) ids.push(b.id);
+      }
+      return this.bots.personalities(ids);
+    } catch (err) {
+      this.logger.warn(`bot personalities for ${t.id}: ${String(err)}`);
+      return [];
+    }
   }
 
   /**

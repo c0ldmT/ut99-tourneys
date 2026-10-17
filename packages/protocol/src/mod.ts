@@ -24,6 +24,12 @@ export const MAX_LINE_BYTES = 255;
 export const MAX_NAME_CHARS = 32;
 /** Escaped byte budget for a name, so two names always fit into one bracket line. */
 export const MAX_NAME_WIRE_BYTES = 48;
+/** Class/texture names of a website bot (skin, face, voice, weapon) on the wire. */
+export const BOT_REF_CHARS = 48;
+/** Chat lines per bot sent to the mod (picked from its lines, spread over the occasions). */
+export const BOT_MAX_LINES = 16;
+/** Rivals per bot sent to the mod. */
+export const BOT_MAX_RIVALS = 8;
 
 const str = (max = 64) => z.string().max(max);
 const int = z.number().int();
@@ -226,6 +232,49 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     cls: str(128),
   }),
   /**
+   * Website bots, sent before their `bot`/`botadd` line: look (skin, face, voice; "" = the
+   * class default) and how they play (`btr`, values x100: accuracy, alertness, strafing and
+   * combat style -100..100, camping 0..100). Without these lines the mod uses the server's bot
+   * configuration of that name, as before.
+   */
+  z.object({
+    t: z.literal('bcfg'),
+    name: str(MAX_NAME_CHARS),
+    skn: str(BOT_REF_CHARS),
+    fac: str(BOT_REF_CHARS),
+    vc: str(BOT_REF_CHARS),
+  }),
+  z.object({
+    t: z.literal('btr'),
+    name: str(MAX_NAME_CHARS),
+    fw: str(BOT_REF_CHARS), // favourite weapon class, "" = none
+    acc: int.min(-100).max(100),
+    alt: int.min(-100).max(100),
+    cs: int.min(-100).max(100),
+    cmp: int.min(0).max(100),
+    str: int.min(-100).max(100),
+    jmp: z.boolean(),
+  }),
+  /**
+   * A bot's personality (sent with its config): `tk` chance in percent to say something on an
+   * occasion; then up to BOT_MAX_LINES `bsay` lines (`k` occasion, `x` text with placeholders
+   * {me} {victim} {killer} {map}) and `brv` lines (`r` rival's name in the game, `lv` 1 rival,
+   * 2 nemesis). A new `bpers` for a name replaces its lines and rivals.
+   */
+  z.object({ t: z.literal('bpers'), name: str(MAX_NAME_CHARS), tk: int.min(0).max(100) }),
+  z.object({
+    t: z.literal('bsay'),
+    name: str(MAX_NAME_CHARS),
+    k: z.enum(['start', 'kill', 'death', 'win', 'loss', 'rkill', 'rdeath']),
+    x: str(160),
+  }),
+  z.object({
+    t: z.literal('brv'),
+    name: str(MAX_NAME_CHARS),
+    r: str(MAX_NAME_CHARS),
+    lv: int.min(1).max(2),
+  }),
+  /**
    * Monster Hunt race, sent with the match: which side runs on this level (the other team
    * watches), the penalty per death and the other team's finished run of this game (p* fields,
    * pt = -1 if this is the first run).
@@ -416,6 +465,20 @@ export function wireName(name: string): string {
     out += ch;
     bytes += cost;
     chars++;
+  }
+  return out;
+}
+
+/** Cuts a text to at most `maxBytes` after escaping (emoji dropped, like wireName). */
+export function wireText(text: string, maxBytes: number): string {
+  let out = '';
+  let bytes = 0;
+  for (const ch of text) {
+    if (ch.length > 1) continue;
+    const cost = asciiJson(ch).length - 2;
+    if (bytes + cost > maxBytes) break;
+    out += ch;
+    bytes += cost;
   }
   return out;
 }

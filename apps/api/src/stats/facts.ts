@@ -132,7 +132,8 @@ export function statMode(settings: TournamentSettings): StatMode {
 }
 
 export const userKey = (userId: string) => `u:${userId}`;
-export const botKey = (name: string) => `b:${name.toLowerCase()}`;
+/** `b:<library id>` for website bots, `b:<name>` for bots of the server's configuration. */
+export const botKey = (idOrName: string) => `b:${idOrName.toLowerCase()}`;
 
 const userRef = (userId: string, name: string): PlayerRef => ({
   key: userKey(userId),
@@ -140,15 +141,15 @@ const userRef = (userId: string, name: string): PlayerRef => ({
   userId,
   bot: false,
 });
-const botRef = (name: string, skill?: number): PlayerRef => ({
-  key: botKey(name),
+const botRef = (name: string, skill?: number, id?: string): PlayerRef => ({
+  key: botKey(id ?? name),
   name,
   bot: true,
   ...(skill === undefined ? {} : { skill }),
 });
 
 /** Difficulty of a bot by name: exact, then without a clone suffix ("Loque2" -> "Loque"). */
-function skillOf(skills: ReadonlyMap<string, number>, name: string): number | undefined {
+function skillOf<T>(skills: ReadonlyMap<string, T>, name: string): T | undefined {
   const k = name.toLowerCase();
   return skills.get(k) ?? skills.get(k.replace(/\d+$/, ''));
 }
@@ -157,11 +158,11 @@ function skillOf(skills: ReadonlyMap<string, number>, name: string): number | un
 function entrantPlayers(e: Entrant | undefined, teamSize: number): PlayerRef[] {
   if (!e) return [];
   if (e.kind === 'human') return [userRef(e.userId, e.displayName)];
-  if (e.kind === 'bot') return [botRef(e.bot.name, e.bot.skill)];
+  if (e.kind === 'bot') return [botRef(e.bot.name, e.bot.skill, e.bot.id)];
   const starters = teamStarters(e, teamSize).map((m) => userRef(m.userId, m.displayName));
   const bots = e.bots
     .slice(0, Math.max(0, teamSize - starters.length))
-    .map((b) => botRef(b.name, b.skill));
+    .map((b) => botRef(b.name, b.skill, b.id));
   return [...starters, ...bots];
 }
 
@@ -180,18 +181,23 @@ export function extractFacts(
     name: string;
     settings: TournamentSettings;
     /** The tournament's bot pool: difficulty of bots that are not in an entrant (stand-ins). */
-    botPool?: readonly { name: string; skill: number }[];
+    botPool?: readonly { name: string; skill: number; id?: string }[];
   },
   events: readonly TournamentEvent[],
 ): TournamentFacts {
-  /** Bot difficulty by lower-case name: the pool, then the entrants (seeding, replacements). */
+  /** Bot difficulty and library id by lower-case name: the pool, then the entrants. */
   const skills = new Map<string, number>();
-  for (const b of t.botPool ?? []) skills.set(b.name.toLowerCase(), b.skill);
-  const noteBots = (e: Entrant) => {
-    if (e.kind === 'bot') skills.set(e.bot.name.toLowerCase(), e.bot.skill);
-    if (e.kind === 'team') for (const b of e.bots) skills.set(b.name.toLowerCase(), b.skill);
+  const ids = new Map<string, string>();
+  const note = (b: { name: string; skill: number; id?: string }) => {
+    skills.set(b.name.toLowerCase(), b.skill);
+    if (b.id) ids.set(b.name.toLowerCase(), b.id);
   };
-  const bot = (name: string) => botRef(name, skillOf(skills, name));
+  for (const b of t.botPool ?? []) note(b);
+  const noteBots = (e: Entrant) => {
+    if (e.kind === 'bot') note(e.bot);
+    if (e.kind === 'team') for (const b of e.bots) note(b);
+  };
+  const bot = (name: string) => botRef(name, skillOf(skills, name), skillOf(ids, name));
   const lineupRefs = (l: Lineup): PlayerRef[] =>
     l.map((x) => (x.userId ? userRef(x.userId, x.name) : bot(x.name)));
   const statRef = (p: PlayerGameStats): PlayerRef =>
