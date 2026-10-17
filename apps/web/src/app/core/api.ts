@@ -10,8 +10,11 @@ import type {
   PublicUser,
   RatedGame,
   RatingRow,
+  Season,
+  SeasonsOverview,
   SiteConfig,
   StatMode,
+  StatScope,
   StatsPlayerDetail,
   StatsPlayerRow,
   StatsRecord,
@@ -75,26 +78,42 @@ export class Api {
   setAdmin = (id: string, isAdmin: boolean) =>
     this.call<PublicUser>('PATCH', `/users/${id}`, { isAdmin });
 
-  statsPlayers = (mode: StatMode | '', bots: boolean) =>
+  statsPlayers = (scope: StatScope, mode: StatMode | '', bots: boolean) =>
     this.call<StatsPlayerRow[]>(
       'GET',
-      `/stats/players?${mode ? `mode=${mode}&` : ''}bots=${bots ? 1 : 0}`,
+      `/stats/players?season=${scope}&${mode ? `mode=${mode}&` : ''}bots=${bots ? 1 : 0}`,
     );
-  statsPlayer = (key: string) =>
-    this.call<StatsPlayerDetail>('GET', `/stats/players/${encodeURIComponent(key)}`);
-  statsRatings = (mode: StatMode, bots: boolean) =>
-    this.call<RatingRow[]>('GET', `/stats/ratings?mode=${mode}&bots=${bots ? 1 : 0}`);
-  playerRatings = (key: string) =>
-    this.call<PlayerRatings>('GET', `/stats/players/${encodeURIComponent(key)}/ratings`);
+  statsPlayer = (key: string, scope: StatScope) =>
+    this.call<StatsPlayerDetail>(
+      'GET',
+      `/stats/players/${encodeURIComponent(key)}?season=${scope}`,
+    );
+  statsRecords = (season: number, mode: StatMode | '') =>
+    this.call<{ records: StatsRecord[]; maps: MapRecord[] }>(
+      'GET',
+      `/stats/records?season=${season}${mode ? `&mode=${mode}` : ''}`,
+    );
+  statsRatings = (season: number, mode: StatMode, bots: boolean) =>
+    this.call<RatingRow[]>(
+      'GET',
+      `/stats/ratings?season=${season}&mode=${mode}&bots=${bots ? 1 : 0}`,
+    );
+  playerRatings = (key: string, season: number) =>
+    this.call<PlayerRatings>(
+      'GET',
+      `/stats/players/${encodeURIComponent(key)}/ratings?season=${season}`,
+    );
   tournamentRatings = (id: string) => this.call<RatedGame[]>('GET', `/tournaments/${id}/ratings`);
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/rating', body);
-  statsRecords = (mode: StatMode | '') =>
-    this.call<{ records: StatsRecord[]; maps: MapRecord[] }>(
-      'GET',
-      `/stats/records${mode ? `?mode=${mode}` : ''}`,
-    );
+  seasons = () => this.call<SeasonsOverview>('GET', '/seasons');
+  createSeason = (startDate: string, endDate: string) =>
+    this.call<Season>('POST', '/seasons', { startDate, endDate });
+  updateSeason = (n: number, body: { startDate?: string; endDate?: string }) =>
+    this.call<Season>('PATCH', `/seasons/${n}`, body);
+  endSeason = (n: number) => this.call<Season>('POST', `/seasons/${n}/end`);
+  deleteSeason = (n: number) => this.call<void>('DELETE', `/seasons/${n}`);
 
   tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);

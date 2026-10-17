@@ -209,8 +209,9 @@ map twice, once per team:
   `config(MonsterHunt)`, so Monster Hunt would read them from `MonsterHunt.ini`, not from `Tourney.ini`.
 - **`mrec`** (bridge → mod, after `race`): the map record from the statistics, shown in the HUD under the run
   info: `ms` best final time (run time plus penalty) in ms or -1 for none (-2: no records, the HUD hides the line), `by` the team that holds it, `rn` a
-  better finish in this tournament counts (`stats_enabled`). The website sends the records with
-  `tournament.sync` (`records`, Monster Hunt only); the bridge keeps its copy current with the runs it records,
+  better finish in this tournament counts (a season tournament in a season). The records are those of the
+  tournament's season and monster skill. The website sends them with `tournament.sync` (`records`, Monster Hunt
+  only); the bridge keeps its copy current with the runs it records,
   announces a new record in the game and sends the new line with the next run.
 - **`rp`** (mod → bridge): progress every few seconds and on every death: `ms` run time (pauses excluded), `d`
   deaths in the team (bots included), `pts` monster points.

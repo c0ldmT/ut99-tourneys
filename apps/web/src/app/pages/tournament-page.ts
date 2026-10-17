@@ -39,6 +39,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <div>
           <h1>
             {{ t.name }} <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+            @if (t.season) {
+              <span class="badge season">{{ 'season.label' | t: { n: t.season } }}</span>
+            }
           </h1>
           <div class="muted small">
             {{ 'format.' + t.settings.format | t }} ·
@@ -334,7 +337,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             </div>
           </div>
         }
-        @if (t.ranked && ratedGames().length) {
+        @if (t.seasonal && ratedGames().length) {
           <div class="card">
             <h2>{{ 'rating.changes' | t }}</h2>
             <div class="scroll">
@@ -639,6 +642,10 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
+    .badge.season {
+      color: var(--accent);
+      border-color: var(--accent-dim);
+    }
     table.ratings td {
       vertical-align: top;
       padding-right: 16px;
@@ -922,7 +929,7 @@ export class TournamentPage {
         const t = await this.api.tournament(id);
         this.t.set(t);
         this.error.set('');
-        if (t.ranked && t.headSeq !== this.ratingsHead) {
+        if (t.seasonal && t.headSeq !== this.ratingsHead) {
           this.ratingsHead = t.headSeq;
           this.ratings.set(await this.api.tournamentRatings(id));
         }

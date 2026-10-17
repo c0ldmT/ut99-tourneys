@@ -13,16 +13,38 @@ import { Api, errorText } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
-import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from '../core/types';
+import { defaultScope, parseScope, startedSeasons } from '../core/season';
+import type {
+  PlayerRatings,
+  SeasonsOverview,
+  StatMode,
+  StatScope,
+  StatsPlayerDetail,
+  StatsPlayerRow,
+} from '../core/types';
 
 @Component({
   selector: 'app-stats-player',
   imports: [TPipe, RouterLink, DatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <p>
+    <div class="top">
       <a routerLink="/stats">← {{ 'stats.title' | t }}</a>
-    </p>
+      <label class="small"
+        >{{ 'season.scope' | t }}
+        <select [value]="scope()" (change)="setScope($any($event.target).value)">
+          @for (s of seasons(); track s.number) {
+            <option [value]="s.number">
+              {{ 'season.label' | t: { n: s.number } }}
+              @if (s.status === 'running') {
+                ({{ 'season.running' | t }})
+              }
+            </option>
+          }
+          <option value="lifetime">{{ 'season.lifetime' | t }}</option>
+        </select>
+      </label>
+    </div>
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }
@@ -60,7 +82,7 @@ import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from 
         </div>
       </div>
 
-      @if (ratingModes().length) {
+      @if (scope() !== 'lifetime' && ratingModes().length) {
         <h2>{{ 'rating.title' | t }}</h2>
         <div class="tiles">
           @for (m of ratingModes(); track m.mode) {
@@ -85,7 +107,10 @@ import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from 
                   <tr>
                     <td class="muted small">{{ g.at | date: 'short' }}</td>
                     <td>
-                      <a [routerLink]="['/t', g.tournamentId]">{{ g.matchId }} G{{ g.game }}</a>
+                      <a [routerLink]="['/t', g.tournamentId]">{{
+                        g.tournamentName ?? g.tournamentId
+                      }}</a>
+                      <span class="muted small match-id">{{ g.matchId }} G{{ g.game }}</span>
                       <span class="muted small match-id">{{ modeLabel(g.mode) | t }}</span>
                     </td>
                     <td class="num" [class.win]="g.delta > 0" [class.loss]="g.delta < 0">
@@ -163,7 +188,9 @@ import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from 
         <div>
           <h2>{{ 'stats.recordsHeld' | t }}</h2>
           <div class="card">
-            @if (d.records.length === 0 && d.mapRecords.length === 0) {
+            @if (scope() === 'lifetime') {
+              <p class="muted">{{ 'stats.recordsSeasonOnly' | t }}</p>
+            } @else if (d.records.length === 0 && d.mapRecords.length === 0) {
               <p class="muted">{{ 'stats.noRecords' | t }}</p>
             }
             @for (r of d.records; track r.id) {
@@ -240,6 +267,14 @@ import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from 
     }
   `,
   styles: `
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 8px 0 12px;
+    }
     .badge {
       font-size: 0.8rem;
       padding: 1px 8px;
@@ -260,6 +295,13 @@ import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from 
     }
     .scroll {
       overflow-x: auto;
+    }
+    .scroll table.stats th:first-child,
+    .scroll table.stats td:first-child {
+      position: sticky;
+      left: 0;
+      background: var(--panel);
+      box-shadow: inset -1px 0 0 var(--border);
     }
     table.stats {
       width: 100%;
@@ -320,6 +362,11 @@ import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from 
 export class StatsPlayerPage {
   private readonly api = inject(Api);
   readonly key = input.required<string>();
+  /** ?season=N or lifetime (from the statistics page). */
+  readonly season = input<string | undefined>(undefined);
+  protected readonly overview = signal<SeasonsOverview | null>(null);
+  protected readonly scope = signal<StatScope>('lifetime');
+  protected readonly seasons = computed(() => startedSeasons(this.overview()));
   protected readonly d = signal<StatsPlayerDetail | null>(null);
   protected readonly error = signal('');
   protected readonly ratings = signal<PlayerRatings | null>(null);
@@ -363,8 +410,25 @@ export class StatsPlayerPage {
   constructor() {
     effect(() => {
       const key = this.key();
-      void this.load(key);
+      const season = this.season();
+      void this.init(key, season);
     });
+  }
+
+  private async init(key: string, season: string | undefined) {
+    try {
+      const o = this.overview() ?? (await this.api.seasons());
+      this.overview.set(o);
+      this.scope.set(season ? parseScope(season) : defaultScope(o));
+      await this.load(key);
+    } catch (e) {
+      this.error.set(errorText(e));
+    }
+  }
+
+  protected setScope(v: string) {
+    this.scope.set(parseScope(v));
+    void this.load(this.key());
   }
 
   protected link = playerLink;
@@ -375,12 +439,15 @@ export class StatsPlayerPage {
 
   private async load(key: string) {
     this.error.set('');
-    this.api.playerRatings(key).then(
-      (r) => this.ratings.set(r),
-      () => this.ratings.set(null),
-    );
+    const scope = this.scope();
+    if (scope === 'lifetime') this.ratings.set(null);
+    else
+      this.api.playerRatings(key, scope).then(
+        (r) => this.ratings.set(r),
+        () => this.ratings.set(null),
+      );
     try {
-      this.d.set(await this.api.statsPlayer(key));
+      this.d.set(await this.api.statsPlayer(key, scope));
     } catch (e) {
       this.d.set(null);
       this.error.set(errorText(e));

@@ -7,11 +7,14 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
-- Ratings (OpenSkill, shown like Elo, start 1500), one per mode: every game of a ranked tournament counts, the
+- Ratings (OpenSkill, shown like Elo, start 1500), one per season and mode: every game of a season tournament counts, the
   margin scales the change. Bots have their own ratings and play with a bonus for their difficulty, so beating weak
   bots is worth little. Statistics page: new tab "Ranking"; player page: rating per mode and the last changes;
   tournament page: rating changes per game.
-- Tournament option "Ranked" (default on). Tournaments created before this version do not count.
+- Seasons: started, planned, moved, ended or deleted on the settings page (days in `SEASON_TZ`, default
+  Europe/Berlin). A "season tournament" (one switch instead of "counts for the statistics" and "ranked", only in
+  season) counts as a whole for the season of its first game: ratings, season statistics and records. Ratings and
+  records exist per season only, statistics per season and lifetime; ended seasons stay in the archive.
 - Seeding "by rating": the strongest meet late, bots are chosen and spread so that the teams come out about equally
   strong. The rating at the seeding shows in the bracket tooltip.
 - Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
@@ -30,7 +33,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   doors, unstick, the fix for once-only movers) are always on; the option "Bot helpers" is gone from the
   tournament form, which explains them in a note instead. Older tournaments with the option switched off now use
   them too. No change in the mod.
-- Tournament form: SmartStockBots is in the panel "Options" with the statistics and ranked switches.
+- Tournament form: SmartStockBots is in the panel "Options" next to the season tournament switch.
+- Statistics: season or lifetime, search, minimum games, "without provisional" in the ranking; Monster Hunt map
+  records per monster skill (dropdown) and map search; more space between the record groups; long tables scroll
+  inside the card with a fixed header row and name column.
 
 ## [0.9.0] – 2026-10-14
 

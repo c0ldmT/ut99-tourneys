@@ -37,12 +37,17 @@ export class I18n {
     return translate(this.lang(), key, params);
   }
 
-  date(iso: string | null | undefined): string {
+  date(iso: string | null | undefined, opts: { dateOnly?: boolean } = {}): string {
     if (!iso) return '';
-    return new Date(iso).toLocaleString(this.lang() === 'de' ? 'de-DE' : 'en-GB', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    });
+    const locale = this.lang() === 'de' ? 'de-DE' : 'en-GB';
+    if (opts.dateOnly)
+      return new Date(iso).toLocaleDateString(locale, { dateStyle: 'medium', timeZone: 'UTC' });
+    return new Date(iso).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  /** A day (YYYY-MM-DD) as a date, e.g. "17.10.2026". */
+  day(d: string): string {
+    return this.date(`${d}T12:00:00Z`, { dateOnly: true });
   }
 }
 

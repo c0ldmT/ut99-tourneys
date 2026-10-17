@@ -77,10 +77,8 @@ interface Model {
   mapPool: string[];
   botPool: BotSpec[];
   notifyMode: 'default' | 'custom' | 'off';
-  /** Counts for the statistics page. */
-  statsEnabled: boolean;
-  /** Counts for the ratings. */
-  ranked: boolean;
+  /** Season tournament: ratings and season statistics (only while a season runs). */
+  seasonal: boolean;
   webhookUrl: string;
 }
 
@@ -429,15 +427,22 @@ function toLocalInput(iso: string | null): string {
         <fieldset>
           <legend>{{ 'form.options' | t }}</legend>
           <label class="row"
-            ><input type="checkbox" name="stats" [(ngModel)]="f.statsEnabled" />
-            {{ 'form.statsEnabled' | t }}</label
+            ><input
+              type="checkbox"
+              name="seasonal"
+              [(ngModel)]="f.seasonal"
+              [disabled]="!currentSeason() && !f.seasonal"
+            />
+            {{ 'form.seasonal' | t }}</label
           >
-          <p class="muted small">{{ 'form.statsHint' | t }}</p>
-          <label class="row"
-            ><input type="checkbox" name="ranked" [(ngModel)]="f.ranked" />
-            {{ 'form.ranked' | t }}</label
-          >
-          <p class="muted small">{{ 'form.rankedHint' | t }}</p>
+          <p class="muted small">
+            {{ 'form.seasonalHint' | t }}
+            @if (currentSeason(); as n) {
+              <span class="ok">{{ 'form.seasonRunning' | t: { n } }}</span>
+            } @else {
+              <span class="error-text">{{ 'form.seasonNone' | t }}</span>
+            }
+          </p>
           <label class="row"
             ><input
               type="checkbox"
@@ -588,6 +593,8 @@ export class TournamentFormPage {
   protected readonly i18n = inject(I18n);
 
   protected readonly agents = signal<AgentView[]>([]);
+  /** The running season (null: out of season, season tournaments cannot be created). */
+  protected readonly currentSeason = signal<number | null>(null);
   protected readonly m = signal<Model | null>(null);
   protected readonly detail = signal<TournamentDetail | null>(null);
   protected readonly error = signal('');
@@ -667,6 +674,7 @@ export class TournamentFormPage {
   private async init() {
     try {
       this.agents.set(await this.api.agents());
+      this.currentSeason.set((await this.api.seasons()).current);
       const id = this.id();
       if (id) {
         const d = await this.api.tournament(id);
@@ -720,8 +728,7 @@ export class TournamentFormPage {
       lives: 0,
       notifyMode: 'default',
       webhookUrl: '',
-      statsEnabled: true,
-      ranked: true,
+      seasonal: this.currentSeason() !== null,
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -770,8 +777,7 @@ export class TournamentFormPage {
       lives: num('lives', 0),
       notifyMode: d.notify?.mode ?? 'default',
       webhookUrl: d.notify?.webhookUrl ?? '',
-      statsEnabled: d.statsEnabled,
-      ranked: d.ranked,
+      seasonal: d.seasonal,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
@@ -873,8 +879,7 @@ export class TournamentFormPage {
       registrationOpen: f.registrationOpen,
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
-      statsEnabled: f.statsEnabled,
-      ranked: f.ranked,
+      seasonal: f.seasonal,
       botPool: f.botPool
         .filter((b) => b.name.trim())
         .map((b) => ({ name: b.name.trim(), skill: b.skill })),
@@ -927,8 +932,7 @@ export class TournamentFormPage {
           registrationOpen: body.registrationOpen,
           notifyMode: body.notifyMode,
           webhookUrl: body.webhookUrl,
-          statsEnabled: body.statsEnabled,
-          ranked: body.ranked,
+          seasonal: body.seasonal,
         };
         if (!this.locked())
           Object.assign(patch, {

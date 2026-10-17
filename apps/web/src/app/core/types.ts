@@ -101,10 +101,10 @@ export interface TournamentDetail {
   settings: TournamentSettings;
   botPool: BotSpec[];
   registrationOpen: boolean;
-  /** Counts for the statistics page. */
-  statsEnabled: boolean;
-  /** Counts for the ratings. */
-  ranked: boolean;
+  /** Season tournament: counts for the ratings and the season statistics and records. */
+  seasonal: boolean;
+  /** The season it counts for (the season of its first game; before it: the running one). */
+  season: number | null;
   scheduledAt: string | null;
   createdAt: string;
   registrations: {
@@ -330,8 +330,33 @@ export interface RatedGame {
 
 export interface PlayerRatings {
   modes: Partial<Record<StatMode, PlayerRating>>;
-  recent: (RatedGame & { delta: number; after: number })[];
+  recent: (RatedGame & { delta: number; after: number; tournamentName?: string })[];
 }
+
+export type SeasonStatus = 'planned' | 'running' | 'ended';
+
+export interface Season {
+  number: number;
+  startDate: string;
+  endDate: string;
+  endedAt: string | null;
+  rating: { botGames: boolean; levelPoints: number };
+  status: SeasonStatus;
+  from: string;
+  to: string;
+}
+
+export interface SeasonsOverview {
+  seasons: Season[];
+  /** The running season ("in season"); null: out of season. */
+  current: number | null;
+  planned: number | null;
+  today: string;
+  timeZone: string;
+}
+
+/** Statistics scope: lifetime or a season number. */
+export type StatScope = 'lifetime' | number;
 
 export interface WebsiteSettings {
   rating: { botGames: boolean; levelPoints: number };
