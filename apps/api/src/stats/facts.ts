@@ -11,8 +11,8 @@ import {
  * Statistics facts of one tournament, derived from its event log (pure, no database).
  *
  * The website's statistics are a read model of the event logs: facts per tournament are cached
- * and aggregated on request (see aggregate.ts). A rating system (Elo) can later consume the same
- * facts in time order (`MatchFact.at`) without new data sources.
+ * and aggregated on request (see aggregate.ts). The ratings (ratings.ts) consume the same facts in
+ * time order (`GameFact.at`) without new data sources.
  *
  * Only games that were really played on the server count (a `match.started` for the game);
  * simulated bot matches and forfeits without a game do not.
@@ -26,6 +26,8 @@ export interface PlayerRef {
   name: string;
   userId?: string;
   bot: boolean;
+  /** Bots: the difficulty (0..7) the bot played with in this tournament. */
+  skill?: number;
 }
 
 export interface GameFact {
@@ -36,6 +38,8 @@ export interface GameFact {
   entrants: [string, string];
   winnerEntrantId: string;
   endReason: string;
+  /** Score per entrant: frags, or the final time in ms in Monster Hunt (lower wins). */
+  scores: Record<string, number>;
   /** Seconds from the start to the end (from the player statistics; Monster Hunt: undefined). */
   durationSec?: number;
 }
@@ -136,22 +140,32 @@ const userRef = (userId: string, name: string): PlayerRef => ({
   userId,
   bot: false,
 });
-const botRef = (name: string): PlayerRef => ({ key: botKey(name), name, bot: true });
+const botRef = (name: string, skill?: number): PlayerRef => ({
+  key: botKey(name),
+  name,
+  bot: true,
+  ...(skill === undefined ? {} : { skill }),
+});
+
+/** Difficulty of a bot by name: exact, then without a clone suffix ("Loque2" -> "Loque"). */
+function skillOf(skills: ReadonlyMap<string, number>, name: string): number | undefined {
+  const k = name.toLowerCase();
+  return skills.get(k) ?? skills.get(k.replace(/\d+$/, ''));
+}
 
 /** Who plays for an entrant when the log has no line-up (1v1, older logs). */
 function entrantPlayers(e: Entrant | undefined, teamSize: number): PlayerRef[] {
   if (!e) return [];
   if (e.kind === 'human') return [userRef(e.userId, e.displayName)];
-  if (e.kind === 'bot') return [botRef(e.bot.name)];
+  if (e.kind === 'bot') return [botRef(e.bot.name, e.bot.skill)];
   const starters = teamStarters(e, teamSize).map((m) => userRef(m.userId, m.displayName));
-  const bots = e.bots.slice(0, Math.max(0, teamSize - starters.length)).map((b) => botRef(b.name));
+  const bots = e.bots
+    .slice(0, Math.max(0, teamSize - starters.length))
+    .map((b) => botRef(b.name, b.skill));
   return [...starters, ...bots];
 }
 
 type Lineup = { name: string; userId?: string; bot?: boolean }[];
-
-const lineupRefs = (l: Lineup): PlayerRef[] =>
-  l.map((x) => (x.userId ? userRef(x.userId, x.name) : botRef(x.name)));
 
 const refOf = (p: PlayerRef): PlayerRef => ({
   key: p.key,
@@ -160,13 +174,29 @@ const refOf = (p: PlayerRef): PlayerRef => ({
   bot: p.bot,
 });
 
-const statRef = (p: PlayerGameStats): PlayerRef =>
-  p.userId ? userRef(p.userId, p.name) : botRef(p.name);
-
 export function extractFacts(
-  t: { id: string; name: string; settings: TournamentSettings },
+  t: {
+    id: string;
+    name: string;
+    settings: TournamentSettings;
+    /** The tournament's bot pool: difficulty of bots that are not in an entrant (stand-ins). */
+    botPool?: readonly { name: string; skill: number }[];
+  },
   events: readonly TournamentEvent[],
 ): TournamentFacts {
+  /** Bot difficulty by lower-case name: the pool, then the entrants (seeding, replacements). */
+  const skills = new Map<string, number>();
+  for (const b of t.botPool ?? []) skills.set(b.name.toLowerCase(), b.skill);
+  const noteBots = (e: Entrant) => {
+    if (e.kind === 'bot') skills.set(e.bot.name.toLowerCase(), e.bot.skill);
+    if (e.kind === 'team') for (const b of e.bots) skills.set(b.name.toLowerCase(), b.skill);
+  };
+  const bot = (name: string) => botRef(name, skillOf(skills, name));
+  const lineupRefs = (l: Lineup): PlayerRef[] =>
+    l.map((x) => (x.userId ? userRef(x.userId, x.name) : bot(x.name)));
+  const statRef = (p: PlayerGameStats): PlayerRef =>
+    p.userId ? userRef(p.userId, p.name) : bot(p.name);
+
   const mode = statMode(t.settings);
   const teamSize = t.settings.teamSize;
   const rules = gameRules(t.settings);
@@ -235,10 +265,14 @@ export function extractFacts(
   for (const e of events) {
     switch (e.type) {
       case 'seeding.set':
-        for (const en of e.data.entrants) entrants[en.id] = en;
+        for (const en of e.data.entrants) {
+          entrants[en.id] = en;
+          noteBots(en);
+        }
         break;
       case 'entrant.replaced':
         entrants[e.data.entrantId] = { ...e.data.replacement, id: e.data.entrantId } as Entrant;
+        noteBots(entrants[e.data.entrantId]!);
         break;
       case 'match.started': {
         const run = e.data.runner ? (runsDone.get(gk(e.data.matchId, e.data.game)) ?? 0) + 1 : 0;
@@ -298,6 +332,7 @@ export function extractFacts(
             entrants: cm,
             winnerEntrantId: d.winnerId,
             endReason: d.endReason,
+            scores: d.scores,
           });
           for (const r of runs)
             addPlayerGames(
@@ -321,6 +356,7 @@ export function extractFacts(
           entrants: cm,
           winnerEntrantId: d.winnerId,
           endReason: d.endReason,
+          scores: d.scores,
           ...(st ? { durationSec: st.durationSec } : {}),
         });
         for (const id of cm)
