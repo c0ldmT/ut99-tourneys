@@ -124,6 +124,16 @@ function EndGame(string Reason)
 		Core.OnEndGame(Reason, bWasOvertime);
 }
 
+// Website bots prefer their rivals as targets (see TourneyCore.RivalThreat).
+function float GameThreatAdd(Bot aBot, Pawn Other)
+{
+	local float F;
+	F = Super.GameThreatAdd(aBot, Other);
+	if (Core != None)
+		F += Core.RivalThreat(aBot, Other);
+	return F;
+}
+
 // Never restart or rotate maps on our own: the bridge sends the next map.
 function RestartGame()
 {

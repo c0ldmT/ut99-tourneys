@@ -8,6 +8,7 @@ import {
 } from '@tourney/adapter-ut99';
 import type {
   AccessEntry,
+  BotPersonality,
   MapRecords,
   AgentCommand,
   AgentProfile,
@@ -57,6 +58,7 @@ export class WebsiteAgent {
   private access = new Map<string, AccessEntry[]>();
   /** Monster Hunt map records (statistics) per tournament, from the website. */
   private records = new Map<string, MapRecords | undefined>();
+  private botPersonas = new Map<string, BotPersonality[] | undefined>();
   private runtime?: Runtime;
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
@@ -139,11 +141,14 @@ export class WebsiteAgent {
         this.access.set(p.tournamentId, p.access);
         const recordsBefore = JSON.stringify(this.records.get(p.tournamentId));
         this.records.set(p.tournamentId, p.records);
+        const botsBefore = JSON.stringify(this.botPersonas.get(p.tournamentId));
+        this.botPersonas.set(p.tournamentId, p.bots);
         const rt = this.runtime;
         if (rt && rt.tournamentId === p.tournamentId) {
           if (JSON.stringify(p.access) !== before) await rt.director.setAccess(p.access);
           if (JSON.stringify(p.records) !== recordsBefore)
             await rt.director.setMapRecords(p.records);
+          if (JSON.stringify(p.bots) !== botsBefore) await rt.director.setBotPersonalities(p.bots);
           if (changed) await rt.director.refresh();
         }
         return;
@@ -251,6 +256,7 @@ export class WebsiteAgent {
       maps: inv.maps,
       bots: inv.bots,
       packages: inv.packages,
+      assets: inv.assets,
       scannedAt: new Date(this.o.clock.now()).toISOString(),
       warnings: inv.warnings,
     });
@@ -305,6 +311,9 @@ export class WebsiteAgent {
       botPool,
       maps: this.maps,
       ...(this.records.get(tournamentId) ? { mapRecords: this.records.get(tournamentId) } : {}),
+      ...(this.botPersonas.get(tournamentId)
+        ? { botPersonalities: this.botPersonas.get(tournamentId) }
+        : {}),
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });
     director.on('live', (info: LiveInfo) => {

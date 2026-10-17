@@ -1,6 +1,9 @@
 import {
+  BOT_REF_CHARS,
   isBotEntrant,
   wireName,
+  wireText,
+  type BotPersonality,
   type AccessEntry,
   type BotSpec,
   type BridgeToMod,
@@ -85,6 +88,55 @@ export function seriesWins(
   ] as [number, number];
 }
 
+/** Bot personalities by lower-case name in the game. */
+export type Personalities = ReadonlyMap<string, BotPersonality>;
+
+const ref = (s: string | undefined) => (s ?? '').slice(0, BOT_REF_CHARS);
+const x100 = (v: number | undefined, lo: number) =>
+  Math.max(lo, Math.min(100, Math.round((v ?? 0) * 100)));
+const SAY_KIND = {
+  start: 'start',
+  kill: 'kill',
+  death: 'death',
+  win: 'win',
+  loss: 'loss',
+  rivalKill: 'rkill',
+  rivalDeath: 'rdeath',
+} as const;
+
+/**
+ * Config lines of a website bot (look, play style, personality), sent before its `bot` or
+ * `botadd` line. Bots of the server's configuration (no id) get none: the mod uses the ini.
+ */
+export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMod[] {
+  if (!b.id) return [];
+  const name = wireName(b.name);
+  const t = b.traits ?? {};
+  const lines: BridgeToMod[] = [
+    { t: 'bcfg', name, skn: ref(b.skin), fac: ref(b.face), vc: ref(t.voice) },
+    {
+      t: 'btr',
+      name,
+      fw: ref(t.favoriteWeapon),
+      acc: x100(t.accuracy, -100),
+      alt: x100(t.alertness, -100),
+      cs: x100(t.combatStyle, -100),
+      cmp: x100(t.camping, 0),
+      str: x100(t.strafing, -100),
+      jmp: !!t.jumpy,
+    },
+  ];
+  const p = personas?.get(b.name.toLowerCase());
+  if (p) {
+    lines.push({ t: 'bpers', name, tk: p.talk });
+    for (const l of p.lines)
+      lines.push({ t: 'bsay', name, k: SAY_KIND[l.kind], x: wireText(l.text, 120) });
+    for (const r of p.rivals)
+      lines.push({ t: 'brv', name, r: wireName(r.name), lv: r.level === 'nemesis' ? 2 : 1 });
+  }
+  return lines;
+}
+
 const botLine = (s: Side, b: BotSpec): BridgeToMod => ({
   t: 'bot',
   s,
@@ -104,6 +156,7 @@ export function matchLines(
   game: number,
   entrants: readonly [string, string],
   teamBots?: Readonly<Record<string, readonly BotSpec[]>>,
+  personas?: Personalities,
 ): BridgeToMod[] {
   const node = proj.bracket?.byId[matchId];
   const [wa, wb] = seriesWins(proj, matchId, entrants);
@@ -126,8 +179,9 @@ export function matchLines(
   entrants.forEach((id, i) => {
     const side: Side = i === 0 ? 'a' : 'b';
     const e: Entrant | undefined = proj.entrants[id];
-    if (e?.kind === 'bot') lines.push(botLine(side, e.bot));
-    for (const b of teamBots?.[id] ?? []) lines.push(botLine(side, b));
+    if (e?.kind === 'bot') lines.push(...botConfigLines(e.bot, personas), botLine(side, e.bot));
+    for (const b of teamBots?.[id] ?? [])
+      lines.push(...botConfigLines(b, personas), botLine(side, b));
   });
   return lines;
 }

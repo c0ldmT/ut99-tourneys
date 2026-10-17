@@ -215,8 +215,38 @@ describe('bot control center', () => {
     expect(res.skipped).toEqual([made[0].name]);
     const list = (await admin.get('/bots')).body.bots as { name: string }[];
     expect(list).toHaveLength(6);
+    agents.saveInventory(
+      'pi',
+      'local',
+      {
+        bots: [],
+        assets: {
+          botClasses: [{ name: 'MyPkg.NinjaBot', label: 'Ninja' }],
+          textures: [
+            { name: 'NinjaSkins.ninj1', label: 'Ninja' },
+            { name: 'NinjaSkins.ninj5Kenji', label: 'Kenji' },
+          ],
+          voices: [],
+          weapons: [],
+        },
+      },
+      new Date().toISOString(),
+    );
     const assets = (await admin.get('/bots/assets')).body;
     expect(assets.botClasses.map((c: { name: string }) => c.name)).toContain('Botpack.TBossBot');
+    expect(assets.botClasses.map((c: { name: string }) => c.name)).toContain('MyPkg.NinjaBot');
+    // Skins and faces from the texture names (UT's naming).
+    expect(assets.skins).toContainEqual({ name: 'NinjaSkins.ninj', label: 'Ninja' });
+    expect(assets.faces).toContainEqual({
+      name: 'NinjaSkins.Kenji',
+      label: 'Kenji',
+      pkg: 'NinjaSkins',
+    });
+    expect(assets.faces).toContainEqual({
+      name: 'CommandoSkins.Blake',
+      label: 'Blake',
+      pkg: 'CommandoSkins',
+    });
   });
 
   it('uses library bots in the pool, the team names and clan teams', async () => {

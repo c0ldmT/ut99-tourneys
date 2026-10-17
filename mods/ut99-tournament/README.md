@@ -31,6 +31,11 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > kills per weapon, time played, Monster Hunt monsters and points, per player and bot, sent to the bridge before
 > the end of every game (run). Monster Hunt: the map record (best final time from the statistics) is shown in the
 > HUD under the run info (`mrec` line).
+> Mod 0.7.0: website bots (bot control center) - look, voice, favourite weapon and play style come from the
+> website (`bcfg`/`btr`, like the ini bot settings), chat lines on occasions (start, kill, death, win, loss,
+> rival kill/death) with placeholders, talkativeness and a cooldown (`bpers`/`bsay`), rivals the bot prefers as a
+> target and a nemesis it hunts down when it sees no other enemy (`brv`, `GameThreatAdd`). Clan tags come as part
+> of the name. Bots of the server's ini work as before.
 
 ## Classes
 
@@ -166,6 +171,7 @@ Work through these in order and note what happens. Each item names what to look 
 | 24 | **Follow** | As spectator at game start you look through side A's eyes. FIRE switches players and stays in first person; `!fp` toggles, `!follow Mario`, `!follow off` |
 | 25 | **Map change** | After several games and map changes no `Failed to garbage collect` or `Accessed None` in the client log (`UnrealTournament.log`) |
 | 26 | **SmartStockBots** (optional, see below) | Server log at start: SmartStockBots loaded; bots dodge, translocate and combo visibly better; before the countdown and during a pause the bot stays invisible and does not move |
+| 27 | **Website bots** (mod 0.7.0) | A bot from the control center has the skin, face and voice set there (team colours in team games) and plays as set (e.g. a camper stays put, "jumpy" jumps a lot). With talkativeness 100 it greets at the start, comments kills/deaths and the end; lines with `{victim}` etc. show the names. A nemesis comes looking for its target when it has no other enemy; server log without `Accessed None` |
 
 ### Team deathmatch (2on2, 3on3, 5on5)
 

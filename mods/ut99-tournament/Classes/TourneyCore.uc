@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.6.0";
+const MOD_VERSION = "0.7.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -25,6 +25,11 @@ const MAXACL = 64;
 const MAXTRACK = 64;
 const MAXST = 32;   // players and bots with statistics per game
 const MAXW = 8;     // weapons per player
+const MAXCFG = 16;  // website bots with a configuration
+const MAXSAY = 192; // their chat lines
+const MAXRIV = 96;  // their rivals
+const SAYCOOLDOWN = 12.0; // seconds between two lines of one bot
+const SAYGAP = 2.0;       // seconds between two bot lines
 
 var DeathMatchPlus Game;          // the game this core drives (TournamentDM, TournamentTDM, TournamentMH)
 var BridgeLink Link;
@@ -111,6 +116,28 @@ var int StWCount[256];
 var int StCount;
 var int StGameSec;
 var bool bFirstBlood;
+
+// Website bots (bridge lines bcfg/btr/bpers/bsay/brv, sent before their "bot" line): look, play
+// style, chat lines and rivals by name in the game. Bots without these lines use the ini.
+var string CfgName[16], CfgSkin[16], CfgFace[16], CfgVoice[16], CfgWeapon[16];
+var float CfgAcc[16], CfgAlert[16], CfgStyle[16], CfgCamp[16], CfgStrafe[16];
+var byte CfgJump[16];
+var byte CfgTraits[16];            // 1 = a btr line came (else the play style stays as spawned)
+var int CfgTalk[16];               // chance to say something, percent
+var float CfgSayAt[16];            // no line before this time (per bot cooldown)
+var byte CfgStarted[16];           // 1 = had its chance for a start line
+var int CfgCount;
+var byte SayCfg[192];              // chat lines: bot (index into Cfg*), occasion, text
+var string SayKind[192];
+var string SayText[192];
+var int SayCount;
+var byte RivCfg[96];               // rivals: bot, rival's name in the game, 1 rival / 2 nemesis
+var string RivName[96];
+var byte RivLevel[96];
+var int RivCount;
+var float NextBotSay;              // no bot line before this time (all bots)
+var int StartTalkLeft;             // seconds after the start in which bots may greet
+var int HuntTicks;
 
 //=============================================================================
 // Startup (from the game type)
@@ -281,6 +308,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			MatchFF = M.GetInt("ff");
 			// The bot lines follow; bots already in the level are taken over (see AddBotSpec).
 			KeepOldBots();
+			ClearBotConfigs();
 			BotCount = 0;
 			TGRI.TeamSize = TeamSize;
 			TGRI.MatchId = MatchId;
@@ -295,8 +323,63 @@ function HandleBridgeMessage(TourneyMsg M)
 			if (!bGameLive)
 				ApplyMatchRules();
 			break;
+		case "bcfg":
+			i = FindCfg(M.Get("name"), true);
+			if (i >= 0)
+			{
+				CfgSkin[i] = M.Get("skn");
+				CfgFace[i] = M.Get("fac");
+				CfgVoice[i] = M.Get("vc");
+			}
+			break;
+		case "btr":
+			i = FindCfg(M.Get("name"), true);
+			if (i >= 0)
+			{
+				CfgWeapon[i] = M.Get("fw");
+				CfgAcc[i] = FClamp(M.GetInt("acc") / 100.0, -1.0, 1.0);
+				CfgAlert[i] = FClamp(M.GetInt("alt") / 100.0, -1.0, 1.0);
+				CfgStyle[i] = FClamp(M.GetInt("cs") / 100.0, -1.0, 1.0);
+				CfgCamp[i] = FClamp(M.GetInt("cmp") / 100.0, 0.0, 1.0);
+				CfgStrafe[i] = FClamp(M.GetInt("str") / 100.0, -1.0, 1.0);
+				if (M.GetBool("jmp"))
+					CfgJump[i] = 1;
+				else
+					CfgJump[i] = 0;
+				CfgTraits[i] = 1;
+			}
+			break;
+		case "bpers":
+			i = FindCfg(M.Get("name"), true);
+			if (i >= 0)
+			{
+				CfgTalk[i] = Clamp(M.GetInt("tk"), 0, 100);
+				ClearPersonality(i);
+			}
+			break;
+		case "bsay":
+			i = FindCfg(M.Get("name"), false);
+			if (i >= 0 && SayCount < MAXSAY && M.Get("x") != "")
+			{
+				SayCfg[SayCount] = byte(i);
+				SayKind[SayCount] = M.Get("k");
+				SayText[SayCount] = M.Get("x");
+				SayCount++;
+			}
+			break;
+		case "brv":
+			i = FindCfg(M.Get("name"), false);
+			if (i >= 0 && RivCount < MAXRIV && M.Get("r") != "")
+			{
+				RivCfg[RivCount] = byte(i);
+				RivName[RivCount] = M.Get("r");
+				RivLevel[RivCount] = byte(Clamp(M.GetInt("lv"), 1, 2));
+				RivCount++;
+			}
+			break;
 		case "bot":
 			AddBotSpec(SideIndex(M.Get("s")), M.Get("name"), M.GetInt("sk"), M.Get("cls"));
+			ApplyBotConfig(FindBotPawn(M.Get("name")), M.Get("name"));
 			if (TeamSize <= 1)
 			{
 				TGRI.bBotA = SideHasBot(0);
@@ -306,6 +389,7 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "botadd":
 			// Team games: a stand-in joins the running game right away.
 			AddBotSpec(SideIndex(M.Get("s")), M.Get("name"), M.GetInt("sk"), M.Get("cls"));
+			ApplyBotConfig(FindBotPawn(M.Get("name")), M.Get("name"));
 			if (bBotsSpawned)
 				SpawnBots();
 			break;
@@ -1070,6 +1154,7 @@ function Bot SpawnSideBot(string BName, int BSkill, string BClass, int Side)
 	// Tournament skill 0..7 = UT's Novice..Godlike: Bot.InitializeSkill takes exactly that range
 	// (0-3 novice skills, 4-7 the full AI with skill 0-3), as the bot menu does.
 	B.InitializeSkill(FClamp(BSkill, 0.0, 7.0));
+	ApplyBotConfig(B, BName);
 	B.ViewRotation = StartSpot.Rotation;
 	Game.BroadcastMessage(B.PlayerReplicationInfo.PlayerName $ Game.EnteredMessage, false);
 	Game.ModifyBehaviour(B);
@@ -1104,6 +1189,8 @@ function int TimerStep()
 	}
 	if (Phase == "ready" || bGameLive)
 		EnsureBots();
+	if (bGameLive && !bTourneyPaused && !Game.bGameEnded)
+		BotTick();
 	if (!bGameLive)
 	{
 		PreMatchTick();
@@ -1261,6 +1348,9 @@ function StartTournamentMatch()
 	bGameLive = true;
 	bEndReported = false;
 	LastSentA = -1;
+	StartTalkLeft = 8;
+	HuntTicks = 0;
+	NextBotSay = Level.TimeSeconds + SAYGAP;
 	LastSentB = -1;
 	Game.StartMatch();
 	AutoFollowAll();
@@ -1397,6 +1487,7 @@ function OnKilled(Pawn Killer, Pawn Other, name DamageType)
 
 	if (!bGameLive || bEndReported || bTourneyPaused || Game.bGameEnded)
 		return;
+	BotTalkKill(Killer, Other);
 	v = StatIndex(Other, true);
 	if (v >= 0)
 	{
@@ -1613,6 +1704,10 @@ function ReportEnd(string Reason, bool bWasOvertime)
 	OutMsg.AddStr("why", Why);
 	PendingEnd = OutMsg.Finish();
 	Send();
+	if (A > B)
+		BotTalkEnd(0);
+	else if (B > A)
+		BotTalkEnd(1);
 }
 
 // The bridge ended the game: forfeit, organizer decision ("admin"), match called off ("void")
@@ -2385,6 +2480,376 @@ function SayTo(int Pid, string Msg)
 	for (P = Level.PawnList; P != None; P = P.NextPawn)
 		if (P.IsA('PlayerPawn') && P.PlayerReplicationInfo != None && P.PlayerReplicationInfo.PlayerID == Pid)
 			P.ClientMessage(Msg);
+}
+
+//=============================================================================
+// Website bots: look, play style, chat lines, rivals
+//=============================================================================
+
+// The configuration of a website bot by its name in the game (-1: none; bCreate adds one).
+function int FindCfg(string BName, bool bCreate)
+{
+	local int i;
+	if (BName == "")
+		return -1;
+	for (i = 0; i < CfgCount; i++)
+		if (SameBotName(CfgName[i], BName))
+			return i;
+	if (!bCreate)
+		return -1;
+	if (CfgCount >= MAXCFG)
+	{
+		Log("too many configured bots, ignoring" @ BName, 'UTTourney');
+		return -1;
+	}
+	i = CfgCount;
+	CfgCount++;
+	CfgName[i] = BName;
+	CfgSkin[i] = "";
+	CfgFace[i] = "";
+	CfgVoice[i] = "";
+	CfgWeapon[i] = "";
+	CfgTraits[i] = 0;
+	CfgJump[i] = 0;
+	CfgTalk[i] = 0;
+	CfgSayAt[i] = 0;
+	CfgStarted[i] = 0;
+	return i;
+}
+
+// A new "match" line: the bot lines (with their configuration) follow.
+function ClearBotConfigs()
+{
+	CfgCount = 0;
+	SayCount = 0;
+	RivCount = 0;
+}
+
+// A new "bpers" line replaces the chat lines and rivals of that bot.
+function ClearPersonality(int c)
+{
+	local int i, j;
+	j = 0;
+	for (i = 0; i < SayCount; i++)
+		if (SayCfg[i] != c)
+		{
+			SayCfg[j] = SayCfg[i];
+			SayKind[j] = SayKind[i];
+			SayText[j] = SayText[i];
+			j++;
+		}
+	SayCount = j;
+	j = 0;
+	for (i = 0; i < RivCount; i++)
+		if (RivCfg[i] != c)
+		{
+			RivCfg[j] = RivCfg[i];
+			RivName[j] = RivName[i];
+			RivLevel[j] = RivLevel[i];
+			j++;
+		}
+	RivCount = j;
+}
+
+// Look and play style of a website bot, as ChallengeBotInfo.CHIndividualize does for the ini
+// bots. Called after the spawn, before the team is assigned (the team keeps skin and face), and
+// for a bot that is already in the level when its "bot" line comes.
+function ApplyBotConfig(Bot B, string BName)
+{
+	local int c;
+	local byte T;
+	local class<Weapon> W;
+	local class<VoicePack> V;
+
+	if (B == None || B.bDeleteMe || B.PlayerReplicationInfo == None)
+		return;
+	c = FindCfg(BName, false);
+	if (c >= 0)
+	{
+		T = 255;
+		if ((TeamSize > 1 || Game.bTeamGame) && B.PlayerReplicationInfo.Team < 4)
+			T = B.PlayerReplicationInfo.Team;
+		if (CfgSkin[c] != "")
+			B.static.SetMultiSkin(B, CfgSkin[c], CfgFace[c], T);
+		if (CfgVoice[c] != "")
+		{
+			V = class<VoicePack>(DynamicLoadObject(CfgVoice[c], class'Class'));
+			if (V != None)
+				B.PlayerReplicationInfo.VoiceType = V;
+		}
+		if (CfgTraits[c] == 1)
+		{
+			B.FavoriteWeapon = None;
+			if (CfgWeapon[c] != "")
+			{
+				W = class<Weapon>(DynamicLoadObject(CfgWeapon[c], class'Class'));
+				if (W != None)
+					B.FavoriteWeapon = W;
+			}
+			B.Accuracy = CfgAcc[c];
+			B.CombatStyle = B.Default.CombatStyle + 0.7 * CfgStyle[c];
+			B.BaseAggressiveness = 0.5 * (B.Default.Aggressiveness + B.CombatStyle);
+			B.BaseAlertness = CfgAlert[c];
+			B.CampingRate = CfgCamp[c];
+			B.bJumpy = CfgJump[c] == 1;
+			B.StrafingAbility = CfgStrafe[c];
+		}
+	}
+	// Without a voice the bot stays silent in voice messages: the class's own, as UT does.
+	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
+		B.PlayerReplicationInfo.VoiceType = class<VoicePack>(DynamicLoadObject(B.VoiceType, class'Class'));
+}
+
+// 0 = no rival, 1 = rival, 2 = nemesis of the configured bot c.
+function int RivalLevelOf(int c, string PName)
+{
+	local int i;
+	if (c < 0 || PName == "")
+		return 0;
+	for (i = 0; i < RivCount; i++)
+		if (RivCfg[i] == c && SameBotName(RivName[i], PName))
+			return RivLevel[i];
+	return 0;
+}
+
+// The game's GameThreatAdd: a bot prefers its rivals (more so its nemesis) when choosing whom
+// to attack among the enemies it sees.
+function float RivalThreat(Bot B, Pawn Other)
+{
+	local int Lv;
+	if (B == None || Other == None || CfgCount == 0 || RivCount == 0)
+		return 0;
+	if (B.PlayerReplicationInfo == None || Other.PlayerReplicationInfo == None)
+		return 0;
+	Lv = RivalLevelOf(FindCfg(B.PlayerReplicationInfo.PlayerName, false), Other.PlayerReplicationInfo.PlayerName);
+	if (Lv == 2)
+		return 0.8;
+	if (Lv == 1)
+		return 0.4;
+	return 0;
+}
+
+// A living player or bot of that name that is not on B's team.
+function Pawn FindOpponent(Bot B, string PName)
+{
+	local Pawn P;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (P != B && P.bIsPlayer && !P.bDeleteMe && P.Health > 0 && P.PlayerReplicationInfo != None
+			&& !P.PlayerReplicationInfo.bIsSpectator && SameBotName(P.PlayerReplicationInfo.PlayerName, PName))
+		{
+			if ((TeamSize > 1 || Game.bTeamGame) && P.PlayerReplicationInfo.Team == B.PlayerReplicationInfo.Team)
+				return None;
+			return P;
+		}
+	return None;
+}
+
+// A nemesis is hunted down when the bot has no other enemy in sight.
+function HuntNemeses()
+{
+	local int i;
+	local Bot B;
+	local Pawn N, Old;
+
+	for (i = 0; i < RivCount; i++)
+	{
+		if (RivLevel[i] != 2)
+			continue;
+		B = FindBotPawn(CfgName[RivCfg[i]]);
+		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
+			continue;
+		N = FindOpponent(B, RivName[i]);
+		if (N == None || B.Enemy == N)
+			continue;
+		if (B.Enemy == None)
+		{
+			if (B.IsInState('Roaming') || B.IsInState('Wandering'))
+				B.SetEnemy(N);
+		}
+		else if (B.IsInState('Hunting') && !B.LineOfSightTo(B.Enemy))
+		{
+			// Hunting someone out of sight: rather the nemesis.
+			Old = B.Enemy;
+			B.Enemy = None;
+			if (!B.SetEnemy(N))
+				B.Enemy = Old;
+			else
+				B.OldEnemy = Old;
+		}
+	}
+}
+
+// Once a second while the game runs: greetings at the start, nemesis hunts every 2 seconds.
+function BotTick()
+{
+	local int i, j, c;
+	if (CfgCount == 0)
+		return;
+	if (StartTalkLeft > 0)
+	{
+		// One chance per bot in the game, one bot per second, in a random order.
+		StartTalkLeft--;
+		j = Rand(CfgCount);
+		for (i = 0; i < CfgCount; i++)
+		{
+			c = (i + j) % CfgCount;
+			if (CfgStarted[c] == 0 && FindBotPawn(CfgName[c]) != None)
+			{
+				CfgStarted[c] = 1;
+				BotTalk(c, "start", "", "", CfgTalk[c], true);
+				break;
+			}
+		}
+	}
+	HuntTicks++;
+	if (HuntTicks >= 2)
+	{
+		HuntTicks = 0;
+		if (RivCount > 0)
+			HuntNemeses();
+	}
+}
+
+function string TReplace(string S, string From, string To)
+{
+	local string R;
+	local int i;
+	R = "";
+	i = InStr(S, From);
+	while (i >= 0)
+	{
+		R = R $ Left(S, i) $ To;
+		S = Mid(S, i + Len(From));
+		i = InStr(S, From);
+	}
+	return R $ S;
+}
+
+// A line needs the names its placeholders stand for.
+function bool LineFits(string T, string Victim, string Killer)
+{
+	if (Victim == "" && InStr(T, "{victim}") >= 0)
+		return false;
+	if (Killer == "" && InStr(T, "{killer}") >= 0)
+		return false;
+	return true;
+}
+
+// A random line of bot c for the occasion, placeholders filled ("" = none).
+function string PickLine(int c, string Kind, string Victim, string Killer)
+{
+	local int i, n, k;
+	local string T;
+
+	n = 0;
+	for (i = 0; i < SayCount; i++)
+		if (SayCfg[i] == c && SayKind[i] == Kind && LineFits(SayText[i], Victim, Killer))
+			n++;
+	if (n == 0)
+		return "";
+	k = Rand(n);
+	for (i = 0; i < SayCount; i++)
+		if (SayCfg[i] == c && SayKind[i] == Kind && LineFits(SayText[i], Victim, Killer))
+		{
+			if (k == 0)
+			{
+				T = SayText[i];
+				break;
+			}
+			k--;
+		}
+	T = TReplace(T, "{me}", CfgName[c]);
+	T = TReplace(T, "{victim}", Victim);
+	T = TReplace(T, "{killer}", Killer);
+	T = TReplace(T, "{map}", CurrentMapName());
+	return T;
+}
+
+// Bot c says a line of the occasion with Chance percent (bForce: no cooldown, no gap).
+function bool BotTalk(int c, string Kind, string Victim, string Killer, int Chance, bool bForce)
+{
+	local Bot B;
+	local Pawn P;
+	local string Msg;
+
+	if (c < 0 || Rand(100) >= Chance)
+		return false;
+	if (!bForce && (Level.TimeSeconds < CfgSayAt[c] || Level.TimeSeconds < NextBotSay))
+		return false;
+	Msg = PickLine(c, Kind, Victim, Killer);
+	if (Msg == "")
+		return false;
+	B = FindBotPawn(CfgName[c]);
+	if (B == None || B.PlayerReplicationInfo == None)
+		return false;
+	CfgSayAt[c] = Level.TimeSeconds + SAYCOOLDOWN;
+	NextBotSay = Level.TimeSeconds + SAYGAP;
+	// As PlayerPawn.Say: to the players and the messaging spectators (web admin, chat listener).
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (P.bIsPlayer || P.IsA('MessagingSpectator'))
+		{
+			if (Game.MessageMutator != None)
+			{
+				if (Game.MessageMutator.MutatorTeamMessage(B, P, B.PlayerReplicationInfo, Msg, 'Say', true))
+					P.TeamMessage(B.PlayerReplicationInfo, Msg, 'Say', true);
+			}
+			else
+				P.TeamMessage(B.PlayerReplicationInfo, Msg, 'Say', true);
+		}
+	return true;
+}
+
+// From OnKilled: the killer may brag, the victim may complain (more often about a rival).
+function BotTalkKill(Pawn Killer, Pawn Other)
+{
+	local int c;
+	local string KName, VName;
+
+	if (CfgCount == 0 || SayCount == 0 || Killer == None || Other == None || Killer == Other)
+		return;
+	if (Killer.PlayerReplicationInfo == None || Other.PlayerReplicationInfo == None)
+		return;
+	if ((TeamSize > 1 || Game.bTeamGame) && Killer.PlayerReplicationInfo.Team == Other.PlayerReplicationInfo.Team)
+		return;
+	KName = Killer.PlayerReplicationInfo.PlayerName;
+	VName = Other.PlayerReplicationInfo.PlayerName;
+	if (Bot(Killer) != None)
+	{
+		c = FindCfg(KName, false);
+		if (c >= 0 && !(RivalLevelOf(c, VName) > 0 && BotTalk(c, "rkill", VName, KName, Min(100, 2 * CfgTalk[c]), false)))
+			BotTalk(c, "kill", VName, KName, CfgTalk[c], false);
+	}
+	if (Bot(Other) != None)
+	{
+		c = FindCfg(VName, false);
+		if (c >= 0 && !(RivalLevelOf(c, KName) > 0 && BotTalk(c, "rdeath", VName, KName, Min(100, 2 * CfgTalk[c]), false)))
+			BotTalk(c, "death", VName, KName, CfgTalk[c], false);
+	}
+}
+
+// End of a game: one bot of the winners and one of the losers may say something.
+function BotTalkEnd(int WinSide)
+{
+	local int i, j, c, n;
+	local bool bWinSaid, bLossSaid;
+
+	n = BotCount;
+	if (CfgCount == 0 || SayCount == 0 || n == 0)
+		return;
+	j = Rand(n);
+	for (i = 0; i < n; i++)
+	{
+		c = FindCfg(BotName[(i + j) % n], false);
+		if (c < 0)
+			continue;
+		if (BotSide[(i + j) % n] == WinSide)
+		{
+			if (!bWinSaid)
+				bWinSaid = BotTalk(c, "win", "", "", CfgTalk[c], true);
+		}
+		else if (!bLossSaid)
+			bLossSaid = BotTalk(c, "loss", "", "", CfgTalk[c], true);
+	}
 }
 
 //=============================================================================

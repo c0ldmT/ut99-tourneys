@@ -399,8 +399,16 @@ export class BotsService {
     return { created, skipped };
   }
 
-  /** Choices for the editor: stock material plus what the servers report. */
-  assets(): GameAssets & { faces: Record<string, string[]>; packages: Record<string, string> } {
+  /**
+   * Choices for the editor: stock material plus what the servers report. Skins and faces come
+   * from texture names: `Pkg.base1` is the skin `Pkg.base`, `Pkg.base<digit>Face` the face
+   * `Pkg.Face` (UT's naming, see TournamentPlayer.SetMultiSkin).
+   */
+  assets(): GameAssets & {
+    skins: { name: string; label: string }[];
+    faces: { name: string; label: string; pkg: string }[];
+    packages: Record<string, string>;
+  } {
     const out: GameAssets = {
       botClasses: STOCK_CLASSES.map((c) => ({ name: c.botClass, label: c.label })),
       textures: [],
@@ -409,25 +417,39 @@ export class BotsService {
     };
     const add = (
       list: { name: string; label: string }[],
-      items: { name: string; label: string }[],
+      items: readonly { name: string; label: string }[],
     ) => {
       for (const i of items)
         if (!list.some((x) => x.name.toLowerCase() === i.name.toLowerCase())) list.push(i);
     };
-    for (const agent of this.agents.list())
-      for (const p of this.agents.info(agent).profiles ?? []) {
-        const inv = this.agents.inventory(agent.id, p.id) as { assets?: GameAssets } | undefined;
-        if (!inv?.assets) continue;
-        add(out.botClasses, inv.assets.botClasses ?? []);
-        add(out.textures, inv.assets.textures ?? []);
-        add(out.voices, inv.assets.voices ?? []);
-        add(out.weapons, inv.assets.weapons ?? []);
-      }
-    const faces: Record<string, string[]> = {};
+    for (const raw of this.agents.allInventories()) {
+      const inv = raw as { assets?: GameAssets } | undefined;
+      if (!inv?.assets) continue;
+      add(out.botClasses, inv.assets.botClasses ?? []);
+      add(out.textures, inv.assets.textures ?? []);
+      add(out.voices, inv.assets.voices ?? []);
+      add(out.weapons, inv.assets.weapons ?? []);
+    }
+    const skins: { name: string; label: string }[] = STOCK_CLASSES.map((c) => ({
+      name: c.defaultSkin,
+      label: c.label,
+    }));
+    const faces: { name: string; label: string; pkg: string }[] = [];
     for (const [pkg, names] of Object.entries(STOCK_FACES))
-      faces[pkg] = names.map((n) => `${pkg}.${n}`);
+      for (const n of names) faces.push({ name: `${pkg}.${n}`, label: n, pkg });
+    for (const t of out.textures) {
+      const skin = /^(\w+)\.([A-Za-z]+)1$/.exec(t.name);
+      if (skin) add(skins, [{ name: `${skin[1]}.${skin[2]}`, label: t.label }]);
+      const face = /^(\w+)\.[A-Za-z]+\d([A-Za-z]\w*)$/.exec(t.name);
+      if (
+        face &&
+        !faces.some((f) => f.name.toLowerCase() === `${face[1]}.${face[2]}`.toLowerCase())
+      )
+        faces.push({ name: `${face[1]}.${face[2]}`, label: t.label || face[2]!, pkg: face[1]! });
+    }
     return {
       ...out,
+      skins,
       faces,
       packages: Object.fromEntries(STOCK_CLASSES.map((c) => [c.botClass, c.pkg])),
     };

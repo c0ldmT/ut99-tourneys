@@ -212,6 +212,50 @@ describe('inventory', () => {
     ]);
   });
 
+  it('reads the play style of configured bots and the assets of the .int files', () => {
+    const root = tmp();
+    fs.mkdirSync(path.join(root, 'System'));
+    fs.writeFileSync(
+      path.join(root, 'System', 'User.ini'),
+      '[Botpack.ChallengeBotInfo]\r\nDifficulty=1\r\nBotNames[0]=Rex\r\nBotAccuracy[0]=0.5\r\nCombatStyle[0]=1.000000\r\nCamping[0]=0.3\r\nStrafingAbility[0]=-0.25\r\nBotJumpy[0]=1\r\nFavoriteWeapon[0]=Botpack.ShockRifle\r\nVoiceType[0]=BotPack.VoiceMaleTwo\r\nAlertness[0]=4\r\n',
+    );
+    fs.writeFileSync(
+      path.join(root, 'System', 'Botpack.int'),
+      [
+        '[Public]',
+        'Object=(Name=Botpack.TMale1Bot,Class=Class,MetaClass=Botpack.Bot,Description="Male Commando")',
+        'Object=(Name=Botpack.VoiceMaleOne,Class=Class,MetaClass=Botpack.ChallengeVoicePack,Description="Male 1")',
+        'Object=(Name=Botpack.ShockRifle,Class=Class,MetaClass=Botpack.TournamentWeapon)',
+        'Object=(Name=Botpack.TMale1,Class=Class,MetaClass=Botpack.TournamentPlayer,Description="Male Commando")',
+      ].join('\r\n'),
+    );
+    fs.writeFileSync(
+      path.join(root, 'System', 'CommandoSkins.int'),
+      '[Public]\r\nObject=(Name=CommandoSkins.cmdo4Blake,Class=Texture,Description="Blake")\r\nObject=(Name=CommandoSkins.cmdo2,Class=Texture)\r\n',
+    );
+    const inv = scanInventory({ installDir: root });
+    expect(inv.bots[0]).toEqual({
+      name: 'Rex',
+      skill: 1,
+      traits: {
+        accuracy: 0.5,
+        combatStyle: 1,
+        alertness: 1,
+        camping: 0.3,
+        strafing: -0.25,
+        jumpy: true,
+        favoriteWeapon: 'Botpack.ShockRifle',
+        voice: 'BotPack.VoiceMaleTwo',
+      },
+    });
+    expect(inv.assets).toEqual({
+      botClasses: [{ name: 'Botpack.TMale1Bot', label: 'Male Commando' }],
+      voices: [{ name: 'Botpack.VoiceMaleOne', label: 'Male 1' }],
+      weapons: [{ name: 'Botpack.ShockRifle', label: 'ShockRifle' }],
+      textures: [{ name: 'CommandoSkins.cmdo4Blake', label: 'Blake' }],
+    });
+  });
+
   it('warns about missing folders and bots', () => {
     const inv = scanInventory({ installDir: tmp() });
     expect(inv.maps).toEqual([]);

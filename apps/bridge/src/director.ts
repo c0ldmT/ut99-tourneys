@@ -13,6 +13,7 @@ import {
   type BridgeToMod,
   type MapInfo,
   MAX_NAME_CHARS,
+  type BotPersonality,
   type MapRecords,
   type ModPhase,
   type ModToBridge,
@@ -46,6 +47,7 @@ import type { Logger } from './log.js';
 import type { ModHello, ModLink } from './mod-server.js';
 import {
   aclLines,
+  botConfigLines,
   bracketLines,
   entrantName,
   matchLines,
@@ -118,6 +120,8 @@ export interface DirectorOptions {
   maps?: MapInfo[];
   /** Monster Hunt: map records from the statistics (shown in the HUD). */
   mapRecords?: MapRecords;
+  /** Personalities of the website bots (chat lines, rivals). */
+  botPersonalities?: readonly BotPersonality[];
   timing?: Partial<DirectorTiming>;
 }
 
@@ -239,6 +243,8 @@ export class MatchDirector extends EventEmitter {
   private access: AccessEntry[];
   /** Monster Hunt: map records (statistics); kept current with the runs of this tournament. */
   private mapRecords?: MapRecords;
+  /** Website bots' personalities by lower-case name in the game. */
+  private personas = new Map<string, BotPersonality>();
   /**
    * Team games: line-up of the current game (user ids per entrant), fixed before the map loads.
    * Monster Hunt: per run, only the running team has a line-up.
@@ -274,6 +280,7 @@ export class MatchDirector extends EventEmitter {
     this.timing = { ...DEFAULT_TIMING, ...o.timing };
     this.access = [...o.access];
     if (o.mapRecords) this.mapRecords = cloneRecords(o.mapRecords);
+    this.setPersonas(o.botPersonalities);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -462,6 +469,15 @@ export class MatchDirector extends EventEmitter {
       this.access = [...entries];
       this.send(this.aclFor(this.proj.currentMatch?.entrants));
     });
+  }
+
+  /** New bot personalities from the website: used from the next bot lines on. */
+  setBotPersonalities(list: readonly BotPersonality[] | undefined): Promise<void> {
+    return this.enqueue(() => this.setPersonas(list));
+  }
+
+  private setPersonas(list: readonly BotPersonality[] | undefined) {
+    this.personas = new Map((list ?? []).map((p) => [p.name.toLowerCase(), p]));
   }
 
   /** Monster Hunt: new map records from the website; the HUD of a running race is updated. */
@@ -821,6 +837,7 @@ export class MatchDirector extends EventEmitter {
       game,
       entrants,
       this.teamMode ? this.teamBots() : undefined,
+      this.personas,
     );
     const cm = this.proj.currentMatch;
     const runner = this.raceMode ? this.runner() : undefined;
@@ -2122,6 +2139,7 @@ export class MatchDirector extends EventEmitter {
     if (!bot) return;
     this.standIns.set(userId, { entrantId, bot });
     this.send([
+      ...botConfigLines(bot, this.personas),
       {
         t: 'botadd',
         s: side,

@@ -122,6 +122,15 @@ export class AgentsService {
     return row ? JSON.parse(row.dataJson) : undefined;
   }
 
+  /** Every stored inventory (all servers and profiles). */
+  allInventories(): unknown[] {
+    return this.db
+      .select()
+      .from(inventories)
+      .all()
+      .map((r) => JSON.parse(r.dataJson) as unknown);
+  }
+
   view(agent: AgentRow) {
     const info = this.info(agent);
     return {

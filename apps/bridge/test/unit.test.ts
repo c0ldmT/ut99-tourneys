@@ -93,3 +93,65 @@ describe('snapshot lines', () => {
     for (const l of lines) expect(encodeModLine(l).length).toBeLessThanOrEqual(MAX_LINE_BYTES);
   });
 });
+
+describe('website bot lines', () => {
+  it('sends look, play style and personality before the bot, nothing for ini bots', async () => {
+    const { botConfigLines } = await import('../src/snapshot.js');
+    const { encodeModLine } = await import('@tourney/protocol');
+    expect(botConfigLines({ name: 'Loque', skill: 5 })).toEqual([]);
+    const spec = {
+      id: 'bAbc',
+      name: '[TC]Loque',
+      skill: 6,
+      skin: 'CommandoSkins.cmdo',
+      face: 'CommandoSkins.Blake',
+      traits: {
+        accuracy: 0.55,
+        combatStyle: -1,
+        camping: 0.3,
+        jumpy: true,
+        voice: 'BotPack.VoiceMaleOne',
+      },
+    };
+    const personas = new Map([
+      [
+        '[tc]loque',
+        {
+          name: '[TC]Loque',
+          talk: 40,
+          lines: [
+            { kind: 'kill' as const, text: 'Too easy, {victim}!' },
+            { kind: 'rivalDeath' as const, text: 'Not you again, {killer}...' },
+          ],
+          rivals: [{ name: 'Mario', level: 'nemesis' as const }],
+        },
+      ],
+    ]);
+    const lines = botConfigLines(spec, personas);
+    expect(lines).toEqual([
+      {
+        t: 'bcfg',
+        name: '[TC]Loque',
+        skn: 'CommandoSkins.cmdo',
+        fac: 'CommandoSkins.Blake',
+        vc: 'BotPack.VoiceMaleOne',
+      },
+      {
+        t: 'btr',
+        name: '[TC]Loque',
+        fw: '',
+        acc: 55,
+        alt: 0,
+        cs: -100,
+        cmp: 30,
+        str: 0,
+        jmp: true,
+      },
+      { t: 'bpers', name: '[TC]Loque', tk: 40 },
+      { t: 'bsay', name: '[TC]Loque', k: 'kill', x: 'Too easy, {victim}!' },
+      { t: 'bsay', name: '[TC]Loque', k: 'rdeath', x: 'Not you again, {killer}...' },
+      { t: 'brv', name: '[TC]Loque', r: 'Mario', lv: 2 },
+    ]);
+    for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
+  });
+});

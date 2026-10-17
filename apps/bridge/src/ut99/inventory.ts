@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import type { BotSpec, MapInfo, ServerProfile } from '@tourney/protocol';
+import type { BotSpec, BotTraits, GameAssets, MapInfo, ServerProfile } from '@tourney/protocol';
 import { IniFile } from './ini.js';
 import { readLevelMeta } from './unreal-package.js';
 
@@ -50,6 +50,8 @@ export interface Inventory {
   bots: BotSpec[];
   /** UnrealScript packages (*.u) in the System folder, without extension, e.g. "SmartStockBots". */
   packages: string[];
+  /** Bot classes, textures (skins/faces), voices, weapons from the .int files. */
+  assets: GameAssets;
   warnings: string[];
 }
 
@@ -94,6 +96,7 @@ export function scanInventory(
     maps,
     bots: readBots(profile.installDir, warnings),
     packages: listPackages(profile.installDir),
+    assets: readAssets(profile.installDir),
     warnings,
   };
 }
@@ -151,6 +154,18 @@ function readBots(installDir: string, warnings: string[]): BotSpec[] {
     const skins = arr('BotSkins');
     const faces = arr('BotFaces');
     const skills = arr('BotSkills');
+    const num = (a: Record<number, string>, i: number) => {
+      const v = Number(a[i]);
+      return Number.isFinite(v) ? v : undefined;
+    };
+    const accuracy = arr('BotAccuracy');
+    const combat = arr('CombatStyle');
+    const alertness = arr('Alertness');
+    const camping = arr('Camping');
+    const strafing = arr('StrafingAbility');
+    const weapon = arr('FavoriteWeapon');
+    const jumpy = arr('BotJumpy');
+    const voice = arr('VoiceType');
     const difficulty = Number(ini.get(section, 'Difficulty') ?? 1);
     const bots: BotSpec[] = [];
     for (const [i, name] of Object.entries(names)) {
@@ -167,6 +182,23 @@ function readBots(installDir: string, warnings: string[]): BotSpec[] {
       if (classes[idx]) spec.botClass = classes[idx];
       if (skins[idx]) spec.skin = skins[idx];
       if (faces[idx]) spec.face = faces[idx];
+      const clamp = (v: number | undefined, lo: number) =>
+        v === undefined ? undefined : Math.max(lo, Math.min(1, v));
+      const traits: BotTraits = {};
+      const set = <K extends keyof BotTraits>(k: K, v: BotTraits[K] | undefined) => {
+        if (v !== undefined) traits[k] = v;
+      };
+      set('accuracy', clamp(num(accuracy, idx), -1));
+      set('combatStyle', clamp(num(combat, idx), -1));
+      set('alertness', clamp(num(alertness, idx), -1));
+      set('camping', clamp(num(camping, idx), 0));
+      set('strafing', clamp(num(strafing, idx), -1));
+      if (jumpy[idx] !== undefined) traits.jumpy = Number(jumpy[idx]) !== 0;
+      const w = weapon[idx]?.trim();
+      if (w && w.toLowerCase() !== 'none') traits.favoriteWeapon = w.slice(0, 64);
+      const vc = voice[idx]?.trim();
+      if (vc && vc.toLowerCase() !== 'none') traits.voice = vc.slice(0, 64);
+      if (Object.keys(traits).length) spec.traits = traits;
       bots.push(spec);
     }
     if (bots.length) return bots;
@@ -175,4 +207,57 @@ function readBots(installDir: string, warnings: string[]): BotSpec[] {
     `no bots configured ([${section}] in User.ini). Bots still work with the names from the tournament settings.`,
   );
   return [];
+}
+
+/** Fields of an `Object=(Name=...,Class=...,MetaClass=...,Description="...")` line of a .int file. */
+export function parseIntObject(line: string): Record<string, string> | undefined {
+  const m = /^\s*Object\s*=\s*\((.*)\)\s*$/i.exec(line);
+  if (!m) return undefined;
+  const out: Record<string, string> = {};
+  const re = /\s*([A-Za-z]+)\s*=\s*("([^"]*)"|[^,]*)\s*,?/g;
+  let f: RegExpExecArray | null;
+  while ((f = re.exec(m[1]!)) && f[0]) out[f[1]!.toLowerCase()] = (f[3] ?? f[2] ?? '').trim();
+  return out;
+}
+
+/**
+ * What the installation offers for bots, from the `Object=` lines of System/*.int: bot classes
+ * (MetaClass ...Bot), voice packs, weapons, and textures with a description (skins and faces).
+ */
+export function readAssets(installDir: string): GameAssets {
+  const assets: GameAssets = { botClasses: [], textures: [], voices: [], weapons: [] };
+  const system = findDir(installDir, 'System');
+  if (!system) return assets;
+  let files: string[];
+  try {
+    files = fs.readdirSync(system).filter((f) => f.toLowerCase().endsWith('.int'));
+  } catch {
+    return assets;
+  }
+  const add = (list: GameAssets['botClasses'], name: string, label: string, max: number) => {
+    if (list.length >= max || !name || name.length > 128) return;
+    if (!list.some((x) => x.name.toLowerCase() === name.toLowerCase()))
+      list.push({ name, label: (label || name.split('.').pop() || name).slice(0, 64) });
+  };
+  for (const f of files) {
+    let text: string;
+    try {
+      text = fs.readFileSync(path.join(system, f), 'latin1');
+    } catch {
+      continue;
+    }
+    for (const line of text.split(/\r?\n/)) {
+      const o = parseIntObject(line);
+      if (!o?.name) continue;
+      const cls = (o.class ?? '').toLowerCase();
+      const meta = (o.metaclass ?? '').toLowerCase();
+      const desc = o.description ?? '';
+      if (cls === 'class' && /\.bot$/.test(meta)) add(assets.botClasses, o.name, desc, 500);
+      else if (cls === 'class' && meta.endsWith('voicepack')) add(assets.voices, o.name, desc, 500);
+      else if (cls === 'class' && meta.endsWith('tournamentweapon'))
+        add(assets.weapons, o.name, desc, 500);
+      else if (cls === 'texture' && desc) add(assets.textures, o.name, desc, 5000);
+    }
+  }
+  return assets;
 }
