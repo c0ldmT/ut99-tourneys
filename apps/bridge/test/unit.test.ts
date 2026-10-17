@@ -122,8 +122,10 @@ describe('website bot lines', () => {
           lines: [
             { kind: 'kill' as const, text: 'Too easy, {victim}!' },
             { kind: 'rivalDeath' as const, text: 'Not you again, {killer}...' },
+            { kind: 'betWon' as const, text: '{amount} Neuro on {pick}. Easy money.' },
           ],
           rivals: [{ name: 'Mario', level: 'nemesis' as const }],
+          bet: { won: true, amount: 240, pick: 'Xan' },
         },
       ],
     ]);
@@ -148,8 +150,10 @@ describe('website bot lines', () => {
         jmp: true,
       },
       { t: 'bpers', name: '[TC]Loque', tk: 40 },
+      { t: 'bbet', name: '[TC]Loque', w: true, amt: 240, pk: 'Xan' },
       { t: 'bsay', name: '[TC]Loque', k: 'kill', x: 'Too easy, {victim}!' },
       { t: 'bsay', name: '[TC]Loque', k: 'rdeath', x: 'Not you again, {killer}...' },
+      { t: 'bsay', name: '[TC]Loque', k: 'bwon', x: '{amount} Neuro on {pick}. Easy money.' },
       { t: 'brv', name: '[TC]Loque', r: 'Mario', lv: 2 },
     ]);
     for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();

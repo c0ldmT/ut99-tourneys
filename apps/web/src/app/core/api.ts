@@ -126,9 +126,14 @@ export class Api {
   betBoard = (season?: number) =>
     this.call<BetBoard>('GET', `/bets/leaderboard${season ? `?season=${season}` : ''}`);
   betRecords = (season?: number) =>
-    this.call<{ season: number | null; records: BetRecordView[] }>(
+    this.call<{ season: number | null; records: BetRecordView[]; botRecords: BetRecordView[] }>(
       'GET',
       `/bets/records${season ? `?season=${season}` : ''}`,
+    );
+  botBets = (botId: string, season?: number) =>
+    this.call<UserBets>(
+      'GET',
+      `/bets/bots/${encodeURIComponent(botId)}${season ? `?season=${season}` : ''}`,
     );
   userBets = (userId: string, season?: number) =>
     this.call<UserBets>(

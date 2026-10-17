@@ -24,13 +24,22 @@ export type RatingSettings = z.infer<typeof RatingSettingsSchema>;
 export const BettingFieldsSchema = z.object({
   startBalance: z.number().int().min(10).max(1_000_000).default(1000),
   floor: z.number().int().min(0).max(1_000_000).default(100),
+  /** The control center's active bots bet too. */
+  botsBet: z.boolean().default(true),
+  /** At most this many bots bet on one match. */
+  botsPerMatch: z.number().int().min(0).max(50).default(6),
 });
 export const BettingSettingsSchema = BettingFieldsSchema.refine(
   (b) => b.floor <= b.startBalance,
   'the floor must not exceed the start balance',
 );
 export type BettingSettings = z.infer<typeof BettingSettingsSchema>;
-export const DEFAULT_BETTING: BettingSettings = { startBalance: 1000, floor: 100 };
+export const DEFAULT_BETTING: BettingSettings = {
+  startBalance: 1000,
+  floor: 100,
+  botsBet: true,
+  botsPerMatch: 6,
+};
 
 /** Rating settings are the defaults for new seasons; each season keeps a copy (seasons table). */
 /** Names for teams made of bots only (bot control center), in the order they are used. */

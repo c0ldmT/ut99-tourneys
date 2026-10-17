@@ -363,7 +363,7 @@ export interface WebsiteSettings {
   /** Names for bot teams (team tournaments), in order. */
   teamNames: string[];
   /** Betting with Neuro: start balance per season, rescue floor. */
-  betting: { startBalance: number; floor: number };
+  betting: { startBalance: number; floor: number; botsBet: boolean; botsPerMatch: number };
 }
 
 // --- Bot control center ---------------------------------------------------------------------
@@ -376,6 +376,8 @@ export const BOT_LINE_KINDS = [
   'loss',
   'rivalKill',
   'rivalDeath',
+  'betWon',
+  'betLost',
 ] as const;
 export type BotLineKind = (typeof BOT_LINE_KINDS)[number];
 
@@ -481,6 +483,17 @@ export interface BetMatchView {
   mine: { pick: string; amount: number; status: BetStatus; payout: number } | null;
   pools: Record<string, { amount: number; bettors: number }> | null;
   bettors: number;
+  /** After the window: the bots' bets. */
+  botBets: {
+    botId: string;
+    name: string;
+    pick: string;
+    amount: number;
+    status: BetStatus;
+    payout: number;
+  }[];
+  /** While open: the side of the strongest bot that bet. */
+  expert: { botId: string; name: string; pick: string } | null;
 }
 
 export interface TournamentBets {
@@ -516,12 +529,16 @@ export interface NeuroWallet {
 export interface BetBoard {
   season: number | null;
   startBalance?: number;
-  rows: (NeuroWallet & { name: string })[];
+  rows: (NeuroWallet & { name: string; bot: boolean; id: string })[];
+  /** Man against machine: Neuro won (+) or lost (-) by all players and all bots. */
+  versus: { humans: number; bots: number };
 }
 
 export interface BetRecordView {
   key: string;
   userId?: string;
+  /** Bot records: the bot's id. */
+  botId?: string;
   name?: string;
   value: number;
   tournamentId?: string;
@@ -532,6 +549,8 @@ export interface BetRecordView {
 export interface UserBets {
   season: number | null;
   name: string | null;
+  /** Bots: their betting type (analyst, gambler, ...). */
+  type?: string;
   wallet: NeuroWallet | null;
   recent: {
     tournamentId: string;

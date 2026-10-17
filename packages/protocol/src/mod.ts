@@ -262,10 +262,22 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * 2 nemesis). A new `bpers` for a name replaces its lines and rivals.
    */
   z.object({ t: z.literal('bpers'), name: str(MAX_NAME_CHARS), tk: int.min(0).max(100) }),
+  /**
+   * Mod 0.7.1: the bot's latest bet with Neuro (after `bpers`): `w` won, `amt` Neuro won or
+   * lost, `pk` whom it backed. At the start of its next game the bot may say a `bwon`/`blost`
+   * line ({amount} {pick}) instead of a start line.
+   */
+  z.object({
+    t: z.literal('bbet'),
+    name: str(MAX_NAME_CHARS),
+    w: z.boolean(),
+    amt: int.min(0),
+    pk: str(MAX_NAME_CHARS),
+  }),
   z.object({
     t: z.literal('bsay'),
     name: str(MAX_NAME_CHARS),
-    k: z.enum(['start', 'kill', 'death', 'win', 'loss', 'rkill', 'rdeath']),
+    k: z.enum(['start', 'kill', 'death', 'win', 'loss', 'rkill', 'rdeath', 'bwon', 'blost']),
     x: str(160),
   }),
   z.object({

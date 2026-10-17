@@ -182,7 +182,9 @@ export const bets = sqliteTable('bets', {
   tournamentId: text('tournament_id').notNull(),
   matchId: text('match_id').notNull(),
   kind: text('kind').notNull(),
-  userId: text('user_id').notNull(),
+  /** A bet of a user or of a bot of the control center (exactly one is set). */
+  userId: text('user_id'),
+  botId: text('bot_id'),
   pick: text('pick').notNull(),
   amount: integer('amount').notNull(),
   allIn: integer('all_in', { mode: 'boolean' }).notNull().default(false),
@@ -193,7 +195,8 @@ export const bets = sqliteTable('bets', {
 export const betBailouts = sqliteTable('bet_bailouts', {
   id: text('id').primaryKey(),
   season: integer('season').notNull(),
-  userId: text('user_id').notNull(),
+  userId: text('user_id'),
+  botId: text('bot_id'),
   amount: integer('amount').notNull(),
   at: text('at').notNull(),
 });

@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.7.0";
+const MOD_VERSION = "0.7.1";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -126,6 +126,9 @@ var byte CfgTraits[16];            // 1 = a btr line came (else the play style s
 var int CfgTalk[16];               // chance to say something, percent
 var float CfgSayAt[16];            // no line before this time (per bot cooldown)
 var byte CfgStarted[16];           // 1 = had its chance for a start line
+var byte CfgBet[16];               // latest bet with Neuro: 0 none, 1 won, 2 lost (bbet)
+var int CfgBetAmt[16];             // Neuro won or lost
+var string CfgBetPick[16];         // whom the bot backed
 var int CfgCount;
 var byte SayCfg[192];              // chat lines: bot (index into Cfg*), occasion, text
 var string SayKind[192];
@@ -355,6 +358,18 @@ function HandleBridgeMessage(TourneyMsg M)
 			{
 				CfgTalk[i] = Clamp(M.GetInt("tk"), 0, 100);
 				ClearPersonality(i);
+			}
+			break;
+		case "bbet":
+			i = FindCfg(M.Get("name"), false);
+			if (i >= 0)
+			{
+				if (M.GetBool("w"))
+					CfgBet[i] = 1;
+				else
+					CfgBet[i] = 2;
+				CfgBetAmt[i] = M.GetInt("amt");
+				CfgBetPick[i] = M.Get("pk");
 			}
 			break;
 		case "bsay":
@@ -2514,6 +2529,9 @@ function int FindCfg(string BName, bool bCreate)
 	CfgTalk[i] = 0;
 	CfgSayAt[i] = 0;
 	CfgStarted[i] = 0;
+	CfgBet[i] = 0;
+	CfgBetAmt[i] = 0;
+	CfgBetPick[i] = "";
 	return i;
 }
 
@@ -2529,6 +2547,9 @@ function ClearBotConfigs()
 function ClearPersonality(int c)
 {
 	local int i, j;
+	CfgBet[c] = 0; // a "bbet" line follows if there is news
+	CfgBetAmt[c] = 0;
+	CfgBetPick[c] = "";
 	j = 0;
 	for (i = 0; i < SayCount; i++)
 		if (SayCfg[i] != c)
@@ -2683,6 +2704,7 @@ function HuntNemeses()
 function BotTick()
 {
 	local int i, j, c;
+	local bool bSaid;
 	if (CfgCount == 0)
 		return;
 	if (StartTalkLeft > 0)
@@ -2696,7 +2718,14 @@ function BotTick()
 			if (CfgStarted[c] == 0 && FindBotPawn(CfgName[c]) != None)
 			{
 				CfgStarted[c] = 1;
-				BotTalk(c, "start", "", "", CfgTalk[c], true);
+				// News first: a bet with Neuro decided since the bot's last game.
+				if (CfgBet[c] == 1)
+					bSaid = BotTalk(c, "bwon", "", "", CfgTalk[c], true);
+				else if (CfgBet[c] == 2)
+					bSaid = BotTalk(c, "blost", "", "", CfgTalk[c], true);
+				CfgBet[c] = 0;
+				if (!bSaid)
+					BotTalk(c, "start", "", "", CfgTalk[c], true);
 				break;
 			}
 		}
@@ -2726,8 +2755,10 @@ function string TReplace(string S, string From, string To)
 }
 
 // A line needs the names its placeholders stand for.
-function bool LineFits(string T, string Victim, string Killer)
+function bool LineFits(int c, string T, string Victim, string Killer)
 {
+	if (CfgBetPick[c] == "" && InStr(T, "{pick}") >= 0)
+		return false;
 	if (Victim == "" && InStr(T, "{victim}") >= 0)
 		return false;
 	if (Killer == "" && InStr(T, "{killer}") >= 0)
@@ -2743,13 +2774,13 @@ function string PickLine(int c, string Kind, string Victim, string Killer)
 
 	n = 0;
 	for (i = 0; i < SayCount; i++)
-		if (SayCfg[i] == c && SayKind[i] == Kind && LineFits(SayText[i], Victim, Killer))
+		if (SayCfg[i] == c && SayKind[i] == Kind && LineFits(c, SayText[i], Victim, Killer))
 			n++;
 	if (n == 0)
 		return "";
 	k = Rand(n);
 	for (i = 0; i < SayCount; i++)
-		if (SayCfg[i] == c && SayKind[i] == Kind && LineFits(SayText[i], Victim, Killer))
+		if (SayCfg[i] == c && SayKind[i] == Kind && LineFits(c, SayText[i], Victim, Killer))
 		{
 			if (k == 0)
 			{
@@ -2762,6 +2793,8 @@ function string PickLine(int c, string Kind, string Victim, string Killer)
 	T = TReplace(T, "{victim}", Victim);
 	T = TReplace(T, "{killer}", Killer);
 	T = TReplace(T, "{map}", CurrentMapName());
+	T = TReplace(T, "{amount}", string(CfgBetAmt[c]));
+	T = TReplace(T, "{pick}", CfgBetPick[c]);
 	return T;
 }
 

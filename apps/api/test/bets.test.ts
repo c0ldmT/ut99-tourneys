@@ -1,7 +1,19 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { betRecords, settleMatch, wallets, type Bet, type MatchBook } from '../src/bets/betting.js';
+import { BetsService } from '../src/bets/bets.service.js';
+import {
+  bettingType,
+  botBet,
+  drawBettors,
+  judgementNoise,
+  stakeShare,
+  type BetSide,
+  type BettingBot,
+  type BotFeelings,
+} from '../src/bets/bot-betting.js';
 import { EventLogService } from '../src/tournaments/event-log.service.js';
+import { createRng } from '@tourney/bracket';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -261,5 +273,239 @@ describe('betting with Neuro', () => {
       bailouts: 1,
       bailedOut: 100,
     });
+  });
+});
+
+describe('bots betting (pure)', () => {
+  const bot = (over: Partial<BettingBot> = {}): BettingBot => ({
+    id: 'b1',
+    skill: 4,
+    accuracy: 0,
+    alertness: 0,
+    combatStyle: 0,
+    camping: 0,
+    jumpy: false,
+    clanId: null,
+    ...over,
+  });
+  const side = (entrantId: string, rating: number, over: Partial<BetSide> = {}): BetSide => ({
+    entrantId,
+    rating,
+    clans: [],
+    players: [],
+    ...over,
+  });
+  const none: BotFeelings = { rivals: new Map() };
+  const favourite = (b: BettingBot, n = 400) => {
+    let fav = 0;
+    for (let i = 0; i < n; i++) {
+      const d = botBet(b, [side('a', 1700), side('b', 1500)], none, 1000, createRng(`s${i}`));
+      if (d?.pick === 'a') fav++;
+    }
+    return fav / n;
+  };
+
+  it('judges by the ratings: strong, accurate bots pick the favourite more often', () => {
+    expect(judgementNoise({ skill: 7, accuracy: 1 })).toBeCloseTo(0.2);
+    expect(judgementNoise({ skill: 0, accuracy: -1 })).toBeCloseTo(0.95);
+    const godlike = favourite(bot({ skill: 7, accuracy: 1 }));
+    const novice = favourite(bot({ skill: 0, accuracy: -1 }));
+    expect(godlike).toBeGreaterThan(0.95);
+    expect(novice).toBeLessThan(godlike);
+    expect(novice).toBeGreaterThan(0.6);
+    // Same seed, same decision.
+    const d1 = botBet(bot(), [side('a', 1600), side('b', 1500)], none, 1000, createRng('x'));
+    const d2 = botBet(bot(), [side('a', 1600), side('b', 1500)], none, 1000, createRng('x'));
+    expect(d1).toEqual(d2);
+  });
+
+  it('stakes by combat style, campers wait, berserkers go all in now and then', () => {
+    expect(stakeShare(-1)).toBeCloseTo(0.03);
+    expect(stakeShare(1)).toBeCloseTo(0.15);
+    const avg = (b: BettingBot) => {
+      let sum = 0;
+      let n = 0;
+      let allIn = 0;
+      for (let i = 0; i < 400; i++) {
+        const d = botBet(b, [side('a', 1600), side('b', 1500)], none, 1000, createRng(`t${i}`));
+        if (!d) continue;
+        n++;
+        sum += d.amount;
+        if (d.allIn) allIn++;
+        expect(d.amount % 10 === 0 || d.allIn).toBe(true);
+      }
+      return { avg: sum / n, bets: n, allIn };
+    };
+    const careful = avg(bot({ combatStyle: -1 }));
+    const berserk = avg(bot({ combatStyle: 1 }));
+    expect(berserk.avg).toBeGreaterThan(careful.avg * 3);
+    expect(careful.allIn).toBe(0);
+    expect(berserk.allIn).toBeGreaterThan(5);
+    expect(avg(bot({ camping: 1 })).bets).toBeLessThan(avg(bot()).bets);
+    expect(botBet(bot(), [side('a', 1600), side('b', 1500)], none, 5, createRng('y'))).toBeNull();
+  });
+
+  it('follows its feelings: nemesis always, clan mates and revenge bend the judgement', () => {
+    const rivals = new Map([['mario', 2 as const]]);
+    for (let i = 0; i < 50; i++) {
+      const d = botBet(
+        bot({ skill: 7, accuracy: 1 }),
+        [side('a', 1900, { players: ['mario'] }), side('b', 1300)],
+        { rivals },
+        1000,
+        createRng(`n${i}`),
+      );
+      expect(d?.pick).toBe('b'); // never on the nemesis, however strong
+    }
+    const clanPick = (clanId: string | null) => {
+      let a = 0;
+      for (let i = 0; i < 300; i++) {
+        const d = botBet(
+          bot({ skill: 2, clanId }),
+          [side('a', 1500, { clans: ['tc'] }), side('b', 1500)],
+          none,
+          1000,
+          createRng(`c${i}`),
+        );
+        if (d?.pick === 'a') a++;
+      }
+      return a;
+    };
+    expect(clanPick('tc')).toBeGreaterThan(clanPick(null) + 30);
+    expect(bettingType({ ...bot(), jumpy: true })).toBe('hunch');
+    expect(bettingType(bot({ skill: 6, accuracy: 0.5 }))).toBe('analyst');
+    expect(bettingType(bot({ combatStyle: 1 }))).toBe('gambler');
+  });
+
+  it('draws at most n bettors, alert bots more often', () => {
+    const bots = Array.from({ length: 10 }, (_, i) => ({ id: `b${i}`, alertness: i < 5 ? 1 : -1 }));
+    let alert = 0;
+    for (let i = 0; i < 200; i++) {
+      const d = drawBettors(bots, 3, createRng(`d${i}`));
+      expect(new Set(d.map((x) => x.id)).size).toBe(3);
+      alert += d.filter((x) => x.alertness === 1).length;
+    }
+    expect(alert / 600).toBeGreaterThan(0.7);
+  });
+});
+
+describe('bots bet with Neuro', () => {
+  it('bet when a match opens, show the expert pick, count separately, tell the game', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    await startSeason(admin);
+    const ids: string[] = [];
+    for (const [i, name] of ['Abe', 'Bea', 'Cid', 'Dot', 'Eli', 'Fay', 'Gus', 'Hal'].entries())
+      ids.push(
+        (
+          await admin.post('/bots', {
+            name,
+            skill: i,
+            traits: { combatStyle: 1, alertness: 1, camping: 0 },
+            personality: {
+              talk: 100,
+              lines: [{ kind: 'betWon', text: '{amount} Neuro on {pick}!' }],
+            },
+          })
+        ).body.id,
+      );
+    await admin.req('PUT', '/settings/betting', { botsPerMatch: 3 });
+    const t = await admin.post('/tournaments', {
+      ...tournamentBody({ name: 'Bot Bets' }, { size: 4, format: 'single' }),
+      botPool: ids.slice(0, 4).map((id) => ({ id, name: 'x', skill: 4 })),
+    });
+    const id = t.body.id as string;
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    const view = (await mario.get(`/bets/tournaments/${id}`)).body;
+    for (const m of view.matches) {
+      // Open: who bet stays hidden, but the expert's side shows.
+      expect(m.bettors).toBeGreaterThan(0);
+      expect(m.bettors).toBeLessThanOrEqual(3);
+      expect(m.botBets).toEqual([]);
+      expect(m.entrants).toContain(m.expert.pick);
+    }
+    const log = api!.app.get(EventLogService);
+    const append = (events: Record<string, unknown>[]) => {
+      const head = log.load(id).length;
+      const r = log.append(
+        id,
+        head,
+        events.map((e) => ({ actor: { kind: 'bridge' }, ...e })),
+      );
+      if (!r.accepted) throw new Error(r.reason);
+    };
+    const m = view.matches[0];
+    // Mario bets against the expert's side, so that the pool has two sides.
+    const against = m.entrants.find((e: string) => e !== m.expert.pick);
+    expect(
+      (
+        await mario.req('PUT', `/bets/tournaments/${id}/${m.matchId}`, {
+          pick: against,
+          amount: 100,
+        })
+      ).status,
+    ).toBe(200);
+    append([
+      { type: 'checkin.opened', data: { serverProfileId: 'local' } },
+      { type: 'tournament.started', data: {} },
+      { type: 'match.called', data: { matchId: m.matchId, entrants: m.entrants } },
+      { type: 'match.started', data: { matchId: m.matchId, game: 1 } },
+    ]);
+    const closed = (await mario.get(`/bets/tournaments/${id}`)).body.matches[0];
+    expect(closed.botBets.length).toBe(closed.bettors - 1);
+    // Bots never bet on their own match.
+    const playing = new Set(
+      m.entrants.map((e: string) => seeded.body.projection.entrants[e].bot.id),
+    );
+    expect(closed.botBets.some((b: { botId: string }) => playing.has(b.botId))).toBe(false);
+    const winner = m.expert.pick;
+    append([
+      {
+        type: 'match.gameFinished',
+        data: {
+          matchId: m.matchId,
+          game: 1,
+          map: 'DM-Deck16][',
+          scores: { [m.entrants[0]]: 20, [m.entrants[1]]: 5 },
+          winnerId: winner,
+          endReason: 'fragLimit',
+        },
+      },
+      {
+        type: 'match.result',
+        data: {
+          result: { matchId: m.matchId, entrants: m.entrants, winnerId: winner, outcome: 'played' },
+        },
+      },
+    ]);
+    const board = (await mario.get('/bets/leaderboard')).body;
+    expect(board.rows.find((r: { bot: boolean }) => !r.bot)).toMatchObject({
+      name: 'Mario',
+      balance: 900,
+    });
+    // Pools are shared: what Mario lost, the bots won (rounded down).
+    expect(board.versus.humans).toBe(-100);
+    expect(board.versus.bots).toBeGreaterThan(90);
+    expect(board.versus.bots).toBeLessThanOrEqual(100);
+    const rec = (await mario.get('/bets/records')).body;
+    expect(rec.records.find((r: { key: string }) => r.key === 'worstLoss')).toMatchObject({
+      name: 'Mario',
+    });
+    expect(rec.records.every((r: { botId?: string }) => !r.botId)).toBe(true);
+    expect(rec.botRecords.length).toBeGreaterThan(0);
+    const settledBots = (await mario.get(`/bets/tournaments/${id}`)).body.matches[0].botBets;
+    const lucky = settledBots.find((b: { status: string }) => b.status === 'won');
+    expect(lucky).toBeDefined();
+    {
+      const profile = (await mario.get(`/bets/bots/${lucky.botId}`)).body;
+      expect(profile.wallet.won).toBe(1);
+      expect(typeof profile.type).toBe('string');
+      // The game hears about it: the bot's personality carries its latest bet.
+      const news = api!.app.get(BetsService).botBetNews([lucky.botId]);
+      expect(news.get(lucky.botId)).toMatchObject({ won: true });
+    }
   });
 });

@@ -39,6 +39,7 @@ import { StatsService } from '../stats/stats.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { BotsService } from '../bots/bots.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { BetsService } from '../bets/bets.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
 import {
@@ -163,6 +164,7 @@ export class TournamentsService {
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(BotsService) private readonly bots: BotsService,
     @Inject(SettingsService) private readonly settingsSvc: SettingsService,
+    @Inject(BetsService) private readonly bets: BetsService,
   ) {}
 
   private now() {
@@ -1120,7 +1122,7 @@ export class TournamentsService {
         if (e.kind === 'bot' && e.bot.id) ids.push(e.bot.id);
         if (e.kind === 'team') for (const b of e.bots) if (b.id) ids.push(b.id);
       }
-      return this.bots.personalities(ids);
+      return this.bots.personalities(ids, this.bets.botBetNews([...new Set(ids)]));
     } catch (err) {
       this.logger.warn(`bot personalities for ${t.id}: ${String(err)}`);
       return [];

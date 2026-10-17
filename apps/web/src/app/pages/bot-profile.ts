@@ -12,12 +12,13 @@ import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { assetLabel, combatStyleKey, traitPercent } from '../core/bots';
 import { TPipe } from '../core/i18n';
-import { BOT_LINE_KINDS, type BotProfile } from '../core/types';
+import { NeuroPipe } from '../core/neuro';
+import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
 
 /** Bot profile (everybody logged in): look, play style, personality, rivals with the record. */
 @Component({
   selector: 'app-bot-profile',
-  imports: [TPipe, RouterLink],
+  imports: [TPipe, RouterLink, NeuroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -149,6 +150,55 @@ import { BOT_LINE_KINDS, type BotProfile } from '../core/types';
         <p class="muted small">{{ 'bots.recordHint' | t }}</p>
       </section>
 
+      @if (neuro(); as n) {
+        @if (n.wallet && n.season) {
+          <section class="card">
+            <h2>{{ 'bets.profileTitle' | t: { n: n.season } }}</h2>
+            <p>
+              <span class="badge type">{{ 'bets.type.' + n.type | t }}</span>
+              <span class="muted small"> {{ 'bets.typeHint.' + n.type | t }}</span>
+            </p>
+            <dl>
+              <dt>{{ 'bets.balance' | t }}</dt>
+              <dd>
+                <b class="neuro">{{ n.wallet.balance | neuro }}</b>
+              </dd>
+              <dt>{{ 'bets.wonLost' | t }}</dt>
+              <dd>{{ n.wallet.won }}–{{ n.wallet.lost }}</dd>
+              <dt>{{ 'bets.col.peak' | t }}</dt>
+              <dd>{{ n.wallet.peak | neuro }}</dd>
+            </dl>
+            @if (n.recent.length) {
+              <ul class="recent">
+                @for (x of n.recent.slice(0, 8); track x.tournamentId + x.matchId) {
+                  <li>
+                    <a [routerLink]="['/t', x.tournamentId]">{{ x.tournamentName }}</a>
+                    <span class="muted"> · {{ x.matchId }} · </span>
+                    {{ x.amount | neuro }} → {{ x.pick }}
+                    <span [class]="x.status">
+                      @switch (x.status) {
+                        @case ('won') {
+                          +{{ x.payout - x.amount | neuro }}
+                        }
+                        @case ('lost') {
+                          −{{ x.amount | neuro }}
+                        }
+                        @case ('refunded') {
+                          ({{ 'bets.status.refunded' | t }})
+                        }
+                        @default {
+                          ({{ 'bets.status.open' | t }})
+                        }
+                      }
+                    </span>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
+        }
+      }
+
       <section class="card">
         <h2>{{ 'bots.sec.personality' | t }}</h2>
         <p>{{ 'bots.talkText' | t: { n: b.personality.talk } }}</p>
@@ -164,6 +214,23 @@ import { BOT_LINE_KINDS, type BotProfile } from '../core/types';
     }
   `,
   styles: `
+    .neuro {
+      color: var(--accent);
+    }
+    .badge.type {
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    ul.recent {
+      list-style: none;
+      padding: 0;
+    }
+    ul.recent .won {
+      color: var(--live);
+    }
+    ul.recent .lost {
+      color: var(--danger);
+    }
     .top {
       display: flex;
       justify-content: space-between;
@@ -235,6 +302,8 @@ import { BOT_LINE_KINDS, type BotProfile } from '../core/types';
   `,
 })
 export class BotProfilePage {
+  /** Neuro of the running (or last) season and the betting type. */
+  protected readonly neuro = signal<UserBets | null>(null);
   private readonly api = inject(Api);
   protected readonly auth = inject(Auth);
   readonly id = input.required<string>();
@@ -271,6 +340,10 @@ export class BotProfilePage {
     this.error.set('');
     try {
       this.b.set(await this.api.botProfile(id));
+      this.api.botBets(id).then(
+        (n) => this.neuro.set(n),
+        () => this.neuro.set(null),
+      );
     } catch (e) {
       this.b.set(null);
       this.error.set(errorText(e));

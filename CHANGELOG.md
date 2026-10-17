@@ -24,6 +24,11 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   shared pari-mutuel; stakes come back when no game was played. Wallets start fresh every season (start balance and
   rescue floor in the settings). Tournament page: bets panel, bracket marks open matches with €. Statistics: tab
   "Bets" with the Neuro ranking and betting records; player page: Neuro of the season.
+- The control center's bots bet too: up to N per match (setting), judging by the ratings with noise that shrinks
+  with difficulty and accuracy, staking by their play style, loyal to their clan, against rivals, nemesis and the
+  player who beat them most. "Expert tip" while bets are open, bot bets shown after the window; bot records apart
+  from the players'; "man vs. machine" bar; betting type and Neuro on the bot profile. New bot lines "bet won" and
+  "bet lost" ({amount}, {pick}) said at the start of the bot's next game (mod 0.7.1).
 - Settings: "danger zone" to reset the website - deletes all tournaments, statistics and seasons (users, bots,
   servers and settings stay), protected by a checkbox, the typed word RESET and a last confirmation.
 - Bot control center (admin page "Bots"): the website's own bots without the ini's limit of 32 - name, model, skin,

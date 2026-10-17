@@ -102,6 +102,8 @@ const SAY_KIND = {
   loss: 'loss',
   rivalKill: 'rkill',
   rivalDeath: 'rdeath',
+  betWon: 'bwon',
+  betLost: 'blost',
 } as const;
 
 /**
@@ -129,6 +131,14 @@ export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMo
   const p = personas?.get(b.name.toLowerCase());
   if (p) {
     lines.push({ t: 'bpers', name, tk: p.talk });
+    if (p.bet)
+      lines.push({
+        t: 'bbet',
+        name,
+        w: p.bet.won,
+        amt: Math.max(0, Math.round(p.bet.amount)),
+        pk: wireName(p.bet.pick),
+      });
     for (const l of p.lines)
       lines.push({ t: 'bsay', name, k: SAY_KIND[l.kind], x: wireText(l.text, 120) });
     for (const r of p.rivals)

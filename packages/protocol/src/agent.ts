@@ -250,6 +250,8 @@ export const BOT_LINE_KINDS = [
   'loss',
   'rivalKill',
   'rivalDeath',
+  'betWon',
+  'betLost',
 ] as const;
 export type BotLineKind = (typeof BOT_LINE_KINDS)[number];
 export const BotLineKindSchema = z.enum(BOT_LINE_KINDS);
@@ -273,6 +275,13 @@ export const BotPersonalitySchema = z.object({
       }),
     )
     .max(16),
+  /**
+   * The bot's latest decided bet with Neuro, if it was decided after the bot's last game: it
+   * talks about it at the start of its next game ({amount} Neuro won or lost, {pick}).
+   */
+  bet: z
+    .object({ won: z.boolean(), amount: z.number().int().nonnegative(), pick: z.string().max(64) })
+    .optional(),
 });
 export type BotPersonality = z.infer<typeof BotPersonalitySchema>;
 

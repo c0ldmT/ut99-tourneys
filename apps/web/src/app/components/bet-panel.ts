@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe } from '../core/neuro';
@@ -22,7 +23,7 @@ interface Draft {
 /** Betting with Neuro on the tournament page: open matches, closed pools, own results. */
 @Component({
   selector: 'app-bet-panel',
-  imports: [TPipe, FormsModule, NeuroPipe],
+  imports: [TPipe, FormsModule, NeuroPipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (view(); as v) {
@@ -119,6 +120,11 @@ interface Draft {
                     </p>
                   }
                 }
+                @if (m.expert; as x) {
+                  <p class="small expert">
+                    {{ 'bets.expert' | t: { bot: x.name, name: name(x.pick) } }}
+                  </p>
+                }
               </div>
             }
           }
@@ -143,6 +149,15 @@ interface Draft {
                 @if (m.mine; as b) {
                   <p class="small ok">
                     {{ 'bets.yourBet' | t: { amount: neuro(b.amount), name: name(b.pick) } }}
+                  </p>
+                }
+                @if (m.botBets.length) {
+                  <p class="small muted botbets">
+                    {{ 'bets.botsBet' | t }}
+                    @for (x of m.botBets; track x.botId; let last = $last) {
+                      <a [routerLink]="['/bots', x.botId]">{{ x.name }}</a>
+                      {{ x.amount | neuro }} → {{ name(x.pick) }}{{ last ? '' : ' · ' }}
+                    }
                   </p>
                 }
               </div>
@@ -182,6 +197,15 @@ interface Draft {
                 @if (m.pools && m.bettors) {
                   <p class="small muted">
                     {{ 'bets.poolTotal' | t: { amount: neuro(total(m)), n: m.bettors } }}
+                  </p>
+                }
+                @if (m.botBets.length) {
+                  <p class="small muted botbets">
+                    {{ 'bets.botsBet' | t }}
+                    @for (x of m.botBets; track x.botId; let last = $last) {
+                      <a [routerLink]="['/bots', x.botId]">{{ x.name }}</a>
+                      {{ x.amount | neuro }} → {{ name(x.pick) }}{{ last ? '' : ' · ' }}
+                    }
                   </p>
                 }
               </div>
@@ -272,6 +296,13 @@ interface Draft {
     .result.won,
     .ok {
       color: var(--live);
+    }
+    .expert {
+      color: var(--info);
+    }
+    .botbets a {
+      color: var(--muted);
+      text-decoration: underline dotted;
     }
     .result.lost {
       color: var(--danger);

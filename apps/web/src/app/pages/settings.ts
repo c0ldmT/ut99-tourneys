@@ -182,6 +182,24 @@ import type { Season, SeasonsOverview } from '../core/types';
           <input type="number" name="floor" min="0" step="10" class="narrow" [(ngModel)]="floor" />
         </label>
       </div>
+      <label class="row"
+        ><input type="checkbox" name="botsBet" [(ngModel)]="botsBet" />
+        {{ 'bets.botsBetLabel' | t }}</label
+      >
+      <div class="row gap">
+        <label
+          >{{ 'bets.botsPerMatch' | t }}
+          <input
+            type="number"
+            name="botsPerMatch"
+            min="0"
+            max="50"
+            class="narrow"
+            [(ngModel)]="botsPerMatch"
+            [disabled]="!botsBet"
+          />
+        </label>
+      </div>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
         @if (savedBetting()) {
@@ -339,6 +357,8 @@ export class SettingsPage {
   protected newFrom = '';
   protected startBalance = 1000;
   protected floor = 100;
+  protected botsBet = true;
+  protected botsPerMatch = 6;
   protected readonly savedBetting = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
   protected readonly resetWord = 'RESET';
@@ -380,6 +400,8 @@ export class SettingsPage {
       this.levelPoints.set(s.rating.levelPoints);
       this.startBalance = s.betting.startBalance;
       this.floor = s.betting.floor;
+      this.botsBet = s.betting.botsBet;
+      this.botsPerMatch = s.betting.botsPerMatch;
       this.o.set(o);
       this.saved.set(false);
     } catch (e) {
@@ -441,6 +463,8 @@ export class SettingsPage {
       const s = await this.api.setBettingSettings({
         startBalance: Math.round(Number(this.startBalance)),
         floor: Math.round(Number(this.floor)),
+        botsBet: this.botsBet,
+        botsPerMatch: Math.round(Number(this.botsPerMatch)),
       });
       this.startBalance = s.betting.startBalance;
       this.floor = s.betting.floor;

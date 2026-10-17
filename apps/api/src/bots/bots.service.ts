@@ -490,7 +490,11 @@ export class BotsService {
    * Personalities for the game: lines (at most BOT_MAX_LINES, spread over the occasions) and
    * rivals by their names in the game (players by display name, bots by game name).
    */
-  personalities(ids: readonly string[]): BotPersonality[] {
+  personalities(
+    ids: readonly string[],
+    /** Latest bets with Neuro per bot id (betting), to talk about in the next game. */
+    news?: ReadonlyMap<string, NonNullable<BotPersonality['bet']>>,
+  ): BotPersonality[] {
     const all = this.list();
     const users = new Map(this.users.list().map((u) => [u.id, u.displayName]));
     const out: BotPersonality[] = [];
@@ -505,12 +509,14 @@ export class BotsService {
         .filter((r): r is { name: string; level: 'rival' | 'nemesis' } => !!r.name)
         .map((r) => ({ name: r.name.slice(0, 32), level: r.level }))
         .slice(0, BOT_MAX_RIVALS);
+      const bet = news?.get(b.id);
       if (!b.personality.lines.length && !rivals.length) continue;
       out.push({
         name: b.gameName,
         talk: b.personality.talk,
         lines: spreadLines(b.personality.lines, BOT_MAX_LINES),
         rivals,
+        ...(bet ? { bet } : {}),
       });
     }
     return out;

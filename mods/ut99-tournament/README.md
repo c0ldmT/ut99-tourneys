@@ -36,6 +36,8 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > rival kill/death) with placeholders, talkativeness and a cooldown (`bpers`/`bsay`), rivals the bot prefers as a
 > target and a nemesis it hunts down when it sees no other enemy (`brv`, `GameThreatAdd`). Clan tags come as part
 > of the name. Bots of the server's ini work as before.
+> Mod 0.7.1: bets with Neuro - a website bot whose bet was decided since its last game may say a "bet won" or
+> "bet lost" line at the start of its next game (`bbet`, placeholders `{amount}` and `{pick}`).
 
 ## Classes
 
@@ -172,6 +174,7 @@ Work through these in order and note what happens. Each item names what to look 
 | 25 | **Map change** | After several games and map changes no `Failed to garbage collect` or `Accessed None` in the client log (`UnrealTournament.log`) |
 | 26 | **SmartStockBots** (optional, see below) | Server log at start: SmartStockBots loaded; bots dodge, translocate and combo visibly better; before the countdown and during a pause the bot stays invisible and does not move |
 | 27 | **Website bots** (mod 0.7.0) | A bot from the control center has the skin, face and voice set there (team colours in team games) and plays as set (e.g. a camper stays put, "jumpy" jumps a lot). With talkativeness 100 it greets at the start, comments kills/deaths and the end; lines with `{victim}` etc. show the names. A nemesis comes looking for its target when it has no other enemy; server log without `Accessed None` |
+| 28 | **Bet lines** (mod 0.7.1) | A website bot with a "Bet won"/"Bet lost" line and talkativeness 100 that won or lost a bet with Neuro says it at the start of its next game, with amount and the backed name |
 
 ### Team deathmatch (2on2, 3on3, 5on5)
 

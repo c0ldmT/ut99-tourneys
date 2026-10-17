@@ -163,6 +163,9 @@ export class AgentGateway {
         });
         if (res.accepted && res.events.some((e) => e.type === 'match.result')) {
           this.hub.clearLive(tournamentId);
+          // Bets were decided: the bots' personalities (bet news) go to the bridge.
+          const t = this.tournaments.get(tournamentId);
+          if (t) this.tournaments.syncToAgent(t, res.projection.headSeq);
         }
         if (res.accepted && res.events.some((e) => e.type === 'match.called')) {
           // The access list puts the players of the current match first (64 entries at most).

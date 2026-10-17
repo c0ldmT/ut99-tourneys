@@ -48,6 +48,14 @@ export class BetsController {
     return this.bets.records(q.season);
   }
 
+  @Get('bots/:botId')
+  bot(
+    @Param('botId') botId: string,
+    @Query(new ZodPipe(SeasonQuery)) q: z.infer<typeof SeasonQuery>,
+  ) {
+    return this.bets.botView(botId, q.season);
+  }
+
   @Get('users/:userId')
   user(
     @Param('userId') userId: string,

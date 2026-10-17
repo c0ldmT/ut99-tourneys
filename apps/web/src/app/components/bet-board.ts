@@ -25,6 +25,28 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }
+    @if (board()?.versus; as v) {
+      @if (v.humans || v.bots) {
+        <div class="card versus">
+          <div class="spread small">
+            <span
+              >{{ 'bets.humans' | t }}
+              <b [class.plus]="v.humans > 0" [class.minus]="v.humans < 0">{{
+                signed(v.humans)
+              }}</b></span
+            >
+            <span class="muted">{{ 'bets.versus' | t }}</span>
+            <span
+              ><b [class.plus]="v.bots > 0" [class.minus]="v.bots < 0">{{ signed(v.bots) }}</b>
+              {{ 'bets.bots' | t }}</span
+            >
+          </div>
+          <div class="vbar">
+            <span class="h" [style.width.%]="humanShare()"></span>
+          </div>
+        </div>
+      }
+    }
     @if (records().length) {
       <div class="records">
         @for (r of records(); track r.key) {
@@ -40,8 +62,28 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
         }
       </div>
     }
+    @if (botRecords().length) {
+      <h3>{{ 'bets.botRecords' | t }}</h3>
+      <div class="records">
+        @for (r of botRecords(); track r.key) {
+          <div class="card record">
+            <span class="muted small">{{ 'bets.rec.' + r.key | t }}</span>
+            <span class="value">{{ value(r) }}</span>
+            <a [routerLink]="['/bots', r.botId]">{{ r.name }}</a>
+          </div>
+        }
+      </div>
+    }
+    <label class="small check"
+      ><input
+        type="checkbox"
+        [checked]="showBots()"
+        (change)="showBots.set($any($event.target).checked)"
+      />
+      {{ 'stats.showBots' | t }}</label
+    >
     <div class="card table-wrap">
-      @if (!board()?.rows?.length) {
+      @if (!rows().length) {
         <p class="muted">{{ 'bets.noBets' | t }}</p>
       } @else {
         <table>
@@ -58,11 +100,16 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
             </tr>
           </thead>
           <tbody>
-            @for (r of board()!.rows; track r.userId; let i = $index) {
+            @for (r of rows(); track r.userId; let i = $index) {
               <tr [class.me]="r.userId === meId()">
                 <td>{{ i + 1 }}</td>
                 <td>
-                  <a [routerLink]="['/stats/p', 'u:' + r.userId]">{{ r.name }}</a>
+                  @if (r.bot) {
+                    <a [routerLink]="['/bots', r.id]">{{ r.name }}</a>
+                    <span class="badge">BOT</span>
+                  } @else {
+                    <a [routerLink]="['/stats/p', 'u:' + r.userId]">{{ r.name }}</a>
+                  }
                 </td>
                 <td class="num">
                   <b>{{ r.balance | neuro }}</b>
@@ -111,6 +158,34 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
     .num {
       text-align: right;
     }
+    .versus {
+      margin-bottom: 16px;
+    }
+    .vbar {
+      height: 10px;
+      border-radius: 5px;
+      background: var(--info);
+      overflow: hidden;
+      margin-top: 8px;
+    }
+    .vbar .h {
+      display: block;
+      height: 100%;
+      background: var(--accent);
+    }
+    h3 {
+      font-size: 0.95rem;
+      margin: 8px 0;
+    }
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .badge {
+      margin-left: 6px;
+    }
     .plus {
       color: var(--live);
     }
@@ -131,7 +206,20 @@ export class BetBoardView {
   protected readonly board = signal<BetBoard | null>(null);
   protected readonly recs = signal<BetRecordView[]>([]);
   protected readonly error = signal('');
+  protected readonly botRecs = signal<BetRecordView[]>([]);
   protected readonly records = computed(() => this.recs());
+  protected readonly botRecords = computed(() => this.botRecs());
+  protected readonly showBots = signal(true);
+  protected readonly rows = computed(() =>
+    (this.board()?.rows ?? []).filter((r) => this.showBots() || !r.bot),
+  );
+  /** Width of the players' part of the bar: 50 % at a draw. */
+  protected readonly humanShare = computed(() => {
+    const v = this.board()?.versus;
+    if (!v) return 50;
+    const span = Math.max(1, Math.abs(v.humans) + Math.abs(v.bots));
+    return Math.round(50 + (50 * (v.humans - v.bots)) / (2 * span));
+  });
 
   constructor() {
     effect(() => {
@@ -146,6 +234,7 @@ export class BetBoardView {
       const [b, r] = await Promise.all([this.api.betBoard(season), this.api.betRecords(season)]);
       this.board.set(b);
       this.recs.set(r.records);
+      this.botRecs.set(r.botRecords ?? []);
     } catch (e) {
       this.error.set(errorText(e));
     }
@@ -153,6 +242,10 @@ export class BetBoardView {
 
   protected neuro(n: number): string {
     return formatNeuro(n, this.i18n.lang());
+  }
+
+  protected signed(n: number): string {
+    return (n > 0 ? '+' : n < 0 ? '−' : '') + this.neuro(Math.abs(n));
   }
 
   protected hit(won: number, lost: number): string {

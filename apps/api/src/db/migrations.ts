@@ -200,4 +200,42 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX bet_bailouts_season ON bet_bailouts(season);
   `,
+  // 9: the control center's bots bet too. A bet or rescue belongs to a user or to a bot.
+  `
+  CREATE TABLE bets_new (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    match_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    bot_id TEXT REFERENCES bots(id) ON DELETE CASCADE,
+    pick TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    all_in INTEGER NOT NULL DEFAULT 0,
+    placed_at TEXT NOT NULL,
+    CHECK ((user_id IS NULL) <> (bot_id IS NULL))
+  );
+  INSERT INTO bets_new (id, season, tournament_id, match_id, kind, user_id, pick, amount, all_in, placed_at)
+    SELECT id, season, tournament_id, match_id, kind, user_id, pick, amount, all_in, placed_at FROM bets;
+  DROP TABLE bets;
+  ALTER TABLE bets_new RENAME TO bets;
+  CREATE UNIQUE INDEX bets_user_match ON bets(tournament_id, match_id, kind, user_id) WHERE user_id IS NOT NULL;
+  CREATE UNIQUE INDEX bets_bot_match ON bets(tournament_id, match_id, kind, bot_id) WHERE bot_id IS NOT NULL;
+  CREATE INDEX bets_season ON bets(season);
+  CREATE TABLE bet_bailouts_new (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL REFERENCES seasons(number) ON DELETE CASCADE,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    bot_id TEXT REFERENCES bots(id) ON DELETE CASCADE,
+    amount INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    CHECK ((user_id IS NULL) <> (bot_id IS NULL))
+  );
+  INSERT INTO bet_bailouts_new (id, season, user_id, amount, at)
+    SELECT id, season, user_id, amount, at FROM bet_bailouts;
+  DROP TABLE bet_bailouts;
+  ALTER TABLE bet_bailouts_new RENAME TO bet_bailouts;
+  CREATE INDEX bet_bailouts_season ON bet_bailouts(season);
+  `,
 ];

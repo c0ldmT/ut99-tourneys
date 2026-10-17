@@ -7,6 +7,13 @@ import { entrantUserIds, type TournamentEvent, type TournamentProjection } from 
  * own, like the statistics.
  */
 
+/**
+ * Who bets: a website user (the user id) or a bot of the control center (`bot:<id>`). The
+ * wallets, settlement and records work on this key.
+ */
+export const botBettor = (botId: string) => `bot:${botId}`;
+export const isBotBettor = (key: string) => key.startsWith('bot:');
+
 /** Kinds of bets. Only the match winner for now; the data model is ready for more. */
 export const BET_KINDS = ['winner'] as const;
 export type BetKind = (typeof BET_KINDS)[number];
@@ -33,7 +40,8 @@ export interface MatchBook {
   winnerId?: string;
   /** When the match was decided (or refunded). */
   settledAt?: string;
-  /** Website users playing in the match (players, team members and subs): no bets. */
+  /** Bettors playing in the match: website users (players, team members and subs) and the
+   * control center's bots (`bot:<id>`). They cannot bet on it. */
   participants: string[];
 }
 
@@ -58,7 +66,16 @@ export function matchBooks(
     const participants = entrants
       ? entrants.flatMap((id) => {
           const e = proj.entrants[id];
-          return e ? entrantUserIds(e) : [];
+          if (!e) return [];
+          const bots =
+            e.kind === 'bot'
+              ? e.bot.id
+                ? [botBettor(e.bot.id)]
+                : []
+              : e.kind === 'team'
+                ? e.bots.flatMap((b) => (b.id ? [botBettor(b.id)] : []))
+                : [];
+          return [...entrantUserIds(e), ...bots];
         })
       : [];
     const book: MatchBook = { matchId: m.id, entrants, state: 'waiting', participants };
