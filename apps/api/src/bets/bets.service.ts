@@ -207,7 +207,7 @@ export class BetsService {
       .map(toBet);
     const settled = this.settle(all);
     const library = this.bots.list();
-    const botNames = new Map(library.map((x) => [x.id, x.gameName]));
+    const names = this.names();
     const matches = [...(b?.books.values() ?? [])]
       .filter((m) => m.entrants)
       .map((m) => {
@@ -227,19 +227,25 @@ export class BetsService {
             : null,
           /** Hidden while bets are open (everybody bets on their own judgement). */
           pools: m.state === 'open' ? null : pools(ofMatch),
+          /** Hidden while open: what one Neuro on a side brings back (pari-mutuel). */
+          odds: m.state === 'open' ? null : odds(m, ofMatch),
           bettors: ofMatch.length,
-          /** After the window: what the bots bet. */
-          botBets:
+          /** After the window: every bet, players' and bots', biggest first. */
+          bets:
             m.state === 'open'
               ? []
-              : botBets.map((x) => ({
-                  botId: x.userId.slice(4),
-                  name: botNames.get(x.userId.slice(4)) ?? x.userId.slice(4),
-                  pick: x.pick,
-                  amount: x.amount,
-                  status: x.status,
-                  payout: x.payout,
-                })),
+              : settled
+                  .filter((x) => x.matchId === m.matchId)
+                  .sort((x, y) => y.amount - x.amount)
+                  .map((x) => ({
+                    bot: isBotBettor(x.userId),
+                    id: isBotBettor(x.userId) ? x.userId.slice(4) : x.userId,
+                    name: names.get(x.userId) ?? x.userId,
+                    pick: x.pick,
+                    amount: x.amount,
+                    status: x.status,
+                    payout: x.payout,
+                  })),
           /** While open: the side of the strongest bot that bet (not the amount). */
           expert: m.state === 'open' ? this.expert(botBets, library) : null,
         };
@@ -633,4 +639,21 @@ function betSide(
     clans,
     players: [...players, ...botIds.map(botBettor)],
   };
+}
+
+/**
+ * Odds per side after the window: total pool / pool of the side, from the bets that count
+ * (a backed entrant still in the match, no players of the match); null if a side has none.
+ */
+function odds(m: MatchBook, list: readonly Bet[]): Record<string, number | null> {
+  const valid = list.filter(
+    (b) => m.entrants!.includes(b.pick) && !m.participants.includes(b.userId),
+  );
+  const total = valid.reduce((s, b) => s + b.amount, 0);
+  const out: Record<string, number | null> = {};
+  for (const e of m.entrants!) {
+    const side = valid.filter((b) => b.pick === e).reduce((s, b) => s + b.amount, 0);
+    out[e] = side && total > side ? Math.round((total / side) * 100) / 100 : null;
+  }
+  return out;
 }

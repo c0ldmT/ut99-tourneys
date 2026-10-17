@@ -483,9 +483,13 @@ export interface BetMatchView {
   mine: { pick: string; amount: number; status: BetStatus; payout: number } | null;
   pools: Record<string, { amount: number; bettors: number }> | null;
   bettors: number;
-  /** After the window: the bots' bets. */
-  botBets: {
-    botId: string;
+  /** After the window: what one Neuro on a side brings back (also after the match). */
+  odds: Record<string, number | null> | null;
+  /** After the window: every bet, players' and bots', biggest first. */
+  bets: {
+    bot: boolean;
+    /** User id or bot id. */
+    id: string;
     name: string;
     pick: string;
     amount: number;

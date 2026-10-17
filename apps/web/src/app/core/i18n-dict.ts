@@ -721,7 +721,6 @@ const en = {
   'bets.lost': 'Lost −{amount}',
   'bets.refunded': 'Refunded ({amount})',
   'bets.refundedMatch': 'All stakes refunded (no game played or called off).',
-  'bets.poolTotal': 'Pool {amount} from {n} bets',
   'bets.noBets': 'No bets in this season yet.',
   'bets.boardHint':
     'Every season starts at {start}; the ranking shows everybody who bet. Pools are shared pari-mutuel.',
@@ -752,7 +751,6 @@ const en = {
   'bets.startBalance': 'Start balance per season (€)',
   'bets.floor': 'Rescue floor (€)',
   'bets.expert': 'Expert tip: {bot} backs {name}.',
-  'bets.botsBet': 'Bots:',
   'bets.humans': 'Players',
   'bets.bots': 'Bots',
   'bets.versus': 'Man vs. machine',
@@ -775,6 +773,11 @@ const en = {
   'bots.kind.betLost': 'Bet lost (next game)',
   'bots.linePlaceholder.betWon': 'e.g. {amount} Neuro on {pick}. Easy money!',
   'bots.linePlaceholder.betLost': 'e.g. {pick} cost me {amount} Neuro. Thanks for nothing.',
+  'bets.col.bettor': 'Bettor',
+  'bets.col.pick': 'Backed',
+  'bets.col.stake': 'Stake',
+  'bets.col.odds': 'Odds',
+  'bets.col.result': 'Result',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -1507,7 +1510,6 @@ const de: Record<TKey, string> = {
   'bets.lost': 'Verloren −{amount}',
   'bets.refunded': 'Zurückerstattet ({amount})',
   'bets.refundedMatch': 'Alle Einsätze zurück (kein Spiel gespielt oder annulliert).',
-  'bets.poolTotal': 'Pool {amount} aus {n} Wetten',
   'bets.noBets': 'In dieser Season gibt es noch keine Wetten.',
   'bets.boardHint':
     'Jede Season startet mit {start}; die Rangliste zeigt alle, die gewettet haben. Die Pools werden anteilig geteilt.',
@@ -1538,7 +1540,6 @@ const de: Record<TKey, string> = {
   'bets.startBalance': 'Startguthaben pro Season (€)',
   'bets.floor': 'Rettungsgrenze (€)',
   'bets.expert': 'Experten-Tipp: {bot} setzt auf {name}.',
-  'bets.botsBet': 'Bots:',
   'bets.humans': 'Menschen',
   'bets.bots': 'Bots',
   'bets.versus': 'Mensch gegen Maschine',
@@ -1562,6 +1563,11 @@ const de: Record<TKey, string> = {
   'bots.linePlaceholder.betWon': 'z. B. {amount} Neuro auf {pick}. Leicht verdient!',
   'bots.linePlaceholder.betLost':
     'z. B. {pick} hat mich {amount} Neuro gekostet. Danke für nichts.',
+  'bets.col.bettor': 'Wetter',
+  'bets.col.pick': 'Tipp',
+  'bets.col.stake': 'Einsatz',
+  'bets.col.odds': 'Quote',
+  'bets.col.result': 'Ergebnis',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

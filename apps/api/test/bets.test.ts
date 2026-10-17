@@ -424,7 +424,8 @@ describe('bots bet with Neuro', () => {
       // Open: who bet stays hidden, but the expert's side shows.
       expect(m.bettors).toBeGreaterThan(0);
       expect(m.bettors).toBeLessThanOrEqual(3);
-      expect(m.botBets).toEqual([]);
+      expect(m.bets).toEqual([]);
+      expect(m.odds).toBeNull();
       expect(m.entrants).toContain(m.expert.pick);
     }
     const log = api!.app.get(EventLogService);
@@ -455,12 +456,23 @@ describe('bots bet with Neuro', () => {
       { type: 'match.started', data: { matchId: m.matchId, game: 1 } },
     ]);
     const closed = (await mario.get(`/bets/tournaments/${id}`)).body.matches[0];
-    expect(closed.botBets.length).toBe(closed.bettors - 1);
+    // After the window: every bet, players' and bots', and the odds per side.
+    expect(closed.bets.length).toBe(closed.bettors);
+    expect(closed.bets.filter((b: { bot: boolean }) => !b.bot)).toEqual([
+      expect.objectContaining({ name: 'Mario', amount: 100, pick: against }),
+    ]);
+    const total = Object.values(closed.pools as Record<string, { amount: number }>).reduce(
+      (s, p) => s + p.amount,
+      0,
+    );
+    expect(closed.odds[against]).toBeCloseTo(total / closed.pools[against].amount, 2);
     // Bots never bet on their own match.
     const playing = new Set(
       m.entrants.map((e: string) => seeded.body.projection.entrants[e].bot.id),
     );
-    expect(closed.botBets.some((b: { botId: string }) => playing.has(b.botId))).toBe(false);
+    expect(closed.bets.some((b: { bot: boolean; id: string }) => b.bot && playing.has(b.id))).toBe(
+      false,
+    );
     const winner = m.expert.pick;
     append([
       {
@@ -496,16 +508,20 @@ describe('bots bet with Neuro', () => {
     });
     expect(rec.records.every((r: { botId?: string }) => !r.botId)).toBe(true);
     expect(rec.botRecords.length).toBeGreaterThan(0);
-    const settledBots = (await mario.get(`/bets/tournaments/${id}`)).body.matches[0].botBets;
-    const lucky = settledBots.find((b: { status: string }) => b.status === 'won');
+    const after = (await mario.get(`/bets/tournaments/${id}`)).body.matches[0];
+    // The odds stay after the match: they explain the payouts.
+    expect(after.odds).toEqual(closed.odds);
+    const lucky = after.bets.find(
+      (b: { bot: boolean; status: string }) => b.bot && b.status === 'won',
+    );
     expect(lucky).toBeDefined();
     {
-      const profile = (await mario.get(`/bets/bots/${lucky.botId}`)).body;
+      const profile = (await mario.get(`/bets/bots/${lucky.id}`)).body;
       expect(profile.wallet.won).toBe(1);
       expect(typeof profile.type).toBe('string');
       // The game hears about it: the bot's personality carries its latest bet.
-      const news = api!.app.get(BetsService).botBetNews([lucky.botId]);
-      expect(news.get(lucky.botId)).toMatchObject({ won: true });
+      const news = api!.app.get(BetsService).botBetNews([lucky.id]);
+      expect(news.get(lucky.id)).toMatchObject({ won: true });
     }
   });
 });

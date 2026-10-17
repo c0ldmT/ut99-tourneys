@@ -254,7 +254,8 @@ export class BetBoardView {
 
   protected value(r: BetRecordView): string {
     if (MONEY.has(r.key)) return this.neuro(r.value);
-    if (r.key === 'bestOdds') return `×${r.value.toFixed(2)}`;
+    if (r.key === 'bestOdds')
+      return `×${r.value.toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     if (r.key === 'hitRate') return `${r.value} %`;
     return String(r.value);
   }

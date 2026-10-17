@@ -8,9 +8,11 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
+import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe } from '../core/neuro';
 import type { BetMatchView, Entrant, TournamentBets, TournamentDetail } from '../core/types';
@@ -23,7 +25,7 @@ interface Draft {
 /** Betting with Neuro on the tournament page: open matches, closed pools, own results. */
 @Component({
   selector: 'app-bet-panel',
-  imports: [TPipe, FormsModule, NeuroPipe, RouterLink],
+  imports: [TPipe, FormsModule, NeuroPipe, RouterLink, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (view(); as v) {
@@ -134,32 +136,7 @@ interface Draft {
             @for (m of closedMatches(); track m.matchId) {
               <div class="match">
                 <div class="label muted small">{{ m.matchId }} · {{ 'bets.closedNow' | t }}</div>
-                @for (e of m.entrants; track e) {
-                  <div class="pool">
-                    <span class="nm">{{ name(e) }}</span>
-                    <span class="bar"><span [style.width.%]="share(m, e)"></span></span>
-                    <span class="mono small"
-                      >{{ m.pools?.[e]?.amount ?? 0 | neuro }}
-                      @if (odds(m, e); as o) {
-                        · ×{{ o }}
-                      }
-                    </span>
-                  </div>
-                }
-                @if (m.mine; as b) {
-                  <p class="small ok">
-                    {{ 'bets.yourBet' | t: { amount: neuro(b.amount), name: name(b.pick) } }}
-                  </p>
-                }
-                @if (m.botBets.length) {
-                  <p class="small muted botbets">
-                    {{ 'bets.botsBet' | t }}
-                    @for (x of m.botBets; track x.botId; let last = $last) {
-                      <a [routerLink]="['/bots', x.botId]">{{ x.name }}</a>
-                      {{ x.amount | neuro }} → {{ name(x.pick) }}{{ last ? '' : ' · ' }}
-                    }
-                  </p>
-                }
+                <ng-container *ngTemplateOutlet="poolAndBets; context: { $implicit: m }" />
               </div>
             }
           }
@@ -194,19 +171,8 @@ interface Draft {
                 } @else if (m.state === 'refunded') {
                   <p class="small muted">{{ 'bets.refundedMatch' | t }}</p>
                 }
-                @if (m.pools && m.bettors) {
-                  <p class="small muted">
-                    {{ 'bets.poolTotal' | t: { amount: neuro(total(m)), n: m.bettors } }}
-                  </p>
-                }
-                @if (m.botBets.length) {
-                  <p class="small muted botbets">
-                    {{ 'bets.botsBet' | t }}
-                    @for (x of m.botBets; track x.botId; let last = $last) {
-                      <a [routerLink]="['/bots', x.botId]">{{ x.name }}</a>
-                      {{ x.amount | neuro }} → {{ name(x.pick) }}{{ last ? '' : ' · ' }}
-                    }
-                  </p>
+                @if (m.bettors) {
+                  <ng-container *ngTemplateOutlet="poolAndBets; context: { $implicit: m }" />
                 }
               </div>
             }
@@ -214,6 +180,75 @@ interface Draft {
         </div>
       }
     }
+
+    <ng-template #poolAndBets let-m>
+      @for (e of m.entrants; track e) {
+        <div class="pool">
+          <span class="nm" [class.winner]="m.winnerId === e">{{ name(e) }}</span>
+          <span class="bar"><span [style.width.%]="share(m, e)"></span></span>
+          <span class="mono small"
+            >{{ m.pools?.[e]?.amount ?? 0 | neuro }}
+            @if (m.odds?.[e]; as o) {
+              · ×{{ oddsText(o) }}
+            }
+          </span>
+        </div>
+      }
+      @if (m.bets.length) {
+        <div class="scroll">
+          <table class="bets">
+            <thead>
+              <tr>
+                <th>{{ 'bets.col.bettor' | t }}</th>
+                <th>{{ 'bets.col.pick' | t }}</th>
+                <th class="num">{{ 'bets.col.stake' | t }}</th>
+                <th class="num">{{ 'bets.col.odds' | t }}</th>
+                <th class="num">{{ 'bets.col.result' | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (x of m.bets; track x.id) {
+                <tr [class.me]="!x.bot && x.id === meId()">
+                  <td>
+                    @if (x.bot) {
+                      <a [routerLink]="['/bots', x.id]">{{ x.name }}</a>
+                      <span class="badge">BOT</span>
+                    } @else {
+                      <a [routerLink]="['/stats/p', 'u:' + x.id]">{{ x.name }}</a>
+                    }
+                  </td>
+                  <td>{{ name(x.pick) }}</td>
+                  <td class="num">{{ x.amount | neuro }}</td>
+                  <td class="num">
+                    @if (m.odds?.[x.pick]; as o) {
+                      ×{{ oddsText(o) }}
+                    } @else {
+                      –
+                    }
+                  </td>
+                  <td class="num" [class]="x.status">
+                    @switch (x.status) {
+                      @case ('won') {
+                        +{{ x.payout - x.amount | neuro }}
+                      }
+                      @case ('lost') {
+                        −{{ x.amount | neuro }}
+                      }
+                      @case ('refunded') {
+                        {{ 'bets.status.refunded' | t }}
+                      }
+                      @default {
+                        {{ 'bets.status.open' | t }}
+                      }
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </ng-template>
   `,
   styles: `
     .bets h2 {
@@ -272,7 +307,7 @@ interface Draft {
     }
     .pool {
       display: grid;
-      grid-template-columns: minmax(100px, 200px) 1fr auto;
+      grid-template-columns: minmax(80px, 200px) minmax(48px, 1fr) auto;
       gap: 8px;
       align-items: center;
       margin: 3px 0;
@@ -297,12 +332,39 @@ interface Draft {
     .ok {
       color: var(--live);
     }
+    .scroll {
+      overflow-x: auto;
+      margin-top: 6px;
+    }
+    table.bets {
+      white-space: nowrap;
+      font-size: 0.9rem;
+    }
+    table.bets th,
+    table.bets td {
+      padding: 4px 8px;
+    }
+    table.bets .num {
+      text-align: right;
+    }
+    table.bets td.won {
+      color: var(--live);
+    }
+    table.bets td.lost {
+      color: var(--danger);
+    }
+    table.bets td.refunded,
+    table.bets td.open {
+      color: var(--muted);
+    }
+    table.bets tr.me td {
+      background: var(--me-bg);
+    }
+    .badge {
+      margin-left: 6px;
+    }
     .expert {
       color: var(--info);
-    }
-    .botbets a {
-      color: var(--muted);
-      text-decoration: underline dotted;
     }
     .result.lost {
       color: var(--danger);
@@ -318,7 +380,10 @@ interface Draft {
 export class BetPanel {
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
+  private readonly auth = inject(Auth);
   readonly tournament = input.required<TournamentDetail>();
+  /** The logged-in user (own bet highlighted in the lists). */
+  protected readonly meId = computed(() => this.auth.me()?.id ?? null);
   /** Matches that take bets now (the bracket marks them). */
   readonly openIds = output<string[]>();
   protected readonly view = signal<TournamentBets | null>(null);
@@ -432,6 +497,14 @@ export class BetPanel {
     void this.run(() => this.api.withdrawBet(this.tournament().id, m.matchId), m.matchId);
   }
 
+  /** Odds with two decimals in the language's format (×1,31 / ×1.31). */
+  protected oddsText(o: number): string {
+    return o.toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  }
+
   protected total(m: BetMatchView): number {
     return Object.values(m.pools ?? {}).reduce((s, p) => s + p.amount, 0);
   }
@@ -439,12 +512,5 @@ export class BetPanel {
   protected share(m: BetMatchView, e: string): number {
     const t = this.total(m);
     return t ? Math.round(((m.pools?.[e]?.amount ?? 0) / t) * 100) : 0;
-  }
-
-  /** What one Neuro on this side would bring back (pari-mutuel). */
-  protected odds(m: BetMatchView, e: string): string | null {
-    const side = m.pools?.[e]?.amount ?? 0;
-    const t = this.total(m);
-    return side && t > side ? (t / side).toFixed(2) : null;
   }
 }
