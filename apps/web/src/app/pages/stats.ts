@@ -5,8 +5,9 @@ import { Api, errorText } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
-import type { MapRecord, StatMode, StatsPlayerRow, StatsRecord } from '../core/types';
+import type { MapRecord, RatingRow, StatMode, StatsPlayerRow, StatsRecord } from '../core/types';
 
+type Tab = 'ratings' | 'players' | 'records';
 type SortKey = keyof StatsPlayerRow | 'record' | 'runs';
 
 interface Column {
@@ -23,6 +24,9 @@ interface Column {
     <h1>{{ 'stats.title' | t }}</h1>
     <div class="row filters">
       <div class="tabs">
+        <button [class.active]="tab() === 'ratings'" (click)="setTab('ratings')">
+          {{ 'rating.list' | t }}
+        </button>
         <button [class.active]="tab() === 'players'" (click)="setTab('players')">
           {{ 'stats.players' | t }}
         </button>
@@ -33,14 +37,19 @@ interface Column {
       <span class="grow"></span>
       <label class="small"
         >{{ 'stats.mode' | t }}
-        <select [value]="mode()" (change)="setMode($any($event.target).value)">
-          <option value="">{{ 'stats.modeAll' | t }}</option>
+        <select
+          [value]="tab() === 'ratings' ? ratingMode() : mode()"
+          (change)="setMode($any($event.target).value)"
+        >
+          @if (tab() !== 'ratings') {
+            <option value="">{{ 'stats.modeAll' | t }}</option>
+          }
           <option value="dm">{{ 'stats.modeDm' | t }}</option>
           <option value="tdm">{{ 'stats.modeTdm' | t }}</option>
           <option value="mh">{{ 'stats.modeMh' | t }}</option>
         </select>
       </label>
-      @if (tab() === 'players') {
+      @if (tab() !== 'records') {
         <label class="small"
           ><input
             type="checkbox"
@@ -55,7 +64,47 @@ interface Column {
       <p class="error">{{ error() }}</p>
     }
 
-    @if (tab() === 'players') {
+    @if (tab() === 'ratings') {
+      <div class="card scroll">
+        @if (ratingRows().length === 0) {
+          <p class="muted">{{ 'rating.empty' | t }}</p>
+        } @else {
+          <table class="stats">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>{{ 'stats.col.name' | t }}</th>
+                <th class="num">{{ 'rating.col.rating' | t }}</th>
+                <th class="num">{{ 'stats.col.games' | t }}</th>
+                <th class="num">{{ 'rating.col.winRate' | t }}</th>
+                <th class="num">{{ 'rating.col.last' | t }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of ratingRows(); track r.key) {
+                <tr [class.provisional]="r.provisional">
+                  <td class="muted">{{ r.rank ?? '–' }}</td>
+                  <td>
+                    <a [routerLink]="link(r.key)">{{ r.name }}</a>
+                    @if (r.bot) {
+                      <span class="badge">{{ 'stats.bot' | t }}</span>
+                    }
+                    @if (r.provisional) {
+                      <span class="badge">{{ 'rating.provisional' | t }}</span>
+                    }
+                  </td>
+                  <td class="num strong">{{ r.rating }}</td>
+                  <td class="num">{{ r.wins }}–{{ r.games - r.wins }}</td>
+                  <td class="num">{{ pct(r.wins / r.games) }}</td>
+                  <td class="num muted">{{ r.lastAt | date: 'mediumDate' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+      <p class="muted small">{{ 'rating.hint' | t }}</p>
+    } @else if (tab() === 'players') {
       <div class="card scroll">
         @if (sorted().length === 0) {
           <p class="muted">{{ 'stats.empty' | t }}</p>
@@ -210,6 +259,9 @@ interface Column {
       font-weight: 700;
       color: var(--accent);
     }
+    tr.provisional td {
+      opacity: 0.7;
+    }
     .badge {
       margin-left: 6px;
       font-size: 0.75rem;
@@ -236,12 +288,15 @@ interface Column {
 })
 export class StatsPage {
   private readonly api = inject(Api);
-  protected readonly tab = signal<'players' | 'records'>(
-    readPref('tab') === 'records' ? 'records' : 'players',
+  protected readonly tab = signal<Tab>(
+    (['ratings', 'players', 'records'] as const).find((x) => x === readPref('tab')) ?? 'ratings',
   );
   protected readonly mode = signal<StatMode | ''>((readPref('mode') as StatMode | '') ?? '');
   protected readonly bots = signal(readPref('bots') === '1');
   protected readonly rows = signal<StatsPlayerRow[]>([]);
+  protected readonly ratingRows = signal<RatingRow[]>([]);
+  /** Ratings exist per mode only: "all modes" shows 1 on 1. */
+  protected readonly ratingMode = computed<StatMode>(() => this.mode() || 'dm');
   protected readonly records = signal<StatsRecord[]>([]);
   protected readonly maps = signal<MapRecord[]>([]);
   protected readonly error = signal('');
@@ -335,7 +390,9 @@ export class StatsPage {
   protected value = recordValue;
   protected time = (ms: number) => raceTime(ms);
 
-  protected setTab(t: 'players' | 'records') {
+  protected pct = percent;
+
+  protected setTab(t: Tab) {
     this.tab.set(t);
     writePref('tab', t);
   }
@@ -367,11 +424,13 @@ export class StatsPage {
   private async load() {
     this.error.set('');
     try {
-      const [rows, rec] = await Promise.all([
+      const [rows, rec, ratings] = await Promise.all([
         this.api.statsPlayers(this.mode(), this.bots()),
         this.api.statsRecords(this.mode()),
+        this.api.statsRatings(this.ratingMode(), this.bots()),
       ]);
       this.rows.set(rows);
+      this.ratingRows.set(ratings);
       this.records.set(rec.records);
       this.maps.set(rec.maps);
     } catch (e) {

@@ -6,7 +6,10 @@ import type {
   InvitePreview,
   Me,
   MapRecord,
+  PlayerRatings,
   PublicUser,
+  RatedGame,
+  RatingRow,
   SiteConfig,
   StatMode,
   StatsPlayerDetail,
@@ -15,6 +18,7 @@ import type {
   TournamentDetail,
   TournamentEventView,
   TournamentSummary,
+  WebsiteSettings,
 } from './types';
 
 /** Error with the server's message (Nest puts it into `message`). */
@@ -78,6 +82,14 @@ export class Api {
     );
   statsPlayer = (key: string) =>
     this.call<StatsPlayerDetail>('GET', `/stats/players/${encodeURIComponent(key)}`);
+  statsRatings = (mode: StatMode, bots: boolean) =>
+    this.call<RatingRow[]>('GET', `/stats/ratings?mode=${mode}&bots=${bots ? 1 : 0}`);
+  playerRatings = (key: string) =>
+    this.call<PlayerRatings>('GET', `/stats/players/${encodeURIComponent(key)}/ratings`);
+  tournamentRatings = (id: string) => this.call<RatedGame[]>('GET', `/tournaments/${id}/ratings`);
+  settings = () => this.call<WebsiteSettings>('GET', '/settings');
+  setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
+    this.call<WebsiteSettings>('PUT', '/settings/rating', body);
   statsRecords = (mode: StatMode | '') =>
     this.call<{ records: StatsRecord[]; maps: MapRecord[] }>(
       'GET',

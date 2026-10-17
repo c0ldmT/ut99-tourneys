@@ -70,6 +70,8 @@ export interface TournamentProjection {
   checkedInUsers: string[];
   bracketDefinition?: BracketDefinition;
   rngSeed?: string;
+  /** Rating of each entrant at the seeding (player, bot or team average). */
+  seedRatings?: Record<string, number>;
   results: MatchResult[];
   bracket?: BracketState;
   currentMatch?: CurrentMatch;
@@ -133,6 +135,8 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         }
         p.bracketDefinition = e.data.bracket;
         p.rngSeed = e.data.rngSeed;
+        if (e.data.ratings) p.seedRatings = e.data.ratings;
+        else delete p.seedRatings;
         p.phase = 'seeded';
         break;
       case 'checkin.opened':

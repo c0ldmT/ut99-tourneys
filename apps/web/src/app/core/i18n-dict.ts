@@ -7,6 +7,33 @@ const en = {
   'nav.agents': 'Servers',
   'nav.users': 'Users',
   'nav.stats': 'Statistics',
+  'nav.settings': 'Settings',
+  'settings.title': 'Settings',
+  'settings.rating': 'Ratings',
+  'settings.ratingHint':
+    'Ratings (OpenSkill, shown like Elo, start 1500) per mode from every game of a ranked tournament. A change here recalculates all ratings.',
+  'settings.botGames': 'Games with bots count',
+  'settings.botGamesHint':
+    'Bots have their own ratings. Off: only games between humans count (a team game with a bot does not).',
+  'settings.levelPoints': 'Points per bot difficulty step',
+  'settings.levelPointsHint':
+    'A bot plays with its rating plus this many points per step above Adept (minus below). A Godlike bot that beats a Novice bot gains little, a human who beats a Novice bot as well.',
+  'settings.saved': 'Saved.',
+  'form.ranked': 'Ranked (counts for the ratings)',
+  'form.rankedHint': 'Switch off for fun tournaments: their games do not change any rating.',
+  'admin.seedRating': 'Seed (by rating)',
+  'admin.seedRatingHint':
+    'The strongest meet late; bots are chosen and spread so that the teams come out about equally strong.',
+  'rating.title': 'Rating',
+  'rating.list': 'Ranking',
+  'rating.provisional': 'provisional',
+  'rating.empty': 'No ratings in this mode yet. They start with the first ranked tournament.',
+  'rating.hint':
+    'One rating per mode, start 1500. Provisional until 5 games. Bots play with a bonus for their difficulty, so a win against weak bots is worth little.',
+  'rating.col.rating': 'Rating',
+  'rating.col.winRate': 'Win rate',
+  'rating.col.last': 'Last game',
+  'rating.changes': 'Rating changes',
   'stats.title': 'Statistics',
   'stats.players': 'Players',
   'stats.records': 'Records',
@@ -493,6 +520,34 @@ const de: Record<TKey, string> = {
   'nav.agents': 'Server',
   'nav.users': 'Benutzer',
   'nav.stats': 'Statistiken',
+  'nav.settings': 'Einstellungen',
+  'settings.title': 'Einstellungen',
+  'settings.rating': 'Ratings',
+  'settings.ratingHint':
+    'Ratings (OpenSkill, angezeigt wie Elo, Start 1500) pro Modus aus jedem Spiel eines gewerteten Turniers. Eine Änderung hier berechnet alle Ratings neu.',
+  'settings.botGames': 'Spiele mit Bots zählen',
+  'settings.botGamesHint':
+    'Bots haben eigene Ratings. Aus: nur Spiele zwischen Menschen zählen (ein Teamspiel mit Bot nicht).',
+  'settings.levelPoints': 'Punkte pro Bot-Stufe',
+  'settings.levelPointsHint':
+    'Ein Bot spielt mit seinem Rating plus so vielen Punkten pro Stufe über Adept (darunter minus). Schlägt ein Godlike-Bot einen Novice-Bot, gibt es wenig – ebenso für einen Menschen, der einen Novice-Bot schlägt.',
+  'settings.saved': 'Gespeichert.',
+  'form.ranked': 'Gewertet (zählt für die Ratings)',
+  'form.rankedHint': 'Für Spaß-Turniere ausschalten: ihre Spiele ändern kein Rating.',
+  'admin.seedRating': 'Setzen (nach Rating)',
+  'admin.seedRatingHint':
+    'Die Stärksten treffen spät aufeinander; Bots werden so gewählt und verteilt, dass die Teams etwa gleich stark sind.',
+  'rating.title': 'Rating',
+  'rating.list': 'Rangliste',
+  'rating.provisional': 'vorläufig',
+  'rating.empty':
+    'Noch keine Ratings in diesem Modus. Sie beginnen mit dem ersten gewerteten Turnier.',
+  'rating.hint':
+    'Ein Rating pro Modus, Start 1500. Vorläufig bis 5 Spiele. Bots spielen mit einem Bonus für ihre Stufe, ein Sieg gegen schwache Bots bringt daher wenig.',
+  'rating.col.rating': 'Rating',
+  'rating.col.winRate': 'Siegquote',
+  'rating.col.last': 'Letztes Spiel',
+  'rating.changes': 'Rating-Änderungen',
   'stats.title': 'Statistiken',
   'stats.players': 'Spieler',
   'stats.records': 'Rekorde',

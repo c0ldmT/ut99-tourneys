@@ -13,7 +13,7 @@ import { Api, errorText } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
-import type { StatMode, StatsPlayerDetail, StatsPlayerRow } from '../core/types';
+import type { PlayerRatings, StatMode, StatsPlayerDetail, StatsPlayerRow } from '../core/types';
 
 @Component({
   selector: 'app-stats-player',
@@ -59,6 +59,46 @@ import type { StatMode, StatsPlayerDetail, StatsPlayerRow } from '../core/types'
           <div class="muted small">{{ 'stats.col.time' | t }}</div>
         </div>
       </div>
+
+      @if (ratingModes().length) {
+        <h2>{{ 'rating.title' | t }}</h2>
+        <div class="tiles">
+          @for (m of ratingModes(); track m.mode) {
+            <div class="card tile">
+              <div class="value">
+                {{ m.r.rating }}
+                @if (m.r.provisional) {
+                  <span class="small muted">({{ 'rating.provisional' | t }})</span>
+                }
+              </div>
+              <div class="muted small">
+                {{ m.label | t }} · {{ m.r.wins }}–{{ m.r.games - m.r.wins }}
+              </div>
+            </div>
+          }
+        </div>
+        @if (ratingRecent().length) {
+          <div class="card scroll">
+            <table class="stats">
+              <tbody>
+                @for (g of ratingRecent(); track g.tournamentId + g.matchId + g.game) {
+                  <tr>
+                    <td class="muted small">{{ g.at | date: 'short' }}</td>
+                    <td>
+                      <a [routerLink]="['/t', g.tournamentId]">{{ g.matchId }} G{{ g.game }}</a>
+                      <span class="muted small match-id">{{ modeLabel(g.mode) | t }}</span>
+                    </td>
+                    <td class="num" [class.win]="g.delta > 0" [class.loss]="g.delta < 0">
+                      {{ signed(g.delta) }}
+                    </td>
+                    <td class="num">{{ g.after }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      }
 
       <h2>{{ 'stats.byMode' | t }}</h2>
       <div class="card scroll">
@@ -282,6 +322,27 @@ export class StatsPlayerPage {
   readonly key = input.required<string>();
   protected readonly d = signal<StatsPlayerDetail | null>(null);
   protected readonly error = signal('');
+  protected readonly ratings = signal<PlayerRatings | null>(null);
+
+  protected readonly ratingModes = computed(() => {
+    const r = this.ratings();
+    if (!r) return [];
+    return (['dm', 'tdm', 'mh'] as const)
+      .filter((m) => r.modes[m])
+      .map((m) => ({ mode: m, label: this.modeLabel(m), r: r.modes[m]! }));
+  });
+  /** The last rated games, newest first. */
+  protected readonly ratingRecent = computed(() =>
+    [...(this.ratings()?.recent ?? [])].reverse().slice(0, 15),
+  );
+
+  protected modeLabel(m: StatMode): string {
+    return { dm: 'stats.modeDm', tdm: 'stats.modeTdm', mh: 'stats.modeMh' }[m];
+  }
+
+  protected signed(n: number): string {
+    return n > 0 ? `+${n}` : String(n);
+  }
 
   protected readonly modes = computed(() => {
     const d = this.d();
@@ -314,6 +375,10 @@ export class StatsPlayerPage {
 
   private async load(key: string) {
     this.error.set('');
+    this.api.playerRatings(key).then(
+      (r) => this.ratings.set(r),
+      () => this.ratings.set(null),
+    );
     try {
       this.d.set(await this.api.statsPlayer(key));
     } catch (e) {

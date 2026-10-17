@@ -43,6 +43,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/agents').then((m) => m.AgentsPage),
       },
       {
+        path: 'admin/settings',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./pages/settings').then((m) => m.SettingsPage),
+      },
+      {
         path: 'admin/users',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/users').then((m) => m.UsersPage),

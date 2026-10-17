@@ -15,24 +15,24 @@ The tournament state is never stored as a mutable blob. The website stores an ap
 per tournament; `projectTournament(events)` folds it into the current state (phase, entrants, current match,
 games, bracket via the bracket engine). Website and bridge run the same code, so they always agree.
 
-| Event                             | Emitted by      | Meaning                                                                               |
-| --------------------------------- | --------------- | ------------------------------------------------------------------------------------- |
-| `tournament.created`              | website         | Name and settings (format, size, best-of policy, timeouts, game rules)                |
-| `seeding.set`                     | website (admin) | Entrant list, first-round slots, RNG seed. Can be re-issued until check-in opens      |
-| `checkin.opened`                  | bridge          | Game server is up, players may connect                                                |
-| `entrant.checkedIn`               | bridge          | A human entrant connected with a valid token (teams: `userId` names the member)       |
-| `team.lineupSet`                  | admin / player  | Team tournaments: a captain picks the starters; applies from the next game            |
-| `entrant.replaced`                | bridge / admin  | A bot takes over a bracket position (no-show at check-in, admin)                      |
-| `tournament.started`              | bridge          | All checked in (or forced / check-in window over)                                     |
-| `match.called`                    | bridge          | Next match chosen by the scheduler                                                    |
-| `match.mapSelected`               | bridge          | Map for a game, with method (`vote`, `random`, `loserPick`, `admin`) and vote details |
-| `match.started`                   | bridge          | Countdown over, game is live                                                          |
-| `match.runFinished`               | bridge          | Monster Hunt: one team's run of the game is over (time, deaths, penalty, points)      |
-| `match.playerStats`               | bridge          | Player statistics of a game (Monster Hunt: of a run), before its end; no state change |
-| `match.gameFinished`              | bridge          | One game of a series is over (scores, end reason)                                     |
-| `match.result`                    | bridge / admin  | Final result of a match; a later result for the same match overrides                  |
-| `tournament.paused` / `resumed`   | admin / bridge  |                                                                                       |
-| `tournament.finished` / `aborted` | bridge / admin  |                                                                                       |
+| Event                             | Emitted by      | Meaning                                                                                                       |
+| --------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------- |
+| `tournament.created`              | website         | Name and settings (format, size, best-of policy, timeouts, game rules)                                        |
+| `seeding.set`                     | website (admin) | Entrant list, first-round slots, RNG seed, optional rating per entrant. Can be re-issued until check-in opens |
+| `checkin.opened`                  | bridge          | Game server is up, players may connect                                                                        |
+| `entrant.checkedIn`               | bridge          | A human entrant connected with a valid token (teams: `userId` names the member)                               |
+| `team.lineupSet`                  | admin / player  | Team tournaments: a captain picks the starters; applies from the next game                                    |
+| `entrant.replaced`                | bridge / admin  | A bot takes over a bracket position (no-show at check-in, admin)                                              |
+| `tournament.started`              | bridge          | All checked in (or forced / check-in window over)                                                             |
+| `match.called`                    | bridge          | Next match chosen by the scheduler                                                                            |
+| `match.mapSelected`               | bridge          | Map for a game, with method (`vote`, `random`, `loserPick`, `admin`) and vote details                         |
+| `match.started`                   | bridge          | Countdown over, game is live                                                                                  |
+| `match.runFinished`               | bridge          | Monster Hunt: one team's run of the game is over (time, deaths, penalty, points)                              |
+| `match.playerStats`               | bridge          | Player statistics of a game (Monster Hunt: of a run), before its end; no state change                         |
+| `match.gameFinished`              | bridge          | One game of a series is over (scores, end reason)                                                             |
+| `match.result`                    | bridge / admin  | Final result of a match; a later result for the same match overrides                                          |
+| `tournament.paused` / `resumed`   | admin / bridge  |                                                                                                               |
+| `tournament.finished` / `aborted` | bridge / admin  |                                                                                                               |
 
 **Team tournaments.** With `settings.teamSize` 2, 3 or 5 every bracket entrant has `kind: "team"`: name, tag,
 captain, `members` (starters first, `sub` marks substitutes, at most `teamSize + 2`) and `bots` for starter places

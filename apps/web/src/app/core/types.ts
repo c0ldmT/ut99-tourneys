@@ -103,6 +103,8 @@ export interface TournamentDetail {
   registrationOpen: boolean;
   /** Counts for the statistics page. */
   statsEnabled: boolean;
+  /** Counts for the ratings. */
+  ranked: boolean;
   scheduledAt: string | null;
   createdAt: string;
   registrations: {
@@ -284,4 +286,53 @@ export interface StatsPlayerDetail {
   }[];
   records: StatsRecord[];
   mapRecords: MapRecord[];
+}
+
+/** Rating of a player or bot in one mode (OpenSkill, shown like Elo: start 1500). */
+export interface PlayerRating {
+  key: string;
+  name: string;
+  bot: boolean;
+  userId?: string;
+  rating: number;
+  games: number;
+  wins: number;
+  provisional: boolean;
+  lastAt: string;
+}
+
+export interface RatingRow extends PlayerRating {
+  /** Place among the non-provisional ratings. */
+  rank?: number;
+}
+
+export interface RatingChange {
+  key: string;
+  name: string;
+  bot: boolean;
+  entrantId: string;
+  skill?: number;
+  before: number;
+  after: number;
+  delta: number;
+}
+
+export interface RatedGame {
+  tournamentId: string;
+  matchId: string;
+  game: number;
+  at: string;
+  mode: StatMode;
+  winnerEntrantId: string;
+  factor: number;
+  changes: RatingChange[];
+}
+
+export interface PlayerRatings {
+  modes: Partial<Record<StatMode, PlayerRating>>;
+  recent: (RatedGame & { delta: number; after: number })[];
+}
+
+export interface WebsiteSettings {
+  rating: { botGames: boolean; levelPoints: number };
 }

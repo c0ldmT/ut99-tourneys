@@ -79,6 +79,8 @@ interface Model {
   notifyMode: 'default' | 'custom' | 'off';
   /** Counts for the statistics page. */
   statsEnabled: boolean;
+  /** Counts for the ratings. */
+  ranked: boolean;
   webhookUrl: string;
 }
 
@@ -449,6 +451,11 @@ function toLocalInput(iso: string | null): string {
             {{ 'form.statsEnabled' | t }}</label
           >
           <p class="muted small">{{ 'form.statsHint' | t }}</p>
+          <label class="row"
+            ><input type="checkbox" name="ranked" [(ngModel)]="f.ranked" />
+            {{ 'form.ranked' | t }}</label
+          >
+          <p class="muted small">{{ 'form.rankedHint' | t }}</p>
         </fieldset>
 
         <fieldset [disabled]="botsLocked()">
@@ -709,6 +716,7 @@ export class TournamentFormPage {
       notifyMode: 'default',
       webhookUrl: '',
       statsEnabled: true,
+      ranked: true,
       mapPool: [...STOCK_POOL],
       botPool: a?.profiles[0]?.inventory?.bots.length
         ? a.profiles[0].inventory.bots.map((b) => ({ name: b.name, skill: b.skill }))
@@ -758,6 +766,7 @@ export class TournamentFormPage {
       notifyMode: d.notify?.mode ?? 'default',
       webhookUrl: d.notify?.webhookUrl ?? '',
       statsEnabled: d.statsEnabled,
+      ranked: d.ranked,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       botPool: d.botPool.map((b) => ({ ...b })),
     };
@@ -860,6 +869,7 @@ export class TournamentFormPage {
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
       statsEnabled: f.statsEnabled,
+      ranked: f.ranked,
       botPool: f.botPool
         .filter((b) => b.name.trim())
         .map((b) => ({ name: b.name.trim(), skill: b.skill })),
@@ -913,6 +923,7 @@ export class TournamentFormPage {
           notifyMode: body.notifyMode,
           webhookUrl: body.webhookUrl,
           statsEnabled: body.statsEnabled,
+          ranked: body.ranked,
         };
         if (!this.locked())
           Object.assign(patch, {

@@ -21,7 +21,7 @@ import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
 import { finalMs, isRace, raceTime, type RunView } from '../core/race';
-import type { TournamentDetail, TournamentEventView } from '../core/types';
+import type { RatedGame, TournamentDetail, TournamentEventView } from '../core/types';
 
 const ACTIVE = ['checkIn', 'running', 'paused'];
 
@@ -276,6 +276,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             [myEntrantId]="t.me.entrantId"
             [race]="race()"
             [currentRuns]="t.projection!.currentMatch?.runs ?? []"
+            [ratings]="t.projection!.seedRatings"
           />
         </div>
         @if (race() && raceRows().length) {
@@ -326,6 +327,41 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                         }}</b>
                       </td>
                       <td class="num">{{ row.run.points }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        }
+        @if (t.ranked && ratedGames().length) {
+          <div class="card">
+            <h2>{{ 'rating.changes' | t }}</h2>
+            <div class="scroll">
+              <table class="ratings">
+                <tbody>
+                  @for (g of ratedGames(); track g.matchId + g.game) {
+                    <tr>
+                      <td class="nowrap">{{ g.matchId }} G{{ g.game }}</td>
+                      @for (side of g.sides; track side.entrantId) {
+                        <td>
+                          @if (teamMode()) {
+                            <div class="muted small">{{ name(side.entrantId) }}</div>
+                          }
+                          @for (c of side.changes; track c.key) {
+                            <div class="nowrap change">
+                              <span>{{ c.name }}</span>
+                              @if (c.skill !== undefined) {
+                                <span class="muted small">({{ skillName(c.skill) | t }})</span>
+                              }
+                              <b [class.up]="c.delta > 0" [class.down]="c.delta < 0">{{
+                                signed(c.delta)
+                              }}</b>
+                              <span class="muted small">→ {{ c.after }}</span>
+                            </div>
+                          }
+                        </td>
+                      }
                     </tr>
                   }
                 </tbody>
@@ -443,6 +479,13 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     [disabled]="busy() || !t.registrations.length"
                   >
                     {{ 'admin.seedOrder' | t }}
+                  </button>
+                  <button
+                    (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'rating' }))"
+                    [disabled]="busy() || !t.registrations.length"
+                    [title]="'admin.seedRatingHint' | t"
+                  >
+                    {{ 'admin.seedRating' | t }}
                   </button>
                   @if (t.phase === 'seeded') {
                     <button (click)="act(api.reset(t.id))" [disabled]="busy()">
@@ -596,6 +639,24 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
+    table.ratings td {
+      vertical-align: top;
+      padding-right: 16px;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+    .change {
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+    }
+    .up {
+      color: var(--live);
+    }
+    .down {
+      color: var(--danger);
+    }
     .head {
       margin-bottom: 12px;
     }
@@ -858,8 +919,13 @@ export class TournamentPage {
     try {
       do {
         this.again = false;
-        this.t.set(await this.api.tournament(id));
+        const t = await this.api.tournament(id);
+        this.t.set(t);
         this.error.set('');
+        if (t.ranked && t.headSeq !== this.ratingsHead) {
+          this.ratingsHead = t.headSeq;
+          this.ratings.set(await this.api.tournamentRatings(id));
+        }
         if (this.tab() === 'events') this.events.set(await this.api.events(id));
       } while (this.again);
     } catch (e) {
@@ -867,6 +933,29 @@ export class TournamentPage {
     } finally {
       this.loading = false;
     }
+  }
+
+  private ratingsHead = -1;
+  protected readonly ratings = signal<RatedGame[]>([]);
+  /** Rated games, newest first, winners first. */
+  protected readonly ratedGames = computed(() =>
+    [...this.ratings()].reverse().map((g) => ({
+      ...g,
+      sides: [...new Set(g.changes.map((c) => c.entrantId))]
+        .sort((a, b) => Number(b === g.winnerEntrantId) - Number(a === g.winnerEntrantId))
+        .map((entrantId) => ({
+          entrantId,
+          changes: g.changes.filter((c) => c.entrantId === entrantId),
+        })),
+    })),
+  );
+
+  protected signed(n: number): string {
+    return n > 0 ? `+${n}` : String(n);
+  }
+
+  protected skillName(skill: number): string {
+    return `skill.${Math.max(0, Math.min(7, Math.round(skill)))}`;
   }
 
   protected name(id: string | null | undefined): string {

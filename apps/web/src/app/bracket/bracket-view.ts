@@ -51,8 +51,8 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
                   [class.loser]="!!id && m.loserId === id"
                   [class.me]="!!id && id === myEntrantId()"
                 >
-                  @if (members(id); as list) {
-                    <title>{{ name(id) }}: {{ list }}</title>
+                  @if (tooltip(id); as tip) {
+                    <title>{{ tip }}</title>
                   }
                   <rect class="row" [attr.width]="boxW" [attr.height]="boxH / 2" rx="6" />
                   @let fit = rowFit(sc[slot], isBot(id));
@@ -168,6 +168,8 @@ export class BracketView {
   readonly race = input(false);
   /** Monster Hunt: finished runs of the game in progress (current match). */
   readonly currentRuns = input<readonly RunView[]>([]);
+  /** Rating of each entrant at the seeding (tooltip). */
+  readonly ratings = input<Record<string, number> | undefined>(undefined);
 
   private readonly i18n = inject(I18n);
   protected readonly boxH = BOX_H;
@@ -208,7 +210,17 @@ export class BracketView {
     return e?.kind === 'bot' || (e?.kind === 'team' && e.members.length === 0);
   }
 
-  /** Tooltip: the team line-up (starters, substitutes, bots). */
+  /** Tooltip: name, rating at the seeding, team line-up. */
+  protected tooltip(id: string | null): string {
+    if (!id) return '';
+    const rating = this.ratings()?.[id];
+    const head = rating === undefined ? this.name(id) : `${this.name(id)} (${rating})`;
+    const list = this.members(id);
+    if (!list && rating === undefined) return '';
+    return list ? `${head}: ${list}` : head;
+  }
+
+  /** The team line-up (starters, substitutes, bots). */
   protected members(id: string | null): string {
     const e = id ? this.entrants()[id] : undefined;
     if (e?.kind !== 'team') return '';

@@ -5,6 +5,17 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ## [Unreleased]
 
+### Added
+
+- Ratings (OpenSkill, shown like Elo, start 1500), one per mode: every game of a ranked tournament counts, the
+  margin scales the change. Bots have their own ratings and play with a bonus for their difficulty, so beating weak
+  bots is worth little. Statistics page: new tab "Ranking"; player page: rating per mode and the last changes;
+  tournament page: rating changes per game.
+- Tournament option "Ranked" (default on). Tournaments created before this version do not count.
+- Seeding "by rating": the strongest meet late, bots are chosen and spread so that the teams come out about equally
+  strong. The rating at the seeding shows in the bracket tooltip.
+- Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
+
 ### Fixed
 
 - Monster Hunt: the final time (run time plus penalty) now decides to the millisecond. Before, it was compared in

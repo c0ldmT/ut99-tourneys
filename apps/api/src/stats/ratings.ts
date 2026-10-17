@@ -33,7 +33,11 @@ export const RATING_DEFAULTS: RatingOptions = { botGames: true, levelPoints: 100
 
 /** OpenSkill's defaults. */
 const MU = 25;
-const SIGMA = 25 / 3;
+/**
+ * Starting uncertainty of a player (OpenSkill's default is 25/3): smaller, so that the first games
+ * move a rating by up to about 100 to 250 points instead of 300 to 500.
+ */
+const SIGMA = 5;
 /**
  * Bots start with less uncertainty: their strength mostly comes from the difficulty, so a few
  * games must not throw their rating around (and humans cannot farm points from weak bots).
