@@ -26,6 +26,16 @@ export class StatsController {
     return d;
   }
 
+  @Get('ratings')
+  ratings(@Query(new ZodPipe(ModeQuery)) q: ModeQuery) {
+    return this.stats.ratingList(q.mode ?? 'dm', q.bots !== '0');
+  }
+
+  @Get('players/:key/ratings')
+  playerRatings(@Param('key') key: string) {
+    return this.stats.playerRatings(key);
+  }
+
   @Get('records')
   records(@Query(new ZodPipe(ModeQuery)) q: ModeQuery) {
     return this.stats.records(q.mode);

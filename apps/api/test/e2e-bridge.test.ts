@@ -266,6 +266,26 @@ describe('website + bridge + simulated UT server', () => {
     expect(((await admin.get('/stats/players?mode=dm')).body as any[]).length).toBeGreaterThan(0);
     await admin.req('PATCH', `/tournaments/${id}`, { statsEnabled: false });
     expect((await admin.get('/stats/players?mode=dm')).body).toEqual([]);
+    // Ranked: every game played on the server changed ratings (simulated bot games do not).
+    expect(d.ranked).toBe(true);
+    const rated = (await admin.get(`/tournaments/${id}/ratings`)).body as any[];
+    expect(rated.length).toBeGreaterThan(0);
+    expect(rated.every((g) => g.changes.length === 2)).toBe(true);
+    const list = (await admin.get('/stats/ratings?mode=dm')).body as any[];
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.some((r) => r.bot)).toBe(true);
+    expect(
+      ((await admin.get('/stats/ratings?mode=dm&bots=0')).body as any[]).every((r) => !r.bot),
+    ).toBe(true);
+    // Games with bots switched off in the settings: only human-only games would count.
+    await admin.req('PUT', '/settings/rating', { botGames: false });
+    expect(
+      ((await admin.get(`/tournaments/${id}/ratings`)).body as any[]).every((g) =>
+        g.changes.every((c: { bot: boolean }) => !c.bot),
+      ),
+    ).toBe(true);
+    await admin.req('PATCH', `/tournaments/${id}`, { ranked: false });
+    expect((await admin.get('/stats/ratings?mode=dm')).body).toEqual([]);
     // The agent reported its status.
     const agents = (await admin.get('/agents')).body;
     expect(agents[0].status.modConnected).toBe(true);

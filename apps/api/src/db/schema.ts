@@ -70,6 +70,15 @@ export const tournaments = sqliteTable('tournaments', {
   remindedAt: text('reminded_at'),
   /** Counts for the statistics page. */
   statsEnabled: integer('stats_enabled', { mode: 'boolean' }).notNull().default(true),
+  /** Counts for the ratings. */
+  ranked: integer('ranked', { mode: 'boolean' }).notNull().default(true),
+});
+
+/** Website settings: one JSON value per key (e.g. "rating"). */
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  valueJson: text('value_json').notNull(),
+  updatedAt: text('updated_at').notNull(),
 });
 
 export const teams = sqliteTable('teams', {

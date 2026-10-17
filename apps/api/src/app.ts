@@ -28,6 +28,8 @@ import { DISCORD_OUT, discordOut, type DiscordOut } from './notify/discord-out.j
 import { NotificationsService } from './notify/notifications.service.js';
 import { StatsController } from './stats/stats.controller.js';
 import { StatsService } from './stats/stats.service.js';
+import { SettingsController } from './settings/settings.controller.js';
+import { SettingsService } from './settings/settings.service.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
@@ -54,7 +56,13 @@ class AppModule {
           : null;
     return {
       module: AppModule,
-      controllers: [AuthController, TournamentsController, AgentsController, StatsController],
+      controllers: [
+        AuthController,
+        TournamentsController,
+        AgentsController,
+        StatsController,
+        SettingsController,
+      ],
       providers: [
         { provide: CONFIG, useValue: config },
         { provide: CLOCK, useValue: o.clock ?? systemClock },
@@ -83,6 +91,7 @@ class AppModule {
         NotificationsService,
         TournamentsService,
         StatsService,
+        SettingsService,
         AgentGateway,
       ],
     };

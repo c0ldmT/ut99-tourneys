@@ -9,6 +9,7 @@ import {
   botTeamName,
   entrantUserIds,
   settingsProblems,
+  teamStarters,
   userEntrantId,
   type AccessEntry,
   type BotSpec,
@@ -32,9 +33,18 @@ import { AgentsService } from '../agents/agents.service.js';
 import type { User } from '../auth/users.service.js';
 import { isWebhookUrl } from '../notify/discord-out.js';
 import { NotificationsService } from '../notify/notifications.service.js';
+import { botKey, statMode, userKey } from '../stats/facts.js';
+import type { RatedGame } from '../stats/ratings.js';
 import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from './event-log.service.js';
 import { LiveHub } from './hub.js';
+import {
+  balanceBots,
+  pickBotsNear,
+  ratingSlots,
+  teamStrength,
+  type RatedBot,
+} from './rating-seed.js';
 import { assignBots, fits, formTeams, joinRole, type TeamShape } from './teams.js';
 import { shapeOf, TeamsService, type TeamView } from './teams.service.js';
 
@@ -58,6 +68,8 @@ const TournamentFields = z.object({
   notifyMode: z.enum(['default', 'custom', 'off']).optional(),
   /** Counts for the statistics page (test tournaments: off). */
   statsEnabled: z.boolean().optional(),
+  /** Counts for the ratings (fun tournaments: off). */
+  ranked: z.boolean().optional(),
   webhookUrl: z
     .string()
     .trim()
@@ -76,7 +88,8 @@ export type UpdateTournament = z.infer<typeof UpdateTournamentBody>;
 export const SeedBody = z.discriminatedUnion('mode', [
   z.object({
     mode: z.literal('auto'),
-    humanOrder: z.enum(['random', 'seeded']).default('random'),
+    /** random; seeded = registration order; rating = strongest meet late, bots balanced. */
+    humanOrder: z.enum(['random', 'seeded', 'rating']).default('random'),
     rngSeed: z.string().max(100).optional(),
   }),
   z.object({
@@ -223,6 +236,7 @@ export class TournamentsService {
         notifyMode: body.notifyMode ?? 'default',
         webhookUrl: body.webhookUrl || null,
         statsEnabled: body.statsEnabled ?? true,
+        ranked: body.ranked ?? true,
         createdBy: by.id,
         createdAt: this.now(),
       })
@@ -265,6 +279,7 @@ export class TournamentsService {
     if (body.notifyMode !== undefined) set.notifyMode = body.notifyMode;
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
     if (body.statsEnabled !== undefined) set.statsEnabled = body.statsEnabled;
+    if (body.ranked !== undefined) set.ranked = body.ranked;
     const oldTeamSize = this.settings(t).teamSize;
     if (Object.keys(set).length) {
       this.db.update(tournaments).set(set).where(eq(tournaments.id, id)).run();
@@ -706,14 +721,18 @@ export class TournamentsService {
     }
     const humanIds = humans.map((h) => h.id);
     const botIds = bots.map((b) => b.id);
+    const byRating = body.mode === 'auto' && body.humanOrder === 'rating';
     let slots: string[];
+    let entrants: Entrant[] = [];
     try {
-      if (body.mode === 'auto') {
+      if (byRating) {
+        ({ slots, entrants } = this.seedByRating(t, settings, humans, bots, rng));
+      } else if (body.mode === 'auto') {
         slots = buildSlots({
           size: settings.size,
           humans: humanIds,
           botPool: botIds,
-          humanOrder: body.humanOrder,
+          humanOrder: body.humanOrder === 'seeded' ? 'seeded' : 'random',
           botPlacement: settings.botPlacement,
           rng,
         });
@@ -730,24 +749,22 @@ export class TournamentsService {
         if (missing.length) throw new Error(`not placed: ${missing.join(', ')}`);
         slots = fillEmptySlots(body.slots, botIds, rng);
       }
+      if (!byRating) {
+        const used = new Set(slots);
+        entrants = [...humans, ...bots].filter((e) => used.has(e.id));
+        if (teamMode)
+          entrants = this.fillTeamsWithBots(
+            t,
+            slots,
+            entrants as TeamEntrant[],
+            settings.teamSize,
+            rng,
+          );
+      }
     } catch (e) {
       throw badRequest((e as Error).message);
     }
-    const used = new Set(slots);
-    let entrants = [...humans, ...bots].filter((e) => used.has(e.id));
-    if (teamMode) {
-      try {
-        entrants = this.fillTeamsWithBots(
-          t,
-          slots,
-          entrants as TeamEntrant[],
-          settings.teamSize,
-          rng,
-        );
-      } catch (e) {
-        throw badRequest((e as Error).message);
-      }
-    }
+    const ratings = this.entrantRatings(settings, entrants);
     const actor = { kind: 'admin' as const, id: by.id };
     const batch: NewTournamentEvent[] = [];
     const head = this.log.load(id).length;
@@ -771,6 +788,7 @@ export class TournamentsService {
           grandFinalReset: settings.grandFinalReset,
           bestOf: settings.bestOf,
         },
+        ...(ratings ? { ratings } : {}),
       },
     });
     const res = this.log.append(id, head, batch);
@@ -806,9 +824,13 @@ export class TournamentsService {
   ): TeamEntrant[] {
     const ordered = slots.map((id) => entrants.find((e) => e.id === id) as TeamEntrant);
     const need = ordered.map((e) => Math.max(0, teamSize - e.members.length));
-    const fills = assignBots(need, this.botPool(t), rng);
+    return this.nameBotTeams(ordered, assignBots(need, this.botPool(t), rng));
+  }
+
+  /** Adds the bots to the teams and names the teams made of bots only. */
+  private nameBotTeams(teams: TeamEntrant[], fills: BotSpec[][]): TeamEntrant[] {
     const taken = new Set(
-      entrants.filter((e) => e.members.length).map((e) => e.displayName.toLowerCase()),
+      teams.filter((e) => e.members.length).map((e) => e.displayName.toLowerCase()),
     );
     let next = 0;
     const botName = () => {
@@ -817,11 +839,110 @@ export class TournamentsService {
       taken.add(name.toLowerCase());
       return name;
     };
-    return ordered.map((e, i) => ({
+    return teams.map((e, i) => ({
       ...e,
       ...(e.members.length ? {} : { displayName: botName() }),
       bots: fills[i] ?? [],
     }));
+  }
+
+  /** Strength (rating) of a player or bot in this tournament's mode. */
+  private strengthOf(settings: TournamentSettings, ref: { userId?: string; bot?: BotSpec }) {
+    const mode = statMode(settings);
+    if (ref.userId) return this.stats.strength(mode, userKey(ref.userId));
+    return this.stats.strength(mode, botKey(ref.bot!.name), ref.bot!.skill);
+  }
+
+  /** Strength of an entrant: the player, the bot, or the average of a team's starters and bots. */
+  private entrantStrength(settings: TournamentSettings, e: Entrant): number {
+    if (e.kind === 'human') return this.strengthOf(settings, { userId: e.userId });
+    if (e.kind === 'bot') return this.strengthOf(settings, { bot: e.bot });
+    return teamStrength([
+      ...teamStarters(e, settings.teamSize).map((m) =>
+        this.strengthOf(settings, { userId: m.userId }),
+      ),
+      ...e.bots.map((b) => this.strengthOf(settings, { bot: b })),
+    ]);
+  }
+
+  /** Ratings of the seeded entrants (shown in the bracket); undefined if they cannot be read. */
+  private entrantRatings(
+    settings: TournamentSettings,
+    entrants: Entrant[],
+  ): Record<string, number> | undefined {
+    try {
+      return Object.fromEntries(entrants.map((e) => [e.id, this.entrantStrength(settings, e)]));
+    } catch (err) {
+      // A nicety: a broken log elsewhere must not stop the seeding.
+      this.logger.warn(`ratings for the seeding: ${String(err)}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Seeding by rating: bots chosen and spread so that the teams come out about equally strong
+   * (1v1: bots close to the players' level), then the strongest meet late.
+   */
+  private seedByRating(
+    t: TournamentRow,
+    settings: TournamentSettings,
+    humans: Entrant[],
+    bots: Entrant[],
+    rng: Rng,
+  ): { slots: string[]; entrants: Entrant[] } {
+    const pool: RatedBot[] = this.botPool(t).map((spec) => ({
+      spec,
+      strength: this.strengthOf(settings, { bot: spec }),
+    }));
+    const missing = settings.size - humans.length;
+    const strengths = new Map<string, number>();
+    let entrants: Entrant[];
+    let botIds: string[];
+    if (settings.teamSize > 1) {
+      const teams = [...humans, ...bots.slice(0, missing)] as TeamEntrant[];
+      const fills = balanceBots(
+        teams.map((e) => ({
+          humans: teamStarters(e, settings.teamSize).map((m) =>
+            this.strengthOf(settings, { userId: m.userId }),
+          ),
+          need: Math.max(0, settings.teamSize - e.members.length),
+        })),
+        pool,
+        settings.teamSize,
+        rng,
+      );
+      entrants = this.nameBotTeams(teams, fills);
+      botIds = entrants.slice(humans.length).map((e) => e.id);
+    } else {
+      const picked = pickBotsNear(
+        pool,
+        missing,
+        humans.map((h) => this.entrantStrength(settings, h)),
+        rng,
+      );
+      if (picked.length < missing)
+        throw new Error(`the bot pool has ${picked.length} bots, ${missing} are needed`);
+      const chosen = picked.map((b) =>
+        bots.find((e) => e.kind === 'bot' && e.bot.name === b.spec.name)!,
+      );
+      entrants = [...humans, ...chosen];
+      botIds = chosen.map((e) => e.id);
+    }
+    for (const e of entrants) strengths.set(e.id, this.entrantStrength(settings, e));
+    const slots = ratingSlots({
+      humans: humans.map((h) => h.id),
+      bots: botIds,
+      strength: (id) => strengths.get(id) ?? 0,
+      botPlacement: settings.botPlacement,
+      rng,
+    });
+    return { slots, entrants };
+  }
+
+  /** Rating changes per game of a ranked tournament. */
+  ratings(id: string): RatedGame[] {
+    const t = this.require(id);
+    return t.ranked ? this.stats.tournamentRatings(id) : [];
   }
 
   /** Throws away the seeding (allowed until check-in opens). */
@@ -1067,6 +1188,7 @@ export class TournamentsService {
       botPool: this.botPool(t),
       registrationOpen: t.registrationOpen,
       statsEnabled: t.statsEnabled,
+      ranked: t.ranked,
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
       registrations: regs.map((u) => ({

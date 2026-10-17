@@ -109,4 +109,16 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE tournaments ADD COLUMN stats_enabled INTEGER NOT NULL DEFAULT 1;
   UPDATE tournaments SET stats_enabled = 0;
   `,
+  // 5: ratings (milestone 10). A tournament counts for the ratings when ranked is set (new
+  // tournaments: yes); tournaments that exist before this update never count (nothing is rated
+  // retroactively). Website settings (key -> JSON value) such as "rating".
+  `
+  ALTER TABLE tournaments ADD COLUMN ranked INTEGER NOT NULL DEFAULT 1;
+  UPDATE tournaments SET ranked = 0;
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  `,
 ];

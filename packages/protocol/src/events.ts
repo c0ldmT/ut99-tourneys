@@ -87,6 +87,8 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
       entrants: z.array(EntrantSchema),
       bracket: BracketDefinitionSchema,
       rngSeed: z.string(),
+      /** Rating (strength) of each entrant at the seeding: player, bot or team average. */
+      ratings: z.record(Id, z.number()).optional(),
     }),
   ),
   event('checkin.opened', z.object({ serverProfileId: Id })),

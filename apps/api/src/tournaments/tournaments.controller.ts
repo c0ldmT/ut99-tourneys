@@ -90,6 +90,12 @@ export class TournamentsController {
     return this.svc.events(id);
   }
 
+  /** Rating changes of the games of this tournament (empty when it is not ranked). */
+  @Get(':id/ratings')
+  ratings(@Param('id') id: string) {
+    return this.svc.ratings(id);
+  }
+
   @Post(':id/registration')
   @HttpCode(204)
   register(@CurrentUser() user: User, @Param('id') id: string) {
