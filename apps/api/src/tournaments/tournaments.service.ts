@@ -1327,8 +1327,13 @@ export class TournamentsService {
       .all();
     return rows.map(({ t, registered, mine, teamCount }) => {
       const s = this.settings(t);
-      const finished = t.phase === 'finished' ? this.log.projection(t.id) : undefined;
-      const proj = finished ? this.withCurrentBotNames(finished) : undefined;
+      const live = t.phase === 'running' || t.phase === 'paused';
+      const loaded = t.phase === 'finished' || live ? this.log.projection(t.id) : undefined;
+      const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
+      const cm = live ? proj?.currentMatch : undefined;
+      const name = (id: string) => proj?.entrants[id]?.displayName ?? id;
+      const wins = (id: string) =>
+        (cm ? (proj?.games[cm.matchId] ?? []) : []).filter((g) => g.winnerId === id).length;
       return {
         id: t.id,
         name: t.name,
@@ -1344,6 +1349,20 @@ export class TournamentsService {
         scheduledAt: t.scheduledAt,
         createdAt: t.createdAt,
         champion: proj?.championId ? proj.entrants[proj.championId]?.displayName : undefined,
+        seasonal: t.seasonal,
+        /** The match being played now (running tournaments): names and series score. */
+        ...(cm
+          ? {
+              now: {
+                matchId: cm.matchId,
+                game: cm.game,
+                ...(cm.map ? { map: cm.map } : {}),
+                status: cm.status,
+                names: [name(cm.entrants[0]), name(cm.entrants[1])],
+                wins: [wins(cm.entrants[0]), wins(cm.entrants[1])],
+              },
+            }
+          : {}),
       };
     });
   }

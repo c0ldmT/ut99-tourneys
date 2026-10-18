@@ -164,7 +164,7 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
     .vbar {
       height: 10px;
       border-radius: 5px;
-      background: var(--info);
+      background: var(--hot);
       overflow: hidden;
       margin-top: 8px;
     }

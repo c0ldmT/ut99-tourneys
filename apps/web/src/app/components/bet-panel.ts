@@ -15,6 +15,7 @@ import { Auth } from '../core/auth';
 import { BetColumns } from './bet-columns';
 import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe } from '../core/neuro';
+import { Coin } from '../core/brand';
 import type { BetMatchView, Entrant, TournamentBets, TournamentDetail } from '../core/types';
 
 interface Draft {
@@ -25,7 +26,7 @@ interface Draft {
 /** Betting with Neuro on the tournament page: open matches, closed pools, own results. */
 @Component({
   selector: 'app-bet-panel',
-  imports: [TPipe, FormsModule, NeuroPipe, RouterLink, BetColumns],
+  imports: [TPipe, FormsModule, NeuroPipe, RouterLink, BetColumns, Coin],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (view(); as v) {
@@ -36,7 +37,8 @@ interface Draft {
             @if (v.wallet; as w) {
               <div class="wallet">
                 <span
-                  >{{ 'bets.balance' | t }} <b>{{ w.balance | neuro }}</b></span
+                  >{{ 'bets.balance' | t }}
+                  <b class="neuro"><na-coin [size]="16" /> {{ w.balance | neuro: false }}</b></span
                 >
                 @if (w.staked) {
                   <span class="muted"
@@ -195,8 +197,11 @@ interface Draft {
       align-items: baseline;
     }
     .wallet b {
-      color: var(--accent);
+      color: var(--neuro-text);
       font-size: 1.15rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
     }
     .match {
       border-top: 1px solid var(--border);
@@ -256,7 +261,7 @@ interface Draft {
       color: var(--live);
     }
     .expert {
-      color: var(--info);
+      color: var(--hot-text);
     }
     .result.lost {
       color: var(--danger);

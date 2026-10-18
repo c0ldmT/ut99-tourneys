@@ -108,8 +108,9 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
       font-family: var(--font);
     }
     .section {
-      fill: var(--muted);
-      font-size: 12px;
+      fill: var(--text-2);
+      font-family: var(--font-display);
+      font-size: 14px;
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
@@ -142,7 +143,8 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
     }
     .score {
       fill: var(--text);
-      font-size: 13px;
+      font-family: var(--font-display);
+      font-size: 15px;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
     }
@@ -151,10 +153,13 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
       font-size: 9px;
       letter-spacing: 0.08em;
     }
-    .winner .name,
+    .winner .name {
+      fill: var(--text);
+      font-weight: 600;
+    }
     .winner .score {
       fill: var(--accent);
-      font-weight: 700;
+      font-weight: 800;
     }
     .loser .name,
     .loser .score {
@@ -164,8 +169,9 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
       fill: var(--me-bg);
     }
     .match.live .box {
-      stroke: var(--live);
+      stroke: var(--accent);
       stroke-width: 2;
+      filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
     }
     .match.void {
       opacity: 0.35;

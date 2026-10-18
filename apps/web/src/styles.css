@@ -1,19 +1,46 @@
+/*
+ * Neuro Arena: dark e-sports look. Every colour, font and radius comes from these tokens;
+ * components use the tokens only. Fonts are self-hosted (@fontsource, see angular.json).
+ */
 :root {
-  --font: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --bg: #0e1116;
-  --panel: #161b22;
-  --panel-2: #1c232d;
-  --border: #2a3340;
-  --line: #3a4553;
-  --text: #e6edf3;
-  --muted: #8b98a8;
-  --accent: #f0a32b;
-  --accent-dim: #8a6427;
-  --live: #3fb950;
-  --danger: #f85149;
-  --info: #58a6ff;
-  --me-bg: rgba(240, 163, 43, 0.12);
-  --radius: 10px;
+  --font: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Barlow Condensed', 'Barlow', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+
+  /* ground and surfaces */
+  --bg: #07080c;
+  --bg-2: #0b0d13;
+  --panel: #0e1118;
+  --panel-2: #151a24;
+  --panel-3: #1b2130;
+  --border: #1d2330;
+  --line: #2a3242;
+
+  /* text */
+  --text: #eef2f8;
+  --text-2: #a3adbf;
+  --muted: #8a94a8;
+  --faint: #5d6679;
+
+  /* roles */
+  --accent: #22d3ee; /* cyan: actions, links, winners */
+  --accent-hover: #67e8f9;
+  --accent-ink: #04151a; /* text on cyan */
+  --accent-dim: #1f6f7d;
+  --hot: #f0468c; /* magenta: highlights, season */
+  --hot-text: #ff7eb0;
+  --neuro: #f5b83d; /* gold: Neuro only */
+  --neuro-text: #f5c75e;
+  --live: #4ade80; /* live, gains */
+  --danger: #ff7a87; /* errors, losses */
+  --danger-strong: #ff5c6c;
+  --info: #7aa9ff;
+  --side-a: #ff4d5e; /* red side / team */
+  --side-b: #4c8dff; /* blue side / team */
+  --me-bg: rgba(34, 211, 238, 0.08);
+
+  --radius: 12px;
+  --radius-sm: 8px;
   color-scheme: dark;
 }
 
@@ -26,45 +53,83 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font);
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 a {
   color: var(--accent);
   text-decoration: none;
 }
 a:hover {
-  text-decoration: underline;
+  color: var(--accent-hover);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+::selection {
+  background: rgba(34, 211, 238, 0.3);
 }
 h1 {
-  font-size: 1.6rem;
-  margin: 0 0 0.25rem;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-size: 2.6rem;
+  line-height: 1;
+  margin: 0 0 0.35rem;
 }
 h2 {
-  font-size: 1.15rem;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 1.35rem;
+  line-height: 1.15;
   margin: 0 0 0.75rem;
 }
 h3 {
-  font-size: 1rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   margin: 0 0 0.5rem;
 }
 code,
 .mono {
-  font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  font-family: var(--font-mono);
   font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.disp {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* small uppercase label over a value */
+.kpi {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 0 auto;
-  padding: 20px 16px 48px;
+  padding: 28px 20px 56px;
 }
 .card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 16px;
-  margin-bottom: 16px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
 }
 .grid {
   display: grid;
@@ -90,7 +155,7 @@ code,
   color: var(--muted);
 }
 .small {
-  font-size: 0.85rem;
+  font-size: 0.86rem;
 }
 .stack > * + * {
   margin-top: 10px;
@@ -99,45 +164,66 @@ code,
 button,
 .btn {
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
-  border-radius: 8px;
-  padding: 7px 14px;
-  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 16px;
+  min-height: 38px;
+  border: 1px solid var(--line);
   background: var(--panel-2);
   color: var(--text);
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  transition:
+    background 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 button:hover:not(:disabled),
 .btn:hover {
-  border-color: var(--line);
-  background: #232c38;
+  border-color: #3a4558;
+  background: var(--panel-3);
+  color: var(--text);
   text-decoration: none;
 }
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 button.primary,
 .btn.primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1a1205;
-  font-weight: 600;
+  color: var(--accent-ink);
 }
-button.primary:hover:not(:disabled) {
-  background: #f7b549;
+button.primary:hover:not(:disabled),
+.btn.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--accent-ink);
 }
 button.danger {
-  border-color: var(--danger);
+  background: transparent;
+  border-color: var(--danger-strong);
   color: var(--danger);
+}
+button.danger:hover:not(:disabled) {
+  background: rgba(255, 92, 108, 0.1);
+  border-color: var(--danger-strong);
 }
 button.link {
   background: none;
   border: none;
   color: var(--accent);
   padding: 0;
+  min-height: 0;
+  font-weight: inherit;
+}
+button.link:hover:not(:disabled) {
+  background: none;
+  color: var(--accent-hover);
 }
 
 input,
@@ -145,24 +231,47 @@ select,
 textarea {
   font: inherit;
   color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 7px 10px;
+  background: #0a0c12;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 7px 11px;
+  min-height: 38px;
   width: 100%;
+}
+textarea {
+  min-height: 0;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: transparent;
 }
 input[type='checkbox'],
 input[type='radio'] {
   width: auto;
+  min-height: 0;
+  accent-color: var(--accent);
+}
+input[type='range'] {
+  accent-color: var(--accent);
+  padding: 0;
+  border: 0;
+  background: none;
+}
+input[type='color'] {
+  padding: 2px;
 }
 label {
   display: block;
-  font-size: 0.85rem;
-  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-2);
   margin-bottom: 4px;
 }
 .field {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .fields {
   display: grid;
@@ -176,7 +285,11 @@ fieldset {
   margin: 0 0 16px;
 }
 legend {
-  color: var(--muted);
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--text-2);
   padding: 0 6px;
   font-size: 0.9rem;
 }
@@ -188,80 +301,111 @@ table {
 th,
 td {
   text-align: left;
-  padding: 6px 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--border);
 }
 th {
   color: var(--muted);
   font-weight: 600;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.015);
 }
 
+/* status pills */
 .badge {
-  display: inline-block;
-  padding: 2px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
   border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  border: 1px solid var(--border);
-  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  background: var(--panel-2);
+  white-space: nowrap;
 }
 .badge.draft {
-  color: var(--muted);
+  color: var(--accent-hover);
+  border-color: rgba(34, 211, 238, 0.4);
+  background: rgba(34, 211, 238, 0.08);
 }
 .badge.seeded {
   color: var(--info);
-  border-color: var(--info);
+  border-color: rgba(122, 169, 255, 0.4);
+  background: rgba(122, 169, 255, 0.08);
 }
-.badge.checkIn {
-  color: var(--accent);
-  border-color: var(--accent);
+.badge.checkIn,
+.badge.paused {
+  color: var(--neuro-text);
+  border-color: rgba(245, 184, 61, 0.4);
+  background: rgba(245, 184, 61, 0.08);
 }
 .badge.running {
   color: var(--live);
-  border-color: var(--live);
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.1);
 }
-.badge.paused {
-  color: var(--accent);
-  border-color: var(--accent);
+.badge.running::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2);
 }
 .badge.finished {
-  color: var(--text);
+  color: var(--text-2);
 }
 .badge.aborted {
   color: var(--danger);
-  border-color: var(--danger);
+  border-color: rgba(255, 92, 108, 0.4);
+}
+.badge.season {
+  color: var(--hot-text);
+  border-color: rgba(240, 70, 140, 0.4);
+  background: rgba(240, 70, 140, 0.1);
 }
 .dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--muted);
+  background: var(--faint);
 }
 .dot.on {
   background: var(--live);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
 }
 
 .error {
   color: var(--danger);
-  background: rgba(248, 81, 73, 0.08);
-  border: 1px solid rgba(248, 81, 73, 0.4);
-  border-radius: 8px;
-  padding: 8px 12px;
+  background: rgba(255, 92, 108, 0.08);
+  border: 1px solid rgba(255, 92, 108, 0.4);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
 }
 .notice {
-  color: var(--info);
-  background: rgba(88, 166, 255, 0.08);
-  border: 1px solid rgba(88, 166, 255, 0.35);
-  border-radius: 8px;
-  padding: 8px 12px;
+  color: var(--accent-hover);
+  background: rgba(34, 211, 238, 0.07);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
 }
 .tabs {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 .tabs button {
   border: none;
@@ -269,8 +413,46 @@ th {
   border-radius: 0;
   background: none;
   color: var(--muted);
+  padding: 10px 14px;
+  min-height: 42px;
+  white-space: nowrap;
+}
+.tabs button:hover:not(:disabled) {
+  background: none;
+  color: var(--text);
 }
 .tabs button.active {
   color: var(--text);
   border-bottom-color: var(--accent);
+}
+
+/* Neuro amounts (gold, tabular); gains and losses */
+.neuro {
+  color: var(--neuro-text);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.gain {
+  color: var(--live);
+}
+.loss {
+  color: var(--danger);
+}
+
+@media (max-width: 640px) {
+  html,
+  body {
+    font-size: 15px;
+  }
+  h1 {
+    font-size: 2.1rem;
+  }
+  .container {
+    padding: 20px 14px 48px;
+  }
+  .card {
+    padding: 14px 14px;
+  }
 }

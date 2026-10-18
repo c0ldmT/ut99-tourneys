@@ -18,7 +18,19 @@
             "tsConfig": "tsconfig.app.json",
             "outputPath": { "base": "dist", "browser": "" },
             "assets": [{ "glob": "**/*", "input": "public" }],
-            "styles": ["src/styles.css"]
+            "styles": [
+              "@fontsource/barlow/latin-400.css",
+              "@fontsource/barlow/latin-500.css",
+              "@fontsource/barlow/latin-600.css",
+              "@fontsource/barlow/latin-700.css",
+              "@fontsource/barlow-condensed/latin-600.css",
+              "@fontsource/barlow-condensed/latin-700.css",
+              "@fontsource/barlow-condensed/latin-800.css",
+              "@fontsource/barlow-condensed/latin-800-italic.css",
+              "@fontsource/jetbrains-mono/latin-500.css",
+              "@fontsource/jetbrains-mono/latin-700.css",
+              "src/styles.css"
+            ]
           },
           "configurations": {
             "production": {

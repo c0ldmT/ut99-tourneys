@@ -8,6 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
@@ -280,15 +281,23 @@ const SUM_KEYS = [
       margin-top: 8px;
     }
     .pill {
-      font-size: 0.8rem;
-      padding: 2px 10px;
+      font-family: var(--font);
+      font-style: normal;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 10px;
       border-radius: 999px;
-      border: 1px solid var(--border);
-      color: var(--muted);
+      border: 1px solid var(--line);
+      color: var(--text-2);
     }
     .pill.live {
       color: var(--live);
-      border-color: var(--live);
+      border-color: rgba(74, 222, 128, 0.4);
+      background: rgba(74, 222, 128, 0.1);
     }
     .pill.done {
       color: var(--text);
@@ -302,20 +311,25 @@ const SUM_KEYS = [
     .versus > .card {
       min-width: 0;
       margin-bottom: 0;
-      border-top: 3px solid var(--danger);
+      padding: 20px 22px;
+      box-shadow: inset 0 4px 0 var(--side-a);
+      background: linear-gradient(180deg, rgba(255, 77, 94, 0.08), transparent 70%), var(--panel);
     }
     .versus > .card.b {
-      border-top-color: var(--info);
+      box-shadow: inset 0 4px 0 var(--side-b);
+      background: linear-gradient(180deg, rgba(76, 141, 255, 0.08), transparent 70%), var(--panel);
     }
     .side.won {
-      box-shadow: inset 0 0 0 1px var(--live);
+      border-color: rgba(74, 222, 128, 0.55);
     }
     .side .spread {
       flex-wrap: nowrap;
     }
     .side h2 {
       margin: 0;
-      font-size: 1.1rem;
+      font-size: 2rem;
+      font-weight: 800;
+      font-style: italic;
       overflow: hidden;
       text-overflow: ellipsis;
     }
@@ -323,8 +337,14 @@ const SUM_KEYS = [
       color: var(--live);
     }
     .score {
-      font-size: 2rem;
+      font-family: var(--font-display);
+      font-size: 3.4rem;
+      line-height: 1;
       font-weight: 800;
+      color: var(--side-a);
+    }
+    .b .score {
+      color: var(--side-b);
     }
     .who {
       display: flex;
@@ -333,13 +353,15 @@ const SUM_KEYS = [
       margin-top: 6px;
     }
     .badge {
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       padding: 0 5px;
       margin-left: 4px;
+      height: 17px;
     }
     .badge.mvp {
-      color: var(--accent);
-      border-color: var(--accent);
+      color: var(--hot-text);
+      border-color: rgba(240, 70, 140, 0.5);
+      background: rgba(240, 70, 140, 0.1);
     }
     .meta {
       margin: 0 0 10px;
@@ -387,10 +409,10 @@ const SUM_KEYS = [
     .sharebar span {
       display: block;
       height: 100%;
-      background: var(--danger);
+      background: var(--side-a);
     }
     .b .sharebar span {
-      background: var(--info);
+      background: var(--side-b);
     }
     .details {
       line-height: 1.5;
@@ -460,7 +482,13 @@ export class MatchPage {
     () => this.views().find((v) => v.key === this.tab()) ?? this.views()[0] ?? null,
   );
 
+  private readonly title = inject(PageTitle);
+
   constructor() {
+    effect(() =>
+      this.title.set(this.d() ? `${this.d()!.matchId} · ${this.t()?.name ?? ''}` : null),
+    );
+    inject(DestroyRef).onDestroy(() => this.title.set(null));
     effect(() => {
       const id = this.id();
       const m = this.matchId();

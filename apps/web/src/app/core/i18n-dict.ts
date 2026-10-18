@@ -150,6 +150,8 @@ const en = {
   'rec.run.monsters': 'Most monsters killed in a run',
   'form.options': 'Options',
   'nav.logout': 'Log out',
+  'nav.menu': 'Menu',
+  'footer.line': 'UT99 tournaments · ratings · bets with Neuro',
 
   'common.loading': 'Loading…',
   'common.save': 'Save',
@@ -214,6 +216,12 @@ const en = {
   'list.registered': '{n} registered',
   'list.youPlay': 'You are registered',
   'list.open': 'Registration open',
+  'list.now': 'Now',
+  'list.game': 'game {n}',
+  'list.filter.all': 'All',
+  'list.filter.live': 'Running',
+  'list.filter.open': 'Registration',
+  'list.filter.done': 'Finished',
 
   'profile.title': 'Profile',
   'profile.name': 'In-game name',
@@ -976,6 +984,8 @@ const de: Record<TKey, string> = {
   'rec.run.monsters': 'Meiste getötete Monster in einem Lauf',
   'form.options': 'Optionen',
   'nav.logout': 'Abmelden',
+  'nav.menu': 'Menü',
+  'footer.line': 'UT99-Turniere · Ratings · Wetten mit Neuro',
 
   'common.loading': 'Lädt…',
   'common.save': 'Speichern',
@@ -1042,6 +1052,12 @@ const de: Record<TKey, string> = {
   'list.registered': '{n} angemeldet',
   'list.youPlay': 'Du bist angemeldet',
   'list.open': 'Anmeldung offen',
+  'list.now': 'Jetzt',
+  'list.game': 'Spiel {n}',
+  'list.filter.all': 'Alle',
+  'list.filter.live': 'Laufend',
+  'list.filter.open': 'Anmeldung',
+  'list.filter.done': 'Beendet',
 
   'profile.title': 'Profil',
   'profile.name': 'Ingame-Name',

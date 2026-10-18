@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
@@ -10,49 +10,102 @@ import type { TournamentSummary } from '../core/types';
   imports: [RouterLink, TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="spread">
+    <div class="head">
       <h1>{{ 'list.title' | t }}</h1>
       @if (auth.me()?.isAdmin) {
-        <a class="btn primary" routerLink="/new">{{ 'list.new' | t }}</a>
+        <a class="btn primary" routerLink="/new">+ {{ 'list.new' | t }}</a>
       }
     </div>
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }
     @if (items(); as list) {
-      @if (!list.length) {
+      @for (t of live(); track t.id) {
+        <a class="hero" [routerLink]="t.now ? ['/t', t.id, 'm', t.now.matchId] : ['/t', t.id]">
+          <div class="hero-l">
+            <div class="row">
+              <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+              @if (t.seasonal) {
+                <span class="badge season">Season</span>
+              }
+            </div>
+            <div class="hero-name">{{ t.name }}</div>
+            <div class="muted small">{{ meta(t) }}</div>
+          </div>
+          @if (t.now; as n) {
+            <div class="hero-r">
+              <div class="kpi">
+                {{ 'list.now' | t }} · {{ n.matchId }} · {{ 'list.game' | t: { n: n.game } }}
+                @if (n.map) {
+                  · {{ n.map }}
+                }
+              </div>
+              <div class="vs">
+                <span class="nm a">{{ n.names[0] }}</span>
+                <span class="sc"
+                  ><b class="sa">{{ n.wins[0] }}</b
+                  ><i>:</i><b class="sb">{{ n.wins[1] }}</b></span
+                >
+                <span class="nm b">{{ n.names[1] }}</span>
+              </div>
+            </div>
+          }
+        </a>
+      }
+      <div class="tabs" role="tablist">
+        @for (f of filters; track f) {
+          <button
+            type="button"
+            role="tab"
+            [class.active]="filter() === f"
+            [attr.aria-selected]="filter() === f"
+            (click)="filter.set(f)"
+          >
+            {{ 'list.filter.' + f | t }} <span class="count">{{ count(f) }}</span>
+          </button>
+        }
+      </div>
+      @if (!shown().length) {
         <p class="muted">{{ 'list.empty' | t }}</p>
       }
       <div class="cards">
-        @for (t of list; track t.id) {
-          <a class="card item" [routerLink]="['/t', t.id]">
-            <div class="spread">
-              <h2>{{ t.name }}</h2>
+        @for (t of shown(); track t.id) {
+          <a class="item" [routerLink]="['/t', t.id]">
+            <div class="row">
               <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
-            </div>
-            <div class="muted small">
-              {{ 'format.' + t.format | t }} ·
-              @if (t.game === 'mh') {
-                {{ 'race.mode' | t }} ·
+              @if (t.seasonal) {
+                <span class="badge season">Season</span>
               }
-              @if (t.teamSize > 1) {
-                {{ 'team.mode' | t: { k: t.teamSize } }} · {{ t.size }} {{ 'list.teams' | t }} ·
-                {{ 'list.teamsRegistered' | t: { teams: t.teams, n: t.registered } }}
+              @if (t.registeredMe) {
+                <span class="me">{{ 'list.youPlay' | t }}</span>
+              }
+            </div>
+            <div class="name">{{ t.name }}</div>
+            <div class="muted small">{{ meta(t) }}</div>
+            <div class="foot">
+              @if (t.champion) {
+                <span class="champ"
+                  ><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M7 4h10v5a5 5 0 0 1-10 0zM5 5H3v2a4 4 0 0 0 4 4M19 5h2v2a4 4 0 0 1-4 4M12 14v4M8 21h8"
+                      fill="none"
+                      stroke="var(--neuro)"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                    /></svg
+                  >{{ t.champion }}</span
+                >
+              } @else if (t.scheduledAt) {
+                <span>{{ i18n.date(t.scheduledAt) }}</span>
+              } @else if (t.phase === 'draft' && t.registrationOpen) {
+                <span class="open">{{ 'list.open' | t }}</span>
               } @else {
-                {{ t.size }} {{ 'list.slots' | t }} ·
-                {{ 'list.registered' | t: { n: t.registered } }}
+                <span></span>
               }
+              <span class="mono muted">{{ fill(t) }}</span>
             </div>
-            @if (t.scheduledAt) {
-              <div class="small">{{ i18n.date(t.scheduledAt) }}</div>
-            }
-            @if (t.champion) {
-              <div class="small">🏆 {{ t.champion }}</div>
-            }
-            @if (t.registeredMe) {
-              <div class="small accent">{{ 'list.youPlay' | t }}</div>
-            } @else if (t.phase === 'draft' && t.registrationOpen) {
-              <div class="small accent">{{ 'list.open' | t }}</div>
+            @if (t.phase === 'draft') {
+              <div class="bar"><div [style.width.%]="fillPct(t)"></div></div>
             }
           </a>
         }
@@ -62,27 +115,175 @@ import type { TournamentSummary } from '../core/types';
     }
   `,
   styles: `
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .head h1 {
+      font-size: 3.2rem;
+      margin: 0;
+    }
+    .hero {
+      display: flex;
+      flex-wrap: wrap;
+      border: 1px solid #1f4a55;
+      border-radius: var(--radius);
+      overflow: hidden;
+      color: var(--text);
+      margin-bottom: 22px;
+      background: var(--panel);
+    }
+    .hero:hover {
+      color: var(--text);
+      border-color: var(--accent-dim);
+    }
+    .hero-l {
+      flex: 1 1 380px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #0c1219;
+    }
+    .hero-name {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-style: italic;
+      text-transform: uppercase;
+      font-size: 2.4rem;
+      line-height: 1;
+    }
+    .hero-r {
+      flex: 1 1 380px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+      border-left: 1px solid var(--border);
+    }
+    .vs {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 14px;
+    }
+    .nm {
+      font-weight: 700;
+      font-size: 1.15rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .nm.a {
+      text-align: right;
+    }
+    .sc {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 2.5rem;
+      line-height: 1;
+    }
+    .sc i {
+      color: var(--muted);
+      font-style: normal;
+      font-size: 1.6rem;
+      padding: 0 6px;
+    }
+    .sa {
+      color: var(--side-a);
+    }
+    .sb {
+      color: var(--side-b);
+    }
+    .count {
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+      color: var(--muted);
+      margin-left: 4px;
+    }
     .cards {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
       gap: 16px;
-      margin-top: 16px;
     }
     .item {
-      display: block;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
       color: var(--text);
-      margin: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      transition:
+        border-color 0.12s,
+        transform 0.12s;
     }
     .item:hover {
-      border-color: var(--line);
-      text-decoration: none;
+      color: var(--text);
+      border-color: #2f3a4f;
+      transform: translateY(-1px);
     }
-    .item h2 {
-      margin: 0;
+    .name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      font-size: 1.65rem;
+      line-height: 1.05;
     }
-    .accent {
+    .me {
+      margin-left: auto;
+      font-size: 0.8rem;
+      font-weight: 600;
       color: var(--accent);
-      margin-top: 6px;
+    }
+    .foot {
+      margin-top: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      font-size: 0.92rem;
+    }
+    .champ {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+    .open {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    .bar {
+      height: 6px;
+      border-radius: 3px;
+      background: var(--panel-2);
+      overflow: hidden;
+    }
+    .bar div {
+      height: 100%;
+      background: var(--accent);
+    }
+    @media (max-width: 640px) {
+      .head h1 {
+        font-size: 2.4rem;
+      }
+      .hero-r {
+        border-left: 0;
+        border-top: 1px solid var(--border);
+      }
+      .hero-name {
+        font-size: 2rem;
+      }
     }
   `,
 })
@@ -92,6 +293,48 @@ export class TournamentListPage {
   private readonly api = inject(Api);
   protected readonly items = signal<TournamentSummary[] | null>(null);
   protected readonly error = signal('');
+
+  protected readonly filters = ['all', 'live', 'open', 'done'] as const;
+  protected readonly filter = signal<(typeof this.filters)[number]>('all');
+  /** Running tournaments: shown big on top. */
+  protected readonly live = computed(() =>
+    (this.items() ?? []).filter((t) => t.phase === 'running' || t.phase === 'paused'),
+  );
+  protected readonly shown = computed(() =>
+    (this.items() ?? []).filter((t) => this.matches(t, this.filter())),
+  );
+
+  private matches(t: TournamentSummary, f: (typeof this.filters)[number]): boolean {
+    if (f === 'live') return ['seeded', 'checkIn', 'running', 'paused'].includes(t.phase);
+    if (f === 'open') return t.phase === 'draft';
+    if (f === 'done') return t.phase === 'finished' || t.phase === 'aborted';
+    return true;
+  }
+
+  protected count(f: (typeof this.filters)[number]): number {
+    return (this.items() ?? []).filter((t) => this.matches(t, f)).length;
+  }
+
+  protected meta(t: TournamentSummary): string {
+    const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
+    const mode =
+      t.game === 'mh'
+        ? `${tr('team.mode', { k: t.teamSize })} ${tr('race.mode')}`
+        : t.teamSize > 1
+          ? tr('team.mode', { k: t.teamSize })
+          : '1v1';
+    const size = `${t.size} ${tr(t.teamSize > 1 ? 'list.teams' : 'list.slots')}`;
+    return `${mode} · ${tr('format.' + t.format)} · ${size}`;
+  }
+
+  /** "9 / 16" registered (teams in team tournaments). */
+  protected fill(t: TournamentSummary): string {
+    return `${t.teamSize > 1 ? t.teams : t.registered} / ${t.size}`;
+  }
+
+  protected fillPct(t: TournamentSummary): number {
+    return Math.min(100, (100 * (t.teamSize > 1 ? t.teams : t.registered)) / Math.max(1, t.size));
+  }
 
   constructor() {
     this.api

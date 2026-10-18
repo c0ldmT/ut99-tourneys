@@ -8,6 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { PageTitle } from '../core/page-title';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BetPanel } from '../components/bet-panel';
@@ -45,14 +46,15 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       <p class="error">{{ error() }}</p>
     }
     @if (t(); as t) {
-      <div class="spread head">
-        <div>
-          <h1>
-            {{ t.name }} <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+      <div class="head">
+        <div class="head-l">
+          <div class="row">
+            <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
             @if (t.season) {
               <span class="badge season">{{ 'season.label' | t: { n: t.season } }}</span>
             }
-          </h1>
+          </div>
+          <h1>{{ t.name }}</h1>
           <div class="muted small">
             {{ 'format.' + t.settings.format | t }} ·
             @if (race()) {
@@ -75,8 +77,11 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           </div>
         </div>
         @if (isAdmin()) {
-          <div class="muted small">
-            <span class="dot" [class.on]="t.agent.online"></span> {{ t.agentId }}
+          <div class="head-r">
+            <div class="kpi">Server</div>
+            <div class="srv">
+              <span class="dot" [class.on]="t.agent.online"></span> {{ t.agentId }}
+            </div>
           </div>
         }
       </div>
@@ -88,7 +93,18 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <p class="error">{{ 'tp.aborted' | t: { reason: t.projection?.abortedReason ?? '' } }}</p>
       }
       @if (champion(); as c) {
-        <div class="card champion">🏆 {{ 'tp.champion' | t: { name: c } }}</div>
+        <div class="card champion">
+          <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M7 4h10v5a5 5 0 0 1-10 0zM5 5H3v2a4 4 0 0 0 4 4M19 5h2v2a4 4 0 0 1-4 4M12 14v4M8 21h8"
+              fill="none"
+              stroke="var(--neuro)"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          {{ 'tp.champion' | t: { name: c } }}
+        </div>
       }
 
       @if (teamMode() && t.phase === 'draft') {
@@ -659,10 +675,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
-    .badge.season {
-      color: var(--accent);
-      border-color: var(--accent-dim);
-    }
     table.ratings td {
       vertical-align: top;
       padding-right: 16px;
@@ -682,16 +694,50 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       color: var(--danger);
     }
     .head {
-      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin: 0 0 22px;
+      padding: 4px 0 22px;
+      border-bottom: 1px solid var(--border);
     }
-    .head h1 .badge {
-      vertical-align: middle;
-      margin-left: 8px;
+    .head-l {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 0;
+    }
+    .head h1 {
+      font-size: 3.4rem;
+      margin: 0;
+      overflow-wrap: anywhere;
+    }
+    .srv {
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
     .champion {
-      font-size: 1.2rem;
-      font-weight: 700;
-      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: var(--font-display);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-size: 1.6rem;
+      font-weight: 800;
+      font-style: italic;
+      color: var(--neuro-text);
+      border-color: rgba(245, 184, 61, 0.35);
+      background: linear-gradient(90deg, rgba(245, 184, 61, 0.1), transparent 60%), var(--panel);
+    }
+    @media (max-width: 640px) {
+      .head h1 {
+        font-size: 2.4rem;
+      }
     }
     .connect {
       display: flex;
@@ -729,7 +775,8 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       font-weight: 700;
     }
     .versus .score {
-      font-size: 2rem;
+      font-family: var(--font-display);
+      font-size: 2.4rem;
       font-weight: 800;
       font-variant-numeric: tabular-nums;
       color: var(--accent);
@@ -742,10 +789,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       border-color: var(--live);
     }
     .badge.running {
-      background: var(--live);
-      color: #000;
       margin-left: 6px;
-      font-size: 0.7rem;
     }
     .scroll {
       overflow-x: auto;
@@ -925,7 +969,11 @@ export class TournamentPage {
   private loading = false;
   private again = false;
 
+  private readonly title = inject(PageTitle);
+
   constructor() {
+    effect(() => this.title.set(this.t()?.name));
+    inject(DestroyRef).onDestroy(() => this.title.set(null));
     effect(() => {
       const id = this.id();
       void this.load(id);

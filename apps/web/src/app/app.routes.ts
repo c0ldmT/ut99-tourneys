@@ -9,10 +9,12 @@ export const routes: Routes = [
     children: [
       {
         path: '',
+        title: 'nav.tournaments',
         loadComponent: () => import('./pages/tournament-list').then((m) => m.TournamentListPage),
       },
       {
         path: 'stats',
+        title: 'nav.stats',
         loadComponent: () => import('./pages/stats').then((m) => m.StatsPage),
       },
       {
@@ -25,10 +27,12 @@ export const routes: Routes = [
       },
       {
         path: 'profile',
+        title: 'profile.title',
         loadComponent: () => import('./pages/profile').then((m) => m.ProfilePage),
       },
       {
         path: 'new',
+        title: 'nav.new',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/tournament-form').then((m) => m.TournamentFormPage),
       },
@@ -42,26 +46,31 @@ export const routes: Routes = [
       },
       {
         path: 't/:id/edit',
+        title: 'form.editTitle',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/tournament-form').then((m) => m.TournamentFormPage),
       },
       {
         path: 'admin/agents',
+        title: 'nav.agents',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/agents').then((m) => m.AgentsPage),
       },
       {
         path: 'admin/bots',
+        title: 'nav.bots',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/bots').then((m) => m.BotsPage),
       },
       {
         path: 'admin/settings',
+        title: 'nav.settings',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/settings').then((m) => m.SettingsPage),
       },
       {
         path: 'admin/users',
+        title: 'nav.users',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/users').then((m) => m.UsersPage),
       },

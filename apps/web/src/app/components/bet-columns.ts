@@ -80,17 +80,19 @@ import type { BetMatchView } from '../core/types';
     }
     .col {
       min-width: 0;
-      border-top: 3px solid var(--danger);
-      background: rgba(248, 81, 73, 0.05);
-      border-radius: 6px;
-      padding: 6px 8px;
+      box-shadow: inset 0 3px 0 var(--side-a);
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255, 77, 94, 0.06), transparent 120px), var(--panel);
+      border-radius: 10px;
+      padding: 10px 12px;
     }
     .col.b {
-      border-top-color: var(--info);
-      background: rgba(88, 166, 255, 0.05);
+      box-shadow: inset 0 3px 0 var(--side-b);
+      background:
+        linear-gradient(180deg, rgba(76, 141, 255, 0.06), transparent 120px), var(--panel);
     }
     .col.won {
-      box-shadow: inset 0 0 0 1px var(--live);
+      border-color: rgba(74, 222, 128, 0.55);
     }
     .col .head {
       display: flex;
@@ -104,33 +106,33 @@ import type { BetMatchView } from '../core/types';
       color: var(--live);
     }
     .col .sum {
-      font-weight: 400;
+      font-weight: 700;
       font-size: 0.8rem;
-      color: var(--accent);
+      color: var(--neuro-text);
       white-space: nowrap;
     }
     .col .bar {
       margin: 4px 0 6px;
     }
     .col .bar span {
-      background: var(--danger);
+      background: var(--side-a);
     }
     .col.b .bar span {
-      background: var(--info);
+      background: var(--side-b);
     }
     .bet {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
       gap: 6px;
       align-items: baseline;
-      padding: 2px 0;
+      padding: 5px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
     .bet.me {
       background: var(--me-bg);
     }
     .bet .amt {
-      color: var(--live);
+      color: var(--neuro-text);
       white-space: nowrap;
       font-size: 0.85rem;
     }
@@ -157,13 +159,9 @@ import type { BetMatchView } from '../core/types';
     }
     .badge {
       margin-left: 4px;
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       padding: 0 5px;
-    }
-    .badge {
-      margin-left: 4px;
-      font-size: 0.65rem;
-      padding: 0 5px;
+      height: 17px;
     }
     .nm {
       overflow: hidden;

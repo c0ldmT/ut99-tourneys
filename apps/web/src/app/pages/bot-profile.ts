@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  DestroyRef,
   Component,
   computed,
   effect,
@@ -7,18 +8,20 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { assetLabel, combatStyleKey, traitPercent } from '../core/bots';
 import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
+import { Coin } from '../core/brand';
 import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
 
 /** Bot profile (everybody logged in): look, play style, personality, rivals with the record. */
 @Component({
   selector: 'app-bot-profile',
-  imports: [TPipe, RouterLink, NeuroPipe],
+  imports: [TPipe, RouterLink, NeuroPipe, Coin],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -161,7 +164,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
             <dl>
               <dt>{{ 'bets.balance' | t }}</dt>
               <dd>
-                <b class="neuro">{{ n.wallet.balance | neuro }}</b>
+                <b class="neuro"><na-coin [size]="16" /> {{ n.wallet.balance | neuro: false }}</b>
               </dd>
               <dt>{{ 'bets.wonLost' | t }}</dt>
               <dd>{{ n.wallet.won }}–{{ n.wallet.lost }}</dd>
@@ -215,7 +218,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
   `,
   styles: `
     .neuro {
-      color: var(--accent);
+      color: var(--neuro-text);
     }
     .badge.type {
       color: var(--accent);
@@ -329,7 +332,11 @@ export class BotProfilePage {
     })).filter((g) => g.lines.length);
   });
 
+  private readonly title = inject(PageTitle);
+
   constructor() {
+    effect(() => this.title.set(this.b()?.gameName));
+    inject(DestroyRef).onDestroy(() => this.title.set(null));
     effect(() => {
       const id = this.id();
       void this.load(id);

@@ -24,7 +24,7 @@ export const ApiConfigSchema = z
     PUBLIC_URL: z.url().default('http://localhost:8080'),
     /** Directory for the SQLite database. ":memory:" keeps everything in memory (tests). */
     DATA_DIR: z.string().default('./data'),
-    SITE_NAME: z.string().max(64).default('UT99 Tournaments'),
+    SITE_NAME: z.string().max(64).default('Neuro Arena'),
     DISCORD_CLIENT_ID: z.string().default(''),
     DISCORD_CLIENT_SECRET: z.string().default(''),
     /** Only members of this Discord server may log in (optional). */

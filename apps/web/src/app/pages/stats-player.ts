@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
+  DestroyRef,
   Component,
   computed,
   effect,
@@ -8,10 +9,12 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
+import { Coin } from '../core/brand';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
 import { defaultScope, parseScope, startedSeasons } from '../core/season';
@@ -27,7 +30,7 @@ import type {
 
 @Component({
   selector: 'app-stats-player',
-  imports: [TPipe, RouterLink, DatePipe, NeuroPipe],
+  imports: [TPipe, RouterLink, DatePipe, NeuroPipe, Coin],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -281,7 +284,9 @@ import type {
         <h2>{{ 'bets.profileTitle' | t: { n: n.season } }}</h2>
         <div class="tiles">
           <div class="card tile">
-            <div class="value neuro">{{ n.wallet.balance | neuro }}</div>
+            <div class="value neuro">
+              <na-coin [size]="22" /> {{ n.wallet.balance | neuro: false }}
+            </div>
             <div class="muted small">{{ 'bets.balance' | t }}</div>
           </div>
           <div class="card tile">
@@ -345,7 +350,10 @@ import type {
       overflow-x: auto;
     }
     .value.neuro {
-      color: var(--accent);
+      color: var(--neuro-text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     table.bets td.won {
       color: var(--live);
@@ -383,8 +391,10 @@ import type {
       gap: 12px;
     }
     .tile .value {
-      font-size: 1.5rem;
-      font-weight: 700;
+      font-family: var(--font-display);
+      font-size: 1.9rem;
+      line-height: 1.1;
+      font-weight: 800;
       color: var(--accent);
     }
     .scroll {
@@ -505,7 +515,11 @@ export class StatsPlayerPage {
     Math.max(1, ...(this.d()?.weapons.map((w) => w.kills) ?? [1])),
   );
 
+  private readonly title = inject(PageTitle);
+
   constructor() {
+    effect(() => this.title.set(this.d()?.row.name ?? this.neuro()?.name));
+    inject(DestroyRef).onDestroy(() => this.title.set(null));
     effect(() => {
       const key = this.key();
       const season = this.season();

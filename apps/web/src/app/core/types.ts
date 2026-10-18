@@ -66,6 +66,16 @@ export interface TournamentSummary {
   scheduledAt: string | null;
   createdAt: string;
   champion?: string;
+  seasonal?: boolean;
+  /** The match being played now (running tournaments). */
+  now?: {
+    matchId: string;
+    game: number;
+    map?: string;
+    status: 'called' | 'mapSelected' | 'live';
+    names: [string, string];
+    wins: [number, number];
+  };
 }
 
 export interface LiveInfo {

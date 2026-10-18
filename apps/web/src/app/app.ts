@@ -9,20 +9,25 @@ import {
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from './core/api';
 import { NeuroPipe } from './core/neuro';
+import { Coin, Logo, Wordmark } from './core/brand';
+import { version } from '../../../../package.json';
 import { Auth } from './core/auth';
 import { I18n, TPipe } from './core/i18n';
 import type { Lang } from './core/i18n-dict';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, NeuroPipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, NeuroPipe, Logo, Wordmark, Coin],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header>
       <div class="bar">
-        <a routerLink="/" class="brand">{{ auth.config().siteName }}</a>
+        <a routerLink="/" class="brand" (click)="menu.set(false)">
+          <na-logo [size]="30" />
+          <na-wordmark [name]="auth.config().siteName" />
+        </a>
         @if (auth.me(); as me) {
-          <nav>
+          <nav [class.open]="menu()" (click)="menu.set(false)">
             <a
               routerLink="/"
               routerLinkActive="active"
@@ -37,86 +42,259 @@ import type { Lang } from './core/i18n-dict';
               <a routerLink="/admin/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
               <a routerLink="/admin/settings" routerLinkActive="active">{{ 'nav.settings' | t }}</a>
             }
+            <div class="nav-foot">
+              <select class="lang" (change)="setLang($event)" aria-label="Language">
+                @for (l of i18n.languages; track l) {
+                  <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
+                }
+              </select>
+              <button class="link" (click)="logout()">{{ 'nav.logout' | t }}</button>
+            </div>
           </nav>
         }
         <span class="grow"></span>
-        <select class="lang" (change)="setLang($event)" aria-label="Language">
-          @for (l of i18n.languages; track l) {
-            <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
-          }
-        </select>
         @if (auth.me(); as me) {
-          <a routerLink="/profile" class="user">
+          @if (neuro() !== null) {
+            <a
+              routerLink="/stats/p/u:{{ me.id }}"
+              class="neuro wallet"
+              [title]="'bets.balance' | t"
+              (click)="menu.set(false)"
+              ><na-coin [size]="18" />{{ neuro()! | neuro: false }}</a
+            >
+          }
+          <a routerLink="/profile" class="user" (click)="menu.set(false)">
             @if (me.avatar) {
               <img [src]="me.avatar" alt="" />
             }
-            {{ me.displayName }}
-            @if (neuro() !== null) {
-              <span class="neuro">({{ neuro()! | neuro }})</span>
-            }
+            <span class="uname">{{ me.displayName }}</span>
           </a>
-          <button class="link" (click)="logout()">{{ 'nav.logout' | t }}</button>
+          <div class="desk">
+            <select class="lang" (change)="setLang($event)" aria-label="Language">
+              @for (l of i18n.languages; track l) {
+                <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
+              }
+            </select>
+            <button class="link" (click)="logout()">{{ 'nav.logout' | t }}</button>
+          </div>
+          <button
+            class="burger"
+            type="button"
+            [attr.aria-expanded]="menu()"
+            [attr.aria-label]="'nav.menu' | t"
+            (click)="menu.set(!menu())"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+              @if (menu()) {
+                <path
+                  d="M6 6l12 12M18 6 6 18"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              } @else {
+                <path
+                  d="M4 7h16M4 12h16M4 17h16"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              }
+            </svg>
+          </button>
+        } @else {
+          <select class="lang" (change)="setLang($event)" aria-label="Language">
+            @for (l of i18n.languages; track l) {
+              <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
+            }
+          </select>
         }
       </div>
     </header>
     <main class="container">
       <router-outlet />
     </main>
+    <footer>
+      <div class="foot">
+        <span class="fbrand"
+          ><na-logo [size]="18" /> <na-wordmark [name]="auth.config().siteName"
+        /></span>
+        <span class="muted small">{{ 'footer.line' | t }} · v{{ version }}</span>
+      </div>
+    </footer>
   `,
   styles: `
+    :host {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    main {
+      flex: 1;
+      width: 100%;
+    }
     header {
-      background: var(--panel);
+      background: rgba(11, 13, 19, 0.92);
+      backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 20;
     }
     .bar {
-      max-width: 1200px;
+      max-width: 1240px;
       margin: 0 auto;
-      padding: 10px 16px;
+      padding: 0 20px;
+      min-height: 64px;
       display: flex;
       align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
+      gap: 22px;
     }
     .brand {
-      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 1.4rem;
       color: var(--text);
-      letter-spacing: 0.02em;
+      flex: none;
+    }
+    .brand:hover {
+      color: var(--text);
     }
     nav {
       display: flex;
       flex-wrap: wrap;
-      gap: 4px 12px;
+      gap: 2px;
     }
     nav a {
-      color: var(--muted);
+      color: var(--text-2);
+      font-weight: 500;
+      padding: 8px 11px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    nav a:hover {
+      color: var(--text);
+      background: var(--panel-2);
     }
     nav a.active {
       color: var(--text);
+      background: var(--panel-2);
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+    .nav-foot {
+      display: none;
     }
     .grow {
       flex: 1;
     }
     .lang {
       width: auto;
-      padding: 4px 6px;
+      min-height: 32px;
+      padding: 3px 6px;
+    }
+    .desk {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .wallet {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.95rem;
+    }
+    .wallet:hover {
+      color: var(--neuro);
     }
     .user {
       display: inline-flex;
       align-items: center;
       gap: 8px;
       color: var(--text);
-    }
-    .neuro {
-      color: var(--accent);
-      white-space: nowrap;
+      font-weight: 600;
     }
     .user img {
-      width: 24px;
-      height: 24px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
+    }
+    .burger {
+      display: none;
+      background: none;
+      border: 0;
+      width: 44px;
+      height: 44px;
+      padding: 0;
+      color: var(--text);
+    }
+    footer {
+      border-top: 1px solid var(--border);
+      background: var(--bg-2);
+    }
+    .foot {
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 18px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .fbrand {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1rem;
+    }
+    @media (max-width: 1080px) {
+      .bar {
+        gap: 12px;
+        padding: 0 8px 0 16px;
+        min-height: 56px;
+      }
+      .brand {
+        font-size: 1.2rem;
+      }
+      .burger {
+        display: inline-flex;
+      }
+      .desk,
+      .uname {
+        display: none;
+      }
+      nav {
+        display: none;
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 100%;
+        flex-direction: column;
+        gap: 0;
+        padding: 8px 12px 14px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--border);
+        box-shadow: 0 16px 32px rgba(0, 0, 0, 0.5);
+      }
+      nav.open {
+        display: flex;
+      }
+      nav a {
+        padding: 12px 10px;
+        font-size: 1.05rem;
+      }
+      nav a.active {
+        box-shadow: inset 3px 0 0 var(--accent);
+      }
+      .nav-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-top: 1px solid var(--border);
+        margin-top: 8px;
+        padding: 12px 10px 0;
+      }
     }
   `,
 })
@@ -128,12 +306,13 @@ export class App {
   private readonly api = inject(Api);
   /** The own Neuro of the running (or last) season, next to the name; null: none. */
   protected readonly neuro = signal<number | null>(null);
+  /** Mobile menu open. */
+  protected readonly menu = signal(false);
+  /** Platform version (root package.json). */
+  protected readonly version = version;
 
   constructor() {
     void this.auth.ready();
-    effect(() => {
-      document.title = this.auth.config().siteName;
-    });
     // Kept current: on every page change and every 30 s.
     effect(() => {
       if (this.auth.me()) void this.loadNeuro();

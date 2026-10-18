@@ -8,7 +8,7 @@ export class Auth {
   private api = inject(Api);
   readonly me = signal<Me | null>(null);
   readonly config = signal<SiteConfig>({
-    siteName: 'UT99 Tournaments',
+    siteName: 'Neuro Arena',
     discordLogin: false,
     devLogin: false,
   });
