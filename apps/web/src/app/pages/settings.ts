@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
@@ -7,7 +8,7 @@ import type { Season, SeasonsOverview } from '../core/types';
 /** Website settings (admins): seasons and ratings. */
 @Component({
   selector: 'app-settings',
-  imports: [TPipe, FormsModule],
+  imports: [TPipe, FormsModule, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
@@ -88,8 +89,14 @@ import type { Season, SeasonsOverview } from '../core/types';
                           </button>
                         }
                         @if (s.number === newest()) {
-                          <button class="danger" (click)="remove(s)" [disabled]="busy()">
-                            {{ 'common.delete' | t }}
+                          <button
+                            class="icon dng"
+                            (click)="remove(s)"
+                            [disabled]="busy()"
+                            [title]="'common.delete' | t"
+                            [attr.aria-label]="'common.delete' | t"
+                          >
+                            <na-icon name="delete" />
                           </button>
                         }
                       }

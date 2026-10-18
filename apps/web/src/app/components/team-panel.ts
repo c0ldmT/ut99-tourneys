@@ -8,6 +8,7 @@ import {
   output,
   signal,
 } from '@angular/core';
+import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { copyText } from '../core/clipboard';
@@ -29,7 +30,7 @@ export function inviteCodeFrom(text: string): string {
  */
 @Component({
   selector: 'app-team-panel',
-  imports: [FormsModule, TPipe],
+  imports: [FormsModule, TPipe, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let t = tournament();
@@ -79,8 +80,13 @@ export function inviteCodeFrom(text: string): string {
               [value]="inviteLink(team)"
               (focus)="$any($event.target).select()"
             />
-            <button (click)="copy(inviteLink(team), invite)">
-              {{ copyLabel() | t }}
+            <button
+              class="icon"
+              (click)="copy(inviteLink(team), invite)"
+              [title]="copyLabel() | t"
+              [attr.aria-label]="copyLabel() | t"
+            >
+              <na-icon [name]="copyLabel() === 'common.copied' ? 'check' : 'copy'" />
             </button>
           </div>
         }
@@ -229,7 +235,14 @@ export function inviteCodeFrom(text: string): string {
                   <option [ngValue]="team.id">{{ team.name }}</option>
                 }
               </select>
-              <button class="link small" (click)="act(api.kick(t.id, r.userId))">✕</button>
+              <button
+                class="icon"
+                (click)="act(api.kick(t.id, r.userId))"
+                [title]="'tp.kick' | t"
+                [attr.aria-label]="('tp.kick' | t) + ' ' + r.displayName"
+              >
+                <na-icon name="close" [size]="15" />
+              </button>
             }
           </li>
         }

@@ -75,6 +75,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Tournament list: the banner of a running tournament opens the tournament page and shows the live score of the
+  game in progress (frags; Monster Hunt: run times), refreshed every few seconds, with the game phase and the series.
+  Statistics: filters inside the table panel like the bot control center. Icon buttons (edit, delete, copy, new
+  token, remove) where the meaning is clear; a shared icon set.
 - New look "Neuro Arena" (dark e-sports style): self-hosted fonts (Barlow, Barlow Condensed, JetBrains Mono), logo
   and favicon, design tokens for all colours (cyan actions, magenta highlights, gold only for Neuro, red/blue for the
   sides of a match), Neuro coin next to balances, header with a menu button on phones, footer with the version,

@@ -466,3 +466,68 @@ tbody tr:hover td {
     padding: 14px 14px;
   }
 }
+
+/* Table panel (pattern of the bot control center): the filters sit in the card above the
+   table, inline without labels (placeholder / aria-label). */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.toolbar .search {
+  flex: 0 1 260px;
+  width: auto;
+}
+.toolbar select.auto,
+.toolbar .auto {
+  width: auto;
+}
+.toolbar .grow {
+  flex: 1;
+}
+.toolbar label.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-2);
+  font-weight: 500;
+}
+.tablepanel {
+  padding: 16px 18px 6px;
+}
+/* Icon buttons (edit, delete, ...): the label is the title / aria-label */
+button.icon,
+.btn.icon {
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-2);
+}
+button.icon:hover:not(:disabled),
+.btn.icon:hover {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+button.icon.dng:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger-strong);
+  background: rgba(255, 92, 108, 0.08);
+}
+.iconbtns {
+  display: inline-flex;
+  gap: 4px;
+}
+.sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

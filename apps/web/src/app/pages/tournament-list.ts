@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  inject,
+  signal,
+} from '@angular/core';
+import { finalMs, raceTime } from '../core/race';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
@@ -21,7 +29,7 @@ import type { TournamentSummary } from '../core/types';
     }
     @if (items(); as list) {
       @for (t of live(); track t.id) {
-        <a class="hero" [routerLink]="t.now ? ['/t', t.id, 'm', t.now.matchId] : ['/t', t.id]">
+        <a class="hero" [routerLink]="['/t', t.id]">
           <div class="hero-l">
             <div class="row">
               <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
@@ -36,17 +44,38 @@ import type { TournamentSummary } from '../core/types';
             <div class="hero-r">
               <div class="kpi">
                 {{ 'list.now' | t }} · {{ n.matchId }} · {{ 'list.game' | t: { n: n.game } }}
-                @if (n.map) {
-                  · {{ n.map }}
+                @if (n.live?.map ?? n.map; as map) {
+                  · {{ map }}
                 }
               </div>
               <div class="vs">
                 <span class="nm a">{{ n.names[0] }}</span>
-                <span class="sc"
-                  ><b class="sa">{{ n.wins[0] }}</b
-                  ><i>:</i><b class="sb">{{ n.wins[1] }}</b></span
-                >
+                @if (t.game === 'mh') {
+                  <span class="sc race"
+                    ><b class="sa">{{ runText(n, 0) }}</b
+                    ><i>:</i><b class="sb">{{ runText(n, 1) }}</b></span
+                  >
+                } @else {
+                  <span class="sc"
+                    ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b
+                    ><i>:</i><b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
+                  >
+                }
                 <span class="nm b">{{ n.names[1] }}</span>
+              </div>
+              <div class="state small">
+                @if (n.live?.phase === 'live' || n.live?.phase === 'overtime') {
+                  <span class="lv"><span class="dot on"></span> {{ 'list.liveNow' | t }}</span>
+                } @else {
+                  <span class="muted">{{ 'list.phase.' + (n.live?.phase ?? 'waiting') | t }}</span>
+                }
+                @if (n.bestOf > 1) {
+                  <span class="muted"
+                    >· {{ 'list.series' | t }} {{ n.wins[0] }}:{{ n.wins[1] }} (Bo{{
+                      n.bestOf
+                    }})</span
+                  >
+                }
               </div>
             </div>
           }
@@ -194,6 +223,21 @@ import type { TournamentSummary } from '../core/types';
       font-size: 1.6rem;
       padding: 0 6px;
     }
+    .sc.race {
+      font-size: 1.7rem;
+    }
+    .state {
+      display: flex;
+      justify-content: center;
+      gap: 6px;
+    }
+    .lv {
+      color: var(--live);
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
     .sa {
       color: var(--side-a);
     }
@@ -294,6 +338,18 @@ export class TournamentListPage {
   protected readonly items = signal<TournamentSummary[] | null>(null);
   protected readonly error = signal('');
 
+  /** Monster Hunt: a side's finished run (final time), the running clock, or a dash. */
+  protected runText(n: NonNullable<TournamentSummary['now']>, i: 0 | 1): string {
+    const id = n.entrants[i];
+    const done = n.runs?.find((r) => r.entrantId === id);
+    if (done)
+      return done.finished
+        ? raceTime(finalMs(done), false)
+        : this.i18n.t(done.forfeit ? 'race.forfeit' : 'race.dnf');
+    const r = n.live?.race;
+    return r && r.runner === id ? raceTime(r.timeMs + r.penaltyMs, false) : '–';
+  }
+
   protected readonly filters = ['all', 'live', 'open', 'done'] as const;
   protected readonly filter = signal<(typeof this.filters)[number]>('all');
   /** Running tournaments: shown big on top. */
@@ -337,9 +393,19 @@ export class TournamentListPage {
   }
 
   constructor() {
-    this.api
-      .tournaments()
-      .then((l) => this.items.set(l))
-      .catch((e) => this.error.set(errorText(e)));
+    void this.load();
+    // While a tournament runs the banner shows the live score: refresh every few seconds.
+    const timer = setInterval(() => {
+      if (this.live().length) void this.load();
+    }, 4000);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  private async load() {
+    try {
+      this.items.set(await this.api.tournaments());
+    } catch (e) {
+      this.error.set(errorText(e));
+    }
   }
 }

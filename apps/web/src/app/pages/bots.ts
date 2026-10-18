@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
@@ -62,7 +63,7 @@ const emptyLines = () =>
 /** Bot control center (admins): the website's bots, clans and team names. */
 @Component({
   selector: 'app-bots',
-  imports: [TPipe, FormsModule, RouterLink],
+  imports: [TPipe, FormsModule, RouterLink, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'bots.title' | t }}</h1>
@@ -286,7 +287,15 @@ const emptyLines = () =>
                     <option value="rival">{{ 'bots.rival' | t }}</option>
                     <option value="nemesis">{{ 'bots.nemesis' | t }}</option>
                   </select>
-                  <button type="button" class="link" (click)="d.rivals.splice($index, 1)">✕</button>
+                  <button
+                    type="button"
+                    class="icon"
+                    (click)="d.rivals.splice($index, 1)"
+                    [title]="'common.remove' | t"
+                    [attr.aria-label]="'common.remove' | t"
+                  >
+                    <na-icon name="close" [size]="15" />
+                  </button>
                 </div>
               }
               @if (d.rivals.length < 16) {
@@ -481,15 +490,7 @@ const emptyLines = () =>
                               [title]="'common.edit' | t"
                               [attr.aria-label]="('common.edit' | t) + ' ' + b.gameName"
                             >
-                              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                                <path
-                                  d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linejoin="round"
-                                />
-                              </svg>
+                              <na-icon name="edit" />
                             </button>
                             <button
                               class="icon"
@@ -502,18 +503,7 @@ const emptyLines = () =>
                                 b.gameName
                               "
                             >
-                              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                                @if (b.active) {
-                                  <path
-                                    d="M9 6v12M15 6v12"
-                                    stroke="currentColor"
-                                    stroke-width="2.2"
-                                    stroke-linecap="round"
-                                  />
-                                } @else {
-                                  <path d="M8 5l11 7-11 7z" fill="currentColor" />
-                                }
-                              </svg>
+                              <na-icon [name]="b.active ? 'pause' : 'play'" />
                             </button>
                             <button
                               class="icon dng"
@@ -522,16 +512,7 @@ const emptyLines = () =>
                               [title]="'common.delete' | t"
                               [attr.aria-label]="('common.delete' | t) + ' ' + b.gameName"
                             >
-                              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
-                                <path
-                                  d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  stroke-width="2"
-                                  stroke-linecap="round"
-                                  stroke-linejoin="round"
-                                />
-                              </svg>
+                              <na-icon name="delete" />
                             </button>
                           </div>
                         </td>
@@ -574,10 +555,25 @@ const emptyLines = () =>
                       <td>{{ members(c.id) }}</td>
                       <td class="muted small">{{ c.description }}</td>
                       <td class="actions">
-                        <button (click)="editClan(c)">{{ 'common.edit' | t }}</button>
-                        <button class="danger" (click)="removeClan(c)" [disabled]="busy()">
-                          {{ 'common.delete' | t }}
-                        </button>
+                        <div class="iconbtns">
+                          <button
+                            class="icon"
+                            (click)="editClan(c)"
+                            [title]="'common.edit' | t"
+                            [attr.aria-label]="('common.edit' | t) + ' ' + c.name"
+                          >
+                            <na-icon name="edit" />
+                          </button>
+                          <button
+                            class="icon dng"
+                            (click)="removeClan(c)"
+                            [disabled]="busy()"
+                            [title]="'common.delete' | t"
+                            [attr.aria-label]="('common.delete' | t) + ' ' + c.name"
+                          >
+                            <na-icon name="delete" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   }
@@ -675,27 +671,6 @@ const emptyLines = () =>
     td.acts {
       width: 1%;
       text-align: right;
-    }
-    .iconbtns {
-      display: inline-flex;
-      gap: 4px;
-    }
-    button.icon {
-      width: 36px;
-      min-height: 36px;
-      padding: 0;
-      background: transparent;
-      border-color: transparent;
-      color: var(--text-2);
-    }
-    button.icon:hover:not(:disabled) {
-      color: var(--text);
-      border-color: var(--line);
-    }
-    button.icon.dng:hover:not(:disabled) {
-      color: var(--danger);
-      border-color: var(--danger-strong);
-      background: rgba(255, 92, 108, 0.08);
     }
     .sr {
       position: absolute;

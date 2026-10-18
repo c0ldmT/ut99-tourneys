@@ -1332,6 +1332,8 @@ export class TournamentsService {
       const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
       const cm = live ? proj?.currentMatch : undefined;
       const name = (id: string) => proj?.entrants[id]?.displayName ?? id;
+      const tele = cm ? (this.hub.latestLive(t.id) as { matchId?: string } | undefined) : undefined;
+      const liveNow = tele && tele.matchId === cm?.matchId ? tele : undefined;
       const wins = (id: string) =>
         (cm ? (proj?.games[cm.matchId] ?? []) : []).filter((g) => g.winnerId === id).length;
       return {
@@ -1358,8 +1360,14 @@ export class TournamentsService {
                 game: cm.game,
                 ...(cm.map ? { map: cm.map } : {}),
                 status: cm.status,
+                entrants: cm.entrants,
                 names: [name(cm.entrants[0]), name(cm.entrants[1])],
                 wins: [wins(cm.entrants[0]), wins(cm.entrants[1])],
+                bestOf: proj?.bracket?.byId[cm.matchId]?.bestOf ?? 1,
+                /** Monster Hunt: finished runs of the game. */
+                ...(cm.runs?.length ? { runs: cm.runs } : {}),
+                /** Telemetry of the game in progress (frags, run clock), if any. */
+                ...(liveNow ? { live: liveNow } : {}),
               },
             }
           : {}),

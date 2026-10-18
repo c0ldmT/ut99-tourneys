@@ -35,96 +35,41 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
   imports: [TPipe, RouterLink, DatePipe, BetBoardView],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>{{ 'stats.title' | t }}</h1>
-
-    <div class="toolbar">
-      <label class="small"
-        >{{ 'season.scope' | t }}
-        <select [value]="scope()" (change)="setScope($any($event.target).value)">
-          @for (s of seasons(); track s.number) {
-            <option [value]="s.number">
-              {{ 'season.label' | t: { n: s.number } }}
-              @if (s.status === 'running') {
-                ({{ 'season.running' | t }})
-              }
-            </option>
-          }
-          <option value="lifetime">{{ 'season.lifetime' | t }}</option>
-        </select>
-      </label>
-      <div class="tabs">
-        @if (scope() !== 'lifetime') {
-          <button [class.active]="tab() === 'ratings'" (click)="setTab('ratings')">
-            {{ 'rating.list' | t }}
-          </button>
-        }
-        <button [class.active]="tab() === 'players'" (click)="setTab('players')">
-          {{ 'stats.players' | t }}
-        </button>
-        @if (scope() !== 'lifetime') {
-          <button [class.active]="tab() === 'records'" (click)="setTab('records')">
-            {{ 'stats.records' | t }}
-          </button>
-          <button [class.active]="tab() === 'bets'" (click)="setTab('bets')">
-            {{ 'bets.tab' | t }}
-          </button>
-        }
-      </div>
-    </div>
-
-    <div class="filters" [style.display]="tab() === 'bets' ? 'none' : null">
-      <label class="small"
-        >{{ 'stats.mode' | t }}
-        <select
-          [value]="tab() === 'ratings' ? ratingMode() : mode()"
-          (change)="setMode($any($event.target).value)"
-        >
-          @if (tab() !== 'ratings') {
-            <option value="">{{ 'stats.modeAll' | t }}</option>
-          }
-          <option value="dm">{{ 'stats.modeDm' | t }}</option>
-          <option value="tdm">{{ 'stats.modeTdm' | t }}</option>
-          <option value="mh">{{ 'stats.modeMh' | t }}</option>
-        </select>
-      </label>
-      @if (tab() !== 'records') {
-        <label class="small grow"
-          >{{ 'stats.search' | t }}
-          <input
-            type="search"
-            [value]="query()"
-            (input)="query.set($any($event.target).value)"
-            [placeholder]="'stats.searchPlayer' | t"
-          />
-        </label>
-        <label class="small check"
-          ><input
-            type="checkbox"
-            [checked]="bots()"
-            (change)="setBots($any($event.target).checked)"
-          />
-          {{ 'stats.showBots' | t }}</label
-        >
-      }
-      @if (tab() === 'ratings') {
-        <label class="small check"
-          ><input
-            type="checkbox"
-            [checked]="settledOnly()"
-            (change)="settledOnly.set($any($event.target).checked)"
-          />
-          {{ 'rating.settledOnly' | t }}</label
-        >
-      }
-      @if (tab() === 'players') {
-        <label class="small"
-          >{{ 'stats.minGames' | t }}
-          <select [value]="minGames()" (change)="minGames.set(+$any($event.target).value)">
-            @for (n of [0, 3, 5, 10, 25]; track n) {
-              <option [value]="n">{{ n ? '≥ ' + n : ('stats.all' | t) }}</option>
+    <div class="pagehead">
+      <h1>{{ 'stats.title' | t }}</h1>
+      <select
+        class="auto"
+        [attr.aria-label]="'season.scope' | t"
+        [value]="scope()"
+        (change)="setScope($any($event.target).value)"
+      >
+        @for (s of seasons(); track s.number) {
+          <option [value]="s.number">
+            {{ 'season.label' | t: { n: s.number } }}
+            @if (s.status === 'running') {
+              ({{ 'season.running' | t }})
             }
-          </select>
-        </label>
+          </option>
+        }
+        <option value="lifetime">{{ 'season.lifetime' | t }}</option>
+      </select>
+    </div>
+    <div class="tabs">
+      @if (scope() !== 'lifetime') {
+        <button [class.active]="tab() === 'ratings'" (click)="setTab('ratings')">
+          {{ 'rating.list' | t }}
+        </button>
+      }
+      <button [class.active]="tab() === 'players'" (click)="setTab('players')">
+        {{ 'stats.players' | t }}
+      </button>
+      @if (scope() !== 'lifetime') {
+        <button [class.active]="tab() === 'records'" (click)="setTab('records')">
+          {{ 'stats.records' | t }}
+        </button>
+        <button [class.active]="tab() === 'bets'" (click)="setTab('bets')">
+          {{ 'bets.tab' | t }}
+        </button>
       }
     </div>
 
@@ -136,88 +81,212 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
     }
 
     @if (tab() === 'ratings') {
-      <div class="card table-wrap">
-        @if (ratingView().length === 0) {
-          <p class="muted">
-            {{ (ratingRows().length ? 'stats.noMatch' : 'rating.empty') | t }}
-          </p>
-        } @else {
-          <table class="stats">
-            <thead>
-              <tr>
-                <th class="sticky c0">#</th>
-                <th class="sticky c1">{{ 'stats.col.name' | t }}</th>
-                <th class="num">{{ 'rating.col.rating' | t }}</th>
-                <th class="num">{{ 'stats.col.games' | t }}</th>
-                <th class="num">{{ 'rating.col.winRate' | t }}</th>
-                <th class="num">{{ 'rating.col.last' | t }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (r of ratingView(); track r.key) {
-                <tr [class.provisional]="r.provisional">
-                  <td class="muted sticky c0">{{ r.rank ?? '–' }}</td>
-                  <td class="sticky c1">
-                    <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }">{{
-                      r.name
-                    }}</a>
-                    @if (r.bot) {
-                      <span class="badge bot">{{ 'stats.bot' | t }}</span>
-                    }
-                    @if (r.provisional) {
-                      <span class="badge">{{ 'rating.provisional' | t }}</span>
-                    }
-                  </td>
-                  <td class="num strong">{{ r.rating }}</td>
-                  <td class="num">{{ r.wins }}–{{ r.games - r.wins }}</td>
-                  <td class="num">{{ pct(r.wins / r.games) }}</td>
-                  <td class="num muted">{{ r.lastAt | date: 'mediumDate' }}</td>
-                </tr>
+      <div class="card tablepanel">
+        <div class="toolbar">
+          <select
+            class="auto"
+            [attr.aria-label]="'stats.mode' | t"
+            [value]="tab() === 'ratings' ? ratingMode() : mode()"
+            (change)="setMode($any($event.target).value)"
+          >
+            @if (tab() !== 'ratings') {
+              <option value="">{{ 'stats.modeAll' | t }}</option>
+            }
+            <option value="dm">{{ 'stats.modeDm' | t }}</option>
+            <option value="tdm">{{ 'stats.modeTdm' | t }}</option>
+            <option value="mh">{{ 'stats.modeMh' | t }}</option>
+          </select>
+          @if (tab() !== 'records') {
+            <input
+              class="search"
+              type="search"
+              [attr.aria-label]="'stats.search' | t"
+              [value]="query()"
+              (input)="query.set($any($event.target).value)"
+              [placeholder]="'stats.searchPlayer' | t"
+            />
+          }
+          @if (tab() === 'players') {
+            <select
+              class="auto"
+              [attr.aria-label]="'stats.minGames' | t"
+              [value]="minGames()"
+              (change)="minGames.set(+$any($event.target).value)"
+            >
+              @for (n of [0, 3, 5, 10, 25]; track n) {
+                <option [value]="n">
+                  {{ n ? ('stats.minGames' | t) + ' ≥ ' + n : ('stats.allGames' | t) }}
+                </option>
               }
-            </tbody>
-          </table>
-        }
+            </select>
+          }
+          <span class="grow"></span>
+          @if (tab() !== 'records') {
+            <label class="check"
+              ><input
+                type="checkbox"
+                [checked]="bots()"
+                (change)="setBots($any($event.target).checked)"
+              />
+              {{ 'stats.showBots' | t }}</label
+            >
+          }
+          @if (tab() === 'ratings') {
+            <label class="check"
+              ><input
+                type="checkbox"
+                [checked]="settledOnly()"
+                (change)="settledOnly.set($any($event.target).checked)"
+              />
+              {{ 'rating.settledOnly' | t }}</label
+            >
+          }
+        </div>
+        <div class="table-wrap">
+          @if (ratingView().length === 0) {
+            <p class="muted">
+              {{ (ratingRows().length ? 'stats.noMatch' : 'rating.empty') | t }}
+            </p>
+          } @else {
+            <table class="stats">
+              <thead>
+                <tr>
+                  <th class="sticky c0">#</th>
+                  <th class="sticky c1">{{ 'stats.col.name' | t }}</th>
+                  <th class="num">{{ 'rating.col.rating' | t }}</th>
+                  <th class="num">{{ 'stats.col.games' | t }}</th>
+                  <th class="num">{{ 'rating.col.winRate' | t }}</th>
+                  <th class="num">{{ 'rating.col.last' | t }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of ratingView(); track r.key) {
+                  <tr [class.provisional]="r.provisional">
+                    <td class="muted sticky c0">{{ r.rank ?? '–' }}</td>
+                    <td class="sticky c1">
+                      <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }">{{
+                        r.name
+                      }}</a>
+                      @if (r.bot) {
+                        <span class="badge bot">{{ 'stats.bot' | t }}</span>
+                      }
+                      @if (r.provisional) {
+                        <span class="badge">{{ 'rating.provisional' | t }}</span>
+                      }
+                    </td>
+                    <td class="num strong">{{ r.rating }}</td>
+                    <td class="num">{{ r.wins }}–{{ r.games - r.wins }}</td>
+                    <td class="num">{{ pct(r.wins / r.games) }}</td>
+                    <td class="num muted">{{ r.lastAt | date: 'mediumDate' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
       </div>
       <p class="muted small">{{ 'rating.hint' | t }}</p>
     } @else if (tab() === 'players') {
-      <div class="card table-wrap">
-        @if (sorted().length === 0) {
-          <p class="muted">{{ (rows().length ? 'stats.noMatch' : 'stats.empty') | t }}</p>
-        } @else {
-          <table class="stats">
-            <thead>
-              <tr>
-                <th class="sticky c0">#</th>
-                <th class="sticky c1 sortable" (click)="sortBy('name')">
-                  {{ 'stats.col.name' | t }}{{ arrow('name') }}
-                </th>
-                @for (c of columns(); track c.key) {
-                  <th class="sortable num" (click)="sortBy(c.key)">
-                    {{ c.label | t }}{{ arrow(c.key) }}
-                  </th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @for (r of sorted(); track r.key; let i = $index) {
+      <div class="card tablepanel">
+        <div class="toolbar">
+          <select
+            class="auto"
+            [attr.aria-label]="'stats.mode' | t"
+            [value]="tab() === 'ratings' ? ratingMode() : mode()"
+            (change)="setMode($any($event.target).value)"
+          >
+            @if (tab() !== 'ratings') {
+              <option value="">{{ 'stats.modeAll' | t }}</option>
+            }
+            <option value="dm">{{ 'stats.modeDm' | t }}</option>
+            <option value="tdm">{{ 'stats.modeTdm' | t }}</option>
+            <option value="mh">{{ 'stats.modeMh' | t }}</option>
+          </select>
+          @if (tab() !== 'records') {
+            <input
+              class="search"
+              type="search"
+              [attr.aria-label]="'stats.search' | t"
+              [value]="query()"
+              (input)="query.set($any($event.target).value)"
+              [placeholder]="'stats.searchPlayer' | t"
+            />
+          }
+          @if (tab() === 'players') {
+            <select
+              class="auto"
+              [attr.aria-label]="'stats.minGames' | t"
+              [value]="minGames()"
+              (change)="minGames.set(+$any($event.target).value)"
+            >
+              @for (n of [0, 3, 5, 10, 25]; track n) {
+                <option [value]="n">
+                  {{ n ? ('stats.minGames' | t) + ' ≥ ' + n : ('stats.allGames' | t) }}
+                </option>
+              }
+            </select>
+          }
+          <span class="grow"></span>
+          @if (tab() !== 'records') {
+            <label class="check"
+              ><input
+                type="checkbox"
+                [checked]="bots()"
+                (change)="setBots($any($event.target).checked)"
+              />
+              {{ 'stats.showBots' | t }}</label
+            >
+          }
+          @if (tab() === 'ratings') {
+            <label class="check"
+              ><input
+                type="checkbox"
+                [checked]="settledOnly()"
+                (change)="settledOnly.set($any($event.target).checked)"
+              />
+              {{ 'rating.settledOnly' | t }}</label
+            >
+          }
+        </div>
+        <div class="table-wrap">
+          @if (sorted().length === 0) {
+            <p class="muted">{{ (rows().length ? 'stats.noMatch' : 'stats.empty') | t }}</p>
+          } @else {
+            <table class="stats">
+              <thead>
                 <tr>
-                  <td class="muted sticky c0">{{ i + 1 }}</td>
-                  <td class="sticky c1">
-                    <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }">{{
-                      r.name
-                    }}</a>
-                    @if (r.bot) {
-                      <span class="badge bot">{{ 'stats.bot' | t }}</span>
-                    }
-                  </td>
+                  <th class="sticky c0">#</th>
+                  <th class="sticky c1 sortable" (click)="sortBy('name')">
+                    {{ 'stats.col.name' | t }}{{ arrow('name') }}
+                  </th>
                   @for (c of columns(); track c.key) {
-                    <td class="num">{{ c.value(r) }}</td>
+                    <th class="sortable num" (click)="sortBy(c.key)">
+                      {{ c.label | t }}{{ arrow(c.key) }}
+                    </th>
                   }
                 </tr>
-              }
-            </tbody>
-          </table>
-        }
+              </thead>
+              <tbody>
+                @for (r of sorted(); track r.key; let i = $index) {
+                  <tr>
+                    <td class="muted sticky c0">{{ i + 1 }}</td>
+                    <td class="sticky c1">
+                      <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }">{{
+                        r.name
+                      }}</a>
+                      @if (r.bot) {
+                        <span class="badge bot">{{ 'stats.bot' | t }}</span>
+                      }
+                    </td>
+                    @for (c of columns(); track c.key) {
+                      <td class="num">{{ c.value(r) }}</td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
       </div>
       <p class="muted small">
         {{ 'stats.playersHint' | t }}
@@ -226,6 +295,66 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
     } @else if (tab() === 'bets') {
       <app-bet-board [season]="seasonNo()" [meId]="auth.me()?.id ?? null" />
     } @else {
+      <div class="toolbar">
+        <select
+          class="auto"
+          [attr.aria-label]="'stats.mode' | t"
+          [value]="tab() === 'ratings' ? ratingMode() : mode()"
+          (change)="setMode($any($event.target).value)"
+        >
+          @if (tab() !== 'ratings') {
+            <option value="">{{ 'stats.modeAll' | t }}</option>
+          }
+          <option value="dm">{{ 'stats.modeDm' | t }}</option>
+          <option value="tdm">{{ 'stats.modeTdm' | t }}</option>
+          <option value="mh">{{ 'stats.modeMh' | t }}</option>
+        </select>
+        @if (tab() !== 'records') {
+          <input
+            class="search"
+            type="search"
+            [attr.aria-label]="'stats.search' | t"
+            [value]="query()"
+            (input)="query.set($any($event.target).value)"
+            [placeholder]="'stats.searchPlayer' | t"
+          />
+        }
+        @if (tab() === 'players') {
+          <select
+            class="auto"
+            [attr.aria-label]="'stats.minGames' | t"
+            [value]="minGames()"
+            (change)="minGames.set(+$any($event.target).value)"
+          >
+            @for (n of [0, 3, 5, 10, 25]; track n) {
+              <option [value]="n">
+                {{ n ? ('stats.minGames' | t) + ' ≥ ' + n : ('stats.allGames' | t) }}
+              </option>
+            }
+          </select>
+        }
+        <span class="grow"></span>
+        @if (tab() !== 'records') {
+          <label class="check"
+            ><input
+              type="checkbox"
+              [checked]="bots()"
+              (change)="setBots($any($event.target).checked)"
+            />
+            {{ 'stats.showBots' | t }}</label
+          >
+        }
+        @if (tab() === 'ratings') {
+          <label class="check"
+            ><input
+              type="checkbox"
+              [checked]="settledOnly()"
+              (change)="settledOnly.set($any($event.target).checked)"
+            />
+            {{ 'rating.settledOnly' | t }}</label
+          >
+        }
+      </div>
       @if (records().length === 0 && maps().length === 0) {
         <div class="card">
           <p class="muted">{{ 'stats.noRecords' | t }}</p>
@@ -347,16 +476,26 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
     }
   `,
   styles: `
-    .toolbar,
+    .pagehead {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .pagehead h1 {
+      margin: 0;
+    }
+    .pagehead select {
+      width: auto;
+    }
     .filters {
       display: flex;
       align-items: flex-end;
       gap: 12px 16px;
       flex-wrap: wrap;
       margin-bottom: 12px;
-    }
-    .toolbar .tabs {
-      margin-bottom: 0;
     }
     .filters label.grow {
       flex: 1 1 200px;
@@ -377,7 +516,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
        row and the name column stay put. */
     .table-wrap {
       overflow: auto;
-      max-height: calc(100vh - 260px);
+      max-height: calc(100vh - 300px);
       min-height: 120px;
       padding: 0;
     }

@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
@@ -8,7 +9,7 @@ import type { AgentView } from '../core/types';
 
 @Component({
   selector: 'app-agents',
-  imports: [FormsModule, TPipe],
+  imports: [FormsModule, TPipe, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="spread">
@@ -25,7 +26,14 @@ import type { AgentView } from '../core/types';
         <h2>{{ 'agents.tokenTitle' | t: { id: tk.id } }}</h2>
         <p class="notice">{{ 'agents.tokenOnce' | t }}</p>
         <pre #snip class="mono snippet">{{ snippet(tk.id, tk.token) }}</pre>
-        <button (click)="copy(snippet(tk.id, tk.token), snip)">{{ copyLabel() | t }}</button>
+        <button
+          class="icon"
+          (click)="copy(snippet(tk.id, tk.token), snip)"
+          [title]="copyLabel() | t"
+          [attr.aria-label]="copyLabel() | t"
+        >
+          <na-icon [name]="copyLabel() === 'common.copied' ? 'check' : 'copy'" />
+        </button>
         <button class="link" (click)="newToken.set(null)">{{ 'common.close' | t }}</button>
       </div>
     }
@@ -38,8 +46,22 @@ import type { AgentView } from '../core/types';
             <span class="muted small">({{ a.id }})</span>
           </h2>
           <div class="row">
-            <button (click)="rotate(a)">{{ 'agents.newToken' | t }}</button>
-            <button class="danger" (click)="remove(a)">{{ 'common.delete' | t }}</button>
+            <button
+              class="icon"
+              (click)="rotate(a)"
+              [title]="'agents.newToken' | t"
+              [attr.aria-label]="'agents.newToken' | t"
+            >
+              <na-icon name="key" />
+            </button>
+            <button
+              class="icon dng"
+              (click)="remove(a)"
+              [title]="'common.delete' | t"
+              [attr.aria-label]="'common.delete' | t"
+            >
+              <na-icon name="delete" />
+            </button>
           </div>
         </div>
         <div class="muted small">

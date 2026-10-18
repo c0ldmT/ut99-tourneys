@@ -73,8 +73,18 @@ export interface TournamentSummary {
     game: number;
     map?: string;
     status: 'called' | 'mapSelected' | 'live';
+    entrants: [string, string];
     names: [string, string];
     wins: [number, number];
+    bestOf: number;
+    runs?: {
+      entrantId: string;
+      timeMs: number;
+      penaltyMs: number;
+      finished: boolean;
+      forfeit?: boolean;
+    }[];
+    live?: LiveInfo;
   };
 }
 

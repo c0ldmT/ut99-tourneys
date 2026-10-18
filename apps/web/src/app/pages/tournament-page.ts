@@ -8,6 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { Icon } from '../core/brand';
 import { PageTitle } from '../core/page-title';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -40,6 +41,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     TeamRoster,
     BetPanel,
     BetColumns,
+    Icon,
   ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -156,8 +158,13 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                   <p class="muted small">{{ 'tp.connectHint' | t }}</p>
                   <div class="connect">
                     <code #cmd>{{ connectCommand(t) }}</code>
-                    <button (click)="copy('cmd', connectCommand(t), cmd)">
-                      {{ copyLabel('cmd') | t }}
+                    <button
+                      class="icon"
+                      (click)="copy('cmd', connectCommand(t), cmd)"
+                      [title]="copyLabel('cmd') | t"
+                      [attr.aria-label]="copyLabel('cmd') | t"
+                    >
+                      <na-icon [name]="copyLabel('cmd') === 'common.copied' ? 'check' : 'copy'" />
                     </button>
                   </div>
                   @if (longToken()) {
@@ -178,8 +185,15 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     /></label>
                     <div class="connect">
                       <code #lin>{{ linuxCommand(t) }}</code>
-                      <button (click)="copy('linux', linuxCommand(t), lin)">
-                        {{ copyLabel('linux') | t }}
+                      <button
+                        class="icon"
+                        (click)="copy('linux', linuxCommand(t), lin)"
+                        [title]="copyLabel('linux') | t"
+                        [attr.aria-label]="copyLabel('linux') | t"
+                      >
+                        <na-icon
+                          [name]="copyLabel('linux') === 'common.copied' ? 'check' : 'copy'"
+                        />
                       </button>
                     </div>
                     <p class="muted small">{{ 'tp.linuxNote' | t }}</p>
@@ -475,7 +489,14 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
               <li>
                 {{ r.displayName }}
                 @if (isAdmin()) {
-                  <button class="link small" (click)="act(api.kick(t.id, r.userId))">✕</button>
+                  <button
+                    class="icon"
+                    (click)="act(api.kick(t.id, r.userId))"
+                    [title]="'tp.kick' | t"
+                    [attr.aria-label]="('tp.kick' | t) + ' ' + r.displayName"
+                  >
+                    <na-icon name="close" [size]="15" />
+                  </button>
                 }
               </li>
             }
