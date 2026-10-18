@@ -8,11 +8,11 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
+import { BetColumns } from './bet-columns';
 import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe } from '../core/neuro';
 import type { BetMatchView, Entrant, TournamentBets, TournamentDetail } from '../core/types';
@@ -25,7 +25,7 @@ interface Draft {
 /** Betting with Neuro on the tournament page: open matches, closed pools, own results. */
 @Component({
   selector: 'app-bet-panel',
-  imports: [TPipe, FormsModule, NeuroPipe, RouterLink, NgTemplateOutlet],
+  imports: [TPipe, FormsModule, NeuroPipe, RouterLink, BetColumns],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (view(); as v) {
@@ -62,7 +62,9 @@ interface Draft {
             <h3>{{ 'bets.openMatches' | t }}</h3>
             @for (m of openMatches(); track m.matchId) {
               <div class="match">
-                <div class="label muted small">{{ m.matchId }}</div>
+                <div class="label muted small">
+                  <a [routerLink]="['/t', tournament().id, 'm', m.matchId]">{{ m.matchId }}</a>
+                </div>
                 @if (m.playing) {
                   <div class="pair">
                     <span>{{ name(m.entrants[0]) }}</span>
@@ -135,8 +137,11 @@ interface Draft {
             <h3>{{ 'bets.running' | t }}</h3>
             @for (m of closedMatches(); track m.matchId) {
               <div class="match">
-                <div class="label muted small">{{ m.matchId }} · {{ 'bets.closedNow' | t }}</div>
-                <ng-container *ngTemplateOutlet="poolAndBets; context: { $implicit: m }" />
+                <div class="label muted small">
+                  <a [routerLink]="['/t', tournament().id, 'm', m.matchId]">{{ m.matchId }}</a> ·
+                  {{ 'bets.closedNow' | t }}
+                </div>
+                <app-bet-columns [match]="m" [names]="entrantNames()" />
               </div>
             }
           }
@@ -145,7 +150,9 @@ interface Draft {
             <h3>{{ 'bets.done' | t }}</h3>
             @for (m of doneMatches(); track m.matchId) {
               <div class="match">
-                <div class="label muted small">{{ m.matchId }}</div>
+                <div class="label muted small">
+                  <a [routerLink]="['/t', tournament().id, 'm', m.matchId]">{{ m.matchId }}</a>
+                </div>
                 @if (m.mine; as b) {
                   <p class="small result" [class]="b.status">
                     @switch (b.status) {
@@ -164,7 +171,7 @@ interface Draft {
                   <p class="small muted">{{ 'bets.refundedMatch' | t }}</p>
                 }
                 @if (m.bettors) {
-                  <ng-container *ngTemplateOutlet="poolAndBets; context: { $implicit: m }" />
+                  <app-bet-columns [match]="m" [names]="entrantNames()" />
                 }
               </div>
             }
@@ -172,53 +179,6 @@ interface Draft {
         </div>
       }
     }
-
-    <ng-template #poolAndBets let-m>
-      <div class="sides2">
-        @for (e of m.entrants; track e; let side = $index) {
-          <div class="col" [class.b]="side === 1" [class.won]="m.winnerId === e">
-            <div class="head">
-              <span class="nm">{{ name(e) }}</span>
-              <span class="sum mono">
-                {{ m.pools?.[e]?.amount ?? 0 | neuro }}
-                @if (m.odds?.[e]; as o) {
-                  · ×{{ oddsText(o) }}
-                }
-              </span>
-            </div>
-            <div class="bar"><span [style.width.%]="share(m, e)"></span></div>
-            @for (x of sideBets(m, e); track x.id) {
-              <div class="bet" [class.me]="!x.bot && x.id === meId()">
-                <span class="amt mono">{{ x.amount | neuro }}</span>
-                <span class="who">
-                  @if (x.bot) {
-                    <a [routerLink]="['/bots', x.id]">{{ x.name }}</a>
-                    <span class="badge">BOT</span>
-                  } @else {
-                    <a [routerLink]="['/stats/p', 'u:' + x.id]">{{ x.name }}</a>
-                  }
-                </span>
-                <span class="res mono" [class]="x.status">
-                  @switch (x.status) {
-                    @case ('won') {
-                      +{{ x.payout - x.amount | neuro }}
-                    }
-                    @case ('lost') {
-                      −{{ x.amount | neuro }}
-                    }
-                    @case ('refunded') {
-                      {{ 'bets.status.refunded' | t }}
-                    }
-                  }
-                </span>
-              </div>
-            } @empty {
-              <div class="muted small none">{{ 'bets.noSideBets' | t }}</div>
-            }
-          </div>
-        }
-      </div>
-    </ng-template>
   `,
   styles: `
     .bets h2 {
@@ -295,95 +255,6 @@ interface Draft {
     .ok {
       color: var(--live);
     }
-    .sides2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-      margin-top: 6px;
-      font-size: 0.9rem;
-    }
-    .col {
-      min-width: 0;
-      border-top: 3px solid var(--danger);
-      background: rgba(248, 81, 73, 0.05);
-      border-radius: 6px;
-      padding: 6px 8px;
-    }
-    .col.b {
-      border-top-color: var(--info);
-      background: rgba(88, 166, 255, 0.05);
-    }
-    .col.won {
-      box-shadow: inset 0 0 0 1px var(--live);
-    }
-    .col .head {
-      display: flex;
-      justify-content: space-between;
-      gap: 6px;
-      align-items: baseline;
-      flex-wrap: wrap;
-      font-weight: 600;
-    }
-    .col.won .head .nm {
-      color: var(--live);
-    }
-    .col .sum {
-      font-weight: 400;
-      font-size: 0.8rem;
-      color: var(--accent);
-      white-space: nowrap;
-    }
-    .col .bar {
-      margin: 4px 0 6px;
-    }
-    .col .bar span {
-      background: var(--danger);
-    }
-    .col.b .bar span {
-      background: var(--info);
-    }
-    .bet {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
-      gap: 6px;
-      align-items: baseline;
-      padding: 2px 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    }
-    .bet.me {
-      background: var(--me-bg);
-    }
-    .bet .amt {
-      color: var(--live);
-      white-space: nowrap;
-      font-size: 0.85rem;
-    }
-    .bet .who {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .bet .res {
-      font-size: 0.8rem;
-      white-space: nowrap;
-    }
-    .res.won {
-      color: var(--live);
-    }
-    .res.lost {
-      color: var(--danger);
-    }
-    .res.refunded {
-      color: var(--muted);
-    }
-    .none {
-      padding: 2px 0;
-    }
-    .badge {
-      margin-left: 4px;
-      font-size: 0.65rem;
-      padding: 0 5px;
-    }
     .expert {
       color: var(--info);
     }
@@ -403,8 +274,15 @@ export class BetPanel {
   private readonly i18n = inject(I18n);
   private readonly auth = inject(Auth);
   readonly tournament = input.required<TournamentDetail>();
-  /** The logged-in user (own bet highlighted in the lists). */
-  protected readonly meId = computed(() => this.auth.me()?.id ?? null);
+  /** Entrant names for the bet lists. */
+  protected readonly entrantNames = computed(() =>
+    Object.fromEntries(
+      Object.entries(this.tournament().projection?.entrants ?? {}).map(([k, e]) => [
+        k,
+        e.displayName,
+      ]),
+    ),
+  );
   /** Matches that take bets now (the bracket marks them). */
   readonly openIds = output<string[]>();
   protected readonly view = signal<TournamentBets | null>(null);
@@ -516,11 +394,6 @@ export class BetPanel {
 
   protected withdraw(m: BetMatchView) {
     void this.run(() => this.api.withdrawBet(this.tournament().id, m.matchId), m.matchId);
-  }
-
-  /** The bets on one side, biggest first. */
-  protected sideBets(m: BetMatchView, e: string) {
-    return m.bets.filter((b) => b.pick === e);
   }
 
   /** Odds with two decimals in the language's format (×1,31 / ×1.31). */

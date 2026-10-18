@@ -41,6 +41,7 @@ import { BotsService } from '../bots/bots.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { BetsService } from '../bets/bets.service.js';
 import { EventLogService } from './event-log.service.js';
+import { matchDetail, type MatchDetail } from './match-detail.js';
 import { LiveHub } from './hub.js';
 import {
   balanceBots,
@@ -1062,6 +1063,23 @@ export class TournamentsService {
   }
 
   /** Rating changes per game of a season tournament. */
+  /** Match page: entrants, games with the players' statistics (current bot names). */
+  matchDetail(id: string, matchId: string): MatchDetail {
+    const t = this.require(id);
+    const proj = this.log.projection(t.id);
+    const d = proj ? matchDetail(this.log.load(t.id), proj, matchId) : undefined;
+    if (!d) throw notFound(`match ${matchId}`);
+    const names = this.bots.gameNames();
+    const current = this.withCurrentBotNames(proj!);
+    for (const s of d.entrants) {
+      s.name = current.entrants[s.id]?.displayName ?? s.name;
+      for (const b of s.bots) if (b.id && names.has(b.id)) b.name = names.get(b.id)!;
+    }
+    for (const g of d.games)
+      for (const p of g.players) if (p.botId && names.has(p.botId)) p.name = names.get(p.botId)!;
+    return d;
+  }
+
   ratings(id: string): RatedGame[] {
     const t = this.require(id);
     return t.seasonal ? this.stats.tournamentRatings(id) : [];

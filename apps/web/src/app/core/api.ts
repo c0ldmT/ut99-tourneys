@@ -10,6 +10,7 @@ import type {
   BotProfile,
   InvitePreview,
   LibraryBot,
+  MatchDetailView,
   Me,
   MapRecord,
   PlayerRatings,
@@ -111,6 +112,8 @@ export class Api {
       'GET',
       `/stats/players/${encodeURIComponent(key)}/ratings?season=${season}`,
     );
+  matchDetail = (id: string, matchId: string) =>
+    this.call<MatchDetailView>('GET', `/tournaments/${id}/matches/${encodeURIComponent(matchId)}`);
   tournamentRatings = (id: string) => this.call<RatedGame[]>('GET', `/tournaments/${id}/ratings`);
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>

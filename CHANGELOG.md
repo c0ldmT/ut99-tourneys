@@ -19,6 +19,12 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   strong. The rating at the seeding shows in the bracket tooltip.
 - Admin page "Settings": games with bots count (default on), points per bot difficulty step (default 100).
 - Tournaments of bots only: seeding works without registered players (everybody can watch).
+- Match page (click a match in the bracket or its id in the bets panel): both sides with rating and players, the
+  series score, a tab per game and for the whole series with map, score, end and every player's statistics in two
+  columns (frags/deaths, K/D, headshots, spree, multi kills, first blood, favourite weapon; Monster Hunt: monsters,
+  points, deaths and both runs), each player's share of the side's frags (points) and an MVP; the bets of the match.
+- Users page: names link to the player page (yourself: your profile); the player page also works for users without
+  games and shows their Neuro.
 - Betting with Neuro (€), the website's virtual currency: bet on the winner of a match in season tournaments
   (never on your own match), change or withdraw until the first game starts; pools stay hidden until then and are
   shared pari-mutuel; stakes come back when no game was played. Wallets start fresh every season (start balance and

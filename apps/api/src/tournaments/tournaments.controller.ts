@@ -90,6 +90,12 @@ export class TournamentsController {
     return this.svc.events(id);
   }
 
+  /** Match page: entrants, games and the players' statistics. */
+  @Get(':id/matches/:matchId')
+  match(@Param('id') id: string, @Param('matchId') matchId: string) {
+    return this.svc.matchDetail(id, matchId);
+  }
+
   /** Rating changes of the games of this tournament (empty when it is not ranked). */
   @Get(':id/ratings')
   ratings(@Param('id') id: string) {

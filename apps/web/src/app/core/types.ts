@@ -567,3 +567,76 @@ export interface UserBets {
     at: string;
   }[];
 }
+
+// --- Match page -------------------------------------------------------------------------------
+
+export interface MatchSideView {
+  id: string;
+  name: string;
+  kind: 'human' | 'bot' | 'team';
+  tag?: string;
+  rating?: number;
+  members: { userId: string; name: string; sub?: boolean }[];
+  bots: { id?: string; name: string }[];
+}
+
+export interface MatchPlayerView {
+  name: string;
+  userId?: string;
+  bot?: boolean;
+  botId?: string;
+  entrantId: string;
+  run?: number;
+  kills: number;
+  deaths: number;
+  suicides: number;
+  teamKills: number;
+  headshots: number;
+  firstBlood: boolean;
+  bestSpree: number;
+  sprees: number;
+  multi2: number;
+  multi3: number;
+  multi4: number;
+  multi5: number;
+  timeSec: number;
+  monsters: number;
+  monsterPoints: number;
+  weapons: Record<string, number>;
+}
+
+export interface MatchRunView {
+  entrantId: string;
+  map: string;
+  timeMs: number;
+  deaths: number;
+  penaltyMs: number;
+  points: number;
+  finished: boolean;
+  forfeit?: boolean;
+}
+
+export interface MatchGameView {
+  game: number;
+  map?: string;
+  scores?: Partial<Record<string, number>>;
+  winnerId?: string;
+  endReason?: string;
+  durationSec?: number;
+  runs?: MatchRunView[];
+  players: MatchPlayerView[];
+  live?: boolean;
+}
+
+export interface MatchDetailView {
+  matchId: string;
+  status: string;
+  bestOf: number;
+  side: string;
+  round: number;
+  winnerId?: string;
+  outcome?: string;
+  entrants: MatchSideView[];
+  games: MatchGameView[];
+  wins: Partial<Record<string, number>>;
+}

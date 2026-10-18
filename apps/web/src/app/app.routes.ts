@@ -37,6 +37,10 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tournament-page').then((m) => m.TournamentPage),
       },
       {
+        path: 't/:id/m/:matchId',
+        loadComponent: () => import('./pages/match-page').then((m) => m.MatchPage),
+      },
+      {
         path: 't/:id/edit',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/tournament-form').then((m) => m.TournamentFormPage),

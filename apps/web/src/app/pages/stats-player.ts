@@ -47,7 +47,7 @@ import type {
         </select>
       </label>
     </div>
-    @if (error() && !neuro()?.wallet?.bets) {
+    @if (error() && !neuro()?.name) {
       <p class="error">{{ error() }}</p>
     }
     @if (d(); as d) {
@@ -273,10 +273,11 @@ import type {
       </div>
     }
     @if (neuro(); as n) {
+      @if (!d() && n.name) {
+        <h1>{{ n.name }}</h1>
+        <p class="muted">{{ 'stats.noGamesYet' | t }}</p>
+      }
       @if (n.wallet && n.season) {
-        @if (!d() && n.name) {
-          <h1>{{ n.name }}</h1>
-        }
         <h2>{{ 'bets.profileTitle' | t: { n: n.season } }}</h2>
         <div class="tiles">
           <div class="card tile">

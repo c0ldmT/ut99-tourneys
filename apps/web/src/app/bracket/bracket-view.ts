@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import type { BracketState, Entrant, LiveInfo, MatchState } from '../core/types';
 import { I18n } from '../core/i18n';
 import type { RunView } from '../core/race';
@@ -31,6 +31,8 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
             <g
               [attr.transform]="'translate(' + b.x + ',' + b.y + ')'"
               class="match"
+              [class.open]="m.entrants[0] && m.entrants[1]"
+              (click)="openMatch(m)"
               [class.live]="m.id === currentMatchId()"
               [class.void]="m.status === 'void'"
               [class.done]="m.status === 'completed'"
@@ -83,6 +85,12 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
     }
   `,
   styles: `
+    .match.open {
+      cursor: pointer;
+    }
+    .match.open:hover .box {
+      stroke: var(--accent);
+    }
     .bet {
       fill: var(--accent);
       font-weight: 700;
@@ -177,6 +185,8 @@ export class BracketView {
   readonly currentRuns = input<readonly RunView[]>([]);
   /** Rating of each entrant at the seeding (tooltip). */
   readonly ratings = input<Record<string, number> | undefined>(undefined);
+  /** A click on a match with both entrants (match page). */
+  readonly matchClick = output<string>();
   /** Matches that take bets right now (marked with €). */
   readonly betOpen = input<readonly string[]>([]);
 
@@ -244,5 +254,9 @@ export class BracketView {
   protected score(m: MatchState): [string, string] {
     const runs = m.id === this.currentMatchId() ? this.currentRuns() : [];
     return matchScore(m, this.games()[m.id] ?? [], this.live(), this.race(), runs);
+  }
+
+  protected openMatch(m: { id: string; entrants: [string | null, string | null] }) {
+    if (m.entrants[0] && m.entrants[1]) this.matchClick.emit(m.id);
   }
 }

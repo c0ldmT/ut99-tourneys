@@ -291,6 +291,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             [currentRuns]="t.projection!.currentMatch?.runs ?? []"
             [ratings]="t.projection!.seedRatings"
             [betOpen]="betOpen()"
+            (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
           />
         </div>
         <app-bet-panel [tournament]="t" (openIds)="betOpen.set($event)" />
@@ -794,7 +795,7 @@ export class TournamentPage {
   private readonly stream = inject(TournamentStream);
   /** Matches that take bets now (from the bets panel). */
   protected readonly betOpen = signal<string[]>([]);
-  private readonly router = inject(Router);
+  protected readonly router = inject(Router);
 
   protected readonly t = signal<TournamentDetail | null>(null);
   protected readonly error = signal('');

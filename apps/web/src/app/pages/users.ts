@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { TPipe } from '../core/i18n';
@@ -6,7 +7,7 @@ import type { PublicUser } from '../core/types';
 
 @Component({
   selector: 'app-users',
-  imports: [TPipe],
+  imports: [TPipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'users.title' | t }}</h1>
@@ -25,7 +26,12 @@ import type { PublicUser } from '../core/types';
         <tbody>
           @for (u of users(); track u.id) {
             <tr>
-              <td>{{ u.displayName }}</td>
+              <td>
+                <a
+                  [routerLink]="u.id === auth.me()?.id ? ['/profile'] : ['/stats/p', 'u:' + u.id]"
+                  >{{ u.displayName }}</a
+                >
+              </td>
               <td class="muted">{{ u.username }}</td>
               <td>
                 <input
