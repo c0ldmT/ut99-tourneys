@@ -173,6 +173,7 @@ export class BetsService {
       this.settledSeason(season.number).filter((b) => b.userId === userId),
       this.seasonBailouts(season.number, userId),
       season.betting.startBalance,
+      season.betting.floor,
     );
     return ws.get(userId) ?? emptyWallet(userId, season.betting.startBalance);
   }
@@ -498,7 +499,12 @@ export class BetsService {
     const season = this.seasonOr(seasonNo);
     if (!season) return { season: null, rows: [], versus: { humans: 0, bots: 0 } };
     const settled = this.settledSeason(season.number);
-    const ws = wallets(settled, this.seasonBailouts(season.number), season.betting.startBalance);
+    const ws = wallets(
+      settled,
+      this.seasonBailouts(season.number),
+      season.betting.startBalance,
+      season.betting.floor,
+    );
     const names = this.names();
     const rows = [...ws.values()]
       .map((w) => ({
@@ -520,7 +526,12 @@ export class BetsService {
     const season = this.seasonOr(seasonNo);
     if (!season) return { season: null, records: [], botRecords: [] };
     const settled = this.settledSeason(season.number);
-    const ws = wallets(settled, this.seasonBailouts(season.number), season.betting.startBalance);
+    const ws = wallets(
+      settled,
+      this.seasonBailouts(season.number),
+      season.betting.startBalance,
+      season.betting.floor,
+    );
     const names = this.names();
     const tnames = this.tournamentNames();
     const part = (bot: boolean) => new Map([...ws].filter(([k]) => isBotBettor(k) === bot));
@@ -576,7 +587,12 @@ export class BetsService {
     const season = this.seasonOr(seasonNo);
     if (!season) return { season: null, wallet: null, recent: [] };
     const settled = this.settledSeason(season.number);
-    const ws = wallets(settled, this.seasonBailouts(season.number), season.betting.startBalance);
+    const ws = wallets(
+      settled,
+      this.seasonBailouts(season.number),
+      season.betting.startBalance,
+      season.betting.floor,
+    );
     const w = ws.get(bettor) ?? emptyWallet(bettor, season.betting.startBalance);
     const tnames = this.tournamentNames();
     const pickName = (b: SettledBet) =>

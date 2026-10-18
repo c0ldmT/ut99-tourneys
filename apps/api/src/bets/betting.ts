@@ -235,6 +235,8 @@ export function wallets(
   settled: readonly SettledBet[],
   bailouts: readonly Bailout[],
   start: number,
+  /** Rescue floor: a lost bet that leaves less tops the balance up to it right away. */
+  floor = 0,
 ): Map<string, Wallet> {
   type Step =
     | { at: string; order: 0; userId: string; bailout: number }
@@ -283,6 +285,12 @@ export function wallets(
         const n = st < 0 ? st - 1 : -1;
         streak.set(s.userId, n);
         w.loseStreak = Math.max(w.loseStreak, -n);
+        // Salt mines: below the floor after a loss, the rescue comes at once.
+        if (w.balance < floor) {
+          w.bailouts++;
+          w.bailedOut += floor - w.balance;
+          w.balance = floor;
+        }
       }
     }
     w.peak = Math.max(w.peak, w.balance);

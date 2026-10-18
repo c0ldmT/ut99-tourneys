@@ -276,6 +276,30 @@ describe('betting with Neuro', () => {
   });
 });
 
+describe('rescue after a loss', () => {
+  it('tops the balance up to the floor right after the losing bet', () => {
+    const at = (h: number) => `2026-10-18T${String(h).padStart(2, '0')}:00:00.000Z`;
+    const s = [
+      { ...bet('u1', 'a', 700), status: 'lost' as const, payout: 0, settledAt: at(10) },
+      {
+        ...bet('u1', 'a', 300),
+        status: 'lost' as const,
+        payout: 0,
+        settledAt: at(11),
+        allIn: true,
+      },
+      { ...bet('u1', 'a', 100), status: 'won' as const, payout: 250, settledAt: at(12) },
+    ];
+    // 1000 - 700 = 300, all in and lost: 0 -> rescued to 100 at once; then +150 = 250.
+    const w = wallets(s, [], 1000, 100).get('u1')!;
+    expect(w).toMatchObject({ balance: 250, bailouts: 1, bailedOut: 100, profit: -850 });
+    expect(wallets(s.slice(0, 2), [], 1000, 100).get('u1')).toMatchObject({
+      balance: 100,
+      free: 100,
+    });
+  });
+});
+
 describe('bots betting (pure)', () => {
   const bot = (over: Partial<BettingBot> = {}): BettingBot => ({
     id: 'b1',

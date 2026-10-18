@@ -703,7 +703,7 @@ const en = {
   'bets.staked': 'staked',
   'bets.free': 'free',
   'bets.hint':
-    "Bet Neuro (€) on the winner. Pools stay hidden until the first game starts; the winners share the losers' pool in proportion to their stakes. Below {floor} you are topped up to {floor} when you bet.",
+    "Bet Neuro (€) on the winner. Pools stay hidden until the first game starts; the winners share the losers' pool in proportion to their stakes. If a lost bet leaves you below {floor}, you get {floor} right away.",
   'bets.closed.notSeasonal': 'No bets: this is not a season tournament.',
   'bets.closed.noSeason': 'No bets: no season is running (Neuro exist per season).',
   'bets.closed.phase': 'Bets are closed in this tournament.',
@@ -1533,7 +1533,7 @@ const de: Record<TKey, string> = {
   'bets.staked': 'gesetzt',
   'bets.free': 'frei',
   'bets.hint':
-    'Setze Neuro (€) auf den Sieger. Die Pools bleiben bis zum Start des ersten Spiels verdeckt; die Gewinner teilen sich den Pool der Verlierer im Verhältnis ihrer Einsätze. Unter {floor} wirst du beim Setzen auf {floor} aufgefüllt.',
+    'Setze Neuro (€) auf den Sieger. Die Pools bleiben bis zum Start des ersten Spiels verdeckt; die Gewinner teilen sich den Pool der Verlierer im Verhältnis ihrer Einsätze. Fällst du nach einer verlorenen Wette unter {floor}, bekommst du sofort {floor}.',
   'bets.closed.notSeasonal': 'Keine Wetten: Das ist kein Season-Turnier.',
   'bets.closed.noSeason': 'Keine Wetten: Es läuft keine Season (Neuro gibt es pro Season).',
   'bets.closed.phase': 'Die Wetten in diesem Turnier sind geschlossen.',
