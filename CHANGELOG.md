@@ -25,6 +25,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   points, deaths and both runs), each player's share of the side's frags (points) and an MVP; the bets of the match.
 - Users page: names link to the player page (yourself: your profile); the player page also works for users without
   games and shows their Neuro.
+- Betting phase: a match of a season tournament takes bets at least 20 s (setting) after it was called; when
+  everybody is ready earlier (bot matches at once), the countdown of its first game waits and the server says when
+  bets close. The own Neuro balance shows next to the name at the top right.
 - Betting with Neuro (€), the website's virtual currency: bet on the winner of a match in season tournaments
   (never on your own match), change or withdraw until the first game starts; pools stay hidden until then and are
   shared pari-mutuel; stakes come back when no game was played. Wallets start fresh every season (start balance and

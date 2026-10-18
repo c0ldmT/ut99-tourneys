@@ -363,7 +363,13 @@ export interface WebsiteSettings {
   /** Names for bot teams (team tournaments), in order. */
   teamNames: string[];
   /** Betting with Neuro: start balance per season, rescue floor. */
-  betting: { startBalance: number; floor: number; botsBet: boolean; botsPerMatch: number };
+  betting: {
+    startBalance: number;
+    floor: number;
+    botsBet: boolean;
+    botsPerMatch: number;
+    windowSec: number;
+  };
 }
 
 // --- Bot control center ---------------------------------------------------------------------

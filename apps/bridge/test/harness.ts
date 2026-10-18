@@ -62,6 +62,7 @@ export async function setup(opts: {
   behaviour?: Partial<SimBehaviour>;
   timing?: Partial<DirectorTiming>;
   mapRecords?: MapRecords;
+  betWindowSec?: number;
 }) {
   const clock = new FakeClock();
   const log = memoryLogger();
@@ -87,6 +88,7 @@ export async function setup(opts: {
       access: boot.access,
       botPool: boot.botPool,
       ...(opts.mapRecords ? { mapRecords: opts.mapRecords } : {}),
+      ...(opts.betWindowSec ? { betWindowSec: opts.betWindowSec } : {}),
       timing: {
         postGameDelayMs: 2_000,
         simulateDelayMs: 1_000,

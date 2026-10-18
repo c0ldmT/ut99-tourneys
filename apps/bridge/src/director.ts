@@ -122,6 +122,11 @@ export interface DirectorOptions {
   mapRecords?: MapRecords;
   /** Personalities of the website bots (chat lines, rivals). */
   botPersonalities?: readonly BotPersonality[];
+  /**
+   * Betting (website): a match takes bets for at least this many seconds after it was called;
+   * when everybody is ready earlier, the countdown of its first game waits. 0 = no betting.
+   */
+  betWindowSec?: number;
   timing?: Partial<DirectorTiming>;
 }
 
@@ -233,7 +238,13 @@ export class MatchDirector extends EventEmitter {
   private players = new Map<number, ConnectedPlayer>();
   private rev = 0;
   private queue: Promise<void> = Promise.resolve();
-  private timer?: { handle: TimerHandle; due: number; fn: () => Promise<void> | void };
+  private timer?: {
+    handle: TimerHandle;
+    due: number;
+    fn: () => Promise<void> | void;
+    /** What the timer waits for (betting phase). */
+    tag?: string;
+  };
   private suspended?: { remaining: number; fn: () => Promise<void> | void };
   private cooldownUntil = 0;
   /** Disconnects per match and entrant during live games (for maxReconnects). */
@@ -243,6 +254,9 @@ export class MatchDirector extends EventEmitter {
   private access: AccessEntry[];
   /** Monster Hunt: map records (statistics); kept current with the runs of this tournament. */
   private mapRecords?: MapRecords;
+  /** Betting window in ms (0: none) and when each match was called. */
+  private betWindowMs = 0;
+  private calledAt = new Map<string, number>();
   /** Website bots' personalities by lower-case name in the game. */
   private personas = new Map<string, BotPersonality>();
   /**
@@ -281,6 +295,7 @@ export class MatchDirector extends EventEmitter {
     this.access = [...o.access];
     if (o.mapRecords) this.mapRecords = cloneRecords(o.mapRecords);
     this.setPersonas(o.botPersonalities);
+    this.betWindowMs = Math.max(0, (o.betWindowSec ?? 0) * 1000);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -472,6 +487,13 @@ export class MatchDirector extends EventEmitter {
   }
 
   /** New bot personalities from the website: used from the next bot lines on. */
+  /** New betting window from the website (0: the tournament takes no bets). */
+  setBetWindow(sec: number | undefined): Promise<void> {
+    return this.enqueue(() => {
+      this.betWindowMs = Math.max(0, (sec ?? 0) * 1000);
+    });
+  }
+
   setBotPersonalities(list: readonly BotPersonality[] | undefined): Promise<void> {
     return this.enqueue(() => this.setPersonas(list));
   }
@@ -667,7 +689,17 @@ export class MatchDirector extends EventEmitter {
     return false;
   }
 
-  private setTimer(ms: number, fn: () => Promise<void> | void): void {
+  /** How long the first game of a match still waits for bets (ms; 0 = no waiting). */
+  private betHoldMs(matchId: string, game: number): number {
+    if (!this.betWindowMs || game !== 1) return 0;
+    const at = this.calledAt.get(matchId);
+    if (at === 0) return 0; // waited already
+    // Not known (bridge restarted): a full window.
+    const since = at === undefined ? 0 : this.o.clock.now() - at;
+    return Math.max(0, this.betWindowMs - since);
+  }
+
+  private setTimer(ms: number, fn: () => Promise<void> | void, tag?: string): void {
     this.clearTimer();
     if (this.proj.phase === 'paused') {
       this.suspended = { remaining: ms, fn };
@@ -677,7 +709,7 @@ export class MatchDirector extends EventEmitter {
       if (this.timer?.handle === handle) this.timer = undefined;
       void this.enqueue(fn);
     }, ms);
-    this.timer = { handle, due: this.o.clock.now() + ms, fn };
+    this.timer = { handle, due: this.o.clock.now() + ms, fn, ...(tag ? { tag } : {}) };
   }
 
   private clearTimer(): void {
@@ -1122,6 +1154,7 @@ export class MatchDirector extends EventEmitter {
     }
     const entrants = m.entrants as [string, string];
     if (!(await this.append({ type: 'match.called', data: { matchId: m.id, entrants } }))) return;
+    this.calledAt.set(m.id, this.o.clock.now());
     this.lineup = undefined;
     this.resetGame();
     // Tell the server who plays next, so it can show vote/ready UI to the right players.
@@ -1482,6 +1515,30 @@ export class MatchDirector extends EventEmitter {
     );
     this.telemetry('readyCheck', { ready, deadline: s.deadline });
     if (!entrants.every((e) => ready[e])) return;
+    // Betting phase: bets on a match close when its first game starts. Everybody is ready (bots
+    // at once), but the match has not taken bets long enough yet: wait for the rest.
+    const hold = this.betHoldMs(s.matchId, s.game);
+    if (hold > 0) {
+      if (this.timer?.tag === `bets:${s.matchId}`) return; // already waiting
+      this.clearTimer();
+      this.say(
+        `Bets on ${this.name(entrants[0]!)} vs ${this.name(entrants[1]!)} close in ${Math.ceil(hold / 1000)} s, then the countdown starts`,
+      );
+      this.telemetry('readyCheck', { ready, deadline: this.o.clock.now() + hold });
+      this.setTimer(
+        hold,
+        async () => {
+          if (this.stage !== s) return;
+          this.calledAt.set(s.matchId, 0); // window over
+          await this.checkAllReady();
+          // Somebody left while waiting: the ready check goes on.
+          if (this.stage === s && !this.timer)
+            this.setTimer(this.proj.settings.noShowSec * 1000, () => this.onNoShow());
+        },
+        `bets:${s.matchId}`,
+      );
+      return;
+    }
     this.clearTimer();
     if (this.captainTimer) this.o.clock.clearTimeout(this.captainTimer);
     this.captainTimer = undefined;

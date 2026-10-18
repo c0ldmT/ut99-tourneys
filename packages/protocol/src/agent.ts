@@ -298,6 +298,11 @@ export const TournamentSync = envelope(
     records: MapRecordsSchema.optional(),
     /** Personalities of the tournament's website bots (chat lines, rivals). */
     bots: z.array(BotPersonalitySchema).max(256).optional(),
+    /**
+     * Betting: matches take bets at least this many seconds after being called (the first game's
+     * countdown waits); 0 or missing = the tournament takes no bets now.
+     */
+    betWindowSec: z.number().int().min(0).max(600).optional(),
   }),
 );
 

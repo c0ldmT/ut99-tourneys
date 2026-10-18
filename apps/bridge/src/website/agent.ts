@@ -59,6 +59,7 @@ export class WebsiteAgent {
   /** Monster Hunt map records (statistics) per tournament, from the website. */
   private records = new Map<string, MapRecords | undefined>();
   private botPersonas = new Map<string, BotPersonality[] | undefined>();
+  private betWindows = new Map<string, number>();
   private runtime?: Runtime;
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
@@ -143,12 +144,15 @@ export class WebsiteAgent {
         this.records.set(p.tournamentId, p.records);
         const botsBefore = JSON.stringify(this.botPersonas.get(p.tournamentId));
         this.botPersonas.set(p.tournamentId, p.bots);
+        const betBefore = this.betWindows.get(p.tournamentId) ?? 0;
+        this.betWindows.set(p.tournamentId, p.betWindowSec ?? 0);
         const rt = this.runtime;
         if (rt && rt.tournamentId === p.tournamentId) {
           if (JSON.stringify(p.access) !== before) await rt.director.setAccess(p.access);
           if (JSON.stringify(p.records) !== recordsBefore)
             await rt.director.setMapRecords(p.records);
           if (JSON.stringify(p.bots) !== botsBefore) await rt.director.setBotPersonalities(p.bots);
+          if ((p.betWindowSec ?? 0) !== betBefore) await rt.director.setBetWindow(p.betWindowSec);
           if (changed) await rt.director.refresh();
         }
         return;
@@ -314,6 +318,7 @@ export class WebsiteAgent {
       ...(this.botPersonas.get(tournamentId)
         ? { botPersonalities: this.botPersonas.get(tournamentId) }
         : {}),
+      betWindowSec: this.betWindows.get(tournamentId) ?? 0,
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });
     director.on('live', (info: LiveInfo) => {

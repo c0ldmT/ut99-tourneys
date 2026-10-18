@@ -1,12 +1,21 @@
-import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Api } from './core/api';
+import { NeuroPipe } from './core/neuro';
 import { Auth } from './core/auth';
 import { I18n, TPipe } from './core/i18n';
 import type { Lang } from './core/i18n-dict';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, NeuroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header>
@@ -42,6 +51,9 @@ import type { Lang } from './core/i18n-dict';
               <img [src]="me.avatar" alt="" />
             }
             {{ me.displayName }}
+            @if (neuro() !== null) {
+              <span class="neuro">({{ neuro()! | neuro }})</span>
+            }
           </a>
           <button class="link" (click)="logout()">{{ 'nav.logout' | t }}</button>
         }
@@ -97,6 +109,10 @@ import type { Lang } from './core/i18n-dict';
       gap: 8px;
       color: var(--text);
     }
+    .neuro {
+      color: var(--accent);
+      white-space: nowrap;
+    }
     .user img {
       width: 24px;
       height: 24px;
@@ -109,11 +125,39 @@ export class App {
   protected readonly i18n = inject(I18n);
   private readonly router = inject(Router);
 
+  private readonly api = inject(Api);
+  /** The own Neuro of the running (or last) season, next to the name; null: none. */
+  protected readonly neuro = signal<number | null>(null);
+
   constructor() {
     void this.auth.ready();
     effect(() => {
       document.title = this.auth.config().siteName;
     });
+    // Kept current: on every page change and every 30 s.
+    effect(() => {
+      if (this.auth.me()) void this.loadNeuro();
+      else this.neuro.set(null);
+    });
+    const sub = this.router.events.subscribe((e) => {
+      if (e instanceof NavigationEnd) void this.loadNeuro();
+    });
+    const timer = setInterval(() => void this.loadNeuro(), 30_000);
+    inject(DestroyRef).onDestroy(() => {
+      sub.unsubscribe();
+      clearInterval(timer);
+    });
+  }
+
+  private async loadNeuro() {
+    const me = this.auth.me();
+    if (!me) return;
+    try {
+      const b = await this.api.userBets(me.id);
+      this.neuro.set(b.wallet ? b.wallet.balance : null);
+    } catch {
+      this.neuro.set(null);
+    }
   }
 
   protected setLang(ev: Event) {

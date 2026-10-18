@@ -28,6 +28,8 @@ export const BettingFieldsSchema = z.object({
   botsBet: z.boolean().default(true),
   /** At most this many bots bet on one match. */
   botsPerMatch: z.number().int().min(0).max(50).default(6),
+  /** Betting phase: a match takes bets at least this many seconds before its first game. */
+  windowSec: z.number().int().min(0).max(600).default(20),
 });
 export const BettingSettingsSchema = BettingFieldsSchema.refine(
   (b) => b.floor <= b.startBalance,
@@ -39,6 +41,7 @@ export const DEFAULT_BETTING: BettingSettings = {
   floor: 100,
   botsBet: true,
   botsPerMatch: 6,
+  windowSec: 20,
 };
 
 /** Rating settings are the defaults for new seasons; each season keeps a copy (seasons table). */

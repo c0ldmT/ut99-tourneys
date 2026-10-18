@@ -1128,8 +1128,15 @@ export class TournamentsService {
         access: this.access(t),
         records: this.mapRecordsFor(t),
         bots: this.botPersonalities(t),
+        betWindowSec: this.betWindowSec(t),
       },
     });
+  }
+
+  /** Betting phase length for the bridge: only season tournaments in season take bets. */
+  private betWindowSec(t: TournamentRow): number {
+    const season = this.seasons.current();
+    return t.seasonal && season ? season.betting.windowSec : 0;
   }
 
   /** Personalities (chat lines, rivals) of the website bots of the pool and the entrants. */

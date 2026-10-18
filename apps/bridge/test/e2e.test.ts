@@ -96,6 +96,23 @@ describe('end to end against the simulated UT server', () => {
     expect(env.director.projection.results).toHaveLength(7);
   });
 
+  it('waits for bets: the first game starts at least betWindowSec after the match was called', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'single', rules: { mapMode: 'random' } },
+    );
+    env = await setup({ file, betWindowSec: 20 });
+    await env.run(finished(env));
+    const called = events(env, 'match.called');
+    const started = events(env, 'match.started').filter((e) => e.data.game === 1);
+    expect(started.length).toBeGreaterThan(0);
+    for (const s of started) {
+      const c = called.filter((x) => x.data.matchId === s.data.matchId && x.seq < s.seq).at(-1)!;
+      expect(Date.parse(s.at) - Date.parse(c.at)).toBeGreaterThanOrEqual(20_000);
+    }
+    expect(env.log.lines.some((l) => l.includes('close in'))).toBe(true);
+  });
+
   it('random map mode needs no vote', async () => {
     const file = tournamentFile(
       { players: players.slice(0, 3) },

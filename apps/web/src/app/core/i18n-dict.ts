@@ -816,6 +816,9 @@ const en = {
   'match.end.admin': 'organizer',
   'match.end.race': 'race',
   'stats.noGamesYet': 'No games yet.',
+  'bets.windowSec': 'Betting phase (seconds)',
+  'bets.windowSecHint':
+    'A match takes bets at least this long after it was called: when everybody is ready earlier (bots at once), the countdown of its first game waits. 0 = no waiting.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -1644,6 +1647,9 @@ const de: Record<TKey, string> = {
   'match.end.admin': 'Organisator',
   'match.end.race': 'Rennen',
   'stats.noGamesYet': 'Noch keine Spiele.',
+  'bets.windowSec': 'Wettphase (Sekunden)',
+  'bets.windowSecHint':
+    'Ein Match nimmt mindestens so lange Wetten an, nachdem es aufgerufen wurde: Sind alle früher bereit (Bots sofort), wartet der Countdown seines ersten Spiels. 0 = kein Warten.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };
