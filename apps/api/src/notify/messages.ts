@@ -1,5 +1,6 @@
 import type { MatchResult } from '@tourney/bracket';
 import type { TournamentProjection, TournamentSettings } from '@tourney/protocol';
+import type { MatchBetSummary, TournamentBetSummary } from '../bets/betting.js';
 
 /** Texts of the Discord notifications (pure functions, one language per installation). */
 
@@ -36,6 +37,21 @@ const T = {
     dmOutYou: '**{name}**: Du bist ausgeschieden – Platz {place}. Danke fürs Mitspielen!',
     dmWon: '🏆 Glückwunsch! {who} hat **{name}** gewonnen.',
     dmWonYou: '🏆 Glückwunsch! Du hast **{name}** gewonnen.',
+    betsOpen: '🎲 Wetten offen: **{a}** vs **{b}** – noch mindestens {sec} s: {link}',
+    betsClosed: '🔒 Wetten geschlossen: **{a}** vs **{b}** – Pool {pool} · {sides}{big}',
+    betsSide: '{name} {odds} ({n})',
+    betsOne: '1 Wette',
+    betsMany: '{n} Wetten',
+    betsBig: ' · größte Wette: {who} {amount} auf {pick}',
+    betsPaid: '💰 {upset}{bets} auf **{w}**: +{profit}{best}',
+    betsUpset: 'Überraschung! ',
+    betsBest: ' – größter Gewinn: {who} +{profit} ({odds})',
+    betsNoGame: '↩️ Wetten zurückgezahlt (kein Spiel gespielt)',
+    betsOneSided: '↩️ Wetten zurückgezahlt (nur auf eine Seite gewettet)',
+    betsTournament: '📊 Wetten: {parts}',
+    betsTop: 'größter Gewinner {who} {net}',
+    betsFlop: 'größter Verlierer {who} {net}',
+    betsVersus: 'Mensch vs. Maschine: Menschen {h} / Bots {b}',
   },
   en: {
     single: 'single elimination',
@@ -68,6 +84,21 @@ const T = {
     dmOutYou: '**{name}**: you are out – place {place}. Thanks for playing!',
     dmWon: '🏆 Congratulations! {who} won **{name}**.',
     dmWonYou: '🏆 Congratulations! You won **{name}**.',
+    betsOpen: '🎲 Bets open: **{a}** vs **{b}** – at least {sec} s left: {link}',
+    betsClosed: '🔒 Bets closed: **{a}** vs **{b}** – pool {pool} · {sides}{big}',
+    betsSide: '{name} {odds} ({n})',
+    betsOne: '1 bet',
+    betsMany: '{n} bets',
+    betsBig: ' · biggest bet: {who} {amount} on {pick}',
+    betsPaid: '💰 {upset}{bets} on **{w}**: +{profit}{best}',
+    betsUpset: 'Upset! ',
+    betsBest: ' – biggest win: {who} +{profit} ({odds})',
+    betsNoGame: '↩️ Bets refunded (no game played)',
+    betsOneSided: '↩️ Bets refunded (bets on one side only)',
+    betsTournament: '📊 Bets: {parts}',
+    betsTop: 'biggest winner {who} {net}',
+    betsFlop: 'biggest loser {who} {net}',
+    betsVersus: 'man vs. machine: players {h} / bots {b}',
   },
 } as const;
 
@@ -208,4 +239,102 @@ export function dmPlacement(lang: Lang, t: TournamentInfo, place: number, team?:
   return place === 1
     ? fill(lang, 'dmWon', { who, name })
     : fill(lang, 'dmOut', { who, name, place });
+}
+
+// --- Bets with Neuro (€) ----------------------------------------------------------------------
+
+const locale = (lang: Lang) => (lang === 'de' ? 'de-DE' : 'en-US');
+
+/** "1.240 €" (Neuro). */
+export const neuro = (lang: Lang, n: number) => `${n.toLocaleString(locale(lang))} €`;
+
+/** "+320 €", "−400 €". */
+const signed = (lang: Lang, n: number) =>
+  (n > 0 ? '+' : n < 0 ? '−' : '') + neuro(lang, Math.abs(n));
+
+/** "2,1x"; "–" when a side has no bets. */
+const oddsText = (lang: Lang, o: number | null) =>
+  o === null ? '–' : `${o.toLocaleString(locale(lang), { maximumFractionDigits: 2 })}x`;
+
+const betCount = (lang: Lang, n: number) =>
+  n === 1 ? fill(lang, 'betsOne') : fill(lang, 'betsMany', { n });
+
+/** Entrant and bettor names for the bet texts. */
+export interface BetNames {
+  entrant: (id: string) => string;
+  bettor: (key: string) => string;
+}
+
+export function betsOpen(lang: Lang, a: string, b: string, sec: number, link: string): string {
+  return fill(lang, 'betsOpen', { a: md(a), b: md(b), sec, link });
+}
+
+export function betsClosed(lang: Lang, s: MatchBetSummary, n: BetNames): string {
+  const [a, b] = s.entrants;
+  const sides = s.entrants
+    .map((e) =>
+      fill(lang, 'betsSide', {
+        name: md(n.entrant(e)),
+        odds: oddsText(lang, s.sides[e]?.odds ?? null),
+        n: betCount(lang, s.sides[e]?.bettors ?? 0),
+      }),
+    )
+    .join(' / ');
+  const big = s.biggest
+    ? fill(lang, 'betsBig', {
+        who: md(n.bettor(s.biggest.userId)),
+        amount: neuro(lang, s.biggest.amount),
+        pick: md(n.entrant(s.biggest.pick)),
+      })
+    : '';
+  return fill(lang, 'betsClosed', {
+    a: md(n.entrant(a)),
+    b: md(n.entrant(b)),
+    pool: neuro(lang, s.total),
+    sides,
+    big,
+  });
+}
+
+/** Payout line under a match result (null: the match is not decided yet). */
+export function betsPayout(lang: Lang, s: MatchBetSummary, n: BetNames): string | null {
+  const o = s.outcome;
+  if (!o) return null;
+  if (o.kind === 'refunded')
+    return fill(lang, o.reason === 'noGame' ? 'betsNoGame' : 'betsOneSided');
+  const best = o.best
+    ? fill(lang, 'betsBest', {
+        who: md(n.bettor(o.best.userId)),
+        profit: neuro(lang, o.best.profit),
+        odds: oddsText(lang, o.odds),
+      })
+    : '';
+  return fill(lang, 'betsPaid', {
+    upset: o.upset ? fill(lang, 'betsUpset') : '',
+    bets: betCount(lang, o.winners),
+    w: md(n.entrant(o.winnerId)),
+    profit: neuro(lang, o.profit),
+    best,
+  });
+}
+
+/** Summary line under the champion message (null: nothing to say). */
+export function betsTournament(lang: Lang, s: TournamentBetSummary, n: BetNames): string | null {
+  const parts: string[] = [];
+  if (s.top)
+    parts.push(
+      fill(lang, 'betsTop', { who: md(n.bettor(s.top.userId)), net: signed(lang, s.top.net) }),
+    );
+  if (s.flop)
+    parts.push(
+      fill(lang, 'betsFlop', { who: md(n.bettor(s.flop.userId)), net: signed(lang, s.flop.net) }),
+    );
+  if (s.versus)
+    parts.push(
+      fill(lang, 'betsVersus', {
+        h: signed(lang, s.versus.humans),
+        b: signed(lang, s.versus.bots),
+      }),
+    );
+  return parts.length ? fill(lang, 'betsTournament', { parts: parts.join(' · ') }) : null;
 }

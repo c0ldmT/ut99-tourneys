@@ -5,7 +5,9 @@ import { users } from '../src/db/schema.js';
 import { discordOut, isWebhookUrl, type DiscordOut } from '../src/notify/discord-out.js';
 import * as M from '../src/notify/messages.js';
 import { NotificationsService } from '../src/notify/notifications.service.js';
-import { Client, memoryLogger, startApi, tournamentBody } from './helpers.js';
+import { Client, memoryLogger, startApi, startSeason, tournamentBody } from './helpers.js';
+import { BetsService } from '../src/bets/bets.service.js';
+import { EventLogService } from '../src/tournaments/event-log.service.js';
 import { eq } from 'drizzle-orm';
 
 const HOOK = 'https://discord.com/api/webhooks/123456/abc-DEF_1';
@@ -162,5 +164,138 @@ describe('reminders', () => {
     } finally {
       await api.close();
     }
+  });
+});
+
+describe('bets in the channel', () => {
+  it('posts bets open, closed with pools, payout and the summary', async () => {
+    const posts: string[] = [];
+    const out: DiscordOut = {
+      webhook: (_url, text) => void posts.push(text),
+      dm: () => {},
+      idle: async () => {},
+    };
+    const { api } = await startApi(
+      { DISCORD_WEBHOOK_URL: HOOK, NOTIFY_LANG: 'de' },
+      { discordOut: out },
+    );
+    try {
+      const admin = await Client.login(api, 'Boss', true);
+      const carl = await Client.login(api, 'Carl');
+      await admin.post('/agents', { id: 'pi', name: 'Pi' });
+      await startSeason(admin);
+      const t = await admin.post(
+        '/tournaments',
+        tournamentBody({ name: 'Bet Cup' }, { size: 4, format: 'single' }),
+      );
+      const id = t.body.id as string;
+      const dave = await Client.login(api, 'Dave');
+      const eve = await Client.login(api, 'Eve');
+      await dave.post(`/tournaments/${id}/registration`);
+      await eve.post(`/tournaments/${id}/registration`);
+      const seeded = await admin.post(`/tournaments/${id}/seed`, {
+        mode: 'auto',
+        humanOrder: 'seeded',
+        botPlacement: 'byes',
+        rngSeed: 's',
+      });
+      expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+      const view = (await carl.get(`/bets/tournaments/${id}`)).body;
+      const m = view.matches[0] as { matchId: string; entrants: [string, string] };
+      const [a, b] = m.entrants;
+      const put = (c: Client, pick: string, amount: number) =>
+        c.req('PUT', `/bets/tournaments/${id}/${m.matchId}`, { pick, amount });
+      expect((await put(admin, a, 600)).status).toBe(200);
+      expect((await put(carl, b, 300)).status).toBe(200);
+      const proj = (await admin.get(`/tournaments/${id}`)).body.projection;
+      const name = (e: string) => proj.entrants[e].displayName as string;
+      const log = api.app.get(EventLogService);
+      const append = (events: Record<string, unknown>[]) => {
+        const r = log.append(
+          id,
+          log.load(id).length,
+          events.map((e) => ({ actor: { kind: 'bridge' }, ...e })),
+        );
+        if (!r.accepted) throw new Error(r.reason);
+      };
+      posts.length = 0;
+      append([
+        { type: 'checkin.opened', data: { serverProfileId: 'local' } },
+        { type: 'tournament.started', data: {} },
+        { type: 'match.called', data: { matchId: m.matchId, entrants: m.entrants } },
+      ]);
+      const open = posts.find((p) => p.startsWith('🎲'));
+      expect(open).toContain(`noch mindestens 20 s: `);
+      expect(open).toContain(`/t/${id}/m/${m.matchId}`);
+      append([{ type: 'match.started', data: { matchId: m.matchId, game: 1 } }]);
+      expect(posts.at(-1)).toBe(
+        `🔒 Wetten geschlossen: **${name(a)}** vs **${name(b)}** – Pool 900 € · ` +
+          `${name(a)} 1,5x (1 Wette) / ${name(b)} 3x (1 Wette) · größte Wette: Boss 600 € auf ${name(a)}`,
+      );
+      append([{ type: 'match.started', data: { matchId: m.matchId, game: 2 } }]);
+      expect(posts.filter((p) => p.startsWith('🔒'))).toHaveLength(1); // only the first game
+      append([
+        {
+          type: 'match.gameFinished',
+          data: {
+            matchId: m.matchId,
+            game: 1,
+            map: 'DM-Deck16][',
+            scores: { [a]: 5, [b]: 20 },
+            winnerId: b,
+            endReason: 'fragLimit',
+          },
+        },
+        {
+          type: 'match.result',
+          data: {
+            result: { matchId: m.matchId, entrants: m.entrants, winnerId: b, outcome: 'played' },
+          },
+        },
+      ]);
+      const result = posts.find((p) => p.includes('💰'))!;
+      expect(result.split('\n')[1]).toBe(
+        `💰 Überraschung! 1 Wette auf **${name(b)}**: +600 € – größter Gewinn: Carl +600 € (3x)`,
+      );
+      const svc = api.app.get(BetsService);
+      const names = { entrant: name, bettor: svc.bettorNames() };
+      expect(M.betsTournament('de', svc.discordTournament(id)!, names)).toBe(
+        '📊 Wetten: größter Gewinner Carl +600 € · größter Verlierer Boss −600 €',
+      );
+
+      // Switched off in the season's betting settings: nothing about bets.
+      expect((await admin.req('PUT', '/settings/betting', { discord: false })).status).toBe(200);
+      expect(svc.discordMatch(id, m.matchId)).toBeNull();
+      expect(svc.discordTournament(id)).toBeNull();
+    } finally {
+      await api.close();
+    }
+  });
+});
+
+describe('bet texts', () => {
+  const names: M.BetNames = { entrant: (e) => e.toUpperCase(), bettor: (k) => k };
+  it('formats Neuro, odds and refunds in both languages', () => {
+    const s = {
+      entrants: ['a', 'b'] as [string, string],
+      bettors: 2,
+      total: 1240,
+      sides: {
+        a: { amount: 1000, bettors: 1, odds: 1.24 },
+        b: { amount: 240, bettors: 1, odds: null },
+      },
+      biggest: null,
+      outcome: { kind: 'refunded' as const, reason: 'oneSided' as const },
+    };
+    expect(M.betsClosed('en', s, names)).toBe(
+      '🔒 Bets closed: **A** vs **B** – pool 1,240 € · A 1.24x (1 bet) / B – (1 bet)',
+    );
+    expect(M.betsPayout('de', s, names)).toBe(
+      '↩️ Wetten zurückgezahlt (nur auf eine Seite gewettet)',
+    );
+    expect(M.neuro('de', 12345)).toBe('12.345 €');
+    expect(
+      M.betsTournament('en', { top: null, flop: null, versus: { humans: 210, bots: -215 } }, names),
+    ).toBe('📊 Bets: man vs. machine: players +210 € / bots −215 €');
   });
 });

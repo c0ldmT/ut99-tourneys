@@ -55,6 +55,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   after. Bot profile page for everybody with the head-to-head record against its rivals. Statistics and ratings
   follow the bot, not its name. Needs mod 0.7.0 for look, play style and personality in the game.
 
+- Bets in the Discord channel of the tournament: "bets open" with the link to the match page when a match is
+  called, "bets closed" with pool, odds and the biggest bet when its first game starts, the payout (or refund) under
+  the result and the biggest winner and loser under the champion. Switch in the betting settings (default on).
+
 ### Fixed
 
 - Bots of the control center show with their current name everywhere (statistics, records, ranking, tournament

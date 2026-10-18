@@ -198,6 +198,10 @@ import type { Season, SeasonsOverview } from '../core/types';
       </div>
       <p class="muted small">{{ 'bets.windowSecHint' | t }}</p>
       <label class="row"
+        ><input type="checkbox" name="betsDiscord" [(ngModel)]="betsDiscord" />
+        {{ 'bets.discordLabel' | t }}</label
+      >
+      <label class="row"
         ><input type="checkbox" name="botsBet" [(ngModel)]="botsBet" />
         {{ 'bets.botsBetLabel' | t }}</label
       >
@@ -374,6 +378,7 @@ export class SettingsPage {
   protected floor = 100;
   protected botsBet = true;
   protected windowSec = 20;
+  protected betsDiscord = true;
   protected botsPerMatch = 6;
   protected readonly savedBetting = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
@@ -419,6 +424,7 @@ export class SettingsPage {
       this.botsBet = s.betting.botsBet;
       this.botsPerMatch = s.betting.botsPerMatch;
       this.windowSec = s.betting.windowSec;
+      this.betsDiscord = s.betting.discord;
       this.o.set(o);
       this.saved.set(false);
     } catch (e) {
@@ -483,6 +489,7 @@ export class SettingsPage {
         botsBet: this.botsBet,
         botsPerMatch: Math.round(Number(this.botsPerMatch)),
         windowSec: Math.round(Number(this.windowSec)),
+        discord: this.betsDiscord,
       });
       this.startBalance = s.betting.startBalance;
       this.floor = s.betting.floor;

@@ -30,6 +30,8 @@ export const BettingFieldsSchema = z.object({
   botsPerMatch: z.number().int().min(0).max(50).default(6),
   /** Betting phase: a match takes bets at least this many seconds before its first game. */
   windowSec: z.number().int().min(0).max(600).default(20),
+  /** Bets in the tournament's Discord channel: open, closed (pools), payout, tournament summary. */
+  discord: z.boolean().default(true),
 });
 export const BettingSettingsSchema = BettingFieldsSchema.refine(
   (b) => b.floor <= b.startBalance,
@@ -42,6 +44,7 @@ export const DEFAULT_BETTING: BettingSettings = {
   botsBet: true,
   botsPerMatch: 6,
   windowSec: 20,
+  discord: true,
 };
 
 /** Rating settings are the defaults for new seasons; each season keeps a copy (seasons table). */

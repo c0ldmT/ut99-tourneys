@@ -369,6 +369,7 @@ export interface WebsiteSettings {
     botsBet: boolean;
     botsPerMatch: number;
     windowSec: number;
+    discord: boolean;
   };
 }
 

@@ -8,6 +8,7 @@ import {
   type TournamentProjection,
 } from '@tourney/protocol';
 import { AgentsService } from '../agents/agents.service.js';
+import { BetsService } from '../bets/bets.service.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
@@ -39,6 +40,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     @Inject(EventLogService) private readonly events: EventLogService,
     @Inject(AgentsService) private readonly agents: AgentsService,
     @Inject(DISCORD_OUT) private readonly out: DiscordOut,
+    @Inject(BetsService) private readonly bets: BetsService,
   ) {}
 
   onModuleInit(): void {
@@ -222,6 +224,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             break;
           }
           case 'match.called': {
+            this.betsOpen(t, after, e.data.matchId);
             const address = this.address(t);
             const [a, b] = e.data.entrants;
             for (const [me, opp] of [
@@ -235,18 +238,53 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             }
             break;
           }
-          case 'match.result':
-            this.post(t, M.matchResult(this.lang, after, e.data.result as MatchResult));
+          case 'match.started': {
+            const s = this.bets.discordMatch(t.id, e.data.matchId, e.at);
+            if (s) this.post(t, M.betsClosed(this.lang, s, this.betNames(after)));
             break;
-          case 'tournament.finished':
-            this.post(t, M.champion(this.lang, after, info.link));
+          }
+          case 'match.result': {
+            const r = e.data.result as MatchResult;
+            const s = this.bets.discordMatch(t.id, r.matchId);
+            const payout = s && M.betsPayout(this.lang, s, this.betNames(after));
+            const text = M.matchResult(this.lang, after, r);
+            this.post(t, payout ? `${text}\n${payout}` : text);
             break;
+          }
+          case 'tournament.finished': {
+            const s = this.bets.discordTournament(t.id);
+            const summary = s && M.betsTournament(this.lang, s, this.betNames(after));
+            const text = M.champion(this.lang, after, info.link);
+            this.post(t, summary ? `${text}\n${summary}` : text);
+            break;
+          }
           default:
             break;
         }
       }
       if (stored.some((e) => e.type === 'match.result')) this.placements(info, before(), after);
     });
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Bets with Neuro (season tournaments; switch in the season's betting settings)
+  // ------------------------------------------------------------------------------------------
+
+  private betNames(p: TournamentProjection): M.BetNames {
+    const bettor = this.bets.bettorNames();
+    return { entrant: (id) => p.entrants[id]?.displayName ?? id, bettor };
+  }
+
+  /** "Bets open" when a match is called and keeps taking bets for the betting phase. */
+  private betsOpen(t: TournamentRow, p: TournamentProjection, matchId: string): void {
+    if (!this.channel(t)) return;
+    const open = this.bets.discordOpen(t.id, matchId);
+    const m = p.bracket?.matches.find((x) => x.id === matchId);
+    const [a, b] = m?.entrants ?? [];
+    if (!open || !a || !b) return;
+    const link = `${this.config.publicUrl}/t/${t.id}/m/${matchId}`;
+    const name = (id: string) => p.entrants[id]?.displayName ?? id;
+    this.post(t, M.betsOpen(this.lang, name(a), name(b), open.windowSec, link));
   }
 
   /** Entrants that just got their final place hear about it. */

@@ -15,19 +15,24 @@ import { botKey, userKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import {
+  betOdds as odds,
   betRecords,
   botBettor,
   emptyWallet,
   isBotBettor,
+  matchBetSummary,
   matchBooks,
   pools,
   settleMatch,
+  tournamentBetSummary,
   wallets,
   type Bailout,
   type Bet,
   type BetKind,
+  type MatchBetSummary,
   type MatchBook,
   type SettledBet,
+  type TournamentBetSummary,
   type Wallet,
 } from './betting.js';
 import {
@@ -485,6 +490,65 @@ export class BetsService {
     return out;
   }
 
+  // --- Discord channel ------------------------------------------------------------------------
+
+  /** Bets go to the Discord channel: a season tournament, a season, the switch on. */
+  private discordOn(t: typeof tournaments.$inferSelect | undefined): boolean {
+    const season = this.seasons.current();
+    return !!t?.seasonal && !!season && season.betting.discord;
+  }
+
+  private tournamentBets(tournamentId: string, matchId?: string): Bet[] {
+    return this.db
+      .select()
+      .from(bets)
+      .where(
+        matchId
+          ? and(eq(bets.tournamentId, tournamentId), eq(bets.matchId, matchId))
+          : eq(bets.tournamentId, tournamentId),
+      )
+      .all()
+      .map(toBet);
+  }
+
+  /** Display name of a bettor (users and bots under their current name). */
+  bettorNames(): (bettor: string) => string {
+    const names = this.names();
+    return (k) => names.get(k) ?? k;
+  }
+
+  /** The match was called and takes bets for a while: how long (null: nothing to post). */
+  discordOpen(tournamentId: string, matchId: string): { windowSec: number } | null {
+    const t = this.db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).get();
+    if (!t || !this.discordOn(t) || this.closedReason(t)) return null;
+    const windowSec = this.seasons.current()!.betting.windowSec;
+    const m = this.book(tournamentId)?.books.get(matchId);
+    if (!windowSec || m?.state !== 'open') return null;
+    return { windowSec };
+  }
+
+  /**
+   * Pools and odds of a match whose bets just closed (its first game started at `at`), or its
+   * payout once decided. Null when nobody bet or the channel gets no bets.
+   */
+  discordMatch(tournamentId: string, matchId: string, closedAt?: string): MatchBetSummary | null {
+    const t = this.db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).get();
+    if (!this.discordOn(t)) return null;
+    const m = this.book(tournamentId)?.books.get(matchId);
+    if (!m?.entrants) return null;
+    if (closedAt !== undefined && (m.state !== 'closed' || m.closedAt !== closedAt)) return null;
+    const list = this.tournamentBets(tournamentId, matchId);
+    if (!list.length) return null;
+    return matchBetSummary(m, this.settle(list));
+  }
+
+  /** Winners and losers of a finished tournament's bets (null: no decided bets). */
+  discordTournament(tournamentId: string): TournamentBetSummary | null {
+    const t = this.db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).get();
+    if (!this.discordOn(t)) return null;
+    return tournamentBetSummary(this.settle(this.tournamentBets(tournamentId)));
+  }
+
   // --- statistics -----------------------------------------------------------------------------
 
   /** Display names of all bettors: users and bots. */
@@ -655,21 +719,4 @@ function betSide(
     clans,
     players: [...players, ...botIds.map(botBettor)],
   };
-}
-
-/**
- * Odds per side after the window: total pool / pool of the side, from the bets that count
- * (a backed entrant still in the match, no players of the match); null if a side has none.
- */
-function odds(m: MatchBook, list: readonly Bet[]): Record<string, number | null> {
-  const valid = list.filter(
-    (b) => m.entrants!.includes(b.pick) && !m.participants.includes(b.userId),
-  );
-  const total = valid.reduce((s, b) => s + b.amount, 0);
-  const out: Record<string, number | null> = {};
-  for (const e of m.entrants!) {
-    const side = valid.filter((b) => b.pick === e).reduce((s, b) => s + b.amount, 0);
-    out[e] = side && total > side ? Math.round((total / side) * 100) / 100 : null;
-  }
-  return out;
 }

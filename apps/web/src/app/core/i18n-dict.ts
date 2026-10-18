@@ -756,6 +756,8 @@ const en = {
   'bets.versus': 'Man vs. machine',
   'bets.botRecords': 'Bot records',
   'bets.botsBetLabel': 'The bots of the control center bet too',
+  'bets.discordLabel':
+    "Post bets in the tournament's Discord channel (open, closed with pools, payout, summary)",
   'bets.botsPerMatch': 'Bots per match (at most)',
   'bets.type.analyst': 'Analyst',
   'bets.type.gambler': 'Gambler',
@@ -1588,6 +1590,8 @@ const de: Record<TKey, string> = {
   'bets.versus': 'Mensch gegen Maschine',
   'bets.botRecords': 'Bot-Rekorde',
   'bets.botsBetLabel': 'Die Bots des Kontrollzentrums wetten mit',
+  'bets.discordLabel':
+    'Wetten im Discord-Channel des Turniers posten (offen, geschlossen mit Pools, Auszahlung, Bilanz)',
   'bets.botsPerMatch': 'Bots pro Match (höchstens)',
   'bets.type.analyst': 'Analytiker',
   'bets.type.gambler': 'Zocker',

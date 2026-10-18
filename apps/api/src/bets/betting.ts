@@ -170,6 +170,116 @@ export function pools(bets: readonly Bet[]): Record<string, { amount: number; be
   return out;
 }
 
+/**
+ * Odds per side after the window: total pool / pool of the side, from the bets that count
+ * (a backed entrant still in the match, no players of the match); null if a side has none.
+ */
+export function betOdds(m: MatchBook, list: readonly Bet[]): Record<string, number | null> {
+  const valid = list.filter(
+    (b) => m.entrants!.includes(b.pick) && !m.participants.includes(b.userId),
+  );
+  const total = valid.reduce((s, b) => s + b.amount, 0);
+  const out: Record<string, number | null> = {};
+  for (const e of m.entrants!) {
+    const side = valid.filter((b) => b.pick === e).reduce((s, b) => s + b.amount, 0);
+    out[e] = side && total > side ? Math.round((total / side) * 100) / 100 : null;
+  }
+  return out;
+}
+
+/** Winner's odds from this value on count as an upset (Discord). */
+export const UPSET_ODDS = 3;
+
+/** A match's bets for the Discord channel: pools, odds, the biggest bet and, once decided, the
+ * payout (winners, their profit, the best win) or a refund. */
+export interface MatchBetSummary {
+  entrants: [string, string];
+  bettors: number;
+  total: number;
+  sides: Record<string, { amount: number; bettors: number; odds: number | null }>;
+  biggest: { userId: string; pick: string; amount: number } | null;
+  outcome:
+    | null
+    /** No game played (forfeit, simulated, called off), or bets on one side only. */
+    | { kind: 'refunded'; reason: 'noGame' | 'oneSided' }
+    | {
+        kind: 'paid';
+        winnerId: string;
+        winners: number;
+        /** Profit of all winners together (what the losers lost, rounded down per bet). */
+        profit: number;
+        best: { userId: string; profit: number } | null;
+        odds: number | null;
+        upset: boolean;
+      };
+}
+
+export function matchBetSummary(m: MatchBook, settled: readonly SettledBet[]): MatchBetSummary {
+  const entrants = m.entrants!;
+  const p = pools(settled);
+  const o = betOdds(m, settled);
+  const sides: MatchBetSummary['sides'] = {};
+  for (const e of entrants)
+    sides[e] = { amount: p[e]?.amount ?? 0, bettors: p[e]?.bettors ?? 0, odds: o[e] ?? null };
+  const biggest = [...settled].sort(
+    (a, b) => b.amount - a.amount || a.placedAt.localeCompare(b.placedAt),
+  )[0];
+  let outcome: MatchBetSummary['outcome'] = null;
+  const won = settled.filter((b) => b.status === 'won');
+  if (m.state === 'settled' && won.length && m.winnerId) {
+    const best = [...won].sort((a, b) => b.payout - b.amount - (a.payout - a.amount))[0]!;
+    const odds = o[m.winnerId] ?? null;
+    outcome = {
+      kind: 'paid',
+      winnerId: m.winnerId,
+      winners: won.length,
+      profit: won.reduce((s, b) => s + b.payout - b.amount, 0),
+      best: { userId: best.userId, profit: best.payout - best.amount },
+      odds,
+      upset: odds !== null && odds >= UPSET_ODDS,
+    };
+  } else if (m.state === 'settled') outcome = { kind: 'refunded', reason: 'oneSided' };
+  else if (m.state === 'refunded') outcome = { kind: 'refunded', reason: 'noGame' };
+  return {
+    entrants,
+    bettors: settled.length,
+    total: settled.reduce((s, b) => s + b.amount, 0),
+    sides,
+    biggest: biggest
+      ? { userId: biggest.userId, pick: biggest.pick, amount: biggest.amount }
+      : null,
+    outcome,
+  };
+}
+
+/** A tournament's bets at its end: biggest winner and loser, players against bots. */
+export interface TournamentBetSummary {
+  top: { userId: string; net: number } | null;
+  flop: { userId: string; net: number } | null;
+  /** Net result of all players and of all bots; null when only one kind bet. */
+  versus: { humans: number; bots: number } | null;
+}
+
+export function tournamentBetSummary(settled: readonly SettledBet[]): TournamentBetSummary | null {
+  const net = new Map<string, number>();
+  for (const b of settled)
+    if (b.status === 'won' || b.status === 'lost')
+      net.set(b.userId, (net.get(b.userId) ?? 0) + b.payout - b.amount);
+  if (!net.size) return null;
+  const rows = [...net].map(([userId, n]) => ({ userId, net: n }));
+  rows.sort((a, b) => b.net - a.net);
+  const top = rows[0]!.net > 0 ? rows[0]! : null;
+  const flop = rows.at(-1)!.net < 0 ? rows.at(-1)! : null;
+  const humans = rows.filter((r) => !isBotBettor(r.userId));
+  const bots = rows.filter((r) => isBotBettor(r.userId));
+  const sum = (l: typeof rows) => l.reduce((s, r) => s + r.net, 0);
+  return {
+    top,
+    flop,
+    versus: humans.length && bots.length ? { humans: sum(humans), bots: sum(bots) } : null,
+  };
+}
+
 export interface Bailout {
   userId: string;
   amount: number;
