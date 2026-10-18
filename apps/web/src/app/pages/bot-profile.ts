@@ -41,7 +41,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
           <span class="swatch" [style.background]="b.color"></span>
         }
         {{ b.gameName }}
-        <span class="badge">{{ 'stats.bot' | t }}</span>
+        <span class="badge bot">{{ 'stats.bot' | t }}</span>
         @if (!b.active) {
           <span class="badge">{{ 'bots.retired' | t }}</span>
         }

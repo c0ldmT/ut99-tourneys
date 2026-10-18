@@ -33,7 +33,7 @@ import type { BetMatchView } from '../core/types';
               <span class="who">
                 @if (x.bot) {
                   <a [routerLink]="['/bots', x.id]">{{ x.name }}</a>
-                  <span class="badge">BOT</span>
+                  <span class="badge bot">BOT</span>
                 } @else {
                   <a [routerLink]="['/stats/p', 'u:' + x.id]">{{ x.name }}</a>
                 }

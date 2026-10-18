@@ -373,6 +373,16 @@ tbody tr:hover td {
   border-color: rgba(240, 70, 140, 0.4);
   background: rgba(240, 70, 140, 0.1);
 }
+/* "BOT" next to a name */
+.badge.bot {
+  height: 17px;
+  padding: 0 5px;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  border-radius: 4px;
+  color: var(--muted);
+  vertical-align: middle;
+}
 .dot {
   display: inline-block;
   width: 8px;

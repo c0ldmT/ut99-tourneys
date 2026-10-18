@@ -12,6 +12,7 @@ import { PageTitle } from '../core/page-title';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BetPanel } from '../components/bet-panel';
+import { BetColumns } from '../components/bet-columns';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
@@ -23,7 +24,7 @@ import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
 import { finalMs, isRace, raceTime, type RunView } from '../core/race';
-import type { RatedGame, TournamentDetail, TournamentEventView } from '../core/types';
+import type { BetMatchView, RatedGame, TournamentDetail, TournamentEventView } from '../core/types';
 
 const ACTIVE = ['checkIn', 'running', 'paused'];
 
@@ -38,6 +39,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     TeamPanel,
     TeamRoster,
     BetPanel,
+    BetColumns,
   ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -310,139 +312,155 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
           />
         </div>
-        <app-bet-panel [tournament]="t" (openIds)="betOpen.set($event)" />
-        @if (race() && raceRows().length) {
-          <div class="card">
-            <h2>{{ 'race.results' | t }}</h2>
-            <p class="muted small">{{ 'race.resultsHint' | t: { s: penaltySec() } }}</p>
-            <div class="scroll">
-              <table class="races">
-                <thead>
-                  <tr>
-                    <th>{{ 'race.match' | t }}</th>
-                    <th>{{ 'race.map' | t }}</th>
-                    <th>{{ 'tp.team' | t }}</th>
-                    <th class="num">{{ 'race.raw' | t }}</th>
-                    <th class="num">{{ 'race.deaths' | t }}</th>
-                    <th class="num">{{ 'race.penalty' | t }}</th>
-                    <th class="num">{{ 'race.total' | t }}</th>
-                    <th class="num">{{ 'race.points' | t }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (row of raceRows(); track $index) {
-                    <tr [class.win]="row.won" [class.first]="row.first">
-                      <td>
-                        @if (row.first) {
-                          {{ row.matchId }} G{{ row.game }}
-                        }
-                      </td>
-                      <td>
-                        @if (row.first) {
-                          {{ row.map }}
-                        }
-                      </td>
-                      <td>
-                        {{ name(row.run.entrantId) }}
-                        @if (row.won) {
-                          🏁
-                        }
-                      </td>
-                      <td class="num">{{ raceTime(row.run.timeMs) }}</td>
-                      <td class="num">{{ row.run.deaths }}</td>
-                      <td class="num">+{{ raceTime(row.run.penaltyMs) }}</td>
-                      <td class="num">
-                        <b>{{
-                          row.run.finished
-                            ? raceTime(finalMs(row.run))
-                            : ((row.run.forfeit ? 'race.forfeit' : 'race.dnf') | t)
-                        }}</b>
-                      </td>
-                      <td class="num">{{ row.run.points }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
-        @if (t.seasonal && ratedGames().length) {
-          <div class="card">
-            <h2>{{ 'rating.changes' | t }}</h2>
-            <div class="scroll">
-              <table class="ratings">
-                <tbody>
-                  @for (g of ratedGames(); track g.matchId + g.game) {
-                    <tr>
-                      <td class="nowrap">{{ g.matchId }} G{{ g.game }}</td>
-                      @for (side of g.sides; track side.entrantId) {
-                        <td>
-                          @if (teamMode()) {
-                            <div class="muted small">{{ name(side.entrantId) }}</div>
-                          }
-                          @for (c of side.changes; track c.key) {
-                            <div class="nowrap change">
-                              <span>{{ c.name }}</span>
-                              @if (c.skill !== undefined) {
-                                <span class="muted small">({{ skillName(c.skill) | t }})</span>
-                              }
-                              <b [class.up]="c.delta > 0" [class.down]="c.delta < 0">{{
-                                signed(c.delta)
-                              }}</b>
-                              <span class="muted small">→ {{ c.after }}</span>
-                            </div>
-                          }
-                        </td>
+        <div class="cols" [class.solo]="!sideActive()">
+          <div class="main">
+            @for (m of runningBets(); track m.matchId) {
+              <div class="card">
+                <div class="spread">
+                  <h2>{{ 'bets.title' | t }} · {{ m.matchId }}</h2>
+                  <a class="small" [routerLink]="['/t', t.id, 'm', m.matchId]">{{
+                    'bets.closedNow' | t
+                  }}</a>
+                </div>
+                <app-bet-columns [match]="m" [names]="entrantNames()" />
+              </div>
+            }
+            @if (race() && raceRows().length) {
+              <div class="card">
+                <h2>{{ 'race.results' | t }}</h2>
+                <p class="muted small">{{ 'race.resultsHint' | t: { s: penaltySec() } }}</p>
+                <div class="scroll">
+                  <table class="races">
+                    <thead>
+                      <tr>
+                        <th>{{ 'race.match' | t }}</th>
+                        <th>{{ 'race.map' | t }}</th>
+                        <th>{{ 'tp.team' | t }}</th>
+                        <th class="num">{{ 'race.raw' | t }}</th>
+                        <th class="num">{{ 'race.deaths' | t }}</th>
+                        <th class="num">{{ 'race.penalty' | t }}</th>
+                        <th class="num">{{ 'race.total' | t }}</th>
+                        <th class="num">{{ 'race.points' | t }}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (row of raceRows(); track $index) {
+                        <tr [class.win]="row.won" [class.first]="row.first">
+                          <td>
+                            @if (row.first) {
+                              {{ row.matchId }} G{{ row.game }}
+                            }
+                          </td>
+                          <td>
+                            @if (row.first) {
+                              {{ row.map }}
+                            }
+                          </td>
+                          <td>
+                            {{ name(row.run.entrantId) }}
+                            @if (row.won) {
+                              🏁
+                            }
+                          </td>
+                          <td class="num">{{ raceTime(row.run.timeMs) }}</td>
+                          <td class="num">{{ row.run.deaths }}</td>
+                          <td class="num">+{{ raceTime(row.run.penaltyMs) }}</td>
+                          <td class="num">
+                            <b>{{
+                              row.run.finished
+                                ? raceTime(finalMs(row.run))
+                                : ((row.run.forfeit ? 'race.forfeit' : 'race.dnf') | t)
+                            }}</b>
+                          </td>
+                          <td class="num">{{ row.run.points }}</td>
+                        </tr>
                       }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+            <div class="card">
+              <h2>{{ 'tp.table' | t }}</h2>
+              <div class="scroll">
+                <table class="table">
+                  <thead>
+                    <tr>
+                      <th class="num">#</th>
+                      <th>{{ (teamMode() ? 'tp.team' : 'tp.player') | t }}</th>
+                      @if (t.seasonal && ratedGames().length) {
+                        <th>{{ 'tp.rating' | t }}</th>
+                      }
+                      <th class="num">{{ 'tp.record' | t }}</th>
                     </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
-        <div class="card">
-          <h2>{{ 'tp.standings' | t }}</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>{{ (teamMode() ? 'tp.team' : 'tp.player') | t }}</th>
-                <th>{{ 'tp.wins' | t }}</th>
-                <th>{{ 'tp.losses' | t }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (s of b.standings; track s.entrantId) {
-                <tr [class.me]="s.entrantId === t.me.entrantId">
-                  <td>{{ s.placement ?? '–' }}</td>
-                  <td>
-                    @if (libraryBotId(s.entrantId); as bid) {
-                      <a [routerLink]="['/bots', bid]">{{ name(s.entrantId) }}</a>
-                    } @else {
-                      {{ name(s.entrantId) }}
+                  </thead>
+                  <tbody>
+                    @for (s of b.standings; track s.entrantId) {
+                      <tr [class.me]="s.entrantId === t.me.entrantId">
+                        <td class="num mono">{{ s.placement ?? '–' }}</td>
+                        <td>
+                          <span class="who">
+                            @if (libraryBotId(s.entrantId); as bid) {
+                              <a [routerLink]="['/bots', bid]">{{ name(s.entrantId) }}</a>
+                            } @else if (humanUserId(s.entrantId); as uid) {
+                              <a [routerLink]="['/stats/p', 'u:' + uid]">{{ name(s.entrantId) }}</a>
+                            } @else {
+                              <span>{{ name(s.entrantId) }}</span>
+                            }
+                            @if (isBot(s.entrantId)) {
+                              <span class="badge bot">BOT</span>
+                            }
+                          </span>
+                        </td>
+                        @if (t.seasonal && ratedGames().length) {
+                          <td>
+                            @for (r of ratingSums().get(s.entrantId) ?? []; track r.key) {
+                              <div class="rt">
+                                @if (teamMode()) {
+                                  <span class="muted small rn">{{ r.name }}</span>
+                                }
+                                <span class="mono">{{ r.after }}</span>
+                                <b
+                                  class="mono"
+                                  [class.up]="r.delta > 0"
+                                  [class.down]="r.delta < 0"
+                                  >{{ signed(r.delta) }}</b
+                                >
+                              </div>
+                            } @empty {
+                              <span class="muted">–</span>
+                            }
+                          </td>
+                        }
+                        <td class="num mono">{{ s.wins }}–{{ s.losses }}</td>
+                      </tr>
                     }
-                    @if (isBot(s.entrantId)) {
-                      <span class="muted small"> BOT</span>
-                    }
-                  </td>
-                  <td>{{ s.wins }}</td>
-                  <td>{{ s.losses }}</td>
-                </tr>
+                  </tbody>
+                </table>
+              </div>
+              @if (t.seasonal && ratedGames().length) {
+                <p class="muted small">{{ 'tp.tableHint' | t }}</p>
               }
-            </tbody>
-          </table>
-        </div>
-      }
-
-      @if (teamMode() && t.projection) {
-        <div class="card">
-          <app-team-roster
-            [tournament]="t"
-            [isAdmin]="isAdmin()"
-            [myUserId]="auth.me()?.id ?? null"
-            (changed)="reload()"
-          />
+            </div>
+            @if (teamMode() && t.projection) {
+              <div class="card">
+                <app-team-roster
+                  [tournament]="t"
+                  [isAdmin]="isAdmin()"
+                  [myUserId]="auth.me()?.id ?? null"
+                  (changed)="reload()"
+                />
+              </div>
+            }
+          </div>
+          <aside class="sidecol">
+            <app-bet-panel
+              [tournament]="t"
+              (openIds)="betOpen.set($event)"
+              (running)="runningBets.set($event)"
+              (active)="sideActive.set($event)"
+            />
+          </aside>
         </div>
       }
 
@@ -714,6 +732,45 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       margin: 0;
       overflow-wrap: anywhere;
     }
+    .cols {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+    .cols.solo {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .cols.solo .sidecol {
+      display: none;
+    }
+    .sidecol {
+      position: sticky;
+      top: 84px;
+    }
+    @media (max-width: 960px) {
+      .cols {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .sidecol {
+        position: static;
+        order: -1;
+      }
+    }
+    .who {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .rt {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .rn {
+      min-width: 70px;
+    }
     .srv {
       font-weight: 600;
       display: flex;
@@ -839,6 +896,15 @@ export class TournamentPage {
   private readonly stream = inject(TournamentStream);
   /** Matches that take bets now (from the bets panel). */
   protected readonly betOpen = signal<string[]>([]);
+  /** Bets of the match being played (closed, from the bet panel). */
+  protected readonly runningBets = signal<BetMatchView[]>([]);
+  /** The side column has something to show (bets, next matches). */
+  protected readonly sideActive = signal(false);
+  protected readonly entrantNames = computed(() =>
+    Object.fromEntries(
+      Object.entries(this.t()?.projection?.entrants ?? {}).map(([k, e]) => [k, e.displayName]),
+    ),
+  );
   protected readonly router = inject(Router);
 
   protected readonly t = signal<TournamentDetail | null>(null);
@@ -1011,6 +1077,21 @@ export class TournamentPage {
 
   private ratingsHead = -1;
   protected readonly ratings = signal<RatedGame[]>([]);
+  /** Per entrant its players' rating after the tournament's games and the change in it. */
+  protected readonly ratingSums = computed(() => {
+    const out = new Map<string, { key: string; name: string; after: number; delta: number }[]>();
+    for (const g of this.ratings())
+      for (const c of g.changes) {
+        const l = out.get(c.entrantId) ?? [];
+        const r = l.find((x) => x.key === c.key);
+        if (r) {
+          r.delta += c.delta;
+          r.after = c.after;
+        } else l.push({ key: c.key, name: c.name, after: c.after, delta: c.delta });
+        out.set(c.entrantId, l);
+      }
+    return out;
+  });
   /** Rated games, newest first, winners first. */
   protected readonly ratedGames = computed(() =>
     [...this.ratings()].reverse().map((g) => ({
@@ -1041,6 +1122,12 @@ export class TournamentPage {
   protected libraryBotId(id: string): string | null {
     const e = this.t()?.projection?.entrants[id];
     return e?.kind === 'bot' ? (e.bot.id ?? null) : null;
+  }
+
+  /** A player's user id (link to the player page). */
+  protected humanUserId(id: string): string | null {
+    const e = this.t()?.projection?.entrants[id];
+    return e?.kind === 'human' ? e.userId : null;
   }
 
   protected isBot(id: string): boolean {

@@ -106,7 +106,7 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
                 <td>
                   @if (r.bot) {
                     <a [routerLink]="['/bots', r.id]">{{ r.name }}</a>
-                    <span class="badge">BOT</span>
+                    <span class="badge bot">BOT</span>
                   } @else {
                     <a [routerLink]="['/stats/p', 'u:' + r.userId]">{{ r.name }}</a>
                   }

@@ -106,7 +106,7 @@ const SUM_KEYS = [
                 } @else {
                   <span>{{ b.name }}</span>
                 }
-                <span class="badge">BOT</span>
+                <span class="badge bot">BOT</span>
               }
             </div>
           </div>
@@ -193,7 +193,7 @@ const SUM_KEYS = [
                             {{ p.name }}
                           }
                           @if (p.bot) {
-                            <span class="badge">BOT</span>
+                            <span class="badge bot">BOT</span>
                           }
                           @if (p.mvp) {
                             <span class="badge mvp">MVP</span>

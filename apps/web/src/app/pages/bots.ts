@@ -424,55 +424,116 @@ const emptyLines = () =>
 
             @if (filtered().length) {
               <div class="scroll">
-                <table>
+                <table class="botlist">
                   <thead>
                     <tr>
                       <th>{{ 'bots.name' | t }}</th>
-                      <th>{{ 'bots.clan' | t }}</th>
                       <th>{{ 'bots.skill' | t }}</th>
-                      <th>{{ 'bots.class' | t }}</th>
-                      <th>{{ 'bots.combatStyle' | t }}</th>
-                      <th>{{ 'bots.col.personality' | t }}</th>
-                      <th></th>
+                      <th class="wide">{{ 'bots.combatStyle' | t }}</th>
+                      <th class="acts">
+                        <span class="sr">{{ 'bots.actions' | t }}</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     @for (b of filtered(); track b.id) {
                       <tr [class.retired]="!b.active">
                         <td>
-                          @if (b.color) {
-                            <span class="swatch" [style.background]="b.color"></span>
-                          }
-                          <a [routerLink]="['/bots', b.id]">{{ b.gameName }}</a>
-                          @if (!b.active) {
-                            <span class="badge">{{ 'bots.retired' | t }}</span>
-                          }
+                          <div class="bname">
+                            @if (b.color) {
+                              <span class="swatch" [style.background]="b.color"></span>
+                            }
+                            <a [routerLink]="['/bots', b.id]">{{ b.gameName }}</a>
+                            @if (!b.active) {
+                              <span class="badge">{{ 'bots.retired' | t }}</span>
+                            }
+                          </div>
+                          <div class="muted small sub">
+                            @if (b.clanId) {
+                              {{ clanName(b.clanId) }} ·
+                            }
+                            {{
+                              'bots.summary'
+                                | t
+                                  : {
+                                      talk: b.personality.talk,
+                                      lines: b.personality.lines.length,
+                                      rivals: b.personality.rivals.length,
+                                    }
+                            }}
+                          </div>
                         </td>
-                        <td>{{ clanName(b.clanId) }}</td>
-                        <td>{{ b.skill }} – {{ 'skill.' + b.skill | t }}</td>
-                        <td>
-                          {{ label(assets()?.botClasses, b.botClass) || ('bots.default' | t) }}
+                        <td class="nowrap">
+                          <span class="mono">{{ b.skill }}</span>
+                          <span class="muted small skn"> {{ 'skill.' + b.skill | t }}</span>
                         </td>
-                        <td>{{ styleKey(b.traits.combatStyle) | t }}</td>
-                        <td class="muted small">
-                          {{
-                            'bots.summary'
-                              | t
-                                : {
-                                    talk: b.personality.talk,
-                                    lines: b.personality.lines.length,
-                                    rivals: b.personality.rivals.length,
-                                  }
-                          }}
+                        <td class="wide">
+                          {{ styleKey(b.traits.combatStyle) | t }}
+                          <div class="muted small">
+                            {{ label(assets()?.botClasses, b.botClass) || ('bots.default' | t) }}
+                          </div>
                         </td>
-                        <td class="actions">
-                          <button (click)="edit(b)">{{ 'common.edit' | t }}</button>
-                          <button (click)="toggleActive(b)" [disabled]="busy()">
-                            {{ (b.active ? 'bots.retire' : 'bots.activate') | t }}
-                          </button>
-                          <button class="danger" (click)="removeBot(b)" [disabled]="busy()">
-                            {{ 'common.delete' | t }}
-                          </button>
+                        <td class="acts">
+                          <div class="iconbtns">
+                            <button
+                              class="icon"
+                              (click)="edit(b)"
+                              [title]="'common.edit' | t"
+                              [attr.aria-label]="('common.edit' | t) + ' ' + b.gameName"
+                            >
+                              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  d="M4 20h4L19 9l-4-4L4 16zM14 6l4 4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linejoin="round"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              class="icon"
+                              (click)="toggleActive(b)"
+                              [disabled]="busy()"
+                              [title]="(b.active ? 'bots.retire' : 'bots.activate') | t"
+                              [attr.aria-label]="
+                                ((b.active ? 'bots.retire' : 'bots.activate') | t) +
+                                ' ' +
+                                b.gameName
+                              "
+                            >
+                              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                                @if (b.active) {
+                                  <path
+                                    d="M9 6v12M15 6v12"
+                                    stroke="currentColor"
+                                    stroke-width="2.2"
+                                    stroke-linecap="round"
+                                  />
+                                } @else {
+                                  <path d="M8 5l11 7-11 7z" fill="currentColor" />
+                                }
+                              </svg>
+                            </button>
+                            <button
+                              class="icon dng"
+                              (click)="removeBot(b)"
+                              [disabled]="busy()"
+                              [title]="'common.delete' | t"
+                              [attr.aria-label]="('common.delete' | t) + ' ' + b.gameName"
+                            >
+                              <svg width="17" height="17" viewBox="0 0 24 24" aria-hidden="true">
+                                <path
+                                  d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     }
@@ -594,6 +655,64 @@ const emptyLines = () =>
     }
   `,
   styles: `
+    table.botlist td {
+      vertical-align: middle;
+    }
+    .bname {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    .sub {
+      margin-top: 2px;
+      white-space: normal;
+    }
+    .nowrap {
+      white-space: nowrap;
+    }
+    th.acts,
+    td.acts {
+      width: 1%;
+      text-align: right;
+    }
+    .iconbtns {
+      display: inline-flex;
+      gap: 4px;
+    }
+    button.icon {
+      width: 36px;
+      min-height: 36px;
+      padding: 0;
+      background: transparent;
+      border-color: transparent;
+      color: var(--text-2);
+    }
+    button.icon:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--line);
+    }
+    button.icon.dng:hover:not(:disabled) {
+      color: var(--danger);
+      border-color: var(--danger-strong);
+      background: rgba(255, 92, 108, 0.08);
+    }
+    .sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+    @media (max-width: 640px) {
+      .wide,
+      .skn {
+        display: none;
+      }
+      button.icon {
+        width: 32px;
+      }
+    }
     .toolbar {
       margin-bottom: 12px;
     }

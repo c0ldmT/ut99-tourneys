@@ -57,7 +57,7 @@ import type {
       <h1>
         {{ d.row.name }}
         @if (d.row.bot) {
-          <span class="badge">{{ 'stats.bot' | t }}</span>
+          <span class="badge bot">{{ 'stats.bot' | t }}</span>
         }
         @if (botId(); as id) {
           <a class="profile-link small" [routerLink]="['/bots', id]">{{

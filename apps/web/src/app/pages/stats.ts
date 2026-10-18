@@ -162,7 +162,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                       r.name
                     }}</a>
                     @if (r.bot) {
-                      <span class="badge">{{ 'stats.bot' | t }}</span>
+                      <span class="badge bot">{{ 'stats.bot' | t }}</span>
                     }
                     @if (r.provisional) {
                       <span class="badge">{{ 'rating.provisional' | t }}</span>
@@ -207,7 +207,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                       r.name
                     }}</a>
                     @if (r.bot) {
-                      <span class="badge">{{ 'stats.bot' | t }}</span>
+                      <span class="badge bot">{{ 'stats.bot' | t }}</span>
                     }
                   </td>
                   @for (c of columns(); track c.key) {

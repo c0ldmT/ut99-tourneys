@@ -66,14 +66,14 @@ type Team = Extract<Entrant, { kind: 'team' }>;
             }
             @for (b of team.bots; track b.name) {
               <li class="muted">
-                <span>
+                <span class="nmb">
                   @if (b.id) {
                     <a [routerLink]="['/bots', b.id]">{{ b.name }}</a>
                   } @else {
-                    {{ b.name }}
+                    <span>{{ b.name }}</span>
                   }
-                  <span class="bot">BOT</span></span
-                >
+                  <span class="badge bot">BOT</span>
+                </span>
               </li>
             }
           </ul>
@@ -133,9 +133,10 @@ type Team = Extract<Entrant, { kind: 'team' }>;
       font-size: 1rem;
       margin: 0;
     }
-    .bot {
-      font-size: 0.7rem;
-      letter-spacing: 0.08em;
+    .nmb {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     .ok {
       color: var(--accent);

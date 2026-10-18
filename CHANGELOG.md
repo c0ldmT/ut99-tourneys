@@ -80,6 +80,11 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   sides of a match), Neuro coin next to balances, header with a menu button on phones, footer with the version,
   page titles in the browser tab. Tournament list: the match being played now on top (series score), filters,
   cards with fill bar and champion. Default `SITE_NAME` is now "Neuro Arena" (an existing `.env` keeps its value).
+- Tournament page for big brackets: bets in a side column (one open match at a time, switch between them; stake
+  presets 10 %/25 %/all-in; expert tip) with the next five matches below it; only the bets of the match being played
+  are listed (the history per match stays on the match pages); one compact table with placement, rating after the
+  tournament and its change, wins–losses (per game on the match pages) replaces "rating changes" and "standings".
+  Bot control center: compact list with icon buttons, no horizontal scrolling. "BOT" is the same badge everywhere.
 - Monster Hunt: the bot AI enhancements (waypoint order, jump routes, keeping clear of movers, opening closed
   doors, unstick, the fix for once-only movers) are always on; the option "Bot helpers" is gone from the
   tournament form, which explains them in a note instead. Older tournaments with the option switched off now use
