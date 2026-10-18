@@ -11,7 +11,7 @@ import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
 import { users } from '../src/db/schema.js';
 import { TournamentsService } from '../src/tournaments/tournaments.service.js';
-import type { DiscordOut } from '../src/notify/discord-out.js';
+import type { DiscordOut, DiscordPost } from '../src/notify/discord-out.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 import { eq } from 'drizzle-orm';
 
@@ -405,8 +405,24 @@ describe('website + bridge + simulated UT server', () => {
   it('sends Discord notifications when they are configured', async () => {
     const posts: string[] = [];
     const dms: { to: string; text: string }[] = [];
+    // Channel posts are embeds: flattened to text here (author, title, description, fields).
+    const flat = (p: string | DiscordPost) =>
+      typeof p === 'string'
+        ? p
+        : p.embeds
+            .map((e) =>
+              [
+                e.author?.name,
+                e.title,
+                e.description,
+                ...(e.fields ?? []).map((f) => `${f.name}: ${f.value}`),
+              ]
+                .filter(Boolean)
+                .join('\n'),
+            )
+            .join('\n');
     const out: DiscordOut = {
-      webhook: (_url, text) => void posts.push(text),
+      webhook: (_url, text) => void posts.push(flat(text)),
       dm: (to, text) => void dms.push({ to, text }),
       idle: async () => {},
     };
@@ -432,7 +448,7 @@ describe('website + bridge + simulated UT server', () => {
       },
     });
     const { admin, id } = env;
-    expect(posts[0]).toMatch(/Friday Cup.*registration is open/);
+    expect(posts[0]).toMatch(/Friday Cup[\s\S]*Registration is open/);
     // Anna does not want direct messages.
     expect((await env.players[1]!.patch('/me', { notifyDm: false })).body.notifyDm).toBe(false);
 
@@ -442,10 +458,10 @@ describe('website + bridge + simulated UT server', () => {
     await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
     const d = (await admin.get(`/tournaments/${id}`)).body;
 
-    expect(posts.some((p) => p.startsWith('🟢 Check-in for **Friday Cup**'))).toBe(true);
-    const results = posts.filter((p) => /^`[WLG]/.test(p));
+    expect(posts.some((p) => p.startsWith('🟢 Check-in: Friday Cup'))).toBe(true);
+    const results = posts.filter((p) => /^Friday Cup · [WLG]/.test(p));
     expect(results).toHaveLength(d.projection.results.length);
-    expect(posts.at(-1)).toMatch(/^🏆 \*\*.+\*\* wins \*\*Friday Cup\*\*/);
+    expect(posts.at(-1)).toMatch(/^🏆 .+ wins Friday Cup!/);
 
     // Only Mario gets DMs: check-in with his connect command, his matches, his place.
     expect(dms.every((m) => m.to === '300000000000000001')).toBe(true);

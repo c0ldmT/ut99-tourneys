@@ -4,9 +4,27 @@ import type { ApiLogger } from '../common/logger.js';
  * Outgoing Discord messages: webhook posts to a channel and direct messages from a bot.
  * Everything here is best effort: failures are logged, never thrown, and nothing waits for it.
  */
+/** A Discord embed (https://discord.com/developers/docs/resources/message#embed-object). */
+export interface Embed {
+  title?: string;
+  description?: string;
+  url?: string;
+  color?: number;
+  author?: { name: string; url?: string };
+  fields?: { name: string; value: string; inline?: boolean }[];
+  footer?: { text: string };
+  timestamp?: string;
+}
+
+/** A channel post: text, embeds or both. */
+export interface DiscordPost {
+  content?: string;
+  embeds: Embed[];
+}
+
 export interface DiscordOut {
-  /** Posts to a channel webhook. */
-  webhook(url: string, content: string): void;
+  /** Posts to a channel webhook (plain text or embeds). */
+  webhook(url: string, content: string | DiscordPost): void;
   /** Sends a direct message to a Discord user (needs a bot token). */
   dm(discordUserId: string, content: string): void;
   /** Resolves when everything queued so far was sent or given up (tests). */
@@ -27,6 +45,25 @@ export const isDiscordId = (id: string) => /^\d{5,25}$/.test(id);
 
 /** Discord rejects messages over 2000 characters. */
 export const fitMessage = (s: string) => (s.length <= 1900 ? s : `${s.slice(0, 1897)}...`);
+
+const cut = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 3)}...`);
+
+/** Discord's embed limits: title 256, description 4096, 25 fields (name 256, value 1024). */
+export function fitEmbed(e: Embed): Embed {
+  return {
+    ...e,
+    ...(e.title ? { title: cut(e.title, 256) } : {}),
+    ...(e.description ? { description: cut(e.description, 4000) } : {}),
+    ...(e.author ? { author: { ...e.author, name: cut(e.author.name, 256) } } : {}),
+    ...(e.fields
+      ? {
+          fields: e.fields
+            .slice(0, 25)
+            .map((f) => ({ ...f, name: cut(f.name, 256), value: cut(f.value || '–', 1024) })),
+        }
+      : {}),
+  };
+}
 
 type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
 
@@ -82,10 +119,14 @@ export function discordOut(opts: {
       .then(() => sleep(gap));
   }
 
-  const message = (content: string) => ({
-    content: fitMessage(content),
-    allowed_mentions: { parse: [] as string[] },
-  });
+  const message = (content: string | DiscordPost) =>
+    typeof content === 'string'
+      ? { content: fitMessage(content), allowed_mentions: { parse: [] as string[] } }
+      : {
+          ...(content.content ? { content: fitMessage(content.content) } : {}),
+          embeds: content.embeds.slice(0, 10).map(fitEmbed),
+          allowed_mentions: { parse: [] as string[] },
+        };
 
   return {
     webhook(url, content) {

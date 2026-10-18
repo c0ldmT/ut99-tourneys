@@ -14,7 +14,13 @@ import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { registrations, tournaments, users } from '../db/schema.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
-import { DISCORD_OUT, isDiscordId, isWebhookUrl, type DiscordOut } from './discord-out.js';
+import {
+  DISCORD_OUT,
+  isDiscordId,
+  isWebhookUrl,
+  type DiscordOut,
+  type DiscordPost,
+} from './discord-out.js';
 import * as M from './messages.js';
 
 type TournamentRow = typeof tournaments.$inferSelect;
@@ -93,7 +99,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     return this.defaultWebhook();
   }
 
-  private post(t: TournamentRow, text: string): void {
+  private post(t: TournamentRow, text: string | DiscordPost): void {
     const url = this.channel(t);
     if (url) this.out.webhook(url, text);
   }
@@ -143,7 +149,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       const t = this.row(tournamentId);
       if (!t || !t.registrationOpen || t.announcedAt || t.phase !== 'draft' || !this.channel(t))
         return;
-      this.post(t, M.announce(this.lang, this.info(t)));
+      this.post(t, M.announceEmbed(this.lang, this.info(t)));
       this.db
         .update(tournaments)
         .set({ announcedAt: new Date(this.clock.now()).toISOString() })
@@ -215,7 +221,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             const deadline = new Date(
               Date.parse(e.at) + after.settings.checkInWindowMin * 60_000,
             ).toISOString();
-            this.post(t, M.checkInOpened(this.lang, info, deadline));
+            this.post(t, M.checkInEmbed(this.lang, info, deadline));
             const address = this.address(t);
             const ids = Object.values(after.entrants).flatMap((x) =>
               NotificationsService.userIds(x),
@@ -240,22 +246,29 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
           }
           case 'match.started': {
             const s = this.bets.discordMatch(t.id, e.data.matchId, e.at);
-            if (s) this.post(t, M.betsClosed(this.lang, s, this.betNames(after)));
+            if (s)
+              this.post(
+                t,
+                M.betsClosedEmbed(
+                  this.lang,
+                  s,
+                  this.betNames(after),
+                  this.matchLink(t, e.data.matchId),
+                ),
+              );
             break;
           }
           case 'match.result': {
             const r = e.data.result as MatchResult;
             const s = this.bets.discordMatch(t.id, r.matchId);
             const payout = s && M.betsPayout(this.lang, s, this.betNames(after));
-            const text = M.matchResult(this.lang, after, r);
-            this.post(t, payout ? `${text}\n${payout}` : text);
+            this.post(t, M.resultEmbed(this.lang, after, r, this.matchLink(t, r.matchId), payout));
             break;
           }
           case 'tournament.finished': {
             const s = this.bets.discordTournament(t.id);
             const summary = s && M.betsTournament(this.lang, s, this.betNames(after));
-            const text = M.champion(this.lang, after, info.link);
-            this.post(t, summary ? `${text}\n${summary}` : text);
+            this.post(t, M.championEmbed(this.lang, after, info.link, summary));
             break;
           }
           default:
@@ -270,6 +283,10 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
   // Bets with Neuro (season tournaments; switch in the season's betting settings)
   // ------------------------------------------------------------------------------------------
 
+  private matchLink(t: TournamentRow, matchId: string): string {
+    return `${this.config.publicUrl}/t/${t.id}/m/${matchId}`;
+  }
+
   private betNames(p: TournamentProjection): M.BetNames {
     const bettor = this.bets.bettorNames();
     return { entrant: (id) => p.entrants[id]?.displayName ?? id, bettor };
@@ -282,9 +299,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     const m = p.bracket?.matches.find((x) => x.id === matchId);
     const [a, b] = m?.entrants ?? [];
     if (!open || !a || !b) return;
-    const link = `${this.config.publicUrl}/t/${t.id}/m/${matchId}`;
     const name = (id: string) => p.entrants[id]?.displayName ?? id;
-    this.post(t, M.betsOpen(this.lang, name(a), name(b), open.windowSec, link));
+    this.post(
+      t,
+      M.betsOpenEmbed(this.lang, name(a), name(b), open.windowSec, this.matchLink(t, matchId)),
+    );
   }
 
   /** Entrants that just got their final place hear about it. */

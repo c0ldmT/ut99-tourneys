@@ -1,6 +1,7 @@
 import type { MatchResult } from '@tourney/bracket';
 import type { TournamentProjection, TournamentSettings } from '@tourney/protocol';
 import type { MatchBetSummary, TournamentBetSummary } from '../bets/betting.js';
+import type { DiscordPost, Embed } from './discord-out.js';
 
 /** Texts of the Discord notifications (pure functions, one language per installation). */
 
@@ -37,6 +38,29 @@ const T = {
     dmOutYou: '**{name}**: Du bist ausgeschieden – Platz {place}. Danke fürs Mitspielen!',
     dmWon: '🏆 Glückwunsch! {who} hat **{name}** gewonnen.',
     dmWonYou: '🏆 Glückwunsch! Du hast **{name}** gewonnen.',
+    eChampion: '🏆 {w} gewinnt {name}!',
+    eMode: 'Modus',
+    eFormat: 'Format',
+    eSize: 'Plätze',
+    eStart: 'Start',
+    eSignUp: 'Anmeldung offen – jetzt auf der Website anmelden.',
+    eCheckInTitle: '🟢 Check-in: {name}',
+    eCheckIn:
+      'Der Server ist online. Verbinde dich mit deinem persönlichen Befehl von der Website.',
+    eStartLatest: 'Start spätestens',
+    eGame: 'Spiel {n}',
+    eSeries: 'Serie',
+    eBets: '💰 Wetten',
+    ePlaces: 'Platzierungen',
+    eBracket: 'Zum Turnierbaum',
+    eBetsOpenTitle: '🎲 Wetten offen: {a} vs {b}',
+    eBetsOpen: 'Noch mindestens **{sec} s**, dann startet der Countdown. [Jetzt wetten]({link})',
+    eBetsClosedTitle: '🔒 Wetten geschlossen: {a} vs {b}',
+    ePool: 'Pool',
+    eBiggest: 'Größte Wette',
+    eOdds: 'Quote {odds}',
+    eBetsSummary: '📊 Wetten',
+    eNoGame: 'kein Spiel gespielt',
     betsOpen: '🎲 Wetten offen: **{a}** vs **{b}** – noch mindestens {sec} s: {link}',
     betsClosed: '🔒 Wetten geschlossen: **{a}** vs **{b}** – Pool {pool} · {sides}{big}',
     betsSide: '{name} {odds} ({n})',
@@ -84,6 +108,28 @@ const T = {
     dmOutYou: '**{name}**: you are out – place {place}. Thanks for playing!',
     dmWon: '🏆 Congratulations! {who} won **{name}**.',
     dmWonYou: '🏆 Congratulations! You won **{name}**.',
+    eChampion: '🏆 {w} wins {name}!',
+    eMode: 'Mode',
+    eFormat: 'Format',
+    eSize: 'Slots',
+    eStart: 'Start',
+    eSignUp: 'Registration is open – sign up on the website.',
+    eCheckInTitle: '🟢 Check-in: {name}',
+    eCheckIn: 'The server is online. Connect with your personal command from the website.',
+    eStartLatest: 'Starts at the latest',
+    eGame: 'Game {n}',
+    eSeries: 'Series',
+    eBets: '💰 Bets',
+    ePlaces: 'Placements',
+    eBracket: 'Open the bracket',
+    eBetsOpenTitle: '🎲 Bets open: {a} vs {b}',
+    eBetsOpen: 'At least **{sec} s** left, then the countdown starts. [Bet now]({link})',
+    eBetsClosedTitle: '🔒 Bets closed: {a} vs {b}',
+    ePool: 'Pool',
+    eBiggest: 'Biggest bet',
+    eOdds: 'odds {odds}',
+    eBetsSummary: '📊 Bets',
+    eNoGame: 'no game played',
     betsOpen: '🎲 Bets open: **{a}** vs **{b}** – at least {sec} s left: {link}',
     betsClosed: '🔒 Bets closed: **{a}** vs **{b}** – pool {pool} · {sides}{big}',
     betsSide: '{name} {odds} ({n})',
@@ -337,4 +383,168 @@ export function betsTournament(lang: Lang, s: TournamentBetSummary, n: BetNames)
       }),
     );
   return parts.length ? fill(lang, 'betsTournament', { parts: parts.join(' · ') }) : null;
+}
+
+// --- Channel posts as embeds ------------------------------------------------------------------
+
+/** Embed colours: cyan (actions), green (live, wins), gold (Neuro, champion), magenta, grey. */
+export const COLOR = {
+  cyan: 0x22d3ee,
+  green: 0x4ade80,
+  gold: 0xf5b83d,
+  magenta: 0xf0468c,
+  grey: 0x5d6679,
+} as const;
+
+const post = (...embeds: Embed[]): DiscordPost => ({ embeds });
+const plain = (s: string) => s.replace(/\*\*/g, '');
+
+export function announceEmbed(lang: Lang, t: TournamentInfo): DiscordPost {
+  const fields = [
+    { name: fill(lang, 'eMode'), value: modeText(lang, t.settings), inline: true },
+    { name: fill(lang, 'eFormat'), value: fill(lang, t.settings.format), inline: true },
+    {
+      name: fill(lang, t.settings.teamSize > 1 ? 'teams' : 'eSize'),
+      value: String(t.settings.size),
+      inline: true,
+    },
+  ];
+  if (t.scheduledAt)
+    fields.push({
+      name: fill(lang, 'eStart'),
+      value: `${when(t.scheduledAt)} (${when(t.scheduledAt, 'R')})`,
+      inline: false,
+    });
+  return post({
+    title: `📣 ${t.name}`,
+    url: t.link,
+    description: `${fill(lang, 'eSignUp')}\n${t.link}`,
+    color: COLOR.cyan,
+    fields,
+  });
+}
+
+export function checkInEmbed(lang: Lang, t: TournamentInfo, deadlineIso: string): DiscordPost {
+  return post({
+    title: fill(lang, 'eCheckInTitle', { name: t.name }),
+    url: t.link,
+    description: fill(lang, 'eCheckIn'),
+    color: COLOR.green,
+    fields: [{ name: fill(lang, 'eStartLatest'), value: when(deadlineIso, 'R') }],
+  });
+}
+
+/** A match result; `payout`: the bets line, if any. */
+export function resultEmbed(
+  lang: Lang,
+  p: TournamentProjection,
+  r: MatchResult,
+  link: string,
+  payout?: string | null,
+): DiscordPost {
+  const nm = (id: string) => p.entrants[id]?.displayName ?? id;
+  const loser = r.entrants.find((e) => e !== r.winnerId) ?? '';
+  const race = p.settings.game.adapter === 'ut99-mh';
+  const games = r.games ?? [];
+  const pair = (g: { scores: Record<string, number> }) =>
+    race
+      ? `${raceTime(g.scores[r.winnerId] ?? 0)} / ${raceTime(g.scores[loser] ?? 0)}`
+      : `${g.scores[r.winnerId] ?? 0} : ${g.scores[loser] ?? 0}`;
+  const key = r.outcome === 'played' ? 'played' : r.outcome;
+  const title = plain(fill(lang, key, { w: nm(r.winnerId), l: nm(loser), score: '' }));
+  const fields: { name: string; value: string; inline?: boolean }[] = [];
+  if (games.length > 1) {
+    const wins = games.filter((g) => g.winnerId === r.winnerId).length;
+    fields.push({ name: fill(lang, 'eSeries'), value: `**${wins} : ${games.length - wins}**` });
+    games.forEach((g, i) =>
+      fields.push({
+        name: `${fill(lang, 'eGame', { n: i + 1 })} · ${g.map ?? '?'}`,
+        value: pair(g),
+        inline: true,
+      }),
+    );
+  }
+  if (payout) fields.push({ name: fill(lang, 'eBets'), value: payout.replace(/^💰 /, '') });
+  return post({
+    author: { name: `${p.name} · ${r.matchId}`, url: link },
+    title: `${r.outcome === 'played' ? '⚔️' : '⏭️'} ${title}`,
+    url: link,
+    ...(games.length === 1
+      ? { description: `**${pair(games[0]!)}** · ${games[0]!.map ?? ''}` }
+      : {}),
+    color: r.outcome === 'played' ? COLOR.green : COLOR.grey,
+    ...(fields.length ? { fields } : {}),
+  });
+}
+
+export function championEmbed(
+  lang: Lang,
+  p: TournamentProjection,
+  link: string,
+  bets?: string | null,
+): DiscordPost {
+  const name = (id: string) => md(p.entrants[id]?.displayName ?? id);
+  const medal = ['🥇', '🥈', '🥉', '4.'];
+  const placed = (p.bracket?.standings ?? [])
+    .filter((s) => s.placement && s.placement <= 4)
+    .sort((a, b) => (a.placement ?? 0) - (b.placement ?? 0))
+    .map((s) => `${medal[(s.placement ?? 4) - 1] ?? `${s.placement}.`} ${name(s.entrantId)}`);
+  const fields = placed.length ? [{ name: fill(lang, 'ePlaces'), value: placed.join('\n') }] : [];
+  if (bets)
+    fields.push({ name: fill(lang, 'eBetsSummary'), value: bets.replace(/^📊 [^:]+: /, '') });
+  return post({
+    title: fill(lang, 'eChampion', {
+      w: p.entrants[p.championId ?? '']?.displayName ?? '',
+      name: p.name,
+    }),
+    url: link,
+    description: `[${fill(lang, 'eBracket')}](${link})`,
+    color: COLOR.gold,
+    fields,
+  });
+}
+
+export function betsOpenEmbed(
+  lang: Lang,
+  a: string,
+  b: string,
+  sec: number,
+  link: string,
+): DiscordPost {
+  return post({
+    title: fill(lang, 'eBetsOpenTitle', { a, b }),
+    url: link,
+    description: fill(lang, 'eBetsOpen', { sec, link }),
+    color: COLOR.gold,
+  });
+}
+
+export function betsClosedEmbed(
+  lang: Lang,
+  s: MatchBetSummary,
+  n: BetNames,
+  link: string,
+): DiscordPost {
+  const [a, b] = s.entrants;
+  const side = (e: string) => {
+    const x = s.sides[e];
+    return `**${oddsText(lang, x?.odds ?? null)}**\n${neuro(lang, x?.amount ?? 0)} · ${betCount(lang, x?.bettors ?? 0)}`;
+  };
+  const fields = [
+    { name: n.entrant(a), value: side(a), inline: true },
+    { name: n.entrant(b), value: side(b), inline: true },
+    { name: fill(lang, 'ePool'), value: `**${neuro(lang, s.total)}**`, inline: true },
+  ];
+  if (s.biggest)
+    fields.push({
+      name: fill(lang, 'eBiggest'),
+      value: `${md(n.bettor(s.biggest.userId))}: ${neuro(lang, s.biggest.amount)} → ${md(n.entrant(s.biggest.pick))}`,
+      inline: false,
+    });
+  return post({
+    title: fill(lang, 'eBetsClosedTitle', { a: n.entrant(a), b: n.entrant(b) }),
+    url: link,
+    color: COLOR.magenta,
+    fields,
+  });
 }

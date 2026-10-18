@@ -75,6 +75,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Discord channel posts are embeds: registration, check-in, results (series and games as fields, bets payout),
+  champion (medals, bets summary), bets open and closed (odds, pools, biggest bet as fields), coloured by type and
+  linked to the tournament or match page. Direct messages stay plain text.
 - Tournament list: the banner of a running tournament opens the tournament page and shows the live score of the
   game in progress (frags; Monster Hunt: run times), refreshed every few seconds, with the game phase and the series.
   Statistics: filters inside the table panel like the bot control center. Icon buttons (edit, delete, copy, new

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { FakeClock } from '@tourney/bridge';
 import { DB, type Db } from '../src/db/database.js';
 import { users } from '../src/db/schema.js';
-import { discordOut, isWebhookUrl, type DiscordOut } from '../src/notify/discord-out.js';
+import {
+  discordOut,
+  isWebhookUrl,
+  type DiscordOut,
+  type DiscordPost,
+} from '../src/notify/discord-out.js';
 import * as M from '../src/notify/messages.js';
 import { NotificationsService } from '../src/notify/notifications.service.js';
 import { Client, memoryLogger, startApi, startSeason, tournamentBody } from './helpers.js';
@@ -43,6 +48,11 @@ describe('discord out', () => {
     expect(f.calls[1]!.body).toEqual({ content: 'hello *world*', allowed_mentions: { parse: [] } });
     expect(log.lines.some((l) => l.includes('not a Discord webhook'))).toBe(true);
     expect(isWebhookUrl('https://discordapp.com/api/v10/webhooks/1/abc')).toBe(true);
+    // Embeds go out with Discord's limits applied.
+    out.webhook(HOOK, { embeds: [{ title: 'x'.repeat(300), fields: [{ name: 'a', value: '' }] }] });
+    await out.idle();
+    expect(f.calls.at(-1)!.body.embeds[0].title).toHaveLength(256);
+    expect(f.calls.at(-1)!.body.embeds[0].fields[0].value).toBe('–');
   });
 
   it('opens a DM channel once, and stops after a rejected token', async () => {
@@ -169,9 +179,10 @@ describe('reminders', () => {
 
 describe('bets in the channel', () => {
   it('posts bets open, closed with pools, payout and the summary', async () => {
-    const posts: string[] = [];
+    const posts: DiscordPost[] = [];
     const out: DiscordOut = {
-      webhook: (_url, text) => void posts.push(text),
+      webhook: (_url, text) =>
+        void posts.push(typeof text === 'string' ? { content: text, embeds: [] } : text),
       dm: () => {},
       idle: async () => {},
     };
@@ -224,16 +235,22 @@ describe('bets in the channel', () => {
         { type: 'tournament.started', data: {} },
         { type: 'match.called', data: { matchId: m.matchId, entrants: m.entrants } },
       ]);
-      const open = posts.find((p) => p.startsWith('🎲'));
-      expect(open).toContain(`noch mindestens 20 s: `);
-      expect(open).toContain(`/t/${id}/m/${m.matchId}`);
+      const title = (p: DiscordPost) => p.embeds[0]?.title ?? '';
+      const open = posts.find((p) => title(p).startsWith('🎲'))!.embeds[0]!;
+      expect(open.description).toContain('Noch mindestens **20 s**');
+      expect(open.url).toContain(`/t/${id}/m/${m.matchId}`);
       append([{ type: 'match.started', data: { matchId: m.matchId, game: 1 } }]);
-      expect(posts.at(-1)).toBe(
-        `🔒 Wetten geschlossen: **${name(a)}** vs **${name(b)}** – Pool 900 € · ` +
-          `${name(a)} 1,5x (1 Wette) / ${name(b)} 3x (1 Wette) · größte Wette: Boss 600 € auf ${name(a)}`,
-      );
+      expect(posts.at(-1)!.embeds[0]).toMatchObject({
+        title: `🔒 Wetten geschlossen: ${name(a)} vs ${name(b)}`,
+        fields: [
+          { name: name(a), value: '**1,5x**\n600 € · 1 Wette', inline: true },
+          { name: name(b), value: '**3x**\n300 € · 1 Wette', inline: true },
+          { name: 'Pool', value: '**900 €**', inline: true },
+          { name: 'Größte Wette', value: `Boss: 600 € → ${name(a)}`, inline: false },
+        ],
+      });
       append([{ type: 'match.started', data: { matchId: m.matchId, game: 2 } }]);
-      expect(posts.filter((p) => p.startsWith('🔒'))).toHaveLength(1); // only the first game
+      expect(posts.filter((p) => title(p).startsWith('🔒'))).toHaveLength(1); // only the first game
       append([
         {
           type: 'match.gameFinished',
@@ -253,10 +270,11 @@ describe('bets in the channel', () => {
           },
         },
       ]);
-      const result = posts.find((p) => p.includes('💰'))!;
-      expect(result.split('\n')[1]).toBe(
-        `💰 Überraschung! 1 Wette auf **${name(b)}**: +600 € – größter Gewinn: Carl +600 € (3x)`,
+      const result = posts.find((p) => p.embeds[0]?.fields?.some((f) => f.name === '💰 Wetten'))!;
+      expect(result.embeds[0]!.fields!.find((f) => f.name === '💰 Wetten')!.value).toBe(
+        `Überraschung! 1 Wette auf **${name(b)}**: +600 € – größter Gewinn: Carl +600 € (3x)`,
       );
+      expect(result.embeds[0]!.title).toBe(`⚔️ ${name(b)} schlägt ${name(a)}`);
       const svc = api.app.get(BetsService);
       const names = { entrant: name, bettor: svc.bettorNames() };
       expect(M.betsTournament('de', svc.discordTournament(id)!, names)).toBe(
