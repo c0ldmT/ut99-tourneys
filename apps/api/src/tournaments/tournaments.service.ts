@@ -839,7 +839,9 @@ export class TournamentsService {
           // Teams: bot teams are interchangeable, the clan teams (first) always play.
           botPool: teamMode ? botIds.slice(0, settings.size - humanIds.length) : botIds,
           humanOrder: body.humanOrder === 'seeded' ? 'seeded' : 'random',
-          botPlacement: settings.botPlacement,
+          // "Draw at random" mixes everybody: players are not placed on top for being human.
+          // The bot placement setting applies to registration order (and rating).
+          botPlacement: body.humanOrder === 'seeded' ? settings.botPlacement : 'random',
           rng,
         });
       } else {

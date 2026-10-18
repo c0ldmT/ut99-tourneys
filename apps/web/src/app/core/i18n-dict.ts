@@ -819,6 +819,8 @@ const en = {
   'bets.windowSec': 'Betting phase (seconds)',
   'bets.windowSecHint':
     'A match takes bets at least this long after it was called: when everybody is ready earlier (bots at once), the countdown of its first game waits. 0 = no waiting.',
+  'form.botPlacementHint':
+    'For seeding by registration order and by rating. "Seed (random)" always mixes players and bots.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -1650,6 +1652,8 @@ const de: Record<TKey, string> = {
   'bets.windowSec': 'Wettphase (Sekunden)',
   'bets.windowSecHint':
     'Ein Match nimmt mindestens so lange Wetten an, nachdem es aufgerufen wurde: Sind alle früher bereit (Bots sofort), wartet der Countdown seines ersten Spiels. 0 = kein Warten.',
+  'form.botPlacementHint':
+    'Gilt für das Seeding nach Anmeldung und nach Rating. „Zufällig auslosen“ mischt immer Spieler und Bots.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

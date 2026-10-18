@@ -386,6 +386,7 @@ function toLocalInput(iso: string | null): string {
                 <option value="byes">{{ 'form.botByes' | t }}</option>
                 <option value="random">{{ 'form.botRandom' | t }}</option>
               </select>
+              <p class="muted small">{{ 'form.botPlacementHint' | t }}</p>
             </div>
           </div>
         </fieldset>
