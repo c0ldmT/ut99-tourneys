@@ -175,7 +175,12 @@ export class StatsService {
     season: number,
   ): {
     modes: Partial<Record<StatMode, PlayerRating>>;
-    recent: (RatedGame & { delta: number; after: number; tournamentName: string })[];
+    recent: (RatedGame & {
+      delta: number;
+      before: number;
+      after: number;
+      tournamentName: string;
+    })[];
   } {
     const r = this.ratings(season);
     const modes: Partial<Record<StatMode, PlayerRating>> = {};
@@ -192,13 +197,15 @@ export class StatsService {
               {
                 ...g,
                 delta: c.delta,
+                before: c.before,
                 after: c.after,
                 tournamentName: names.get(g.tournamentId) ?? g.tournamentId,
               },
             ]
           : [];
       })
-      .slice(-50);
+      // The whole season (rating chart); a season has a few hundred games at most.
+      .slice(-1000);
     return { modes, recent };
   }
 

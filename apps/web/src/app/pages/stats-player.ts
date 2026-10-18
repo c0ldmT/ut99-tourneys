@@ -12,8 +12,9 @@ import {
 import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
-import { TPipe } from '../core/i18n';
+import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
+import { RatingChart } from '../components/rating-chart';
 import { Coin } from '../core/brand';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
@@ -30,7 +31,7 @@ import type {
 
 @Component({
   selector: 'app-stats-player',
-  imports: [TPipe, RouterLink, DatePipe, NeuroPipe, Coin],
+  imports: [TPipe, RouterLink, DatePipe, NeuroPipe, Coin, RatingChart],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -109,6 +110,34 @@ import type {
             </div>
           }
         </div>
+        @if (chartPoints().length) {
+          <div class="card chart">
+            <div class="spread">
+              <h3>{{ 'rating.chart' | t }}</h3>
+              @if (ratingModes().length > 1) {
+                <div class="tabs mini" role="tablist">
+                  @for (m of ratingModes(); track m.mode) {
+                    <button
+                      type="button"
+                      role="tab"
+                      [class.active]="chartMode() === m.mode"
+                      [attr.aria-selected]="chartMode() === m.mode"
+                      (click)="pickMode.set(m.mode)"
+                    >
+                      {{ m.label | t }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+            <app-rating-chart
+              [points]="chartPoints()"
+              [label]="'rating.chart' | t"
+              [locale]="i18n.lang() === 'de' ? 'de-DE' : 'en-GB'"
+            />
+            <p class="muted small">{{ 'rating.chartHint' | t }}</p>
+          </div>
+        }
         @if (ratingRecent().length) {
           <div class="card scroll">
             <table class="stats">
@@ -385,6 +414,20 @@ import type {
       color: var(--muted);
       vertical-align: middle;
     }
+    .chart h3 {
+      margin: 0;
+    }
+    .chart .spread {
+      margin-bottom: 8px;
+    }
+    .tabs.mini {
+      margin: 0;
+      border: 0;
+    }
+    .tabs.mini button {
+      min-height: 32px;
+      padding: 4px 10px;
+    }
     .tiles {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -486,6 +529,18 @@ export class StatsPlayerPage {
       .filter((m) => r.modes[m])
       .map((m) => ({ mode: m, label: this.modeLabel(m), r: r.modes[m]! }));
   });
+  protected readonly i18n = inject(I18n);
+  protected readonly pickMode = signal<StatMode | null>(null);
+  /** The chart's mode: picked, else the one with the most games. */
+  protected readonly chartMode = computed<StatMode | null>(() => {
+    const modes = this.ratingModes();
+    const p = this.pickMode();
+    if (p && modes.some((m) => m.mode === p)) return p;
+    return [...modes].sort((a, b) => b.r.games - a.r.games)[0]?.mode ?? null;
+  });
+  protected readonly chartPoints = computed(() =>
+    (this.ratings()?.recent ?? []).filter((g) => g.mode === this.chartMode()),
+  );
   /** The last rated games, newest first. */
   protected readonly ratingRecent = computed(() =>
     [...(this.ratings()?.recent ?? [])].reverse().slice(0, 15),

@@ -350,7 +350,12 @@ export interface RatedGame {
 
 export interface PlayerRatings {
   modes: Partial<Record<StatMode, PlayerRating>>;
-  recent: (RatedGame & { delta: number; after: number; tournamentName?: string })[];
+  recent: (RatedGame & {
+    delta: number;
+    before?: number;
+    after: number;
+    tournamentName?: string;
+  })[];
 }
 
 export type SeasonStatus = 'planned' | 'running' | 'ended';

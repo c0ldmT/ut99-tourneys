@@ -67,6 +67,9 @@ const en = {
   'admin.seedRatingHint':
     'The strongest meet late; bots are chosen and spread so that the teams come out about equally strong.',
   'rating.title': 'Rating',
+  'rating.chart': 'Rating over the season',
+  'rating.chartHint':
+    'One dot per rated game (green up, red down); dashed: start 1500; magenta marks: a new tournament. Hover for details.',
   'rating.list': 'Ranking',
   'rating.provisional': 'provisional',
   'rating.empty':
@@ -930,6 +933,9 @@ const de: Record<TKey, string> = {
   'admin.seedRatingHint':
     'Die Stärksten treffen spät aufeinander; Bots werden so gewählt und verteilt, dass die Teams etwa gleich stark sind.',
   'rating.title': 'Rating',
+  'rating.chart': 'Rating-Verlauf der Season',
+  'rating.chartHint':
+    'Ein Punkt pro gewertetem Spiel (grün hoch, rot runter); gestrichelt: Start 1500; magenta Linien: neues Turnier. Für Details mit der Maus darüberfahren.',
   'rating.list': 'Rangliste',
   'rating.provisional': 'vorläufig',
   'rating.empty':

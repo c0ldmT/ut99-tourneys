@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Player page: rating over the season as a line chart per mode (a dot per game, green up, red down, 1500 dashed,
+  marks where a new tournament starts, tooltip with tournament, match and date on hover).
 - Ratings (OpenSkill, shown like Elo, start 1500), one per season and mode: every game of a season tournament counts, the
   margin scales the change. Bots have their own ratings and play with a bonus for their difficulty, so beating weak
   bots is worth little. Statistics page: new tab "Ranking"; player page: rating per mode and the last changes;
