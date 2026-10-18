@@ -38,6 +38,8 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > of the name. Bots of the server's ini work as before.
 > Mod 0.7.1: bets with Neuro - a website bot whose bet was decided since its last game may say a "bet won" or
 > "bet lost" line at the start of its next game (`bbet`, placeholders `{amount}` and `{pick}`).
+> Mod 0.7.2: Monster Hunt bots - a monster that takes no damage for seconds (cage, bars, wall) is left alone for a
+> while and the bots go to what opens the cage; a bot without ammo switches weapons or fetches ammo.
 
 ## Classes
 
@@ -217,6 +219,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 48 | Bot helpers 2 | Level start: `map fix: MoverN ... it no longer turns back` (MH-Canyon: Mover9–16, MH-Trials: gateway, beams, final bars) and `key monster: ...` (MH-NaliVillage][: both titans). During the run: `stuck at closed MoverN (tag) ..., opened by: ... -> hunts/goes to/bumps X` and `errand for MoverN ends, ...`; `no route to waypoint N itself, goes via ...`; `makes room at lift ...`; `mover ... turned back ..., nearest pawn ...`; `objective active/completed: ...`; `key monster dead: ...`. MH-Canyon: the castle bars always open; MH-NaliVillage][: the bots kill the second titan; MH-Trials: the bots reach waypoint 10 or the trigger next to it |
 | 49 | Statistics | Play a game (or Monster Hunt run) to the end. Tournament page → Events (admin): a `match.playerStats` line right before the game's result with every player and bot and their kills (Monster Hunt: monsters, `12M`). Bridge log without `player statistics ... of ... players arrived` warnings |
 | 50 | Map record in the HUD | Monster Hunt tournament with statistics: the run banner at the top shows a third line `Map record: none yet - reach the exit to set it` on a fresh database. Finish a run: the bridge says `New map record on MAP: m:ss.s by TEAM` and the HUD shows it at once; the second run of the game shows `Map record: m:ss.s by TEAM`. A tournament with statistics switched off shows `(this tournament does not count)` and never announces a record. The record also appears on the statistics page (Records → maps) |
+| 51 | Caged targets and ammo (mod 0.7.2) | Bot-only Monster Hunt run on MH-NaliVillage][ or MH-Forbidden, then `grep "UTTourney: bot" Tourney.log`: `target X takes no damage (in the way: ...), bots leave it for now` and, with a mover in the way, `target X behind MoverN (tag) ..., opened by: ...`; later `target X is free (MoverN moves)`/`takes damage`/`is tried again`. The bots no longer shoot at the cage for minutes. A bot with an empty weapon: `no ammo for ..., switches to ...`, with no ammo at all `no weapon with ammo left, fetches ...` and `has ammo again` |
 
 ## SmartStockBots (optional)
 

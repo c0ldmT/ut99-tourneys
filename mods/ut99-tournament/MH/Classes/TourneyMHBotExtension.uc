@@ -29,6 +29,13 @@
 //    MH-Trials' last switch) or bumps an unused button.
 // 7. Waypoints without a route: when the route search finds no way to a waypoint,
 //    the bot heads for the path point right next to it and walks the last bit.
+// 8. Shielded targets: a monster the bots shoot at for seconds without hurting it (in a cage,
+//    behind bars or a wall, e.g. MH-NaliVillage, MH-Forbidden) is left alone for a while; the
+//    bots follow the waypoints and objectives, and when a mover (cage, gate) is in the way they
+//    go to what opens it (as in 6). It counts again as soon as it takes damage or the mover
+//    opens.
+// 9. Empty weapons: a bot whose weapon has no ammo switches weapons; when no weapon has ammo
+//    any more it fetches ammo or a weapon lying around instead of dodging about.
 // Debug log: also which pawn made a mover turn back, objectives and the death
 // of monsters whose death triggers an event.
 // Every step is written to the server log only (tag UTTourney, lines start
@@ -65,6 +72,15 @@ var int SNearWP[32];            // waypoint tried via the path point next to it,
 var float SNearSince[32];
 var byte SCoolKind[32];
 var int SNearLog[32];           // waypoint position last logged as "via the path point next to it"
+var Pawn SEngaged[32];          // the monster the bot fights, since when, its health then
+var float SEngagedSince[32];
+var int SEngagedHealth[32];
+var byte SEngagedFired[32];     // 1 = the bot fired at it since then
+var Inventory SAmmoGoal[32];    // ammo or weapon the bot fetches (no weapon with ammo left)
+var float SAmmoSince[32];
+var float SAmmoLogAt[32];
+var Inventory SAmmoSkip[32];    // item the last ammo run failed on, left out until SAmmoSkipUntil
+var float SAmmoSkipUntil[32];
 var Actor NearGoal[16];         // PathNear cache: goal -> path point next to it
 var NavigationPoint NearNode[16];
 var int NumNear;
@@ -83,6 +99,12 @@ var name KeyEvent[32];
 var name KeyName[32];
 var byte KeyDead[32];
 var int NumKeyMonsters;
+var ScriptedPawn Shielded[16];  // monsters out of reach for now (cage, bars, wall)
+var Mover ShieldMover[16];      // the mover in the way (None: level geometry)
+var float ShieldUntil[16];
+var int ShieldHealth[16];
+var byte ShieldKey[16];         // the mover's key when it was marked
+var int NumShielded;
 var bool bMoversLogged;
 var byte VisitedLogged[128];
 var int TickCount;
@@ -216,6 +238,9 @@ function ClearSlot(int k)
 	SFailOpener[k] = None;
 	SErrandMover[k] = None;
 	SErrandCount[k] = 0;
+	SEngaged[k] = None;
+	SAmmoGoal[k] = None;
+	SAmmoSkip[k] = None;
 	ClearHold(k);
 }
 
@@ -289,6 +314,8 @@ function bool FindSpecialAttractionFor(Bot aBot)
 		k = FindSlot(aBot);
 		if (k >= 0 && SHoldKind[k] != 0 && HoldBot(aBot, k))
 			return true;
+		if (k >= 0 && SAmmoGoal[k] != None && AmmoRun(aBot, k))
+			return true;
 		if (k >= 0 && SErrand[k] != None)
 		{
 			Errand = DoErrand(aBot, k);
@@ -346,8 +373,9 @@ function bool FindNextWaypoint(Bot aBot)
 				break;
 		}
 
-		// the last reached waypoint has a target to attack
-		if (lastVisited > -1 && waypoints[lastVisited].ArrivalTarget != None)
+		// the last reached waypoint has a target to attack (not while it is out of reach)
+		if (lastVisited > -1 && waypoints[lastVisited].ArrivalTarget != None
+			&& ShieldIndex(waypoints[lastVisited].ArrivalTarget) < 0)
 		{
 			AT = waypoints[lastVisited].ArrivalTarget;
 			if (!aBot.CanSee(AT))
@@ -584,6 +612,8 @@ function Timer()
 			{
 				ClearHold(k);
 				SStill[k] = 0;
+				SEngaged[k] = None;
+				SAmmoGoal[k] = None;
 			}
 			continue;
 		}
@@ -593,9 +623,16 @@ function Timer()
 		if (k < 0)
 			continue;
 		GuardBot(B, k);
+		WatchFire(B, k);
 		if (bSecond)
+		{
 			StuckCheck(B, k);
+			ShieldCheck(B, k);
+			AmmoCheck(B, k);
+		}
 	}
+	if (bSecond)
+		UpdateShields();
 }
 
 function LogVisited()
@@ -1398,21 +1435,28 @@ function FreeRespawn(Bot B, int k)
 function bool ClosedDoorErrand(Bot B, int k)
 {
 	local Mover M;
-	local Actor T;
-	local string Chain;
-	local int Budget;
 
 	SResolveAt[k] = Level.TimeSeconds;
 	M = ClosedMoverAhead(B);
 	if (M == None)
 		return false;
+	return MoverErrand(B, k, M, "stuck at closed");
+}
+
+// Sends the bot to what opens closed mover M (Why: "stuck at closed", "target behind").
+function bool MoverErrand(Bot B, int k, Mover M, string Why)
+{
+	local Actor T;
+	local string Chain;
+	local int Budget;
+
 	if (SErrandMover[k] == M && SErrandCount[k] >= 2)
 		return false; // tried twice for this door: leave it to jumps, detours and the respawn
 	Budget = 12;
 	T = FindOpener(B, k, M, M.Tag, 0, Chain, Budget);
 	if (T == None)
 	{
-		BotLog(BName(B) $ ": stuck at closed" @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location)
+		BotLog(BName(B) $ ":" @ Why @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location)
 			$ ", nothing found that could still open it");
 		return false;
 	}
@@ -1425,7 +1469,7 @@ function bool ClosedDoorErrand(Bot B, int k)
 	SErrand[k] = T;
 	SErrandFor[k] = M;
 	SErrandSince[k] = Level.TimeSeconds;
-	BotLog(BName(B) $ ": stuck at closed" @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location) $ ", opened by:" @ Chain
+	BotLog(BName(B) $ ":" @ Why @ M.Name @ "(" $ M.Tag $ ") at" @ Where(B.Location) $ ", opened by:" @ Chain
 		$ " ->" @ ErrandVerb(T) @ T.Name);
 	return true;
 }
@@ -1665,8 +1709,13 @@ function bool Huntable(ScriptedPawn P, Bot B)
 // is hunted instead, or bot-only teams never get past it.
 function byte AssessBotAttitude(Bot aBot, Pawn Other)
 {
-	local int i;
+	local int i, k;
 
+	if (ScriptedPawn(Other) != None && ShieldIndex(Other) >= 0)
+		return 2; // Ignore (Bot.AttitudeTo: 0 fear, 1 hate, 2 ignore, 3 friendly): out of reach for now (see 8)
+	k = FindSlot(aBot);
+	if (k >= 0 && SAmmoGoal[k] != None && ScriptedPawn(Other) != None && VSize(Other.Location - aBot.Location) > 300)
+		return 2; // Ignore: fetching ammo, only what comes close is fought
 	if (ScriptedPawn(Other) != None && Other.Health > 0 && Huntable(ScriptedPawn(Other), aBot))
 		for (i = 0; i < NumKeyMonsters; i++)
 			if (KeyMonsters[i] == Other)
@@ -1676,6 +1725,323 @@ function byte AssessBotAttitude(Bot aBot, Pawn Other)
 				break;
 			}
 	return Super.AssessBotAttitude(aBot, Other);
+}
+
+//-----------------------------------------------------------------------------
+// 8. Shielded targets
+
+function int ShieldIndex(Actor A)
+{
+	local int i;
+	if (A == None)
+		return -1;
+	for (i = 0; i < NumShielded; i++)
+		if (Shielded[i] == A)
+			return i;
+	return -1;
+}
+
+// Once a second: a monster that took damage, died, or whose mover opened counts again; after
+// 30 s the bots try it again anyway.
+function UpdateShields()
+{
+	local int i;
+	local string Why;
+
+	i = 0;
+	while (i < NumShielded)
+	{
+		Why = "";
+		if (Shielded[i] == None || Shielded[i].bDeleteMe || Shielded[i].Health <= 0)
+			Why = "is gone";
+		else if (Shielded[i].Health < ShieldHealth[i])
+			Why = "takes damage";
+		else if (ShieldMover[i] != None && (ShieldMover[i].KeyNum != ShieldKey[i] || ShieldMover[i].bInterpolating))
+			Why = "is free (" $ ShieldMover[i].Name $ " moves)";
+		else if (Level.TimeSeconds > ShieldUntil[i])
+			Why = "is tried again";
+		else if (Level.TimeSeconds > ShieldUntil[i] - 25 && Bot(Shielded[i].Enemy) != None
+			&& Shielded[i].LineOfSightTo(Shielded[i].Enemy)
+			&& VSize(Shielded[i].Enemy.Location - Shielded[i].Location) < 1200)
+			Why = "attacks" @ BName(Shielded[i].Enemy);
+		if (Why == "")
+		{
+			i++;
+			continue;
+		}
+		BotLog("target" @ What(Shielded[i]) @ Why);
+		NumShielded--;
+		Shielded[i] = Shielded[NumShielded];
+		ShieldMover[i] = ShieldMover[NumShielded];
+		ShieldUntil[i] = ShieldUntil[NumShielded];
+		ShieldHealth[i] = ShieldHealth[NumShielded];
+		ShieldKey[i] = ShieldKey[NumShielded];
+		Shielded[NumShielded] = None;
+		ShieldMover[NumShielded] = None;
+	}
+}
+
+// Every tick (0.25 s): notes when the bot first fires at the monster it fights; the time without
+// damage counts from then.
+function WatchFire(Bot B, int k)
+{
+	if (SEngaged[k] == None || SEngaged[k] != B.Enemy || SEngagedFired[k] != 0)
+		return;
+	if (B.bFire != 0 || B.bAltFire != 0)
+	{
+		SEngagedFired[k] = 1;
+		SEngagedSince[k] = Level.TimeSeconds;
+	}
+}
+
+// Once a second per bot: does it hurt the monster it fights? 5 s of fire without any damage
+// while a mover or the level is in the line of fire, and the monster is out of reach for now.
+function ShieldCheck(Bot B, int k)
+{
+	local ScriptedPawn E;
+	local Actor HitA;
+	local vector HitLoc, HitNorm, Eye;
+
+	E = ScriptedPawn(B.Enemy);
+	if (E == None || E.Health <= 0 || ShieldIndex(E) >= 0)
+	{
+		SEngaged[k] = None;
+		return;
+	}
+	if (SEngaged[k] != E || E.Health < SEngagedHealth[k])
+	{
+		SEngaged[k] = E;
+		SEngagedSince[k] = Level.TimeSeconds;
+		SEngagedHealth[k] = E.Health;
+		SEngagedFired[k] = 0;
+		return;
+	}
+	if (SEngagedFired[k] == 0 || Level.TimeSeconds - SEngagedSince[k] < 5)
+		return;
+	Eye = B.Location + vect(0,0,1) * B.BaseEyeHeight;
+	HitA = B.Trace(HitLoc, HitNorm, E.Location, Eye, true);
+	// Nothing in the way (the bot just misses) or another pawn in the line: not shielded.
+	if (HitA == None || HitA == E || Pawn(HitA) != None)
+		return;
+	MarkShielded(E, Mover(HitA), B, HitA);
+}
+
+function MarkShielded(ScriptedPawn E, Mover M, Bot By, Actor HitA)
+{
+	local Pawn P;
+	local Bot B;
+	local int k;
+	local string Blocker;
+
+	if (NumShielded >= 16 || ShieldIndex(E) >= 0)
+		return;
+	Shielded[NumShielded] = E;
+	ShieldMover[NumShielded] = M;
+	ShieldUntil[NumShielded] = Level.TimeSeconds + 30;
+	ShieldHealth[NumShielded] = E.Health;
+	if (M != None)
+		ShieldKey[NumShielded] = M.KeyNum;
+	NumShielded++;
+	if (M != None)
+		Blocker = "mover" @ M.Name @ "(" $ M.Tag $ ")";
+	else
+		Blocker = string(HitA.Name);
+	BotLog(BName(By) $ ": target" @ What(E) @ "takes no damage (in the way:" @ Blocker
+		$ "), bots leave it for now and follow the waypoints");
+	// Every bot fighting it lets go; with a closed mover in the way they look for its opener.
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		B = Bot(P);
+		if (B == None || B.Health <= 0)
+			continue;
+		if (B.OldEnemy == E)
+			B.OldEnemy = None;
+		if (B.Enemy != E)
+			continue;
+		k = FindSlot(B);
+		B.Enemy = None;
+		if (k >= 0)
+		{
+			SEngaged[k] = None;
+			if (M != None && M.KeyNum == 0 && !M.bInterpolating && !M.bDelaying && SErrand[k] == None)
+				MoverErrand(B, k, M, "target" @ E.Name @ "behind");
+		}
+		B.WhatToDoNext('', '');
+	}
+}
+
+//-----------------------------------------------------------------------------
+// 9. Empty weapons
+
+// A weapon the bot can fight with: ammo left, or none needed (Impact Hammer, chainsaw).
+function bool CanShoot(Weapon W)
+{
+	return W != None && (W.AmmoType == None || W.AmmoType.AmmoAmount > 0);
+}
+
+// Any weapon with ammo (not counting the ones that need none).
+function bool HasRangedAmmo(Bot B)
+{
+	local Inventory I;
+	for (I = B.Inventory; I != None; I = I.Inventory)
+		if (Weapon(I) != None && Weapon(I).AmmoType != None && Weapon(I).AmmoType.AmmoAmount > 0)
+			return true;
+	return false;
+}
+
+// Once a second per bot: an empty weapon in hand is changed; with no ammo for any weapon the bot
+// fetches some.
+function AmmoCheck(Bot B, int k)
+{
+	local Inventory I;
+
+	if (SAmmoGoal[k] != None)
+	{
+		AmmoRunOver(B, k);
+		return;
+	}
+	if (B.Weapon == None || !CanShoot(B.Weapon))
+	{
+		if (B.PendingWeapon == None || !CanShoot(B.PendingWeapon))
+		{
+			B.SwitchToBestWeapon();
+			if (Level.TimeSeconds - SAmmoLogAt[k] > 10)
+			{
+				SAmmoLogAt[k] = Level.TimeSeconds;
+				BotLog(BName(B) $ ": no ammo for" @ What(B.Weapon) $ ", switches to" @ What(B.PendingWeapon));
+			}
+		}
+	}
+	if (HasRangedAmmo(B))
+		return;
+	I = FindAmmo(B, k);
+	if (I == None)
+		return;
+	SAmmoGoal[k] = I;
+	SAmmoSince[k] = Level.TimeSeconds;
+	BotLog(BName(B) $ ": no weapon with ammo left, fetches" @ What(I) @ "at" @ Where(I.Location));
+	if (B.OldEnemy != None && VSize(B.OldEnemy.Location - B.Location) > 300)
+		B.OldEnemy = None;
+	if (B.Enemy != None && VSize(B.Enemy.Location - B.Location) > 300)
+	{
+		B.Enemy = None;
+		B.WhatToDoNext('', '');
+	}
+}
+
+// The nearest ammo for a weapon the bot carries, else the nearest weapon it does not carry yet,
+// lying ready and reachable. Only the 5 nearest are checked for a route.
+function Inventory FindAmmo(Bot B, int k)
+{
+	local Inventory I;
+	local Inventory Cand[5];
+	local float CandD[5];
+	local float D;
+	local int n, j;
+	local byte bJump;
+	local bool bAmmo;
+
+	foreach AllActors(class'Inventory', I)
+	{
+		if (I.Owner != None || I.bHidden || !I.IsInState('Pickup'))
+			continue;
+		if (I == SAmmoSkip[k] && Level.TimeSeconds < SAmmoSkipUntil[k])
+			continue;
+		bAmmo = Ammo(I) != None && FitsWeapon(B, Ammo(I));
+		if (!bAmmo && (Weapon(I) == None || (B.FindInventoryType(I.Class) != None && WeaponStay())))
+			continue;
+		D = VSize(I.Location - B.Location);
+		if (!bAmmo)
+			D += 2000; // ammo that fits comes first
+		if (D > 6000)
+			continue;
+		// insert sorted by distance, keep the 5 nearest
+		j = n;
+		if (j == 5)
+		{
+			if (D >= CandD[4])
+				continue;
+			j = 4;
+		}
+		else
+			n++;
+		while (j > 0 && CandD[j - 1] > D)
+		{
+			Cand[j] = Cand[j - 1];
+			CandD[j] = CandD[j - 1];
+			j--;
+		}
+		Cand[j] = I;
+		CandD[j] = D;
+	}
+	for (j = 0; j < n; j++)
+		if (PathTo(B, Cand[j], bJump) != None)
+			return Cand[j];
+	return None;
+}
+
+// Weapons stay: a weapon the bot carries cannot be picked up again (no ammo from it).
+function bool WeaponStay()
+{
+	return DeathMatchPlus(Level.Game) != None && DeathMatchPlus(Level.Game).bMultiWeaponStay;
+}
+
+function bool FitsWeapon(Bot B, Ammo A)
+{
+	local Inventory I;
+	for (I = B.Inventory; I != None; I = I.Inventory)
+		if (Weapon(I) != None && Weapon(I).AmmoName != None && ClassIsChildOf(A.Class, Weapon(I).AmmoName))
+			return true;
+	return false;
+}
+
+// Ends the ammo run when the bot has ammo again, the item is taken or after 30 s (true: over).
+// A failed item is left out for a minute.
+function bool AmmoRunOver(Bot B, int k)
+{
+	local Inventory I;
+
+	I = SAmmoGoal[k];
+	if (HasRangedAmmo(B))
+	{
+		BotLog(BName(B) $ ": has ammo again");
+		SAmmoGoal[k] = None;
+		B.SwitchToBestWeapon();
+		return true;
+	}
+	if (I == None || I.bDeleteMe || I.Owner != None || I.bHidden || Level.TimeSeconds - SAmmoSince[k] > 30)
+	{
+		if (I != None && Level.TimeSeconds - SAmmoSince[k] > 30)
+		{
+			SAmmoSkip[k] = I;
+			SAmmoSkipUntil[k] = Level.TimeSeconds + 60;
+		}
+		SAmmoGoal[k] = None;
+		return true;
+	}
+	return false;
+}
+
+// While the bot fetches ammo: go there.
+function bool AmmoRun(Bot B, int k)
+{
+	local Actor Hop;
+	local byte bJump;
+
+	if (AmmoRunOver(B, k))
+		return false;
+	Hop = PathTo(B, SAmmoGoal[k], bJump);
+	if (Hop == None)
+	{
+		SAmmoSkip[k] = SAmmoGoal[k];
+		SAmmoSkipUntil[k] = Level.TimeSeconds + 10;
+		SAmmoGoal[k] = None;
+		return false;
+	}
+	B.LastAttractCheck = Level.TimeSeconds;
+	B.MoveTarget = Hop;
+	SetAttractionStateFor(B);
+	return true;
 }
 
 defaultproperties

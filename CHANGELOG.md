@@ -64,6 +64,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   whole seconds, so a team 0.3 s faster (7:17.3 against 7:17.6) could lose on monster points.
 - Monster Hunt: the bracket shows the final time of a run as soon as it is over, not only the run in progress; run
   times in the bracket show tenths of a second.
+- Monster Hunt bots (mod 0.7.2): a monster they shoot at for seconds without hurting it (in a cage or behind bars,
+  e.g. MH-NaliVillage, MH-Forbidden) is left alone for a while; the bots follow the waypoints and go to what opens
+  the cage instead of shooting at it forever. A bot whose weapon has no ammo switches weapons and, with no ammo
+  left at all, fetches ammo or a weapon instead of only dodging.
 
 ### Changed
 
