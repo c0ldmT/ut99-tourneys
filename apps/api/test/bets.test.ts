@@ -320,8 +320,9 @@ describe('bots betting (pure)', () => {
   });
 
   it('stakes by combat style, campers wait, berserkers go all in now and then', () => {
-    expect(stakeShare(-1)).toBeCloseTo(0.03);
-    expect(stakeShare(1)).toBeCloseTo(0.15);
+    expect(stakeShare(-1)).toBeCloseTo(0.12);
+    expect(stakeShare(0)).toBeCloseTo(0.3);
+    expect(stakeShare(1)).toBeCloseTo(0.48);
     const avg = (b: BettingBot) => {
       let sum = 0;
       let n = 0;

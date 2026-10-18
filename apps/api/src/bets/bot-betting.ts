@@ -64,9 +64,13 @@ export function judgementNoise(bot: Pick<BettingBot, 'skill' | 'accuracy'>): num
   return 0.2 + 0.5 * (1 - clamp(bot.skill, 0, 7) / 7) * (1 - 0.5 * clamp(bot.accuracy, -1, 1));
 }
 
-/** Share of the free Neuro a bot bets at full confidence, by combat style: 3 % .. 15 %. */
+/**
+ * Base share of the free Neuro by combat style: 12 % (avoidant) .. 30 % (normal) .. 48 % (berserk).
+ * A bet takes 0.5x of it at a sure 50:50 up to 1.5x at full confidence (see botBet); with the
+ * bot's own uncertainty a normal bot bets about 20 % on an even match.
+ */
 export function stakeShare(combatStyle: number): number {
-  return 0.03 + 0.06 * (clamp(combatStyle, -1, 1) + 1);
+  return 0.12 + 0.18 * (clamp(combatStyle, -1, 1) + 1);
 }
 
 /** Weight in the draw of the bots that bet on a match: alert bots bet more often. */
@@ -143,7 +147,11 @@ export function botBet(
   // 4. Stake: share by combat style, more when sure, more for patient campers.
   if (bot.combatStyle >= 1 && rng() < 0.05)
     return { pick: pick.entrantId, amount: free, allIn: true, belief };
-  const share = stakeShare(bot.combatStyle) * (0.5 + confidence) * (1 + clamp(bot.camping, 0, 1));
+  // Never more than 80 % (only the berserker's all-in above stakes everything).
+  const share = Math.min(
+    0.8,
+    stakeShare(bot.combatStyle) * (0.5 + confidence) * (1 + 0.5 * clamp(bot.camping, 0, 1)),
+  );
   const amount = clamp(Math.round((free * share) / 10) * 10, 10, free);
   return { pick: pick.entrantId, amount, allIn: amount === free, belief };
 }

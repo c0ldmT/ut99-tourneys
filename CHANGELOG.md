@@ -34,7 +34,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
   rescue floor in the settings). Tournament page: bets panel, bracket marks open matches with €. Statistics: tab
   "Bets" with the Neuro ranking and betting records; player page: Neuro of the season.
 - The control center's bots bet too: up to N per match (setting), judging by the ratings with noise that shrinks
-  with difficulty and accuracy, staking by their play style, loyal to their clan, against rivals, nemesis and the
+  with difficulty and accuracy, staking by their play style (a normal bot about 200 of 1,000 Neuro on an even match), loyal to their clan, against rivals, nemesis and the
   player who beat them most. "Expert tip" while bets are open, bot bets shown after the window; bot records apart
   from the players'; "man vs. machine" bar; betting type and Neuro on the bot profile. New bot lines "bet won" and
   "bet lost" ({amount}, {pick}) said at the start of the bot's next game (mod 0.7.1).
