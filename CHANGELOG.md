@@ -7,11 +7,11 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
-- Neuro shop (page "Shop"): cosmetics for the season's Neuro, kept for good – titles, name colours (gradients, the
+- Neuro shop (bag icon next to the Neuro balance in the header): cosmetics for the season's Neuro, kept for good – titles, name colours (gradients, the
   animated "Aurora"), avatar frames, badges, player page banners, victory fanfare, bot dedication; spending only down
   to the rescue floor. Wardrobe: one item per place, change any time. Season awards (champion frame, "Top Bettor"
   title) for ended seasons. Names are drawn in their look on the header, player page, tournament table, statistics,
-  bets and the kill feed. Admins: shop on/off, prices, items taken out, approval of dedications (rejected ones are
+  bets and the kill feed. Admins: shop on/off, prices and items taken out on the settings page, approval of dedications (rejected ones are
   refunded), purchase log. The website reset also deletes purchases.
 - Live kill feed on the match page (mod 0.7.3, `kf` line): killer and victim in their side's colour, weapon,
   headshots, first blood, sprees and multi kills as UT announces them, suicides and team kills; the live score above

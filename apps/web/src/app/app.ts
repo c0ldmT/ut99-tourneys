@@ -48,7 +48,6 @@ import type { Lang } from './core/i18n-dict';
               >{{ 'nav.tournaments' | t }}</a
             >
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
-            <a routerLink="/shop" routerLinkActive="active">{{ 'shop.title' | t }}</a>
             @if (me.isAdmin) {
               <a routerLink="/new" routerLinkActive="active">{{ 'nav.new' | t }}</a>
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
@@ -77,6 +76,15 @@ import type { Lang } from './core/i18n-dict';
               ><na-coin [size]="18" />{{ neuro()! | neuro: false }}</a
             >
           }
+          <a
+            routerLink="/shop"
+            routerLinkActive="on"
+            class="btn icon shopbtn"
+            [title]="'shop.title' | t"
+            [attr.aria-label]="'shop.title' | t"
+            (click)="menu.set(false)"
+            ><na-icon name="shop" [size]="19"
+          /></a>
           <a routerLink="/profile" class="user" (click)="menu.set(false)">
             <na-avatar [name]="me.displayName" [id]="me.id" [src]="me.avatar" [size]="28" />
             <span class="uname"><na-name [name]="me.displayName" [id]="me.id" /></span>
@@ -224,6 +232,13 @@ import type { Lang } from './core/i18n-dict';
       font-size: 0.95rem;
     }
     .wallet:hover {
+      color: var(--neuro);
+    }
+    .shopbtn {
+      margin-left: -6px;
+    }
+    .shopbtn:hover,
+    .shopbtn.on {
       color: var(--neuro);
     }
     .user {

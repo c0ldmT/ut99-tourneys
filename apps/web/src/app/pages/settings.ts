@@ -1,14 +1,15 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../core/brand';
+import { ShopSettings } from '../components/shop-settings';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import type { Season, SeasonsOverview } from '../core/types';
 
-/** Website settings (admins): seasons and ratings. */
+/** Website settings (admins): seasons, ratings, bets, the Neuro shop and the reset. */
 @Component({
   selector: 'app-settings',
-  imports: [TPipe, FormsModule, Icon],
+  imports: [TPipe, FormsModule, Icon, ShopSettings],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
@@ -233,6 +234,8 @@ import type { Season, SeasonsOverview } from '../core/types';
         }
       </div>
     </form>
+
+    <app-shop-settings />
 
     <section class="card danger-zone">
       <h2>⚠ {{ 'reset.title' | t }}</h2>

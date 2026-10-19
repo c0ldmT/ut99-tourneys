@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { Coin, Icon } from '../core/brand';
@@ -23,7 +24,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
 /** The Neuro shop: cosmetics for Neuro, the wardrobe, and (admins) prices and approvals. */
 @Component({
   selector: 'app-shop',
-  imports: [FormsModule, TPipe, NeuroPipe, Coin, Icon, Avatar],
+  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, Icon, Avatar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
@@ -282,60 +283,10 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
                 }
               </div>
             }
-            <div class="card tablepanel">
-              <div class="toolbar">
-                <label class="check"
-                  ><input
-                    type="checkbox"
-                    name="en"
-                    [ngModel]="v.enabled"
-                    (ngModelChange)="setEnabled($event)"
-                  />
-                  {{ 'shop.enabled' | t }}</label
-                >
-                <span class="grow"></span>
-                <button class="primary" (click)="saveCatalog(a.catalog)" [disabled]="busy()">
-                  {{ 'common.save' | t }}
-                </button>
-              </div>
-              <div class="scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>{{ 'shop.item' | t }}</th>
-                      <th>{{ 'shop.slotCol' | t }}</th>
-                      <th class="num">{{ 'shop.price' | t }}</th>
-                      <th>{{ 'shop.visible' | t }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (i of a.catalog; track i.id) {
-                      <tr>
-                        <td>{{ i.name }}</td>
-                        <td class="muted small">{{ 'shop.slot.' + i.slot | t }}</td>
-                        <td class="num">
-                          <input
-                            class="price-in mono"
-                            type="number"
-                            min="1"
-                            [name]="'p' + i.id"
-                            [(ngModel)]="i.price"
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="checkbox"
-                            [name]="'h' + i.id"
-                            [ngModel]="!i.hidden"
-                            (ngModelChange)="i.hidden = !$event"
-                          />
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <p class="muted small">
+              {{ 'shop.pricesMoved' | t }}
+              <a routerLink="/admin/settings">{{ 'nav.settings' | t }}</a>
+            </p>
             <div class="card tablepanel">
               <h2>{{ 'shop.log' | t }}</h2>
               <div class="scroll">
@@ -538,10 +489,6 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       padding: 10px 0;
       border-top: 1px solid var(--border);
     }
-    .price-in {
-      width: 100px;
-      text-align: right;
-    }
     .scroll {
       overflow-x: auto;
     }
@@ -579,7 +526,11 @@ export class ShopPage {
 
   constructor() {
     void this.load();
-    if (this.auth.me()?.isAdmin) void this.loadAdmin();
+    if (this.auth.me()?.isAdmin) {
+      void this.loadAdmin();
+      if (inject(ActivatedRoute).snapshot.queryParamMap.get('tab') === 'admin')
+        this.tab.set('admin');
+    }
   }
 
   private async load() {
@@ -675,25 +626,6 @@ export class ShopPage {
     void this.run(async () => {
       await this.api.reviewDedication(p.id, approve);
       await this.loadAdmin();
-    });
-  }
-
-  protected setEnabled(on: boolean) {
-    void this.run(async () => {
-      await this.api.setShopSettings({ enabled: on });
-      await this.load();
-    });
-  }
-
-  protected saveCatalog(items: ShopItem[]) {
-    const prices: Record<string, number> = {};
-    for (const i of items)
-      if (i.basePrice !== undefined && Number(i.price) !== i.basePrice)
-        prices[i.id] = Math.max(1, Math.round(Number(i.price)));
-    const hidden = items.filter((i) => i.hidden).map((i) => i.id);
-    void this.run(async () => {
-      await this.api.setShopSettings({ prices, hidden });
-      await Promise.all([this.load(), this.loadAdmin()]);
     });
   }
 

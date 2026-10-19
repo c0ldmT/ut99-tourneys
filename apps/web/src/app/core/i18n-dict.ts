@@ -211,6 +211,13 @@ const en = {
   'shop.pending': 'Dedications to approve',
   'shop.approve': 'Approve',
   'shop.reject': 'Reject (refund)',
+  'shop.settings': 'Neuro shop',
+  'shop.settingsHint':
+    'Prices and the items on sale; bought items stay with their owners. Dedications to approve and the purchase log:',
+  'shop.toAdmin': 'Shop → Manage',
+  'shop.hiddenHint':
+    'Items taken out of the shop can no longer be bought; who owns one keeps wearing it.',
+  'shop.pricesMoved': 'Shop on/off, prices and the items on sale:',
   'shop.enabled': 'Shop open',
   'shop.item': 'Item',
   'shop.slotCol': 'Kind',
@@ -1178,6 +1185,13 @@ const de: Record<TKey, string> = {
   'shop.pending': 'Bot-Widmungen zur Freigabe',
   'shop.approve': 'Freigeben',
   'shop.reject': 'Ablehnen (erstatten)',
+  'shop.settings': 'Neuro-Shop',
+  'shop.settingsHint':
+    'Preise und angebotene Artikel; Gekauftes bleibt bei den Besitzern. Freizugebende Widmungen und das Kaufprotokoll:',
+  'shop.toAdmin': 'Shop → Verwaltung',
+  'shop.hiddenHint':
+    'Herausgenommene Artikel kann niemand mehr kaufen; wer einen besitzt, trägt ihn weiter.',
+  'shop.pricesMoved': 'Shop an/aus, Preise und angebotene Artikel:',
   'shop.enabled': 'Shop geöffnet',
   'shop.item': 'Artikel',
   'shop.slotCol': 'Art',
