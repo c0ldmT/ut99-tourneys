@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.10.0";
+const MOD_VERSION = "0.10.1";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -165,6 +165,16 @@ var float IdleSince[32];           // since then it did not move away
 var float FreeSince[32];           // since then it had no enemy
 var byte IdleStage[32];            // 0 nothing done, 1 sent after an opponent, 2 sent wandering
 var int IdleCount;
+var vector StuckRef[32];           // where the bot last made progress (150 units, mod 0.10.1)
+var int StuckSec[32];              // seconds trying to move without progress
+var byte StuckSide[32];            // side of the next jump aside
+var vector AreaRef[32];            // centre of the area (300 units) the bot has not left
+var float AreaSince[32];           // since then (not counted while it fights or camps)
+var byte AreaStage[32];            // 0 nothing done, 1 and 2 detours, 3 respawned
+var Pawn HuntFor[32];              // target of a hunt this mod started
+var float HuntCheckAt[32];         // when the hunt's progress is checked next
+var float HuntDist[32];            // distance to the target at the last check
+var float HuntBlock[32];           // no hunts from this mod before this time
 
 //=============================================================================
 // Startup (from the game type)
@@ -1251,6 +1261,7 @@ function int TimerStep()
 	if (bGameLive && !bTourneyPaused && !Game.bGameEnded)
 	{
 		BotTick();
+		HuntGuard();
 		AntiIdle();
 		AdrenalineTick();
 		BehaviourTick();
@@ -2820,10 +2831,10 @@ function HuntNemeses()
 			continue;
 		if (B.Enemy == None)
 		{
-			if ((B.IsInState('Roaming') || B.IsInState('Wandering')) && B.SetEnemy(N))
-				KeepHunting(B, N);
+			if (B.IsInState('Roaming') || B.IsInState('Wandering'))
+				ForceHunt(B, N);
 		}
-		else if (B.IsInState('Hunting') && !B.LineOfSightTo(B.Enemy))
+		else if (B.IsInState('Hunting') && !B.LineOfSightTo(B.Enemy) && HuntAllowed(B, N))
 		{
 			// Hunting someone out of sight: rather the nemesis.
 			Old = B.Enemy;
@@ -2905,11 +2916,23 @@ function int IdleSlot(Bot B)
 		IdleCount++;
 	}
 	IdleBot[Free] = B;
-	IdleLoc[Free] = B.Location;
-	IdleSince[Free] = Level.TimeSeconds;
-	FreeSince[Free] = Level.TimeSeconds;
-	IdleStage[Free] = 0;
+	ResetWatch(Free, B);
 	return Free;
+}
+
+// A watch from now on (new slot, the bot respawned).
+function ResetWatch(int s, Bot B)
+{
+	IdleLoc[s] = B.Location;
+	IdleSince[s] = Level.TimeSeconds;
+	FreeSince[s] = Level.TimeSeconds;
+	IdleStage[s] = 0;
+	StuckRef[s] = B.Location;
+	StuckSec[s] = 0;
+	AreaRef[s] = B.Location;
+	AreaSince[s] = Level.TimeSeconds;
+	AreaStage[s] = 0;
+	HuntFor[s] = None;
 }
 
 // The nearest living opponent of B: players and bots, not of its team in team games.
@@ -2979,12 +3002,11 @@ function AntiIdle()
 			continue;
 		if (B.Health <= 0)
 		{
-			IdleLoc[s] = B.Location;
-			IdleSince[s] = Now;
-			FreeSince[s] = Now;
-			IdleStage[s] = 0;
+			ResetWatch(s, B);
 			continue;
 		}
+		if (UnstickBot(B, s))
+			continue;
 		if (B.bCamping && B.IsInState('Roaming'))
 		{
 			IdleSince[s] = Now;
@@ -3010,9 +3032,8 @@ function AntiIdle()
 		if (bStuck || Now - FreeSince[s] >= Limit)
 		{
 			Opp = NearestOpponent(B);
-			if (Opp != None && B.SetEnemy(Opp))
+			if (Opp != None && ForceHunt(B, Opp))
 			{
-				KeepHunting(B, Opp);
 				FreeSince[s] = Now;
 				if (bStuck)
 					IdleStage[s] = 1;
@@ -3025,6 +3046,345 @@ function AntiIdle()
 			B.GotoState('Wandering');
 		}
 	}
+}
+
+//-----------------------------------------------------------------------------
+// Mod 0.10.1: hunts that lead nowhere, stuck bots and bots that run about on the spot.
+// Hunts this mod starts (AI help, nemesis, revenant, bounty hunter) need a path to the target
+// and must bring the bot closer: a hunt without progress for 6 s is given up and no hunt from
+// this mod follows for 15 s (bots turned back and forth when a target out of reach was set
+// again and again). With AI help: a bot that tries to move but makes no progress jumps aside
+// (3 s, 5 s), takes a detour (8 s, 14 s) and is moved to a start spot without a death (20 s);
+// a bot that has not left an area of 300 units for 12 s without a fight takes a far detour
+// (12 s, 24 s) and is moved to a start spot at 36 s. Each step goes to the server log.
+//-----------------------------------------------------------------------------
+
+function BotLog(string S)
+{
+	Log("bot [" $ int(Level.TimeSeconds) $ "s]" @ S, 'UTTourney');
+}
+
+function string BName(Pawn P)
+{
+	if (P == None)
+		return "nobody";
+	if (P.PlayerReplicationInfo != None)
+		return P.PlayerReplicationInfo.PlayerName;
+	return string(P.Name);
+}
+
+function string Where(vector V)
+{
+	return "(" $ int(V.X) $ "," $ int(V.Y) $ "," $ int(V.Z) $ ")";
+}
+
+function string What(Actor A)
+{
+	if (A == None)
+		return "nothing";
+	return string(A.Name);
+}
+
+function vector Flat(vector V)
+{
+	V.Z = 0;
+	return V;
+}
+
+// May this mod send B after N? Not while hunts are blocked for B, not when no path leads there.
+function bool HuntAllowed(Bot B, Pawn N)
+{
+	local int s;
+	if (B == None || N == None)
+		return false;
+	s = IdleSlot(B);
+	if (s < 0)
+		return false;
+	if (Level.TimeSeconds < HuntBlock[s])
+		return false;
+	if (B.LineOfSightTo(N) || B.FindPathToward(N) != None)
+		return true;
+	HuntBlock[s] = Level.TimeSeconds + 10;
+	BotLog(BName(B) $ ": no path to" @ BName(N) $ ", no hunt for 10 s");
+	return false;
+}
+
+// Sends B after N (when allowed) and watches the hunt's progress.
+function bool ForceHunt(Bot B, Pawn N)
+{
+	local int s;
+	if (!HuntAllowed(B, N) || !B.SetEnemy(N))
+		return false;
+	KeepHunting(B, N);
+	s = IdleSlot(B);
+	if (s >= 0 && HuntFor[s] != N)
+	{
+		HuntFor[s] = N;
+		HuntCheckAt[s] = Level.TimeSeconds + 6;
+		HuntDist[s] = VSize(N.Location - B.Location);
+	}
+	return true;
+}
+
+// Once a second (deathmatch games): a hunt from this mod that brings the bot no closer is given up.
+function HuntGuard()
+{
+	local Pawn P;
+	local Bot B;
+	local int s;
+	local float D, Now;
+
+	if (!AntiIdleAllowed())
+		return;
+	Now = Level.TimeSeconds;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		B = Bot(P);
+		if (B == None || B.bDeleteMe || B.Health <= 0)
+			continue;
+		s = IdleSlot(B);
+		if (s < 0 || HuntFor[s] == None)
+			continue;
+		if (B.Enemy != HuntFor[s] || HuntFor[s].bDeleteMe || HuntFor[s].Health <= 0)
+		{
+			HuntFor[s] = None;
+			continue;
+		}
+		D = VSize(HuntFor[s].Location - B.Location);
+		if (B.LineOfSightTo(HuntFor[s]) || D < HuntDist[s] - 250)
+		{
+			HuntDist[s] = D;
+			HuntCheckAt[s] = Now + 6;
+			continue;
+		}
+		if (Now < HuntCheckAt[s])
+			continue;
+		BotLog(BName(B) $ ": hunt of" @ BName(HuntFor[s]) @ "without progress for 6 s at" @ Where(B.Location) $ ", given up for 15 s");
+		HuntFor[s] = None;
+		HuntBlock[s] = Now + 15;
+		B.bMustHunt = false;
+		B.OldEnemy = None;
+		B.Enemy = None;
+		if (B.IsInState('Hunting'))
+			B.WhatToDoNext('', '');
+	}
+}
+
+// AI help: stuck bots and bots that run about on the spot. True: something was done this second.
+function bool UnstickBot(Bot B, int s)
+{
+	local bool bFight;
+	local float Now;
+
+	Now = Level.TimeSeconds;
+	bFight = B.Enemy != None && B.LineOfSightTo(B.Enemy);
+	// Progress: 150 units from where it last made progress.
+	if (VSize(B.Location - StuckRef[s]) > 150)
+	{
+		if (StuckSec[s] >= 3)
+			BotLog(BName(B) $ ": moves again after" @ StuckSec[s] @ "s");
+		StuckSec[s] = 0;
+		StuckRef[s] = B.Location;
+	}
+	else if (B.Physics != PHYS_Falling && MayBeStuck(B, bFight))
+	{
+		StuckSec[s]++;
+		if (StuckSec[s] == 3 || StuckSec[s] == 5)
+		{
+			JumpAside(B, s);
+			return true;
+		}
+		if (StuckSec[s] == 8 || StuckSec[s] == 14)
+		{
+			Detour(B, s, 150, 900);
+			return true;
+		}
+		if (StuckSec[s] >= 20)
+		{
+			FreeRespawn(B, s, "stuck for 20 s");
+			return true;
+		}
+	}
+	// The area: 300 units around a point; fights and camping do not count.
+	if (VSize(B.Location - AreaRef[s]) > 300 || bFight || B.bCamping || B.Orders == 'Hold' || B.Orders == 'Follow'
+		|| B.IsInState('StakeOut') || Mover(B.Base) != None)
+	{
+		if (VSize(B.Location - AreaRef[s]) > 300)
+		{
+			if (AreaStage[s] > 0)
+				BotLog(BName(B) $ ": left the area after" @ int(Now - AreaSince[s]) @ "s");
+			AreaRef[s] = B.Location;
+			AreaStage[s] = 0;
+		}
+		AreaSince[s] = Now;
+		return false;
+	}
+	if ((AreaStage[s] == 0 && Now - AreaSince[s] >= 12) || (AreaStage[s] == 1 && Now - AreaSince[s] >= 24))
+	{
+		AreaStage[s]++;
+		HuntBlock[s] = Now + 15;
+		BotLog(BName(B) $ ": has not left" @ Where(AreaRef[s]) @ "(300 units) for" @ int(Now - AreaSince[s]) @ "s, heading for" @ What(B.MoveTarget) $ ", enemy" @ BName(B.Enemy));
+		B.bMustHunt = false;
+		if (B.Enemy != None && !bFight)
+		{
+			B.OldEnemy = None;
+			B.Enemy = None;
+		}
+		Detour(B, s, 600, 2000);
+		return true;
+	}
+	if (AreaStage[s] == 2 && Now - AreaSince[s] >= 36)
+	{
+		AreaStage[s] = 3;
+		FreeRespawn(B, s, "has not left an area of 300 units for 36 s");
+		return true;
+	}
+	return false;
+}
+
+// Trying to move (not standing still on purpose, not riding or waiting for a lift, not fighting).
+function bool MayBeStuck(Bot B, bool bFight)
+{
+	if (B.SpecialPause > 0 || B.MoveTarget == None || bFight)
+		return false;
+	if (B.bCamping || VSize(B.Acceleration) < 1 || B.Orders == 'Hold' || B.Orders == 'Follow' || B.IsInState('StakeOut'))
+		return false;
+	if (Mover(B.Base) != None)
+		return false;
+	if (LiftCenter(B.MoveTarget) != None && JumpSpot(B.MoveTarget) == None)
+		return false;
+	if (LiftExit(B.MoveTarget) != None && VSize(B.Location - B.MoveTarget.Location) < 60)
+		return false;
+	return !B.IsInState('GameEnded') && !B.IsInState('Dying');
+}
+
+function vector MoveDir(Bot B)
+{
+	local vector Dir;
+	if (B.MoveTarget != None)
+		Dir = Flat(B.MoveTarget.Location - B.Location);
+	if (VSize(Dir) < 1)
+		Dir = Flat(vector(B.Rotation));
+	return Normal(Dir);
+}
+
+// Floor within a normal step down below V (no jump into a pit).
+function bool FloorAt(Bot B, vector V)
+{
+	local vector HitLoc, HitNorm;
+	return B.Trace(HitLoc, HitNorm, V - vect(0,0,1) * (B.CollisionHeight + 120), V, false) != None;
+}
+
+function JumpAside(Bot B, int s)
+{
+	local vector Dir, Side;
+	Dir = MoveDir(B);
+	Side = Normal(Dir Cross vect(0,0,1));
+	if (StuckSide[s] != 0)
+		Side = -Side;
+	StuckSide[s] = 1 - StuckSide[s];
+	if (!FloorAt(B, B.Location + Side * 150 + Dir * 100))
+	{
+		Side = -Side;
+		if (!FloorAt(B, B.Location + Side * 150 + Dir * 100))
+		{
+			BotLog(BName(B) $ ": stuck for" @ StuckSec[s] @ "s at" @ Where(B.Location) $ ", heading for" @ What(B.MoveTarget) $ ": no floor beside it");
+			return;
+		}
+	}
+	BotLog(BName(B) $ ": stuck for" @ StuckSec[s] @ "s at" @ Where(B.Location) $ ", heading for" @ What(B.MoveTarget) $ ": jumps aside");
+	B.Velocity = Side * 220 + Dir * 180;
+	B.Velocity.Z = B.JumpZ;
+	B.SetPhysics(PHYS_Falling);
+	B.bJumpOffPawn = true;
+	B.SetFall();
+}
+
+// A reachable path point MinD-MaxD units away, preferably to the side or behind; the bot walks
+// there and then searches its way again.
+function Detour(Bot B, int s, float MinD, float MaxD)
+{
+	local NavigationPoint N, Best;
+	local vector Dir;
+	local float D, Score, BestScore;
+	local int Tried;
+
+	Dir = MoveDir(B);
+	for (N = Level.NavigationPointList; N != None && Tried < 16; N = N.nextNavigationPoint)
+	{
+		if (N == B.MoveTarget || LiftCenter(N) != None || Teleporter(N) != None)
+			continue;
+		D = VSize(N.Location - B.Location);
+		if (D < MinD || D > MaxD)
+			continue;
+		if (MaxD <= 900 && Abs(N.Location.Z - B.Location.Z) > 200)
+			continue;
+		Score = 1.5 - (Normal(Flat(N.Location - B.Location)) Dot Dir) + FRand();
+		if (Best != None && Score <= BestScore)
+			continue;
+		Tried++;
+		if (MaxD <= 900)
+		{
+			if (!B.ActorReachable(N))
+				continue;
+		}
+		else if (B.FindPathToward(N) == None)
+			continue;
+		Best = N;
+		BestScore = Score;
+	}
+	if (Best == None)
+	{
+		BotLog(BName(B) $ ": at" @ Where(B.Location) $ ", no detour found");
+		return;
+	}
+	BotLog(BName(B) $ ": at" @ Where(B.Location) $ ", heading for" @ What(B.MoveTarget) $ ": detour via" @ Best.Name);
+	if (MaxD > 900)
+		B.MoveTarget = B.FindPathToward(Best);
+	else
+		B.MoveTarget = Best;
+	B.SpecialPause = 0;
+	if (!B.IsInState('Roaming') && !B.IsInState('Wandering') && !B.IsInState('FallBack') && !B.IsInState('Hunting'))
+		return; // fighting etc.: the next decision picks it up
+	B.TweenToRunning(0.1);
+	if (B.Enemy != None)
+	{
+		if (!B.IsInState('FallBack'))
+			B.bNoClearSpecial = true;
+		B.GotoState('FallBack', 'SpecialNavig');
+	}
+	else
+	{
+		if (!B.IsInState('Roaming'))
+			B.bNoClearSpecial = true;
+		B.GotoState('Roaming', 'SpecialNavig');
+	}
+}
+
+// Last resort: to a start spot without dying (no death, no score change).
+function FreeRespawn(Bot B, int s, string Why)
+{
+	local NavigationPoint N;
+	local vector Was;
+
+	Was = B.Location;
+	N = Level.Game.FindPlayerStart(B, B.PlayerReplicationInfo.Team);
+	if (N == None || !B.SetLocation(N.Location))
+	{
+		BotLog(BName(B) $ ":" @ Why @ "at" @ Where(Was) $ ", respawn failed (no free start spot)");
+		StuckSec[s] = 0;
+		StuckRef[s] = B.Location;
+		return;
+	}
+	B.SetRotation(N.Rotation);
+	B.Velocity = vect(0,0,0);
+	B.Acceleration = vect(0,0,0);
+	B.MoveTarget = None;
+	B.SpecialPause = 0;
+	BotLog(BName(B) $ ":" @ Why @ "at" @ Where(Was) $ ", moved to" @ N.Name @ "(no death counted)");
+	ResetWatch(s, B);
+	if (B.IsInState('Roaming') || B.IsInState('Wandering') || B.IsInState('FallBack') || B.IsInState('Hunting'))
+		B.WhatToDoNext('', '');
 }
 
 function string TReplace(string S, string From, string To)
@@ -3556,8 +3916,8 @@ function BehaviourTick()
 			N = FindOpponent(B, CfgAvenge[c]);
 		if (N == None && (CfgBeh[c] & 16) != 0)
 			N = LeaderFor(B);
-		if (N != None && B.SetEnemy(N))
-			KeepHunting(B, N);
+		if (N != None)
+			ForceHunt(B, N);
 	}
 }
 

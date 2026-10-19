@@ -58,6 +58,12 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > cautiously, so it retreats to health and armour), kamikaze (flak cannon as favourite weapon unless one is set, charges
 > more), berserker (a little more aggressive, below 40 health it never retreats), revenant (prefers its last killer and
 > hunts him when it has no enemy), bounty hunter (prefers the leader and hunts him); the hunts in deathmatch games only.
+> Mod 0.10.1: bots that run back and forth or stand stuck (deathmatch games). Hunts the mod starts (AI help, nemesis,
+> revenant, bounty hunter) need a path to the target and must bring the bot closer: without progress for 6 s the hunt is
+> given up and no hunt from the mod follows for 15 s. With AI help: a bot that tries to move without progress jumps
+> aside (3 s, 5 s), takes a detour (8 s, 14 s) and is moved to a start spot without a death (20 s); a bot that has not
+> left an area of 300 units for 12 s without a fight takes a far detour (12 s, 24 s), at 36 s it is moved to a start
+> spot. Every step is in the server log (`UTTourney: bot [...]`).
 
 ## Classes
 
@@ -243,6 +249,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 54 | **Bot AI help** (mod 0.8.0) | Settings → "Bot AI help" on "Failsafe and duel mode". 1v1 bot-only tournament on maps where bots used to stand still (and a small one like DM-Tempest): the bots look for each other, a game with 10 frags ends in about 4-6 minutes, no bot stands in one place for long. 2on2 bot-only: normal play, a bot that stops moving gets going within ~10 s. Monster Hunt run: bots behave as before. Setting "Off": behaviour as in 0.7.4. Server log without `Accessed None` from `AntiIdle` |
 | 55 | **Dream Team game traits** (mod 0.9.0) | Test instance with Dream Team on: give a roster bot a body trait (Packs → craft, My team → add trait), enter it in a Dream Team 1v1 with a real server. Start armour: the bot spawns with 25 armour (spectate: armour in the HUD of the bot view). Phoenix: the first lethal hit of a game leaves it alive, chat `[TAG]Name rises from the ashes!`, server log `game trait phoenix: ... survives`; the second hit kills. Glass cannon/thick skin/vampire: compare damage numbers with `stat` or by feel (a glass cannon bot dies faster, a vampire recovers health). Adrenaline: visibly faster for a few seconds after a frag. Bots without traits and normal tournaments behave as in 0.8.0; server log without `Accessed None` |
 | 56 | **Dream Team behaviour traits** (mod 0.10.0) | Dream Team 1v1 or 2on2 with a real server and roster bots with behaviour traits. Revenant: after it was fragged it goes after its killer (spectate it). Bounty hunter: goes after the player or bot with the most frags. Kamikaze without a favourite weapon: picks up and uses the flak cannon, charges. Vulture: below 50 health it runs for health or armour instead of fighting on; berserker: keeps fighting when low. Monster Hunt: no hunts, the rest works. Bots without traits as in 0.9.0; server log without `Accessed None` |
+| 57 | **Running on the spot, stuck bots** (mod 0.10.1) | Bot AI help on. Bot-only 1v1 and 2on2 on DM-Curse][ (and maps where bots stood under stairs or ran back and forth), a few games. No bot runs back and forth or stands in one place for more than ~15 s without a fight. `grep "UTTourney: bot" Tourney.log`: lines like `hunt of X without progress for 6 s ..., given up for 15 s`, `no path to X, no hunt for 10 s`, `stuck for 3 s ...: jumps aside`, `detour via PathNodeN`, `has not left (x,y,z) (300 units) for 12 s ...`, `moves again after ...`, rarely `moved to PlayerStartN (no death counted)`. Bots camping on purpose (sniper bots) are left alone; fights in a small room are not touched. Server log without `Accessed None` |
 
 ## SmartStockBots (optional)
 

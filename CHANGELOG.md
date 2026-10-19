@@ -132,6 +132,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Mod 0.10.1: bots no longer run back and forth on the spot or stay stuck (deathmatch games): hunts without a path or progress are given up, stuck bots jump aside, take detours and as a last resort move to a start spot (with Bot AI help).
 - Dream Team tournaments: registering on the tournament page enters the Dream Team (one sign-up, one count with the Dream Team events page); the page shows the teams with tag and name; old registrations of the tournament page are removed.
 - Website reset wipes the Dream Team too (teams, rosters, market, packs, trades, academy, yearbook, hall of fame, manager-made bots, AI managers); before only its ledger bookings went, the teams stayed.
 - Partial settings updates (API) no longer reset the fields they leave out to their defaults.
