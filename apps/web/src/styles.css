@@ -1392,3 +1392,18 @@ udt-pack-stage .rays svg {
 udt-pack-stage .stage.lg .rays {
   opacity: 0.8;
 }
+.udt-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 4px;
+  border-radius: 9px;
+  background: var(--udt);
+  color: #0b0614;
+  font-size: 0.7rem;
+  font-weight: 800;
+  vertical-align: 1px;
+}

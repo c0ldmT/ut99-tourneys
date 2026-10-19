@@ -946,6 +946,8 @@ export interface UdtView {
   roster: UdtRosterBot[];
   wallet?: UdtWallet;
   starterBudget?: number;
+  /** Trade offers waiting for the manager. */
+  tradesIn?: number;
 }
 
 export interface UdtOffer {
@@ -1027,4 +1029,106 @@ export interface UdtSettings {
   marketTime: string;
   offersPerDay: number;
   starterBudget: number;
+  tradeEnabled: boolean;
+  tradeFeePct: number;
+  tradeBalancePct: number;
+  tradeLockDays: number;
+  tradeExpiryHours: number;
+  tradePairPerWeek: number;
+}
+
+export interface UdtTradeBot {
+  botId: string;
+  name: string;
+  skill: number;
+}
+
+export interface UdtTradeSide {
+  userId: string;
+  team: string;
+  tag: string;
+  manager: string;
+}
+
+export type UdtTradeStatus = 'open' | 'accepted' | 'declined' | 'withdrawn' | 'expired' | 'void';
+
+export interface UdtTrade {
+  id: string;
+  incoming: boolean;
+  from: UdtTradeSide;
+  to: UdtTradeSide;
+  give: UdtTradeBot[];
+  take: UdtTradeBot[];
+  giveNeuro: number;
+  takeNeuro: number;
+  giveValue: number;
+  takeValue: number;
+  feeFrom: number;
+  feeTo: number;
+  message: string | null;
+  status: UdtTradeStatus;
+  reason: string | null;
+  createdAt: string;
+  expiresAt: string;
+  decidedAt: string | null;
+}
+
+export interface UdtTradeRules {
+  feePct: number;
+  balancePct: number;
+  lockDays: number;
+  expiryHours: number;
+  pairPerWeek: number;
+}
+
+export interface UdtTrades {
+  enabled: boolean;
+  rules: UdtTradeRules;
+  mine: UdtPartnerBot[];
+  open: UdtTrade[];
+  done: UdtTrade[];
+}
+
+export interface UdtPartnerBot {
+  botId: string;
+  name: string;
+  gameName: string;
+  skill: number;
+  rarity: UdtRarity;
+  traits: BotTraitsView;
+  effective: { skill: number; traits: BotTraitsView; overflow: boolean };
+  udtTraits: UdtTraitOnBot[];
+  level: number;
+  slots: number;
+  stamina: number;
+  value: number;
+  starter: boolean;
+  blocked: 'starter' | 'playing' | 'locked' | null;
+  unlocksAt: string | null;
+}
+
+export interface UdtPartner {
+  userId: string;
+  name: string;
+  tag: string;
+  manager: string;
+  roster: UdtPartnerBot[];
+}
+
+export interface UdtTradeOffer {
+  to: string;
+  give: string[];
+  take: string[];
+  giveNeuro: number;
+  takeNeuro: number;
+  message?: string;
+}
+
+export interface UdtTradePreview {
+  giveValue: number;
+  takeValue: number;
+  feeFrom: number;
+  feeTo: number;
+  balancePct: number;
+  feePct: number;
 }

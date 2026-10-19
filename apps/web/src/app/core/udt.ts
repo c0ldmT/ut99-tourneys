@@ -177,6 +177,14 @@ export function staminaColor(s: number): string {
       }}</a>
       <a routerLink="/udt/market" routerLinkActive="active">{{ 'udt.nav.market' | t }}</a>
       <a routerLink="/udt/packs" routerLinkActive="active">{{ 'udt.nav.packs' | t }}</a>
+      <a routerLink="/udt/trades" routerLinkActive="active"
+        >{{ 'udt.nav.trades' | t }}
+        @if (tradesIn()) {
+          <span class="udt-badge" [attr.aria-label]="'udt.trades.waiting' | t: { n: tradesIn() }">{{
+            tradesIn()
+          }}</span>
+        }
+      </a>
       <a routerLink="/udt/events" routerLinkActive="active">{{ 'udt.nav.events' | t }}</a>
       <a routerLink="/udt/table" routerLinkActive="active">{{ 'udt.nav.table' | t }}</a>
     </nav>
@@ -218,12 +226,24 @@ export class UdtNav {
   readonly changed = output<void>();
   protected readonly state = signal<UdtTestState | null>(null);
   protected readonly msg = signal('');
+  /** Trade offers waiting for the manager. */
+  protected readonly tradesIn = signal(0);
   protected readonly testBar = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );
 
   constructor() {
     if (this.testBar()) void this.load();
+    void this.loadTrades();
+  }
+
+  private async loadTrades() {
+    try {
+      const t = await this.api.udtTrades();
+      this.tradesIn.set(t.open.filter((x) => x.incoming).length);
+    } catch {
+      this.tradesIn.set(0);
+    }
   }
 
   private async load() {
@@ -244,6 +264,7 @@ export class UdtNav {
         await this.load();
       }
       this.changed.emit();
+      void this.loadTrades();
     } catch (e) {
       this.msg.set(errorText(e));
     }

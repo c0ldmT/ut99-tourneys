@@ -10,6 +10,10 @@ import type {
   UdtPacks,
   UdtPull,
   UdtTableRow,
+  UdtPartner,
+  UdtTradeOffer,
+  UdtTradePreview,
+  UdtTrades,
   UdtTestState,
   UdtView,
   AgentView,
@@ -174,6 +178,17 @@ export class Api {
     this.call<UdtView>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}/assign`);
   udtScrap = (cardId: string) =>
     this.call<UdtPacks>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}`);
+  udtTrades = () => this.call<UdtTrades>('GET', '/udt/trades');
+  udtPartners = () => this.call<UdtPartner[]>('GET', '/udt/trades/partners');
+  udtTradePreview = (body: UdtTradeOffer) =>
+    this.call<UdtTradePreview>('POST', '/udt/trades/preview', body);
+  udtPropose = (body: UdtTradeOffer) => this.call<UdtTrades>('POST', '/udt/trades', body);
+  udtAccept = (id: string) =>
+    this.call<UdtTrades>('POST', `/udt/trades/${encodeURIComponent(id)}/accept`);
+  udtDecline = (id: string) =>
+    this.call<UdtTrades>('POST', `/udt/trades/${encodeURIComponent(id)}/decline`);
+  udtWithdrawTrade = (id: string) =>
+    this.call<UdtTrades>('DELETE', `/udt/trades/${encodeURIComponent(id)}`);
   udtTable = () => this.call<UdtTableRow[]>('GET', '/udt/table');
   udtLedger = () => this.call<UdtLedgerEntry[]>('GET', '/udt/ledger');
   udtTest = () => this.call<UdtTestState>('GET', '/udt/test');

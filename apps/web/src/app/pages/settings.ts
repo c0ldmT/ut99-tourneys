@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
-import type { Season, SeasonsOverview } from '../core/types';
+import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
 
 /** Website settings (admins): seasons, ratings, bets, the Neuro shop and the reset. */
 @Component({
@@ -291,6 +291,71 @@ import type { Season, SeasonsOverview } from '../core/types';
           />
         </label>
       </div>
+      <h3>{{ 'udt.settings.trade' | t }}</h3>
+      <label class="switch"
+        ><input type="checkbox" name="tradeOn" [(ngModel)]="trade.tradeEnabled" /><span
+          class="tr"
+        ></span
+        >{{ 'udt.settings.tradeOn' | t }}</label
+      >
+      <div class="row gap">
+        <label
+          >{{ 'udt.settings.tradeFee' | t }}
+          <input
+            type="number"
+            name="tradeFee"
+            min="0"
+            max="50"
+            [(ngModel)]="trade.tradeFeePct"
+            class="narrow"
+          />
+        </label>
+        <label
+          >{{ 'udt.settings.tradeBalance' | t }}
+          <input
+            type="number"
+            name="tradeBalance"
+            min="0"
+            max="100"
+            [(ngModel)]="trade.tradeBalancePct"
+            class="narrow"
+          />
+        </label>
+        <label
+          >{{ 'udt.settings.tradeLock' | t }}
+          <input
+            type="number"
+            name="tradeLock"
+            min="0"
+            max="30"
+            [(ngModel)]="trade.tradeLockDays"
+            class="narrow"
+          />
+        </label>
+        <label
+          >{{ 'udt.settings.tradeExpiry' | t }}
+          <input
+            type="number"
+            name="tradeExpiry"
+            min="1"
+            max="336"
+            [(ngModel)]="trade.tradeExpiryHours"
+            class="narrow"
+          />
+        </label>
+        <label
+          >{{ 'udt.settings.tradePair' | t }}
+          <input
+            type="number"
+            name="tradePair"
+            min="0"
+            max="50"
+            [(ngModel)]="trade.tradePairPerWeek"
+            class="narrow"
+          />
+        </label>
+      </div>
+      <p class="muted small">{{ 'udt.settings.tradeHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
         @if (savedUdt()) {
@@ -458,6 +523,14 @@ export class SettingsPage {
   protected readonly savedBetting = signal(false);
   protected botAiLevel = 2;
   protected udtOn = false;
+  protected trade = pickTrade({
+    tradeEnabled: true,
+    tradeFeePct: 5,
+    tradeBalancePct: 50,
+    tradeLockDays: 3,
+    tradeExpiryHours: 48,
+    tradePairPerWeek: 2,
+  });
   protected udtTime = '04:00';
   protected udtOffers = 8;
   protected udtBudget = 1500;
@@ -513,6 +586,7 @@ export class SettingsPage {
         this.udtTime = s.udt.marketTime;
         this.udtOffers = s.udt.offersPerDay;
         this.udtBudget = s.udt.starterBudget;
+        this.trade = pickTrade(s.udt);
       }
       this.o.set(o);
       this.saved.set(false);
@@ -600,7 +674,14 @@ export class SettingsPage {
         marketTime: this.udtTime,
         offersPerDay: Math.round(Number(this.udtOffers)),
         starterBudget: Math.round(Number(this.udtBudget)),
+        ...Object.fromEntries(
+          Object.entries(this.trade).map(([k, v]) => [
+            k,
+            typeof v === 'boolean' ? v : Math.round(Number(v)),
+          ]),
+        ),
       });
+      this.trade = pickTrade(s.udt);
       this.udtOn = s.udt.enabled;
       // The menu shows the Dream Team at once.
       this.auth.config.update((c) => ({ ...c, udt: s.udt.enabled }));
@@ -673,4 +754,16 @@ export class SettingsPage {
 function addDay(d: string): string {
   const [y, m, day] = d.split('-').map(Number) as [number, number, number];
   return new Date(Date.UTC(y, m - 1, day + 1)).toISOString().slice(0, 10);
+}
+
+/** The trade fields of the Dream Team settings. */
+function pickTrade(u: Partial<UdtSettings>) {
+  return {
+    tradeEnabled: u.tradeEnabled ?? true,
+    tradeFeePct: u.tradeFeePct ?? 5,
+    tradeBalancePct: u.tradeBalancePct ?? 50,
+    tradeLockDays: u.tradeLockDays ?? 3,
+    tradeExpiryHours: u.tradeExpiryHours ?? 48,
+    tradePairPerWeek: u.tradePairPerWeek ?? 2,
+  };
 }

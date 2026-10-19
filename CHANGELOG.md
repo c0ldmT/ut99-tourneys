@@ -7,6 +7,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team trades (page "Trades", badge for waiting offers): offer bots and Neuro to another manager and ask
+  for bots and Neuro; the partner accepts or declines, the proposer can withdraw, offers expire after 48 hours. Brakes
+  against moving Neuro (settings "Dream Team"): balance of both sides, fee on what each side receives, lock after
+  buying or trading, trades per pair and week. Bots keep their traits, level and stamina.
 - Unreal Dream Team packs and traits: page "Packs" with three boxes (standard, premium, elite) and 10-pulls, open
   drop rates and pity, an opening animation (charge up, burst, cards dealt face down, flip one by one or all,
   legendary banner); trait inventory, scrap and crafting. Traits go on roster bots within the slots of their level
@@ -107,6 +111,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Partial settings updates (API) no longer reset the fields they leave out to their defaults.
 - Bots of the control center show with their current name everywhere (statistics, records, ranking, tournament
   pages); bot profiles are linked from the standings and team lists.
 - Manual seeding could not place bots of the control center (wrong entrant id).
