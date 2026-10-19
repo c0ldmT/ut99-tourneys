@@ -7,6 +7,14 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- New tournament form: sections as cards (name and date, game and bracket, rules and maps, server, bots, Discord,
+  advanced), segmented buttons and switches, map tiles with search and "all/none", a summary on the side with the
+  create button (a bar at the bottom on phones). "Repeating series" right in the form: weekday, time, rhythm and
+  lead days with the same settings as a tournament; series are edited in the same form (Series → edit).
+- Bots of a tournament come from the bot control center: its active bots with their skill, until the bracket is
+  seeded (then the pool is fixed). The per-tournament bot list with single skills is gone; older tournaments switch
+  when they are saved. API: `botPool` is optional (missing or empty = control center); `POST/PATCH /series` take a
+  `template` (the tournament settings) instead of `fromTournament`.
 - Neuro shop (bag icon next to the Neuro balance in the header): cosmetics for the season's Neuro, kept for good – titles, name colours (gradients, the
   animated "Aurora"), avatar frames, badges, player page banners, victory fanfare, bot dedication; spending only down
   to the rescue floor. Wardrobe: one item per place, change any time. Season awards (champion frame, "Top Bettor"

@@ -1,76 +1,25 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
-import type { SeriesFields, SeriesView } from '../core/types';
-
-interface Draft extends SeriesFields {
-  id: string | null;
-  fromTournament: string;
-  fromName: string;
-}
+import type { SeriesView } from '../core/types';
 
 /** Tournament series: weekly templates that create the next tournament by themselves. */
 @Component({
   selector: 'app-series',
-  imports: [FormsModule, RouterLink, TPipe, Icon],
+  imports: [RouterLink, TPipe, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>{{ 'series.title' | t }}</h1>
+    <div class="spread">
+      <h1>{{ 'series.title' | t }}</h1>
+      <a class="btn primary" routerLink="/new" [queryParams]="{ mode: 'series' }">
+        <na-icon name="plus" [size]="16" /> {{ 'series.new' | t }}
+      </a>
+    </div>
     <p class="muted small intro">{{ 'series.intro' | t }}</p>
     @if (error()) {
       <p class="error">{{ error() }}</p>
-    }
-
-    @if (draft(); as d) {
-      <form class="card editor" (ngSubmit)="save(d)">
-        <h2>{{ (d.id ? 'series.edit' : 'series.new') | t }}</h2>
-        @if (!d.id) {
-          <p class="muted small">{{ 'series.from' | t: { name: d.fromName } }}</p>
-        }
-        <div class="fields">
-          <div class="field wide">
-            <label for="sn">{{ 'series.name' | t }}</label>
-            <input id="sn" name="name" [(ngModel)]="d.name" maxlength="90" required />
-            <p class="muted small">{{ 'series.nameHint' | t }}</p>
-          </div>
-          <div class="field">
-            <label for="sw">{{ 'series.weekday' | t }}</label>
-            <select id="sw" name="wd" [(ngModel)]="d.weekday">
-              @for (w of weekdays(); track w.n) {
-                <option [ngValue]="w.n">{{ w.name }}</option>
-              }
-            </select>
-          </div>
-          <div class="field">
-            <label for="st">{{ 'series.time' | t }}</label>
-            <input id="st" name="time" type="time" [(ngModel)]="d.time" required />
-          </div>
-          <div class="field">
-            <label for="se">{{ 'series.every' | t }}</label>
-            <select id="se" name="every" [(ngModel)]="d.everyWeeks">
-              @for (n of [1, 2, 3, 4]; track n) {
-                <option [ngValue]="n">
-                  {{ n === 1 ? ('series.everyWeek' | t) : ('series.everyN' | t: { n }) }}
-                </option>
-              }
-            </select>
-          </div>
-          <div class="field">
-            <label for="sl">{{ 'series.lead' | t }}</label>
-            <input id="sl" name="lead" type="number" min="0" max="28" [(ngModel)]="d.leadDays" />
-          </div>
-        </div>
-        <p class="muted small">{{ 'series.leadHint' | t }}</p>
-        <div class="row">
-          <button type="submit" class="primary" [disabled]="busy() || !d.name.trim()">
-            {{ 'common.save' | t }}
-          </button>
-          <button type="button" (click)="draft.set(null)">{{ 'common.cancel' | t }}</button>
-        </div>
-      </form>
     }
 
     <div class="card tablepanel">
@@ -138,14 +87,14 @@ interface Draft extends SeriesFields {
                       >
                         <na-icon name="copyToNew" />
                       </button>
-                      <button
-                        class="icon"
-                        (click)="edit(s)"
+                      <a
+                        class="btn icon"
+                        [routerLink]="['/series', s.id, 'edit']"
                         [title]="'common.edit' | t"
                         [attr.aria-label]="('common.edit' | t) + ' ' + s.name"
                       >
                         <na-icon name="edit" />
-                      </button>
+                      </a>
                       <button
                         class="icon dng"
                         (click)="remove(s)"
@@ -164,16 +113,13 @@ interface Draft extends SeriesFields {
         </div>
       }
       <p class="muted small hint">
-        {{ 'series.howTo' | t }} <a routerLink="/">{{ 'nav.tournaments' | t }}</a>
+        {{ 'series.howTo' | t }}
       </p>
     </div>
   `,
   styles: `
     .intro {
       margin-top: 0;
-    }
-    .editor .wide {
-      grid-column: 1 / -1;
     }
     .nm {
       display: flex;
@@ -201,11 +147,7 @@ interface Draft extends SeriesFields {
 export class SeriesPage {
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
-  /** ?from=<tournament id>: open the form for a new series from that tournament. */
-  readonly from = input<string | undefined>(undefined);
-
   protected readonly list = signal<SeriesView[]>([]);
-  protected readonly draft = signal<Draft | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
 
@@ -222,7 +164,7 @@ export class SeriesPage {
   });
 
   constructor() {
-    void this.load().then(() => this.openFrom());
+    void this.load();
   }
 
   private async load() {
@@ -231,45 +173,6 @@ export class SeriesPage {
     } catch (e) {
       this.error.set(errorText(e));
     }
-  }
-
-  /** Prefills a new series from the tournament given in the address. */
-  private async openFrom() {
-    const id = this.from();
-    if (!id) return;
-    try {
-      const t = await this.api.tournament(id);
-      const at = t.scheduledAt ? new Date(t.scheduledAt) : null;
-      const weekday = at ? ((at.getDay() + 6) % 7) + 1 : 5;
-      const time = at
-        ? `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
-        : '20:00';
-      this.draft.set({
-        id: null,
-        fromTournament: t.id,
-        fromName: t.name,
-        name: `${t.name.replace(/\s*#?\d+$/, '')} #{n}`,
-        weekday,
-        time,
-        everyWeeks: 1,
-        leadDays: 7,
-      });
-    } catch (e) {
-      this.error.set(errorText(e));
-    }
-  }
-
-  protected edit(s: SeriesView) {
-    this.draft.set({
-      id: s.id,
-      fromTournament: '',
-      fromName: '',
-      name: s.name,
-      weekday: s.weekday,
-      time: s.time,
-      everyWeeks: s.everyWeeks,
-      leadDays: s.leadDays,
-    });
   }
 
   private async run(fn: () => Promise<unknown>) {
@@ -283,21 +186,6 @@ export class SeriesPage {
     } finally {
       this.busy.set(false);
     }
-  }
-
-  protected save(d: Draft) {
-    const body = {
-      name: d.name.trim(),
-      weekday: Number(d.weekday),
-      time: d.time,
-      everyWeeks: Number(d.everyWeeks),
-      leadDays: Math.max(0, Math.round(Number(d.leadDays) || 0)),
-    };
-    void this.run(async () => {
-      if (d.id) await this.api.updateSeries(d.id, body);
-      else await this.api.createSeries({ ...body, fromTournament: d.fromTournament });
-      this.draft.set(null);
-    });
   }
 
   protected toggle(s: SeriesView) {

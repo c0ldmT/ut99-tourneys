@@ -118,6 +118,9 @@ export interface TournamentDetail {
   profileId: string;
   connectAddress: string | null;
   connectAddressOverride: string | null;
+  /** The bots are the control center's active ones (fixed at the seeding). */
+  botsFromLibrary: boolean;
+  seriesId: string | null;
   settings: TournamentSettings;
   botPool: BotSpec[];
   registrationOpen: boolean;
@@ -695,8 +698,21 @@ export interface SeriesView extends SeriesFields {
   nextName: string;
   lastStart: string | null;
   settings: TournamentSettings;
+  /** What every tournament of the series gets (no botPool: the control center's bots). */
+  template: SeriesTemplate;
   tournaments: number;
   timeZone: string;
+}
+
+export interface SeriesTemplate {
+  agentId: string;
+  profileId: string;
+  connectAddress?: string | null;
+  settings: TournamentSettings;
+  botPool?: BotSpec[];
+  notifyMode?: 'default' | 'custom' | 'off';
+  webhookUrl?: string | null;
+  seasonal?: boolean;
 }
 
 /** One kill of the game in progress (kill feed, live only). */

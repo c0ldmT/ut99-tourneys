@@ -202,10 +202,12 @@ export class Api {
   setShopSettings = (body: Partial<ShopSettings>) =>
     this.call<WebsiteSettings>('PUT', '/settings/shop', body);
   series = () => this.call<SeriesView[]>('GET', '/series');
-  createSeries = (body: SeriesFields & { fromTournament: string }) =>
+  createSeries = (body: SeriesFields & { fromTournament?: string; template?: unknown }) =>
     this.call<SeriesView>('POST', '/series', body);
-  updateSeries = (id: string, body: Partial<SeriesFields> & { active?: boolean }) =>
-    this.call<SeriesView>('PATCH', `/series/${id}`, body);
+  updateSeries = (
+    id: string,
+    body: Partial<SeriesFields> & { active?: boolean; template?: unknown },
+  ) => this.call<SeriesView>('PATCH', `/series/${id}`, body);
   runSeries = (id: string) => this.call<SeriesView>('POST', `/series/${id}/run`);
   deleteSeries = (id: string) => this.call<void>('DELETE', `/series/${id}`);
   createTournament = (body: unknown) => this.call<TournamentDetail>('POST', '/tournaments', body);

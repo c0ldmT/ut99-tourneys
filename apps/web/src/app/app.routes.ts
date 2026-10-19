@@ -74,6 +74,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/settings').then((m) => m.SettingsPage),
       },
       {
+        path: 'series/:sid/edit',
+        title: 'series.edit',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./pages/tournament-form').then((m) => m.TournamentFormPage),
+      },
+      {
         path: 'admin/series',
         title: 'series.title',
         canActivate: [adminOnly],
