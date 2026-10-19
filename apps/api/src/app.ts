@@ -17,7 +17,7 @@ import { SessionsService } from './auth/sessions.service.js';
 import { UsersService } from './auth/users.service.js';
 import { ApiExceptionFilter } from './common/errors.js';
 import { consoleLogger, LOGGER, type ApiLogger } from './common/logger.js';
-import { CLOCK, CONFIG, systemClock, type ApiClock, type ApiConfig } from './config.js';
+import { CLOCK, CONFIG, ShiftClock, systemClock, type ApiClock, type ApiConfig } from './config.js';
 import { DB, openDatabase, type Db } from './db/database.js';
 import { EventLogService } from './tournaments/event-log.service.js';
 import { LiveHub } from './tournaments/hub.js';
@@ -40,6 +40,8 @@ import { SeriesController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { UdtController } from './udt/udt.controller.js';
+import { UdtTestController } from './udt/udt-test.controller.js';
+import { UdtTestService } from './udt/udt-test.service.js';
 import { UdtRewardsService } from './udt/udt-rewards.service.js';
 import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
@@ -85,10 +87,14 @@ class AppModule {
         SeriesController,
         ShopController,
         UdtController,
+        UdtTestController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
-        { provide: CLOCK, useValue: o.clock ?? systemClock },
+        {
+          provide: CLOCK,
+          useValue: o.clock ?? (config.testMode ? new ShiftClock() : systemClock),
+        },
         { provide: LOGGER, useValue: o.logger ?? consoleLogger(config.logLevel) },
         { provide: DB, useValue: o.db ?? openDatabase(config.dbFile) },
         { provide: DISCORD, useValue: discord },
@@ -126,6 +132,7 @@ class AppModule {
         UdtMarketService,
         UdtEventsService,
         UdtRewardsService,
+        UdtTestService,
         AgentGateway,
       ],
     };

@@ -36,6 +36,12 @@ export const ApiConfigSchema = z
      * a reachable server.
      */
     DEV_LOGIN: bool.default(false),
+    /**
+     * Dream Team test mode (a local test instance with its own DATA_DIR, never production): the
+     * clock can be moved forward, market days and season ends forced, tournaments simulated
+     * without a game server, test managers created. Admin endpoints under /api/udt/test.
+     */
+    TEST_MODE: bool.default(false),
     /** Built Angular app to serve (index.html + assets). Empty = API only. */
     WEB_DIST: z.string().default(''),
     SESSION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
@@ -78,6 +84,7 @@ export const ApiConfigSchema = z
     },
     adminDiscordIds: c.ADMIN_DISCORD_IDS,
     devLogin: c.DEV_LOGIN,
+    testMode: c.TEST_MODE,
     webDist: c.WEB_DIST,
     sessionDays: c.SESSION_DAYS,
     logLevel: c.LOG_LEVEL,
@@ -107,3 +114,11 @@ export interface ApiClock {
   now(): number;
 }
 export const systemClock: ApiClock = { now: () => Date.now() };
+
+/** Test mode: the system clock plus an offset that only grows ("+1 day"). */
+export class ShiftClock implements ApiClock {
+  offsetMs = 0;
+  now(): number {
+    return Date.now() + this.offsetMs;
+  }
+}

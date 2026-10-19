@@ -49,6 +49,21 @@ All settings are environment variables, see [.env.example](.env.example).
 | `DISCORD_BOT_TOKEN`                           |                            | Optional: direct messages from a bot             |
 | `NOTIFY_LANG` / `NOTIFY_REMIND_MIN`           | `de` / `30`                | Message language, reminder before the start      |
 | `SEASON_TZ`                                   | `Europe/Berlin`            | Time zone of the season days                     |
+| `TEST_MODE`                                   | `false`                    | Dream Team test mode (local test instance only)  |
+
+### Dream Team test mode (local)
+
+For trying a whole Dream Team season in an afternoon: a second instance on a PC with its own data folder, e.g.
+a copy of the real database.
+
+```sh
+DATA_DIR=./data-test DEV_LOGIN=true TEST_MODE=true PORT=8099 pnpm --filter @tourney/api dev
+```
+
+Admin endpoints (`/api/udt/test`, 404 without `TEST_MODE`): `GET` state; `POST advance {hours}` moves the clock
+(market days on the way run), `POST market-day`, `POST season-end`, `POST simulate/:id` plays a Dream Team
+tournament without a game server (results by the bots' strength), `POST managers {count}` creates test managers
+with a team, `POST managers/act` lets them bid, line up and enter open tournaments.
 
 ### Discord notifications (optional)
 
