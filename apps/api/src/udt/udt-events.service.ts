@@ -71,6 +71,12 @@ export class UdtEventsService implements OnModuleInit {
       if (t.kind === 'udt' && t.phase === 'draft') this.refundTickets(t.id);
     });
     this.tournaments.onResetAll(() => this.udt.wipeAll());
+    // The tournament page signs up through the Dream Team: the manager enters the team.
+    this.tournaments.registerSignupProvider('udt', {
+      enter: (t, user) => void this.enter(user, t.id),
+      leave: (t, userId) => this.withdraw(t.id, userId),
+      entries: (id) => this.labelledEntries(id),
+    });
   }
 
   private row(id: string): TournamentRow {
@@ -448,16 +454,32 @@ export class UdtEventsService implements OnModuleInit {
         ticketRef,
       })
       .run();
+    this.tournaments.changed(id);
     return this.events(user);
   }
 
   /** Takes the team out again (until the seeding). */
   leave(user: User, id: string) {
     this.udt.assertOn();
+    this.withdraw(id, user.id);
+    return this.events(user);
+  }
+
+  /** A team out of a tournament in draft (its manager or an admin), the ticket back. */
+  withdraw(id: string, userId: string): void {
     const t = this.row(id);
     if (t.phase !== 'draft') throw conflict('the bracket is seeded: ask an organizer');
-    this.dropEntry(id, user.id);
-    return this.events(user);
+    this.dropEntry(id, userId);
+    this.tournaments.changed(id);
+  }
+
+  /** The entries as the tournament page shows them: tag and team name. */
+  private labelledEntries(id: string): { userId: string; label: string }[] {
+    const season = this.udt.seasonNumber();
+    return this.entries(id).map((userId) => {
+      const team = season === null ? null : this.udt.team(userId, season);
+      return { userId, label: team ? `${team.tag} ${team.name}` : userId };
+    });
   }
 }
 

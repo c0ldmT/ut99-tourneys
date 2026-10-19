@@ -506,4 +506,11 @@ export const MIGRATIONS: string[] = [
   `
   UPDATE udt_teams SET tag = '[' || tag || ']', tag_key = '[' || tag_key || ']';
   `,
+  // 26: Dream Team tournaments sign up through the Dream Team (the manager enters the team):
+  // registrations and teams made on the tournament page before had no effect and go.
+  `
+  DELETE FROM registrations WHERE tournament_id IN (SELECT id FROM tournaments WHERE kind = 'udt');
+  DELETE FROM teams WHERE tournament_id IN (SELECT id FROM tournaments WHERE kind = 'udt');
+  UPDATE tournaments SET seasonal = 1 WHERE kind = 'udt';
+  `,
 ];

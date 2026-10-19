@@ -356,6 +356,7 @@ const en = {
   'list.teamsRegistered': '{teams} teams, {n} players',
   'list.registered': '{n} registered',
   'list.youPlay': 'You are registered',
+  'list.youEntered': 'Your team is in',
   'list.open': 'Registration open',
   'list.now': 'Now',
   'list.liveNow': 'live',
@@ -565,6 +566,21 @@ const en = {
   'tp.championWins': 'wins the tournament!',
   'tp.registration': 'Registration',
   'tp.registered': '{n} of {size} slots taken; empty slots are filled with bots.',
+  'tp.udtSignup': 'Dream Team sign-up',
+  'tp.udtHint':
+    'Managers enter their Dream Team here or on the Dream Team events page: the lineup plays, you watch and cheer.',
+  'tp.udtRegistered': '{n} of {size} teams in; empty places get free library bots.',
+  'tp.udtEnter': 'Enter my Dream Team',
+  'tp.udtIn': 'Your Dream Team is in.',
+  'tp.udtWithdraw': 'Take my team out',
+  'tp.udtLineup': 'Team and lineup',
+  'tp.udtTicket':
+    'High stakes: entering costs a ticket in Neuro (back when you take the team out).',
+  'tp.udtFinale': 'Season finale: no sign-up, the top of the season table plays.',
+  'tp.udtFinaleBadge': 'Finale',
+  'tp.udtTeams': 'Teams',
+  'tp.udtNoTeams': 'No team has entered yet.',
+  'form.udtSeason': 'Dream Team tournaments always belong to the running season.',
   'tp.youAreIn': 'You are registered.',
   'tp.withdraw': 'Withdraw',
   'tp.register': 'Register',
@@ -1462,7 +1478,7 @@ const en = {
   'form.udtStars': 'Bots of skill 6-7 at most',
   'form.udtNoLimit': 'no limit',
   'form.udtHint':
-    'Managers sign up on the Dream Team page; free library bots fill the bracket. Not in the statistics.',
+    'Managers enter their Dream Team on the tournament page or under Dream Team › Events (one sign-up); free library bots fill the bracket. Not in the statistics.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -1824,6 +1840,7 @@ const de: Record<TKey, string> = {
   'list.teamsRegistered': '{teams} Teams, {n} Spieler',
   'list.registered': '{n} angemeldet',
   'list.youPlay': 'Du bist angemeldet',
+  'list.youEntered': 'Dein Team ist dabei',
   'list.open': 'Anmeldung offen',
   'list.now': 'Jetzt',
   'list.liveNow': 'live',
@@ -2035,6 +2052,21 @@ const de: Record<TKey, string> = {
   'tp.championWins': 'gewinnt das Turnier!',
   'tp.registration': 'Anmeldung',
   'tp.registered': '{n} von {size} Plätzen belegt; freie Plätze bekommen Bots.',
+  'tp.udtSignup': 'Dream-Team-Anmeldung',
+  'tp.udtHint':
+    'Manager melden hier oder unter Dream Team › Events ihr Dream Team an: Die Aufstellung spielt, du schaust zu und fieberst mit.',
+  'tp.udtRegistered':
+    '{n} von {size} Teams angemeldet; freie Plätze bekommen freie Bibliotheks-Bots.',
+  'tp.udtEnter': 'Mein Dream Team anmelden',
+  'tp.udtIn': 'Dein Dream Team ist angemeldet.',
+  'tp.udtWithdraw': 'Team abmelden',
+  'tp.udtLineup': 'Team und Aufstellung',
+  'tp.udtTicket': 'High Stakes: Die Anmeldung kostet ein Ticket in Neuro (zurück beim Abmelden).',
+  'tp.udtFinale': 'Season-Finale: keine Anmeldung, die Tabellenspitze der Season spielt.',
+  'tp.udtFinaleBadge': 'Finale',
+  'tp.udtTeams': 'Teams',
+  'tp.udtNoTeams': 'Noch kein Team angemeldet.',
+  'form.udtSeason': 'Dream-Team-Turniere gehören immer zur laufenden Season.',
   'tp.youAreIn': 'Du bist angemeldet.',
   'tp.withdraw': 'Abmelden',
   'tp.register': 'Anmelden',
@@ -2939,7 +2971,7 @@ const de: Record<TKey, string> = {
   'form.udtStars': 'Höchstens Bots mit Skill 6–7',
   'form.udtNoLimit': 'keine Grenze',
   'form.udtHint':
-    'Manager melden sich auf der Dream-Team-Seite an; freie Bibliotheks-Bots füllen das Bracket auf. Nicht in der Statistik.',
+    'Manager melden ihr Dream Team auf der Turnierseite oder unter Dream Team › Events an (eine Anmeldung); freie Bibliotheks-Bots füllen das Bracket auf. Nicht in der Statistik.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

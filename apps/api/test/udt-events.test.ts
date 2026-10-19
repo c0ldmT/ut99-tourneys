@@ -93,6 +93,38 @@ describe('Unreal Dream Team: events', () => {
     expect((await mario.req('DELETE', `/udt/events/${id}/enter`)).status).toBe(409);
   });
 
+  it('the tournament page signs up through the Dream Team: one count, one season', async () => {
+    const { admin, mario, tim, anna } = await setup();
+    // No season switch of its own: a Dream Team tournament always belongs to the season.
+    const t = await admin.post('/tournaments', { ...udtCup(1), seasonal: false });
+    expect(t.status, JSON.stringify(t.body)).toBe(201);
+    const id = t.body.id as string;
+    expect((await admin.get(`/tournaments/${id}`)).body.seasonal).toBe(true);
+    // Register on the tournament page = enter the team.
+    expect((await mario.post(`/tournaments/${id}/registration`)).status).toBeLessThan(300);
+    expect((await anna.post(`/tournaments/${id}/registration`)).status).toBe(409); // no team
+    const ev = (await mario.get('/udt/events')).body.find((e: any) => e.id === id);
+    expect(ev).toMatchObject({ entered: true });
+    const page = (await mario.get(`/tournaments/${id}`)).body;
+    expect(page.me.registered).toBe(true);
+    expect(page.registrations).toEqual([
+      expect.objectContaining({ label: '[NX] Nexus', displayName: 'Mario' }),
+    ]);
+    // Entered on the Dream Team page: the tournament page and list count it too.
+    expect((await tim.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    expect((await tim.get(`/tournaments/${id}`)).body.registrations).toHaveLength(2);
+    const row = (await tim.get('/tournaments')).body.find((x: any) => x.id === id);
+    expect(row).toMatchObject({ registered: 2, registeredMe: true, kind: 'udt' });
+    // Withdraw on the tournament page = the team leaves; an admin can take a team out.
+    expect((await mario.req('DELETE', `/tournaments/${id}/registration`)).status).toBeLessThan(300);
+    expect((await mario.get('/udt/events')).body.find((e: any) => e.id === id).entered).toBe(false);
+    const timId = (await tim.get('/me')).body.id as string;
+    expect((await admin.req('DELETE', `/tournaments/${id}/registrations/${timId}`)).status).toBe(
+      204,
+    );
+    expect((await admin.get(`/tournaments/${id}`)).body.registrations).toHaveLength(0);
+  });
+
   it('2v2: a team needs two playable bots; value cap and star limit apply', async () => {
     const { admin, mario } = await setup();
     const t = await admin.post('/tournaments', udtCup(2, { starLimit: 0 }));

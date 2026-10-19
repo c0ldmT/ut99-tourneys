@@ -10,12 +10,13 @@ import { finalMs, raceTime } from '../core/race';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
+import { UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import type { TournamentSummary } from '../core/types';
 
 @Component({
   selector: 'app-tournament-list',
-  imports: [RouterLink, TPipe],
+  imports: [RouterLink, TPipe, UdtMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -32,10 +33,13 @@ import type { TournamentSummary } from '../core/types';
     }
     @if (items(); as list) {
       @for (t of live(); track t.id) {
-        <a class="hero" [routerLink]="['/t', t.id]">
+        <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
           <div class="hero-l">
             <div class="row">
               <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+              @if (t.kind === 'udt') {
+                <span class="badge udt"><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span>
+              }
               @if (t.seasonal) {
                 <span class="badge season">Season</span>
               }
@@ -102,14 +106,25 @@ import type { TournamentSummary } from '../core/types';
       }
       <div class="cards">
         @for (t of shown(); track t.id) {
-          <a class="item" [routerLink]="['/t', t.id]">
+          <a
+            class="item tcard"
+            [class.udt]="t.kind === 'udt'"
+            [class.done]="t.phase === 'finished' || t.phase === 'aborted'"
+            [class.aborted]="t.phase === 'aborted'"
+            [routerLink]="['/t', t.id]"
+          >
             <div class="row">
               <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+              @if (t.kind === 'udt') {
+                <span class="badge udt"><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span>
+              }
               @if (t.seasonal) {
                 <span class="badge season">Season</span>
               }
               @if (t.registeredMe) {
-                <span class="me">{{ 'list.youPlay' | t }}</span>
+                <span class="me">{{
+                  (t.kind === 'udt' ? 'list.youEntered' : 'list.youPlay') | t
+                }}</span>
               }
             </div>
             <div class="name">{{ t.name }}</div>
@@ -172,6 +187,13 @@ import type { TournamentSummary } from '../core/types';
     .hero:hover {
       color: var(--text);
       border-color: var(--accent-dim);
+    }
+    .hero.udt {
+      border-color: rgba(178, 107, 255, 0.55);
+    }
+    .hero.udt .hero-l {
+      background:
+        radial-gradient(120% 120% at 0% 0%, rgba(178, 107, 255, 0.18), transparent 60%), #0e0c1a;
     }
     .hero-l {
       flex: 1 1 380px;

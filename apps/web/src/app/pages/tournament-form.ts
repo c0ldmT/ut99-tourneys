@@ -412,15 +412,17 @@ function toLocalInput(iso: string | null): string {
                   /><span class="tr"></span>{{ 'form.registrationOpen' | t }}</label
                 >
               }
-              <label class="switch"
-                ><input
-                  type="checkbox"
-                  name="seasonal"
-                  [(ngModel)]="f.seasonal"
-                  (ngModelChange)="touch()"
-                  [disabled]="!currentSeason() && !f.seasonal && f.when === 'once'"
-                /><span class="tr"></span>{{ 'form.seasonal' | t }}</label
-              >
+              @if (!f.udt) {
+                <label class="switch"
+                  ><input
+                    type="checkbox"
+                    name="seasonal"
+                    [(ngModel)]="f.seasonal"
+                    (ngModelChange)="touch()"
+                    [disabled]="!currentSeason() && !f.seasonal && f.when === 'once'"
+                  /><span class="tr"></span>{{ 'form.seasonal' | t }}</label
+                >
+              }
               <label class="switch"
                 ><input
                   type="checkbox"
@@ -440,7 +442,7 @@ function toLocalInput(iso: string | null): string {
                   type="checkbox"
                   name="udt"
                   [(ngModel)]="f.udt"
-                  (ngModelChange)="touch()"
+                  (ngModelChange)="f.udt && (f.seasonal = true); touch()"
                   [disabled]="locked()"
                 /><span class="tr"></span>{{ 'form.udt' | t }}</label
               >
@@ -528,7 +530,7 @@ function toLocalInput(iso: string | null): string {
               }
             }
             <p class="muted small">
-              {{ 'form.seasonalHint' | t }}
+              {{ (f.udt ? 'form.udtSeason' : 'form.seasonalHint') | t }}
               @if (currentSeason(); as n) {
                 <span class="ok">{{ 'form.seasonRunning' | t: { n } }}</span>
               } @else if (f.when === 'series') {
@@ -2225,7 +2227,7 @@ export class TournamentFormPage {
       connectAddress: f.connectAddress.trim() || null,
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
-      seasonal: f.seasonal,
+      seasonal: f.udt || f.seasonal,
       autoStart: f.autoStart,
       settings: this.settings(f),
       kind: f.udt ? ('udt' as const) : ('standard' as const),

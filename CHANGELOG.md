@@ -132,6 +132,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Dream Team tournaments: registering on the tournament page enters the Dream Team (one sign-up, one count with the Dream Team events page); the page shows the teams with tag and name; old registrations of the tournament page are removed.
 - Website reset wipes the Dream Team too (teams, rosters, market, packs, trades, academy, yearbook, hall of fame, manager-made bots, AI managers); before only its ledger bookings went, the teams stayed.
 - Partial settings updates (API) no longer reset the fields they leave out to their defaults.
 - Bots of the control center show with their current name everywhere (statistics, records, ranking, tournament
@@ -148,6 +149,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team tournaments always count for the running season (no season switch in the form).
+- Tournament cards: Dream Team tournaments in violet with a badge; finished and aborted tournaments get a gold or red accent.
 - Dream Team tags: 1-8 signs of any kind (e.g. `td'`), used as typed, no brackets added; existing tags keep theirs.
 - Navigation: the Dream Team is a self-drawn mark left of the menu; "New tournament" left the menu (button on the tournament list).
 - Discord channel posts are embeds: registration, check-in, results (series and games as fields, bets payout),

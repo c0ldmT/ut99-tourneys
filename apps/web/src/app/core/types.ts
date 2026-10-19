@@ -71,6 +71,8 @@ export interface TournamentSummary {
   createdAt: string;
   champion?: string;
   seasonal?: boolean;
+  /** "udt": a Dream Team tournament. */
+  kind?: string;
   /** The match being played now (running tournaments). */
   now?: {
     matchId: string;
@@ -140,6 +142,8 @@ export interface TournamentDetail {
   scheduledAt: string | null;
   createdAt: string;
   registrations: {
+    /** Dream Team: the team as it signed up (tag and name). */
+    label?: string;
     userId: string;
     displayName: string;
     avatar: string | null;

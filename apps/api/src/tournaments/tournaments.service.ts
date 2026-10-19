@@ -112,6 +112,17 @@ export type LineupProvider = (
   rng: () => number,
 ) => { entrants: Entrant[]; fill: Entrant[] };
 
+/**
+ * Who signs up for an add-on's kind of tournament (Dream Team: managers enter their teams).
+ * The tournament page's register and withdraw go through it, and its entries are the
+ * registrations everybody sees (with a label, e.g. the team name).
+ */
+export interface SignupProvider {
+  enter(t: TournamentRow, user: User): void;
+  leave(t: TournamentRow, userId: string): void;
+  entries(tournamentId: string): { userId: string; label: string }[];
+}
+
 const TournamentFields = z.object({
   name: z.string().trim().min(1).max(100),
   agentId: z.string().min(1).max(64),
@@ -362,7 +373,9 @@ export class TournamentsService {
     };
     this.checkFields(body);
     const inSeason = !!this.seasons.current();
-    if (body.seasonal && !inSeason) throw conflict('no season is running');
+    // Dream Team tournaments belong to the running season, always (no switch of their own).
+    if (body.kind === 'udt') body.seasonal = true;
+    if (body.seasonal && !inSeason && !opts.seriesId) throw conflict('no season is running');
     let id = body.id ?? slugify(body.name);
     if (this.get(id)) {
       if (body.id) throw conflict(`tournament ${id} exists`);
@@ -384,7 +397,7 @@ export class TournamentsService {
         scheduledAt: body.scheduledAt ?? null,
         notifyMode: body.notifyMode ?? 'default',
         webhookUrl: body.webhookUrl || null,
-        seasonal: body.seasonal ?? inSeason,
+        seasonal: (body.seasonal ?? inSeason) && inSeason,
         seriesId: opts.seriesId ?? null,
         kind: body.kind ?? 'standard',
         udtJson:
@@ -445,13 +458,18 @@ export class TournamentsService {
       if (t.phase !== 'draft') throw conflict('the kind of a tournament changes in draft only');
       const kind = body.kind ?? (t.kind as TournamentKind);
       set.kind = kind;
+      if (kind === 'udt') {
+        if (!this.seasons.current()) throw conflict('no season is running');
+        set.seasonal = true;
+      }
       set.udtJson =
         kind === 'udt'
           ? JSON.stringify(UdtEventRulesSchema.parse(body.udt ?? this.udtRules(t) ?? {}))
           : null;
     }
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
-    if (body.seasonal !== undefined && body.seasonal !== t.seasonal) {
+    const udtNow = (body.kind ?? t.kind) === 'udt';
+    if (!udtNow && body.seasonal !== undefined && body.seasonal !== t.seasonal) {
       if (body.seasonal && !this.seasons.current()) throw conflict('no season is running');
       set.seasonal = body.seasonal;
     }
@@ -549,6 +567,20 @@ export class TournamentsService {
   // ------------------------------------------------------------------------------------------
 
   registered(id: string): User[] {
+    const provider = this.signupProviders.get(this.get(id)?.kind ?? 'standard');
+    if (provider) {
+      const ids = provider.entries(id).map((e) => e.userId);
+      if (!ids.length) return [];
+      const byId = new Map(
+        this.db
+          .select()
+          .from(users)
+          .where(inArray(users.id, ids))
+          .all()
+          .map((u) => [u.id, u]),
+      );
+      return ids.flatMap((u) => (byId.has(u) ? [byId.get(u)!] : []));
+    }
     return this.db
       .select({ user: users })
       .from(registrations)
@@ -570,8 +602,24 @@ export class TournamentsService {
       .map((r) => r.user);
   }
 
+  private readonly signupProviders = new Map<string, SignupProvider>();
+  registerSignupProvider(kind: TournamentKind, provider: SignupProvider): void {
+    this.signupProviders.set(kind, provider);
+  }
+
+  /** The tournament's page and list change (an add-on took a sign-up). */
+  changed(id: string): void {
+    if (this.get(id)) this.notifyDraft(id);
+  }
+
   register(id: string, user: User): void {
     const t = this.require(id);
+    const provider = this.signupProviders.get(t.kind);
+    if (provider) {
+      provider.enter(t, user);
+      this.notifyDraft(id);
+      return;
+    }
     if (t.phase !== 'draft')
       throw conflict('registration is closed: the bracket is already seeded');
     if (!t.registrationOpen) throw conflict('registration is closed');
@@ -590,6 +638,12 @@ export class TournamentsService {
   unregister(id: string, userId: string): void {
     const t = this.require(id);
     if (t.phase !== 'draft') throw conflict('the bracket is already seeded');
+    const provider = this.signupProviders.get(t.kind);
+    if (provider) {
+      provider.leave(t, userId);
+      this.notifyDraft(id);
+      return;
+    }
     const teamId = this.teams.registration(id, userId)?.teamId;
     this.db
       .delete(registrations)
@@ -607,6 +661,8 @@ export class TournamentsService {
     const t = this.require(id);
     const settings = this.settings(t);
     if (settings.teamSize < 2) throw conflict('this is not a team tournament');
+    if (this.signupProviders.has(t.kind))
+      throw conflict('teams sign up on their own page here (Dream Team: the manager enters)');
     if (t.phase !== 'draft') throw conflict('teams are fixed: the bracket is already seeded');
     if (opts.open && !t.registrationOpen) throw conflict('registration is closed');
     return { t, settings };
@@ -1601,6 +1657,13 @@ export class TournamentsService {
       .all();
     return rows.map(({ t, registered, mine, teamCount }) => {
       const s = this.settings(t);
+      const provider = this.signupProviders.get(t.kind);
+      if (provider) {
+        const entries = provider.entries(t.id);
+        registered = entries.length;
+        mine = entries.some((e) => e.userId === user.id) ? 1 : 0;
+        teamCount = 0;
+      }
       const live = t.phase === 'running' || t.phase === 'paused';
       const loaded = t.phase === 'finished' || live ? this.log.projection(t.id) : undefined;
       const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
@@ -1660,6 +1723,9 @@ export class TournamentsService {
   detail(id: string, user: User) {
     const t = this.require(id);
     const regs = this.registered(id);
+    const labels = new Map(
+      (this.signupProviders.get(t.kind)?.entries(id) ?? []).map((e) => [e.userId, e.label]),
+    );
     const watching = this.watching(id);
     const proj = this.log.projection(id);
     const myEntrant = this.entrantByUser(proj).get(user.id);
@@ -1696,6 +1762,7 @@ export class TournamentsService {
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
       registrations: regs.map((u) => ({
+        ...(labels.has(u.id) ? { label: labels.get(u.id) } : {}),
         userId: u.id,
         displayName: u.displayName,
         avatar: u.avatar,

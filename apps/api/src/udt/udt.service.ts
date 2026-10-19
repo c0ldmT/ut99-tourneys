@@ -196,6 +196,11 @@ export class UdtService {
   }
 
   /** The running season, or 409. */
+  /** The running season's number, null out of season. */
+  seasonNumber(): number | null {
+    return this.seasons.current()?.number ?? null;
+  }
+
   season(): Season {
     const s = this.seasons.current();
     if (!s) throw conflict('no season is running');

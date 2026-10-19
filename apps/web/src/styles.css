@@ -373,6 +373,42 @@ tbody tr:hover td {
   border-color: rgba(240, 70, 140, 0.4);
   background: rgba(240, 70, 140, 0.1);
 }
+.badge.udt {
+  color: #d7b4ff;
+  border-color: rgba(178, 107, 255, 0.5);
+  background: rgba(178, 107, 255, 0.14);
+  padding-left: 5px;
+}
+/* Tournament cards: Dream Team tournaments in violet, finished and aborted ones toned down. */
+a.tcard.udt {
+  border-color: rgba(178, 107, 255, 0.45);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.16), transparent 55%),
+    linear-gradient(180deg, rgba(178, 107, 255, 0.06), transparent 40%), var(--panel);
+  box-shadow: inset 0 2px 0 rgba(178, 107, 255, 0.55);
+}
+a.tcard.udt:hover {
+  border-color: rgba(178, 107, 255, 0.75);
+}
+a.tcard.udt .bar div {
+  background: var(--udt);
+}
+a.tcard.done {
+  background: linear-gradient(180deg, rgba(245, 184, 61, 0.07), transparent 55%), var(--panel);
+  border-left: 3px solid rgba(245, 184, 61, 0.45);
+}
+a.tcard.done.aborted {
+  background: linear-gradient(180deg, rgba(255, 92, 108, 0.06), transparent 55%), var(--panel);
+  border-left-color: rgba(255, 92, 108, 0.4);
+}
+a.tcard.done .name {
+  color: var(--text-2);
+}
+a.tcard.udt.done {
+  background:
+    linear-gradient(180deg, rgba(245, 184, 61, 0.06), transparent 55%),
+    radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.12), transparent 55%), var(--panel);
+}
 /* "BOT" next to a name */
 .badge.bot {
   height: 17px;
@@ -1420,4 +1456,23 @@ udt-pack-stage .stage.lg .rays {
 }
 .udt-card .car.ph-decline {
   color: #ff9aa4;
+}
+/* Dream Team sign-up on the tournament page */
+.card.udt-signup {
+  border-color: rgba(178, 107, 255, 0.45);
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.14), transparent 55%), var(--panel);
+}
+.card.udt-signup h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+button.primary.udt {
+  background: var(--udt);
+  border-color: var(--udt);
+  color: #0b0614;
+}
+a.badge.udt:hover {
+  color: #fff;
 }

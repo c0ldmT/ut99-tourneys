@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { Looks, NameTag } from '../core/looks';
-import { Icon } from '../core/brand';
+import { Icon, UdtMark } from '../core/brand';
 import { PageTitle } from '../core/page-title';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -44,6 +44,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     BetColumns,
     Icon,
     NameTag,
+    UdtMark,
   ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -56,6 +57,14 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <div class="head-l">
           <div class="row">
             <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+            @if (udtMode()) {
+              <a class="badge udt" routerLink="/udt/events"
+                ><na-udt-mark [size]="16" />{{ 'udt.title' | t }}
+                @if (t.udt?.finale) {
+                  · {{ 'tp.udtFinaleBadge' | t }}
+                }
+              </a>
+            }
             @if (t.season) {
               <span class="badge season">{{ 'season.label' | t: { n: t.season } }}</span>
             }
@@ -123,7 +132,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         </div>
       }
 
-      @if (teamMode() && t.phase === 'draft') {
+      @if (teamMode() && !udtMode() && t.phase === 'draft') {
         <div class="card">
           <app-team-panel
             [tournament]="t"
@@ -138,10 +147,47 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       <div class="grid two">
         <!-- Taking part -->
         @if (
-          t.phase !== 'finished' && t.phase !== 'aborted' && !(teamMode() && t.phase === 'draft')
+          t.phase !== 'finished' &&
+          t.phase !== 'aborted' &&
+          !(teamMode() && !udtMode() && t.phase === 'draft')
         ) {
-          <div class="card">
-            @if (t.phase === 'draft') {
+          <div class="card" [class.udt-signup]="udtMode() && t.phase === 'draft'">
+            @if (t.phase === 'draft' && udtMode()) {
+              <h2><na-udt-mark [size]="24" /> {{ 'tp.udtSignup' | t }}</h2>
+              <p class="muted small">{{ 'tp.udtHint' | t }}</p>
+              @if (t.udt?.finale) {
+                <p>{{ 'tp.udtFinale' | t }}</p>
+              } @else {
+                <p class="muted small">
+                  {{ 'tp.udtRegistered' | t: { n: t.registrations.length, size: t.settings.size } }}
+                </p>
+                @if (t.udt?.ticket) {
+                  <p class="small">{{ 'tp.udtTicket' | t }}</p>
+                }
+                @if (t.me.registered) {
+                  <p>{{ 'tp.udtIn' | t }}</p>
+                  <div class="row">
+                    <button (click)="act(api.unregister(t.id))" [disabled]="busy()">
+                      {{ 'tp.udtWithdraw' | t }}
+                    </button>
+                    <a class="btn" routerLink="/udt">{{ 'tp.udtLineup' | t }}</a>
+                  </div>
+                } @else if (t.registrationOpen && t.registrations.length < t.settings.size) {
+                  <div class="row">
+                    <button
+                      class="primary udt"
+                      (click)="act(api.register(t.id))"
+                      [disabled]="busy()"
+                    >
+                      {{ 'tp.udtEnter' | t }}
+                    </button>
+                    <a class="btn" routerLink="/udt">{{ 'tp.udtLineup' | t }}</a>
+                  </div>
+                } @else {
+                  <p class="muted">{{ 'tp.registrationClosed' | t }}</p>
+                }
+              }
+            } @else if (t.phase === 'draft') {
               <h2>{{ 'tp.registration' | t }}</h2>
               <p class="muted small">
                 {{ 'tp.registered' | t: { n: t.registrations.length, size: t.settings.size } }}
@@ -492,16 +538,23 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         </div>
       }
 
-      @if (t.phase === 'draft' && !teamMode()) {
+      @if (t.phase === 'draft' && (!teamMode() || udtMode()) && !t.udt?.finale) {
         <div class="card">
-          <h2>{{ 'tp.players' | t }} ({{ t.registrations.length }})</h2>
+          <h2>
+            {{ (udtMode() ? 'tp.udtTeams' : 'tp.players') | t }} ({{ t.registrations.length }})
+          </h2>
           @if (!t.registrations.length) {
-            <p class="muted">{{ 'tp.noPlayers' | t }}</p>
+            <p class="muted">{{ (udtMode() ? 'tp.udtNoTeams' : 'tp.noPlayers') | t }}</p>
           }
           <ul class="players">
             @for (r of t.registrations; track r.userId) {
               <li>
-                {{ r.displayName }}
+                @if (r.label) {
+                  <b>{{ r.label }}</b
+                  ><span class="muted small">&nbsp;· {{ r.displayName }}</span>
+                } @else {
+                  {{ r.displayName }}
+                }
                 @if (isAdmin()) {
                   <button
                     class="icon"
@@ -986,6 +1039,8 @@ export class TournamentPage {
     return cm ? (this.t()?.projection?.bracket?.byId[cm.matchId]?.bestOf ?? 1) : 1;
   });
   protected readonly teamMode = computed(() => (this.t()?.settings.teamSize ?? 1) > 1);
+  /** Dream Team: managers enter their teams, the lineups play. */
+  protected readonly udtMode = computed(() => this.t()?.kind === 'udt');
   /** Monster Hunt time race. */
   protected readonly race = computed(() => isRace(this.t()?.settings));
   protected readonly penaltySec = computed(
