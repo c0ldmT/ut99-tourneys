@@ -38,6 +38,7 @@ import { BotsController } from './bots/bots.controller.js';
 import { BotsService } from './bots/bots.service.js';
 import { SeriesController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
+import { LedgerService } from './ledger/ledger.service.js';
 import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
 import { AutoStartService } from './tournaments/auto-start.service.js';
@@ -114,6 +115,7 @@ class AppModule {
         SeriesService,
         AutoStartService,
         ShopService,
+        LedgerService,
         AgentGateway,
       ],
     };

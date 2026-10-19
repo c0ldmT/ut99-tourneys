@@ -288,4 +288,19 @@ export const MIGRATIONS: string[] = [
     lead_minutes = lead_days * 1440;
   ALTER TABLE tournaments ADD COLUMN auto_start INTEGER NOT NULL DEFAULT 0;
   `,
+  // 14: Neuro ledger: earnings and spendings besides bets and the shop (Dream Team), one row per
+  // booking, `ref` makes bookings idempotent.
+  `
+  CREATE TABLE neuro_ledger (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    ref TEXT NOT NULL UNIQUE,
+    at TEXT NOT NULL,
+    meta_json TEXT
+  );
+  CREATE INDEX neuro_ledger_season ON neuro_ledger(season, user_id);
+  `,
 ];

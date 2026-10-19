@@ -24,7 +24,14 @@ import { gameProblems } from '@tourney/adapter-ut99';
 import { z } from 'zod';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { registrations, tournaments, users, watchers, shopPurchases } from '../db/schema.js';
+import {
+  neuroLedger,
+  registrations,
+  shopPurchases,
+  tournaments,
+  users,
+  watchers,
+} from '../db/schema.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { randomId, slugify, TOURNAMENT_ID } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
@@ -437,6 +444,8 @@ export class TournamentsService {
     for (const t of all) this.remove(t.id);
     // Shop purchases were paid with the seasons' Neuro: they go with them (looks too).
     this.db.delete(shopPurchases).run();
+    // So do the ledger's bookings (Dream Team rewards, purchases, salaries).
+    this.db.delete(neuroLedger).run();
     this.db.update(users).set({ lookJson: null }).run();
     const seasons = this.seasons.clearAll();
     this.stats.clearCache();

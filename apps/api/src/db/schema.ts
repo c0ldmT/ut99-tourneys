@@ -33,6 +33,21 @@ export const shopPurchases = sqliteTable('shop_purchases', {
   dataJson: text('data_json'),
 });
 
+/**
+ * Neuro ledger: bookings besides bets and shop purchases (Dream Team rewards, purchases,
+ * salaries, ...). Positive amounts earn, negative ones spend; `ref` is unique (idempotent).
+ */
+export const neuroLedger = sqliteTable('neuro_ledger', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  userId: text('user_id').notNull(),
+  kind: text('kind').notNull(),
+  amount: integer('amount').notNull(),
+  ref: text('ref').notNull().unique(),
+  at: text('at').notNull(),
+  metaJson: text('meta_json'),
+});
+
 export const sessions = sqliteTable('sessions', {
   /** sha256 of the cookie value. */
   idHash: text('id_hash').primaryKey(),

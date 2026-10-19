@@ -305,6 +305,8 @@ export interface Wallet {
   profit: number;
   /** Neuro spent in the shop. */
   spent: number;
+  /** Sum of the ledger bookings (Dream Team rewards minus purchases and salaries, ...). */
+  ledger: number;
   bailouts: number;
   bailedOut: number;
   bestWin: number;
@@ -330,6 +332,7 @@ export const emptyWallet = (userId: string, start: number): Wallet => ({
   open: 0,
   profit: 0,
   spent: 0,
+  ledger: 0,
   bailouts: 0,
   bailedOut: 0,
   bestWin: 0,
@@ -352,14 +355,18 @@ export function wallets(
   floor = 0,
   /** Shop purchases of the season (never below the floor, so no rescue follows). */
   spends: readonly Bailout[] = [],
+  /** Ledger bookings: positive earns, negative spends (spending never goes below the floor). */
+  ledger: readonly Bailout[] = [],
 ): Map<string, Wallet> {
   type Step =
     | { at: string; order: 0; userId: string; bailout: number }
     | { at: string; order: 1; userId: string; bet: SettledBet }
-    | { at: string; order: 2; userId: string; spend: number };
+    | { at: string; order: 2; userId: string; spend: number }
+    | { at: string; order: 3; userId: string; booking: number };
   const steps: Step[] = [
     ...bailouts.map((b) => ({ at: b.at, order: 0 as const, userId: b.userId, bailout: b.amount })),
     ...spends.map((b) => ({ at: b.at, order: 2 as const, userId: b.userId, spend: b.amount })),
+    ...ledger.map((b) => ({ at: b.at, order: 3 as const, userId: b.userId, booking: b.amount })),
     ...settled
       .filter((b) => b.status !== 'open')
       .map((b) => ({ at: b.settledAt ?? b.placedAt, order: 1 as const, userId: b.userId, bet: b })),
@@ -376,6 +383,12 @@ export function wallets(
     if ('spend' in s) {
       w.balance -= s.spend;
       w.spent += s.spend;
+      continue;
+    }
+    if ('booking' in s) {
+      w.balance += s.booking;
+      w.ledger += s.booking;
+      w.peak = Math.max(w.peak, w.balance);
       continue;
     }
     if ('bailout' in s) {
