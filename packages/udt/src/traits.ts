@@ -1,7 +1,7 @@
 /**
  * Unreal Dream Team traits: category A (play-style values, sent to the game as the bot's
  * effective values), B (body: the mod changes damage, health, armour and speed in the game,
- * mod 0.9.0), C (behaviour: the mod steers the bot's AI, first group mod 0.10.0) and D (manager:
+ * mod 0.9.0), C (behaviour: the mod steers the bot's AI, groups in mod 0.10.0 and 0.11.0) and D (manager:
  * economy and career on the website). Traits only work in Dream Team games and last one season.
  */
 import { baseValue, DEFAULT_ECONOMY, RARITIES, valueScore, type Rarity } from './economy.js';
@@ -37,6 +37,10 @@ export type TraitCode =
   | 'berserker'
   | 'revenant'
   | 'bounty-hunter'
+  | 'snipers-nest'
+  | 'team-player'
+  | 'shuffle-dancer'
+  | 'item-controller'
   | 'mentor';
 
 export interface TraitDef {
@@ -80,6 +84,11 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'berserker', rarity: 'rare', category: 'behaviour', mod: 'bs' },
   { code: 'revenant', rarity: 'rare', category: 'behaviour', mod: 'rg' },
   { code: 'bounty-hunter', rarity: 'epic', category: 'behaviour', mod: 'bh' },
+  // Second behaviour group (mod 0.11.0).
+  { code: 'snipers-nest', rarity: 'rare', category: 'behaviour', mod: 'sn' },
+  { code: 'team-player', rarity: 'rare', category: 'behaviour', mod: 'tp' },
+  { code: 'shuffle-dancer', rarity: 'epic', category: 'behaviour', mod: 'sd' },
+  { code: 'item-controller', rarity: 'epic', category: 'behaviour', mod: 'ic' },
 ];
 
 const BY_CODE = new Map(TRAITS.map((t) => [t.code, t]));

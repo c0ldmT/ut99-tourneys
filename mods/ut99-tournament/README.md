@@ -64,6 +64,13 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > aside (3 s, 5 s), takes a detour (8 s, 14 s) and is moved to a start spot without a death (20 s); a bot that has not
 > left an area of 300 units for 12 s without a fight takes a far detour (12 s, 24 s), at 36 s it is moved to a start
 > spot. Every step is in the server log (`UTTourney: bot [...]`).
+> Mod 0.11.0: Dream Team behaviour traits, second group (codes `sn`, `tp`, `sd`, `ic` in the `btrt` line): sniper's nest
+> (sniper rifle as favourite weapon unless one is set; with it and no enemy in sight it heads for one of up to 12 high
+> points with a view, found once per map, and camps there 8-14 s), team player (team games: prefers what its team mates
+> attack and joins a team mate's fight within 2500 units when it has no enemy in sight), shuffle dancer (strafes more;
+> in a fight it dodges to alternating sides about once a second), item controller (knows when armour, shield belts and
+> damage amplifiers come back and is there in time, waits next to them). The errands only without an enemy in sight;
+> the AI help does not send a bot after an opponent while it is on one.
 
 ## Classes
 
@@ -250,6 +257,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 55 | **Dream Team game traits** (mod 0.9.0) | Test instance with Dream Team on: give a roster bot a body trait (Packs → craft, My team → add trait), enter it in a Dream Team 1v1 with a real server. Start armour: the bot spawns with 25 armour (spectate: armour in the HUD of the bot view). Phoenix: the first lethal hit of a game leaves it alive, chat `[TAG]Name rises from the ashes!`, server log `game trait phoenix: ... survives`; the second hit kills. Glass cannon/thick skin/vampire: compare damage numbers with `stat` or by feel (a glass cannon bot dies faster, a vampire recovers health). Adrenaline: visibly faster for a few seconds after a frag. Bots without traits and normal tournaments behave as in 0.8.0; server log without `Accessed None` |
 | 56 | **Dream Team behaviour traits** (mod 0.10.0) | Dream Team 1v1 or 2on2 with a real server and roster bots with behaviour traits. Revenant: after it was fragged it goes after its killer (spectate it). Bounty hunter: goes after the player or bot with the most frags. Kamikaze without a favourite weapon: picks up and uses the flak cannon, charges. Vulture: below 50 health it runs for health or armour instead of fighting on; berserker: keeps fighting when low. Monster Hunt: no hunts, the rest works. Bots without traits as in 0.9.0; server log without `Accessed None` |
 | 57 | **Running on the spot, stuck bots** (mod 0.10.1) | Bot AI help on. Bot-only 1v1 and 2on2 on DM-Curse][ (and maps where bots stood under stairs or ran back and forth), a few games. No bot runs back and forth or stands in one place for more than ~15 s without a fight. `grep "UTTourney: bot" Tourney.log`: lines like `hunt of X without progress for 6 s ..., given up for 15 s`, `no path to X, no hunt for 10 s`, `stuck for 3 s ...: jumps aside`, `detour via PathNodeN`, `has not left (x,y,z) (300 units) for 12 s ...`, `moves again after ...`, rarely `moved to PlayerStartN (no death counted)`. Bots camping on purpose (sniper bots) are left alone; fights in a small room are not touched. Server log without `Accessed None` |
+| 58 | **Dream Team behaviour traits, group 2** (mod 0.11.0) | Dream Team games with a real server, roster bots with the new traits. Sniper's nest (DM-Deck16][, DM-Morpheus or another map with heights): the bot picks up the sniper rifle, goes up and camps there for a while (server log `sniper nests on this map: N`, `heads for the sniper's nest PathNodeN`, `... reached, camps`). Team player (2on2 or larger): two bots of a side attack the same opponent, `team player joins X's fight against Y`. Shuffle dancer: dodges left and right in fights (spectate it). Item controller (DM-Deck16][ or a map with shield belt/UDamage): `power items on this map: N`, it heads for the item before it is back (`item controller heads for ..., back in N s`) and waits next to it (`waits N s at ...`). Bots without these traits as in 0.10.1; server log without `Accessed None` |
 
 ## SmartStockBots (optional)
 

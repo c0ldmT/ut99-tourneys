@@ -282,7 +282,10 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * damage dealt and taken, vp 15 % of the damage dealt as health, px survives one lethal hit
    * per game with 50 health; mod 0.10.0 behaviour: aa vulture (hurt: retreats to health), kz
    * kamikaze (flak, charges), bs berserker (hurt: no retreat), rg revenant (hunts its last
-   * killer), bh bounty hunter (hunts the leader). Unknown codes are ignored.
+   * killer), bh bounty hunter (hunts the leader); mod 0.11.0: sn sniper's nest (high points
+   * with the sniper rifle), tp team player (focus fire in team games), sd shuffle dancer (dodges
+   * in a fight), ic item controller (armour, belts and amplifiers at respawn time). Unknown codes
+   * are ignored.
    */
   z.object({ t: z.literal('btrt'), name: str(MAX_NAME_CHARS), c: str(64) }),
   /**

@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.10.1";
+const MOD_VERSION = "0.11.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -138,10 +138,29 @@ var byte CfgBody[16];              // Dream Team game traits (btrt): 1 start arm
 var byte CfgPhoenix[16];           // 1 = the phoenix was used this game
 var float CfgAdrUntil[16];         // adrenaline: faster until then (0 = not boosted)
 var float CfgAdrSpeed[16];         // the ground speed before the boost
-var byte CfgBeh[16];               // behaviour traits (btrt, mod 0.10.0): 1 vulture, 2 kamikaze,
+var int CfgBeh[16];                // behaviour traits (btrt, mod 0.10.0): 1 vulture, 2 kamikaze,
                                    // 4 berserker, 8 revenant, 16 bounty hunter
 var byte CfgAggr[16];              // 1 = the hurt bot's aggressiveness was changed by a trait
 var string CfgAvenge[16];          // revenant: its last killer
+                                   // mod 0.11.0: 32 sniper's nest, 64 team player, 128 shuffle
+                                   // dancer, 256 item controller
+var NavigationPoint CfgNest[16];   // sniper's nest: the nest it heads for
+var NavigationPoint CfgLastNest[16];
+var float CfgNestUntil[16];        // gives up the way there then
+var float CfgNestNext[16];         // no new nest before then
+var float CfgDanceNext[16];        // shuffle dancer: next dodge not before then
+var byte CfgDanceSide[16];
+var Inventory CfgItem[16];         // item controller: the item it heads for or waits at
+var float CfgItemUntil[16];
+var float CfgItemNext[16];
+var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
+var int NestScore[12];
+var int NestCount;
+var bool bNestsDone;
+var Inventory PowItem[16];         // armour, shield belts, damage amplifiers of the map
+var float PowBack[16];             // when a taken one is back (0 = it is there)
+var int PowCount;
+var bool bPowDone;
 var byte SayCfg[192];              // chat lines: bot (index into Cfg*), occasion, text
 var string SayKind[192];
 var string SayText[192];
@@ -394,7 +413,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			if (i >= 0)
 			{
 				CfgBody[i] = byte(ParseGameTraits(M.Get("c")));
-				CfgBeh[i] = byte(ParseBehaviourTraits(M.Get("c")));
+				CfgBeh[i] = ParseBehaviourTraits(M.Get("c"));
 			}
 			break;
 		case "bpers":
@@ -2675,6 +2694,11 @@ function int FindCfg(string BName, bool bCreate)
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
 	CfgBeh[i] = 0;
+	CfgNest[i] = None;
+	CfgLastNest[i] = None;
+	CfgNestNext[i] = 0;
+	CfgItem[i] = None;
+	CfgItemNext[i] = 0;
 	CfgAggr[i] = 0;
 	CfgAvenge[i] = "";
 	return i;
@@ -2831,7 +2855,7 @@ function HuntNemeses()
 			continue;
 		if (B.Enemy == None)
 		{
-			if (B.IsInState('Roaming') || B.IsInState('Wandering'))
+			if ((B.IsInState('Roaming') || B.IsInState('Wandering')) && !(B.bCamping && OnCampErrand(B)))
 				ForceHunt(B, N);
 		}
 		else if (B.IsInState('Hunting') && !B.LineOfSightTo(B.Enemy) && HuntAllowed(B, N))
@@ -3006,7 +3030,16 @@ function AntiIdle()
 			continue;
 		}
 		if (UnstickBot(B, s))
+		{
+			DropTraitErrand(B, 20);
 			continue;
+		}
+		if (OnTraitErrand(B))
+		{
+			IdleSince[s] = Now;
+			FreeSince[s] = Now;
+			continue;
+		}
 		if (B.bCamping && B.IsInState('Roaming'))
 		{
 			IdleSince[s] = Now;
@@ -3387,6 +3420,492 @@ function FreeRespawn(Bot B, int s, string Why)
 		B.WhatToDoNext('', '');
 }
 
+//-----------------------------------------------------------------------------
+// Mod 0.11.0: behaviour traits, second group. Sniper's nest: with the sniper rifle (its
+// favourite weapon) it heads for a high point with a view when it has no enemy in sight and
+// camps there 8-14 s. Team player (team games): attacks what its team mates attack (target
+// threat), and without an enemy in sight joins a team mate's fight within 2500 units. Shuffle
+// dancer: in a fight it dodges left and right about once a second (the game's own dodge),
+// strafes more. Item controller: knows when armour, shield belts and damage amplifiers come
+// back and is there in time (waits next to them), when it has no enemy in sight.
+//-----------------------------------------------------------------------------
+
+// The bot heads for a nest or an item for its trait (no AI help hunt meanwhile).
+function bool OnTraitErrand(Bot B)
+{
+	local int c;
+	c = GameTraitCfg(B);
+	if (c < 0)
+		return false;
+	return CfgNest[c] != None || CfgItem[c] != None;
+}
+
+// A bot with a trait that camps on purpose (sniper's nest, item controller).
+function bool OnCampErrand(Bot B)
+{
+	local int c;
+	c = GameTraitCfg(B);
+	return c >= 0 && (CfgBeh[c] & (32 | 256)) != 0;
+}
+
+// Ends a nest or item errand (stuck, orders); no new one for Secs.
+function DropTraitErrand(Bot B, float Secs)
+{
+	local int c;
+	c = GameTraitCfg(B);
+	if (c < 0)
+		return;
+	if (CfgNest[c] != None)
+		CfgLastNest[c] = CfgNest[c];
+	CfgNest[c] = None;
+	CfgItem[c] = None;
+	if (Secs > 0)
+	{
+		CfgNestNext[c] = Level.TimeSeconds + Secs;
+		CfgItemNext[c] = Level.TimeSeconds + Secs;
+	}
+}
+
+// Next step of B towards Goal; the bot takes it unless it fights. False: no way there.
+function bool SteerTo(Bot B, Actor Goal)
+{
+	local Actor A;
+	local int i;
+	if (B.ActorReachable(Goal))
+		A = Goal;
+	else
+		A = B.FindPathToward(Goal);
+	if (A == None)
+		return false;
+	if (B.MoveTarget == A || B.MoveTarget == Goal || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
+		return true;
+	// Still on the route just searched (it may name the point the bot just passed): leave it alone.
+	if (A != Goal)
+		for (i = 0; i < 16; i++)
+		{
+			if (B.RouteCache[i] == None)
+				break;
+			if (B.MoveTarget == B.RouteCache[i])
+				return true;
+		}
+	B.MoveTarget = A;
+	B.SpecialPause = 0;
+	if (!B.IsInState('Roaming'))
+		B.bNoClearSpecial = true;
+	B.GotoState('Roaming', 'SpecialNavig');
+	return true;
+}
+
+// Stands still for Secs (the game's camping: an enemy in sight ends it).
+function CampHere(Bot B, float Secs)
+{
+	if (B.Enemy != None && !B.LineOfSightTo(B.Enemy))
+	{
+		B.Enemy = None;
+		B.OldEnemy = None;
+		B.bMustHunt = false;
+	}
+	B.CampTime = Secs;
+	B.bCampOnlyOnce = true;
+	B.Acceleration = vect(0,0,0);
+	B.GotoState('Roaming', 'Camp');
+}
+
+function bool HasSniper(Bot B)
+{
+	local Weapon W;
+	W = Weapon(B.FindInventoryType(class'Botpack.SniperRifle'));
+	return W != None && W.AmmoType != None && W.AmmoType.AmmoAmount > 0;
+}
+
+// Once per map: up to 12 high points (upper 45 % of the map's height) that see many path points
+// below them; ambush points count more.
+function FindNests()
+{
+	local NavigationPoint N, M;
+	local float MinZ, MaxZ, Thresh;
+	local int Count, Step, CStep, i, j, k, Score;
+
+	bNestsDone = true;
+	MinZ = 0;
+	MaxZ = 0;
+	for (N = Level.NavigationPointList; N != None; N = N.nextNavigationPoint)
+	{
+		if (Count == 0 || N.Location.Z < MinZ)
+			MinZ = N.Location.Z;
+		if (Count == 0 || N.Location.Z > MaxZ)
+			MaxZ = N.Location.Z;
+		Count++;
+	}
+	if (Count < 10 || MaxZ - MinZ < 256)
+		return;
+	Thresh = MinZ + 0.55 * (MaxZ - MinZ);
+	Step = Max(1, Count / 30);
+	CStep = Max(1, Count / 80);
+	i = 0;
+	for (N = Level.NavigationPointList; N != None; N = N.nextNavigationPoint)
+	{
+		i++;
+		if (i % CStep != 0 || N.Location.Z < Thresh || LiftCenter(N) != None || Teleporter(N) != None)
+			continue;
+		Score = 0;
+		j = 0;
+		for (M = Level.NavigationPointList; M != None; M = M.nextNavigationPoint)
+		{
+			j++;
+			if (j % Step != 0 || M.Location.Z > N.Location.Z - 96 || VSize(M.Location - N.Location) > 4000)
+				continue;
+			if (FastTrace(M.Location, N.Location))
+				Score++;
+		}
+		if (Ambushpoint(N) != None)
+			Score += 3;
+		if (Score < 4)
+			continue;
+		// Insert sorted (best first), at most 12.
+		k = NestCount;
+		if (k >= 12)
+		{
+			if (Score <= NestScore[11])
+				continue;
+			k = 11;
+		}
+		else
+			NestCount++;
+		while (k > 0 && NestScore[k - 1] < Score)
+		{
+			Nest[k] = Nest[k - 1];
+			NestScore[k] = NestScore[k - 1];
+			k--;
+		}
+		Nest[k] = N;
+		NestScore[k] = Score;
+	}
+	Log("sniper nests on this map:" @ NestCount, 'UTTourney');
+}
+
+// The best free nest for B (not its last one, not another sniper's), with a way there.
+function NavigationPoint PickNest(Bot B, int c)
+{
+	local int i, m;
+	local float D, Value, BestValue;
+	local NavigationPoint Best;
+	local bool bTaken;
+
+	if (!bNestsDone)
+		FindNests();
+	for (i = 0; i < NestCount; i++)
+	{
+		if (Nest[i] == None || Nest[i] == CfgLastNest[c])
+			continue;
+		D = VSize(Nest[i].Location - B.Location);
+		if (D < 200 || D > 4500)
+			continue;
+		bTaken = false;
+		for (m = 0; m < CfgCount; m++)
+			if (m != c && CfgNest[m] == Nest[i])
+				bTaken = true;
+		if (bTaken)
+			continue;
+		Value = NestScore[i] - D / 600 + 2 * FRand();
+		if (Best != None && Value <= BestValue)
+			continue;
+		if (B.FindPathToward(Nest[i]) == None)
+			continue;
+		Best = Nest[i];
+		BestValue = Value;
+	}
+	return Best;
+}
+
+// Sniper's nest. True: the bot is on its way to a nest or camps in it.
+function bool SniperNest(Bot B, int c)
+{
+	local float Now;
+	local NavigationPoint N;
+
+	Now = Level.TimeSeconds;
+	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
+		return false;
+	if (!HasSniper(B))
+	{
+		CfgNest[c] = None;
+		return false;
+	}
+	if (CfgNest[c] != None)
+	{
+		if (VSize(CfgNest[c].Location - B.Location) < 250 && Abs(CfgNest[c].Location.Z - B.Location.Z) < B.CollisionHeight + 48
+			&& B.FastTrace(CfgNest[c].Location))
+		{
+			BotLog(BName(B) $ ": sniper's nest" @ CfgNest[c].Name @ "reached, camps");
+			CfgLastNest[c] = CfgNest[c];
+			CfgNest[c] = None;
+			CfgNestNext[c] = Now + 25;
+			B.SwitchToBestWeapon();
+			CampHere(B, 8 + 6 * FRand());
+			return true;
+		}
+		if (Now > CfgNestUntil[c] || !SteerTo(B, CfgNest[c]))
+		{
+			BotLog(BName(B) $ ": sniper's nest" @ CfgNest[c].Name @ "not reached, gives up");
+			CfgLastNest[c] = CfgNest[c];
+			CfgNest[c] = None;
+			CfgNestNext[c] = Now + 20;
+			return false;
+		}
+		return true;
+	}
+	if (B.bCamping || Now < CfgNestNext[c] || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
+		return false;
+	N = PickNest(B, c);
+	if (N == None)
+	{
+		CfgNestNext[c] = Now + 30;
+		return false;
+	}
+	CfgNest[c] = N;
+	CfgNestUntil[c] = Now + 25;
+	BotLog(BName(B) $ ": heads for the sniper's nest" @ N.Name @ Where(N.Location));
+	return SteerTo(B, N);
+}
+
+// Team player: is Other the enemy of one of B's team mates?
+function bool MateTarget(Bot B, Pawn Other)
+{
+	local Pawn P;
+	if (TeamSize <= 1 && !Game.bTeamGame)
+		return false;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (P != B && Bot(P) != None && P.Health > 0 && SameTeam(P, B) && Bot(P).Enemy == Other)
+			return true;
+	return false;
+}
+
+// Team player without an enemy in sight: joins a team mate's fight within 2500 units.
+// True: it goes for that enemy now.
+function bool TeamPlay(Bot B)
+{
+	local Pawn P, T, Old, Mate, Q;
+	local float D, BestD;
+	if (TeamSize <= 1 && !Game.bTeamGame)
+		return false;
+	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
+		return false;
+	// The enemy of the nearest team mate in a fight, within 2500 units.
+	for (Q = Level.PawnList; Q != None; Q = Q.NextPawn)
+	{
+		if (Q == B || Bot(Q) == None || Q.Health <= 0 || !SameTeam(Q, B))
+			continue;
+		T = Bot(Q).Enemy;
+		if (T == None || T.Health <= 0 || T.bDeleteMe || SameTeam(T, B))
+			continue;
+		D = VSize(T.Location - B.Location);
+		if (D > 2500 || (Mate != None && D >= BestD))
+			continue;
+		Mate = Q;
+		BestD = D;
+	}
+	if (Mate != None)
+	{
+		P = Mate;
+		T = Bot(P).Enemy;
+		if (B.Enemy == T)
+			return false;
+		if (B.Enemy == None)
+		{
+			if ((B.IsInState('Roaming') || B.IsInState('Wandering')) && ForceHunt(B, T))
+			{
+				BotLog(BName(B) $ ": team player joins" @ BName(P) $ "'s fight against" @ BName(T));
+				return true;
+			}
+			return false;
+		}
+		if (!HuntAllowed(B, T))
+			return false;
+		// Its own enemy is out of sight: rather the team mate's.
+		Old = B.Enemy;
+		B.Enemy = None;
+		if (!B.SetEnemy(T))
+		{
+			B.Enemy = Old;
+			return false;
+		}
+		B.OldEnemy = Old;
+		return true;
+	}
+	return false;
+}
+
+// Shuffle dancer: in a fight, a dodge to the other side about once a second.
+function ShuffleDance(Bot B, int c)
+{
+	local vector X, Y;
+	if (B.Enemy == None || B.Physics != PHYS_Walking || Level.TimeSeconds < CfgDanceNext[c])
+		return;
+	if (!B.IsInState('Attacking') && !B.IsInState('TacticalMove') && !B.IsInState('RangedAttack') && !B.IsInState('Charging'))
+		return;
+	if (!B.LineOfSightTo(B.Enemy) || FRand() > 0.75)
+		return;
+	X = Normal(Flat(B.Enemy.Location - B.Location));
+	Y = Normal(X Cross vect(0,0,1));
+	CfgDanceSide[c] = 1 - CfgDanceSide[c];
+	if (CfgDanceSide[c] == 1)
+		Y = -Y;
+	CfgDanceNext[c] = Level.TimeSeconds + 0.9;
+	B.TryToDuck(Y, CfgDanceSide[c] == 1);
+}
+
+// Once per map (first item controller): the armour, shield belts and damage amplifiers lying in
+// the level.
+function FindPowerItems()
+{
+	local Inventory Itm;
+	bPowDone = true;
+	foreach AllActors(class'Inventory', Itm)
+	{
+		if (PowCount >= 16)
+			break;
+		if (Itm.Owner != None || Itm.bHeldItem || Itm.RespawnTime <= 0)
+			continue;
+		if (UDamage(Itm) == None && UT_ShieldBelt(Itm) == None && Armor2(Itm) == None && ThighPads(Itm) == None)
+			continue;
+		PowItem[PowCount] = Itm;
+		PowBack[PowCount] = 0;
+		if (Itm.IsInState('Sleeping'))
+			PowBack[PowCount] = Level.TimeSeconds + FMax(Itm.LatentFloat, 0.1);
+		PowCount++;
+	}
+	Log("power items on this map:" @ PowCount, 'UTTourney');
+}
+
+// Once a second: a taken item is back after its respawn time (taken = it sleeps).
+function PowerItemTick()
+{
+	local int i;
+	for (i = 0; i < PowCount; i++)
+	{
+		if (PowItem[i] == None || PowItem[i].bDeleteMe)
+			continue;
+		// While it sleeps, LatentFloat is what is left of its Sleep (the game's bots use it too).
+		if (!PowItem[i].IsInState('Sleeping'))
+			PowBack[i] = 0;
+		else
+			PowBack[i] = Level.TimeSeconds + FMax(PowItem[i].LatentFloat, 0.1);
+	}
+}
+
+function int PowIndex(Inventory Itm)
+{
+	local int i;
+	for (i = 0; i < PowCount; i++)
+		if (PowItem[i] == Itm)
+			return i;
+	return -1;
+}
+
+function float PowValue(Bot B, Inventory Itm)
+{
+	if (UDamage(Itm) != None)
+		return 3.0;
+	if (B.FindInventoryType(Itm.Class) != None)
+		return 0; // has one of these
+	if (UT_ShieldBelt(Itm) != None)
+		return 2.5;
+	if (Armor2(Itm) != None)
+		return 2.0;
+	return 1.0;
+}
+
+// Item controller. True: the bot heads for an item or waits next to it.
+function bool ItemControl(Bot B, int c)
+{
+	local int i, Best;
+	local float Now, D, Eta, Rest, Value, BestValue;
+	local Inventory Itm;
+
+	Now = Level.TimeSeconds;
+	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
+		return false;
+	if (!bPowDone)
+		FindPowerItems();
+	if (CfgItem[c] != None)
+	{
+		Itm = CfgItem[c];
+		i = PowIndex(Itm);
+		if (i < 0 || Itm.bDeleteMe || Itm.Owner != None || Now > CfgItemUntil[c] || (PowBack[i] > 0 && PowBack[i] - Now > 20))
+		{
+			// Gone, too late, or somebody else took it (back only in a while).
+			CfgItem[c] = None;
+			CfgItemNext[c] = Now + 5;
+			return false;
+		}
+		D = VSize(Itm.Location - B.Location);
+		if (PowBack[i] > 0 && D < 200 && Abs(Itm.Location.Z - B.Location.Z) < B.CollisionHeight + 48 && B.FastTrace(Itm.Location))
+		{
+			if (!B.bCamping)
+			{
+				BotLog(BName(B) $ ": item controller waits" @ int(PowBack[i] - Now + 1) @ "s at" @ Itm.Name);
+				CampHere(B, FClamp(PowBack[i] - Now + 0.6, 1, 8));
+			}
+			return true;
+		}
+		if (PowBack[i] == 0 && D < 60)
+		{
+			CfgItem[c] = None; // it touches it now
+			CfgItemNext[c] = Now + 3;
+			return false;
+		}
+		if (B.bCamping)
+			return true;
+		if (!SteerTo(B, Itm))
+		{
+			CfgItem[c] = None;
+			CfgItemNext[c] = Now + 10;
+			return false;
+		}
+		return true;
+	}
+	if (Now < CfgItemNext[c] || B.bCamping || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
+		return false;
+	Best = -1;
+	for (i = 0; i < PowCount; i++)
+	{
+		Itm = PowItem[i];
+		if (Itm == None || Itm.bDeleteMe || Itm.Owner != None)
+			continue;
+		Value = PowValue(B, Itm);
+		if (Value <= 0)
+			continue;
+		D = VSize(Itm.Location - B.Location);
+		if (D > 4000)
+			continue;
+		Eta = D / FMax(B.GroundSpeed, 200) + 1.5;
+		Rest = 0;
+		if (PowBack[i] > 0)
+			Rest = PowBack[i] - Now;
+		if (Rest > Eta + 4 || Rest > 20)
+			continue;
+		Value -= D / 2000;
+		if (Best >= 0 && Value <= BestValue)
+			continue;
+		Best = i;
+		BestValue = Value;
+	}
+	CfgItemNext[c] = Now + 3;
+	if (Best < 0)
+		return false;
+	Itm = PowItem[Best];
+	if (!SteerTo(B, Itm))
+		return false;
+	CfgItem[c] = Itm;
+	Rest = 0;
+	if (PowBack[Best] > 0)
+		Rest = PowBack[Best] - Now;
+	CfgItemUntil[c] = Now + VSize(Itm.Location - B.Location) / FMax(B.GroundSpeed, 200) + Rest + 10;
+	BotLog(BName(B) $ ": item controller heads for" @ Itm.Name $ ", back in" @ int(Rest) @ "s");
+	return true;
+}
+
 function string TReplace(string S, string From, string To)
 {
 	local string R;
@@ -3695,6 +4214,11 @@ function ResetGameTraits()
 		CfgAdrUntil[c] = 0;
 		CfgAggr[c] = 0;
 		CfgAvenge[c] = "";
+		CfgNest[c] = None;
+		CfgLastNest[c] = None;
+		CfgNestNext[c] = 0;
+		CfgItem[c] = None;
+		CfgItemNext[c] = 0;
 	}
 }
 
@@ -3830,6 +4354,14 @@ function int ParseBehaviourTraits(string S)
 			Bits = Bits | 8;
 		else if (Code == "bh")
 			Bits = Bits | 16;
+		else if (Code == "sn")
+			Bits = Bits | 32;
+		else if (Code == "tp")
+			Bits = Bits | 64;
+		else if (Code == "sd")
+			Bits = Bits | 128;
+		else if (Code == "ic")
+			Bits = Bits | 256;
 	}
 	return Bits;
 }
@@ -3859,6 +4391,10 @@ function ApplyBehaviourTraits(Bot B, int c)
 	}
 	if ((CfgBeh[c] & 4) != 0)
 		B.BaseAggressiveness = FMin(1.0, B.BaseAggressiveness + 0.2);
+	if ((CfgBeh[c] & 32) != 0 && (CfgBeh[c] & 2) == 0 && CfgWeapon[c] == "")
+		B.FavoriteWeapon = class'Botpack.SniperRifle';
+	if ((CfgBeh[c] & 128) != 0)
+		B.StrafingAbility = FMin(1.0, B.StrafingAbility + 0.5);
 	B.Aggressiveness = B.BaseAggressiveness;
 }
 
@@ -3887,6 +4423,8 @@ function BehaviourTick()
 	local Bot B;
 	local Pawn N;
 	local float A;
+	if (bPowDone)
+		PowerItemTick();
 	for (c = 0; c < CfgCount; c++)
 	{
 		if (CfgBeh[c] == 0)
@@ -3909,6 +4447,21 @@ function BehaviourTick()
 			B.Aggressiveness = B.BaseAggressiveness;
 			CfgAggr[c] = 0;
 		}
+		if ((CfgBeh[c] & 128) != 0)
+			ShuffleDance(B, c);
+		if (AntiIdleAllowed() && (B.Orders == '' || B.Orders == 'FreeLance' || B.Orders == 'Attack'))
+		{
+			if ((CfgBeh[c] & 64) != 0 && TeamPlay(B))
+				continue;
+			if ((CfgBeh[c] & 32) != 0 && SniperNest(B, c))
+				continue;
+			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c))
+				continue;
+		}
+		else if (CfgNest[c] != None || CfgItem[c] != None)
+			DropTraitErrand(B, 0);
+		if (B.bCamping && (CfgBeh[c] & (32 | 256)) != 0)
+			continue; // in its nest or waiting for an item
 		if (!AntiIdleAllowed() || B.Enemy != None || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
 			continue;
 		N = None;
@@ -3935,6 +4488,8 @@ function float BehaviourThreat(Bot B, Pawn Other)
 	if ((CfgBeh[c] & 8) != 0 && CfgAvenge[c] != "" && SameBotName(CfgAvenge[c], Other.PlayerReplicationInfo.PlayerName))
 		F += 0.6;
 	if ((CfgBeh[c] & 16) != 0 && LeaderFor(B) == Other)
+		F += 0.5;
+	if ((CfgBeh[c] & 64) != 0 && MateTarget(B, Other))
 		F += 0.5;
 	return F;
 }

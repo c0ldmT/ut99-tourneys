@@ -1268,6 +1268,14 @@ const en = {
   'udt.traitE.revenant': 'Hunts its last killer',
   'udt.trait.bounty-hunter': 'Bounty hunter',
   'udt.traitE.bounty-hunter': 'Hunts the leader',
+  'udt.trait.snipers-nest': 'Sniper’s nest',
+  'udt.traitE.snipers-nest': 'Takes high positions with the sniper rifle',
+  'udt.trait.team-player': 'Team player',
+  'udt.traitE.team-player': 'Team games: attacks its team mate’s target (focus fire)',
+  'udt.trait.shuffle-dancer': 'Shuffle dancer',
+  'udt.traitE.shuffle-dancer': 'Quick left-right dodges in a fight',
+  'udt.trait.item-controller': 'Item controller',
+  'udt.traitE.item-controller': 'Times armour, shield belt and damage amplifier',
   'udt.cat.behaviour': 'Behaviour',
   'udt.trait.starter-armour': 'Starter armour',
   'udt.traitE.starter-armour': 'Spawns with 25 armour',
@@ -1432,7 +1440,7 @@ const en = {
     'Crafting costs four times the scrap of a trait. One card of each trait fits in the inventory; duplicates turn into scrap.',
   'udt.packs.noTeam': 'Found your team first.',
   'udt.packs.mod':
-    'Body traits need mod 0.9.0 on the game server, behaviour traits mod 0.10.0; more behaviour traits follow.',
+    'Body traits need mod 0.9.0 on the game server, behaviour traits mod 0.10.0 (sniper’s nest, team player, shuffle dancer and item controller 0.11.0).',
   'udt.market.title': 'Transfer market',
   'udt.market.intro':
     'Hidden bids, paid at once; the highest bid gets the bot on the next market day, the others get their Neuro back.',
@@ -2761,6 +2769,15 @@ const de: Record<TKey, string> = {
   'udt.traitE.revenant': 'Jagt seinen letzten Killer',
   'udt.trait.bounty-hunter': 'Kopfgeldjäger',
   'udt.traitE.bounty-hunter': 'Jagt den Führenden',
+  'udt.trait.snipers-nest': 'Scharfschützennest',
+  'udt.traitE.snipers-nest': 'Sucht erhöhte Positionen mit dem Scharfschützengewehr',
+  'udt.trait.team-player': 'Teamplayer',
+  'udt.traitE.team-player': 'Team-Modi: greift das Ziel des Mitspielers an (Fokusfeuer)',
+  'udt.trait.shuffle-dancer': 'Shuffle-Dancer',
+  'udt.traitE.shuffle-dancer': 'Im Kampf schnelle Links-rechts-Ausweichsprünge',
+  'udt.trait.item-controller': 'Item-Kontrolleur',
+  'udt.traitE.item-controller':
+    'Läuft Rüstung, Schildgürtel und Schadensverstärker zur Respawn-Zeit an',
   'udt.cat.behaviour': 'Verhalten',
   'udt.trait.starter-armour': 'Startpanzer',
   'udt.traitE.starter-armour': 'Spawnt mit 25 Rüstung',
@@ -2925,7 +2942,7 @@ const de: Record<TKey, string> = {
     'Craften kostet das Vierfache des Schrottwerts. Von jedem Trait passt eine Karte ins Inventar; Duplikate werden zu Schrott.',
   'udt.packs.noTeam': 'Gründe zuerst dein Team.',
   'udt.packs.mod':
-    'Körper-Traits brauchen Mod 0.9.0 auf dem Spielserver, Verhaltens-Traits Mod 0.10.0; weitere Verhaltens-Traits folgen.',
+    'Körper-Traits brauchen Mod 0.9.0 auf dem Spielserver, Verhaltens-Traits Mod 0.10.0 (Scharfschützennest, Teamplayer, Shuffle-Dancer und Item-Kontrolleur 0.11.0).',
   'udt.market.title': 'Transfermarkt',
   'udt.market.intro':
     'Verdeckte Gebote, sofort bezahlt; das höchste Gebot bekommt den Bot am nächsten Markttag, die anderen bekommen ihr Neuro zurück.',

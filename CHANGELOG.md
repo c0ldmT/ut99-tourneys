@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.11.0, Dream Team behaviour traits group 2: sniper's nest, team player, shuffle dancer, item controller (in the packs).
 - Unreal Dream Team season finale: a Dream Team tournament can be the finale (no sign-up, the top of the season table
   plays); the season's Dream Team champion gets the frame "Dream Team" and the title "Dream Team Champion" in the shop.
 - Unreal Dream Team AI managers (off by default; settings "Dream Team"): up to eight AI teams with a personality
