@@ -4,6 +4,7 @@ import {
   craftCost,
   effectiveValues,
   levelOf,
+  modCodes,
   managerEffects,
   rewardFactor,
   traitOfRarity,
@@ -39,6 +40,8 @@ describe('levels and slots', () => {
     expect(cannotAssign('steady-hand', ['steady-hand'], 10)).toBe('same');
     expect(cannotAssign('midas', ['claudius'], 10)).toBe('legendary');
     expect(cannotAssign('watchdog', ['claudius'], 5)).toBeNull();
+    expect(cannotAssign('vampire', ['thick-skin'], 10)).toBe('body');
+    expect(cannotAssign('vampire', ['watchdog'], 5)).toBeNull();
   });
 });
 
@@ -98,8 +101,9 @@ describe('manager traits', () => {
 });
 
 describe('packs', () => {
-  it('draws a trait of the rarity (epic: the all-rounder)', () => {
-    expect(traitOfRarity('epic', () => 0.5).code).toBe('all-rounder');
+  it('draws a trait of the rarity', () => {
+    expect(traitOfRarity('epic', () => 0).code).toBe('all-rounder');
+    expect(traitOfRarity('epic', () => 0.99).code).toBe('vampire');
     expect(traitOfRarity('legendary', () => 0).rarity).toBe('legendary');
     for (const r of ['common', 'uncommon', 'rare'] as const)
       expect(traitOfRarity(r, () => 0.99).rarity).toBe(r);
@@ -108,6 +112,11 @@ describe('packs', () => {
   it('crafting costs four times the scrap', () => {
     expect(craftCost('midas')).toBe(600);
     expect(craftCost('steady-hand')).toBe(20);
-    expect(TRAITS.length).toBe(17);
+    expect(TRAITS.length).toBe(23);
+  });
+
+  it('gives the mod the body trait codes and values them', () => {
+    expect(modCodes([{ code: 'phoenix' }, { code: 'watchdog' }])).toEqual(['px']);
+    expect(traitValueFactor(4, {}, [{ code: 'phoenix' }])).toBeCloseTo(1.2);
   });
 });

@@ -17,6 +17,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { dayStartMs } from '../seasons/season-time.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
+import { UdtEventsService } from './udt-events.service.js';
 import { UdtService } from './udt.service.js';
 
 /** Table points per place (1, 2, 3/4, played), times the format's factor. */
@@ -49,6 +50,7 @@ export class UdtRewardsService implements OnModuleInit {
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(UdtService) private readonly udt: UdtService,
+    @Inject(UdtEventsService) private readonly udtEvents: UdtEventsService,
   ) {}
 
   onModuleInit(): void {
@@ -68,6 +70,7 @@ export class UdtRewardsService implements OnModuleInit {
       for (const e of stored) {
         if (e.type === 'match.result') this.matchDone(id, season.number, e.data.result, after);
         else if (e.type === 'tournament.finished') this.finished(id, season.number, after);
+        else if (e.type === 'tournament.aborted') this.udtEvents.refundTickets(id);
       }
     } catch (err) {
       this.log.error(`udt rewards ${id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -187,6 +190,37 @@ export class UdtRewardsService implements OnModuleInit {
         meta: { tournamentId, place },
       });
     }
+    this.payPot(tournamentId, season, managers);
+  }
+
+  /**
+   * High stakes: the best human team gets 60 % of the tickets plus one ticket as a bonus, the
+   * second best 20 %; the rest leaves the economy.
+   */
+  private payPot(
+    tournamentId: string,
+    season: number,
+    managers: { entrantId: string; placement?: number | null }[],
+  ): void {
+    const paid = this.udtEvents.tickets(tournamentId).filter((e) => e.ticket > 0);
+    if (!paid.length) return;
+    const pot = paid.reduce((n, e) => n + e.ticket, 0);
+    const bonus = Math.max(...paid.map((e) => e.ticket));
+    const ranked = [...managers]
+      .map((m) => ({ userId: udtManagerOf(m.entrantId)!, place: m.placement ?? 99 }))
+      .filter((m) => paid.some((e) => e.userId === m.userId))
+      .sort((a, b) => a.place - b.place);
+    const shares = [roundNeuro(pot * 0.6) + bonus, roundNeuro(pot * 0.2)];
+    ranked.slice(0, 2).forEach((m, i) =>
+      this.ledger.book({
+        season,
+        userId: m.userId,
+        kind: 'udt_pot',
+        amount: shares[i]!,
+        ref: `udt-pot:${tournamentId}:${m.userId}`,
+        meta: { tournamentId, place: i + 1, pot },
+      }),
+    );
   }
 
   /** Season table: points from the places of finished Dream Team tournaments of the season. */

@@ -9,10 +9,12 @@ import {
   type Entrant,
   type TournamentSettings,
 } from '@tourney/protocol';
-import { bracketOf, effectiveValues, tiredPenalty } from '@tourney/udt';
+import { bracketOf, effectiveValues, modCodes, roundNeuro, tiredPenalty } from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { conflict, notFound } from '../common/http.js';
+import { randomId } from '../common/ids.js';
+import { LedgerService } from '../ledger/ledger.service.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { tournaments, udtEntries } from '../db/schema.js';
@@ -50,10 +52,14 @@ export class UdtEventsService implements OnModuleInit {
     @Inject(BotsService) private readonly bots: BotsService,
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
     @Inject(UdtService) private readonly udt: UdtService,
+    @Inject(LedgerService) private readonly ledger: LedgerService,
   ) {}
 
   onModuleInit(): void {
     this.tournaments.registerLineupProvider('udt', (t, s, rng) => this.provide(t, s, rng));
+    this.tournaments.onRemove((t) => {
+      if (t.kind === 'udt' && t.phase === 'draft') this.refundTickets(t.id);
+    });
   }
 
   private row(id: string): TournamentRow {
@@ -67,7 +73,66 @@ export class UdtEventsService implements OnModuleInit {
   }
 
   private rules(t: TournamentRow): UdtEventRules {
-    return this.tournaments.udtRules(t) ?? { valueCap: null, starLimit: null };
+    return (
+      this.tournaments.udtRules(t) ?? {
+        valueCap: null,
+        starLimit: null,
+        ticket: null,
+        ticketIndexed: true,
+        minTeams: 4,
+      }
+    );
+  }
+
+  /** The entry ticket now (high stakes), 0 without one. */
+  ticketNow(rules: UdtEventRules): number {
+    if (!rules.ticket) return 0;
+    return rules.ticketIndexed
+      ? Math.max(10, roundNeuro(rules.ticket * this.udt.index(this.udt.season().number)))
+      : rules.ticket;
+  }
+
+  /** Gives a manager's ticket back and takes the entry out. */
+  private dropEntry(tournamentId: string, userId: string): void {
+    const e = this.db
+      .select()
+      .from(udtEntries)
+      .where(and(eq(udtEntries.tournamentId, tournamentId), eq(udtEntries.userId, userId)))
+      .get();
+    if (!e) return;
+    if (e.ticket > 0 && e.ticketRef) {
+      const season = this.udt.season().number;
+      this.ledger.book({
+        season,
+        userId,
+        kind: 'udt_ticket',
+        amount: e.ticket,
+        ref: `${e.ticketRef}:back`,
+        meta: { tournamentId },
+      });
+    }
+    this.db
+      .delete(udtEntries)
+      .where(and(eq(udtEntries.tournamentId, tournamentId), eq(udtEntries.userId, userId)))
+      .run();
+  }
+
+  /** All tickets of a tournament back (called off, deleted, too few teams). */
+  refundTickets(tournamentId: string): void {
+    for (const e of this.db
+      .select()
+      .from(udtEntries)
+      .where(eq(udtEntries.tournamentId, tournamentId))
+      .all())
+      if (e.ticket > 0 && e.ticketRef)
+        this.ledger.book({
+          season: this.udt.season().number,
+          userId: e.userId,
+          kind: 'udt_ticket',
+          amount: e.ticket,
+          ref: `${e.ticketRef}:back`,
+          meta: { tournamentId },
+        });
   }
 
   private entries(tournamentId: string): string[] {
@@ -141,7 +206,15 @@ export class UdtEventsService implements OnModuleInit {
     const eff = effectiveValues(base.skill, { ...(base.traits ?? b?.traits ?? {}) }, r.udtTraits);
     const traits = eff.values;
     if (tired) traits.accuracy = Math.max(-1, (traits.accuracy ?? 0) - 0.2);
-    return { ...base, skill: eff.skill, name: gameName(tag, r.name), traits };
+    // Body traits (category B) are played by the mod.
+    const codes = modCodes(r.udtTraits);
+    return {
+      ...base,
+      skill: eff.skill,
+      name: gameName(tag, r.name),
+      traits,
+      ...(codes.length ? { gameTraits: codes } : {}),
+    };
   }
 
   /** Lineup provider for the seeding (TournamentsService). */
@@ -151,11 +224,15 @@ export class UdtEventsService implements OnModuleInit {
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const main: Entrant[] = [];
     const skills: number[] = [];
-    for (const userId of this.entries(t.id)) {
+    const entered = this.entries(t.id);
+    for (const userId of entered) {
       const team = this.udt.team(userId, season);
-      if (!team) continue;
-      const l = this.lineup(userId, settings, rules);
-      if (l.problems.length) continue; // cannot play (any more): left out
+      const l = team ? this.lineup(userId, settings, rules) : null;
+      if (!team || !l || l.problems.length || main.length >= settings.size) {
+        // Cannot play (any more) or no room: left out, the ticket goes back.
+        this.dropEntry(t.id, userId);
+        continue;
+      }
       const specs = l.bots.map((r) => this.spec(r, team.tag, lib));
       skills.push(...l.bots.map((r) => r.effective.skill));
       main.push(
@@ -170,7 +247,14 @@ export class UdtEventsService implements OnModuleInit {
             }
           : { id: udtEntrantId(userId), kind: 'bot', displayName: team.name, bot: specs[0]! },
       );
-      if (main.length >= settings.size) break;
+    }
+    // High stakes: too few human teams, everybody gets the ticket back.
+    if (rules.ticket && main.length < rules.minTeams) {
+      this.refundTickets(t.id);
+      this.db.delete(udtEntries).where(eq(udtEntries.tournamentId, t.id)).run();
+      throw conflict(
+        `high stakes needs ${rules.minTeams} teams, ${main.length} can play: the tickets went back`,
+      );
     }
     // Free library bots, closest to the managers' average skill first (ties at random).
     const owners = this.udt.owners(season);
@@ -240,6 +324,8 @@ export class UdtEventsService implements OnModuleInit {
         size: s.size,
         game: s.game.adapter === ADAPTER_MH ? ('mh' as const) : ('dm' as const),
         rules,
+        ticketNow: this.ticketNow(rules),
+        pot: this.pot(t.id),
         valueCapNow:
           rules.valueCap === null
             ? null
@@ -252,6 +338,26 @@ export class UdtEventsService implements OnModuleInit {
           : null,
       };
     });
+  }
+
+  /** Tickets paid into a tournament (high stakes). */
+  pot(tournamentId: string): number {
+    return this.db
+      .select()
+      .from(udtEntries)
+      .where(eq(udtEntries.tournamentId, tournamentId))
+      .all()
+      .reduce((n, e) => n + e.ticket, 0);
+  }
+
+  /** Entries with their paid tickets (for the payout). */
+  tickets(tournamentId: string) {
+    return this.db
+      .select()
+      .from(udtEntries)
+      .where(eq(udtEntries.tournamentId, tournamentId))
+      .all()
+      .map((e) => ({ userId: e.userId, ticket: e.ticket }));
   }
 
   /** Signs the manager's team up (draft, registration open, the lineup can play). */
@@ -267,12 +373,25 @@ export class UdtEventsService implements OnModuleInit {
     const who = this.entries(id);
     if (who.includes(user.id)) return this.events(user);
     if (who.length >= s.size) throw conflict('the bracket is full');
+    // High stakes: the ticket is paid on entering (back on leaving or when it is called off).
+    const ticket = this.ticketNow(this.rules(t));
+    const ticketRef = ticket ? `ticket:${id}:${user.id}:${randomId(6)}` : null;
+    if (ticket)
+      this.ledger.charge({
+        userId: user.id,
+        kind: 'udt_ticket',
+        amount: ticket,
+        ref: ticketRef!,
+        meta: { tournamentId: id },
+      });
     this.db
       .insert(udtEntries)
       .values({
         tournamentId: id,
         userId: user.id,
         createdAt: new Date(this.clock.now()).toISOString(),
+        ticket,
+        ticketRef,
       })
       .run();
     return this.events(user);
@@ -283,10 +402,7 @@ export class UdtEventsService implements OnModuleInit {
     this.udt.assertOn();
     const t = this.row(id);
     if (t.phase !== 'draft') throw conflict('the bracket is seeded: ask an organizer');
-    this.db
-      .delete(udtEntries)
-      .where(and(eq(udtEntries.tournamentId, id), eq(udtEntries.userId, user.id)))
-      .run();
+    this.dropEntry(id, user.id);
     return this.events(user);
   }
 }

@@ -88,6 +88,11 @@ export const MAX_ACCESS = 64;
 export const UdtEventRulesSchema = z.object({
   valueCap: z.number().int().min(100).max(10_000_000).nullable().default(null),
   starLimit: z.number().int().min(0).max(5).nullable().default(null),
+  /** High stakes: the entry ticket in Neuro (null: none), at the economy index or fixed. */
+  ticket: z.number().int().min(10).max(10_000_000).nullable().default(null),
+  ticketIndexed: z.boolean().default(true),
+  /** High stakes: fewer human teams at the seeding and the tickets go back. */
+  minTeams: z.number().int().min(2).max(16).default(4),
 });
 export type UdtEventRules = z.infer<typeof UdtEventRulesSchema>;
 
@@ -461,9 +466,16 @@ export class TournamentsService {
     return this.require(id);
   }
 
+  /** Called before a tournament is deleted (the Dream Team gives entry tickets back). */
+  private readonly removeHooks: ((t: TournamentRow) => void)[] = [];
+  onRemove(fn: (t: TournamentRow) => void): void {
+    this.removeHooks.push(fn);
+  }
+
   remove(id: string): void {
     const t = this.require(id);
     if (ACTIVE_PHASES.includes(t.phase)) throw conflict('abort the tournament before deleting it');
+    for (const fn of this.removeHooks) fn(t);
     this.db.delete(tournaments).where(eq(tournaments.id, id)).run();
     this.log.forget(id);
     this.hub.clearLive(id);

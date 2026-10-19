@@ -429,4 +429,9 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX udt_trades_to ON udt_trades(season, to_user, status);
   CREATE INDEX udt_trades_from ON udt_trades(season, from_user, status);
   `,
+  // 19: Dream Team high stakes: the entry ticket a manager paid (and its ledger ref).
+  `
+  ALTER TABLE udt_entries ADD COLUMN ticket INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE udt_entries ADD COLUMN ticket_ref TEXT;
+  `,
 ];

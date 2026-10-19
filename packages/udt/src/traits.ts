@@ -1,12 +1,12 @@
 /**
- * Unreal Dream Team traits, phase 2: category A (play-style values, sent to the game as the bot's
- * effective values) and D (manager: economy and career on the website). Body (B) and behaviour
- * (C) traits need the mod and come later. Traits only work in Dream Team games and last one
- * season.
+ * Unreal Dream Team traits: category A (play-style values, sent to the game as the bot's
+ * effective values), B (body: the mod changes damage, health, armour and speed in the game,
+ * mod 0.9.0) and D (manager: economy and career on the website). Behaviour traits (C) come with
+ * later mod packages. Traits only work in Dream Team games and last one season.
  */
 import { baseValue, DEFAULT_ECONOMY, RARITIES, valueScore, type Rarity } from './economy.js';
 
-export type TraitCategory = 'values' | 'manager';
+export type TraitCategory = 'values' | 'body' | 'manager';
 
 export type TraitCode =
   | 'steady-hand'
@@ -25,7 +25,13 @@ export type TraitCode =
   | 'crowd-favourite'
   | 'market-darling'
   | 'training-champion'
-  | 'midas';
+  | 'midas'
+  | 'starter-armour'
+  | 'thick-skin'
+  | 'adrenaline'
+  | 'glass-cannon'
+  | 'vampire'
+  | 'phoenix';
 
 export interface TraitDef {
   code: TraitCode;
@@ -33,6 +39,8 @@ export interface TraitDef {
   category: TraitCategory;
   /** The trait needs a choice when it is put on a bot (gun nut: the weapon). */
   needsWeapon?: boolean;
+  /** Body traits: the code in the mod's `btrt` line. */
+  mod?: string;
 }
 
 /** The catalogue v1 (owner approved), phase 2 part: values and manager traits. */
@@ -54,6 +62,12 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'market-darling', rarity: 'rare', category: 'manager' },
   { code: 'training-champion', rarity: 'rare', category: 'manager' },
   { code: 'midas', rarity: 'legendary', category: 'manager' },
+  { code: 'starter-armour', rarity: 'uncommon', category: 'body', mod: 'sa' },
+  { code: 'thick-skin', rarity: 'rare', category: 'body', mod: 'tf' },
+  { code: 'adrenaline', rarity: 'rare', category: 'body', mod: 'ad' },
+  { code: 'glass-cannon', rarity: 'epic', category: 'body', mod: 'gc' },
+  { code: 'vampire', rarity: 'epic', category: 'body', mod: 'vp' },
+  { code: 'phoenix', rarity: 'legendary', category: 'body', mod: 'px' },
 ];
 
 const BY_CODE = new Map(TRAITS.map((t) => [t.code, t]));
@@ -65,8 +79,8 @@ export function traitDef(code: string): TraitDef | undefined {
 export const isTraitCode = (code: string): code is TraitCode => BY_CODE.has(code as TraitCode);
 
 /**
- * A pack draws a trait of the rolled rarity. Epic has a single trait in phase 2 and the rarities
- * without one of their own fall back to the next lower rarity that has traits.
+ * A pack draws a trait of the rolled rarity (uniformly among them); a rarity without traits of
+ * its own falls back to the next lower one that has some.
  */
 export function traitOfRarity(rarity: Rarity, rng: () => number): TraitDef {
   for (let i = RARITIES.indexOf(rarity); i >= 0; i--) {
@@ -95,9 +109,11 @@ export function cannotAssign(
   code: TraitCode,
   onBot: readonly TraitCode[],
   level: number,
-): 'slots' | 'same' | 'legendary' | null {
+): 'slots' | 'same' | 'legendary' | 'body' | null {
   if (onBot.includes(code)) return 'same';
   if (onBot.length >= traitSlots(level)) return 'slots';
+  if (traitDef(code)?.category === 'body' && onBot.some((c) => traitDef(c)?.category === 'body'))
+    return 'body';
   if (
     traitDef(code)?.rarity === 'legendary' &&
     onBot.some((c) => traitDef(c)?.rarity === 'legendary')
@@ -220,9 +236,26 @@ export function managerEffects(traits: readonly TraitOnBot[]): ManagerEffects {
   };
 }
 
+/** Body traits raise the market value by rarity (they act in the game, not on the values). */
+export const BODY_VALUE: Readonly<Record<Rarity, number>> = {
+  common: 0.03,
+  uncommon: 0.05,
+  rare: 0.08,
+  epic: 0.12,
+  legendary: 0.2,
+};
+
+/** Codes of the body traits for the mod's `btrt` line. */
+export function modCodes(traits: readonly TraitOnBot[]): string[] {
+  return traits.flatMap((t) => {
+    const m = traitDef(t.code)?.mod;
+    return m ? [m] : [];
+  });
+}
+
 /**
  * How much the traits raise a bot's market value: its base value with the effective skill and
- * values (category A) over its own base value, times the market darling.
+ * values (category A) over its own base value, plus the body traits, times the market darling.
  */
 export function traitValueFactor(
   skill: number,
@@ -234,7 +267,11 @@ export function traitValueFactor(
   const e = effectiveValues(skill, values, traits);
   const plain = baseValue(skill, valueScore(values), cfg);
   const eff = baseValue(e.skill, valueScore(e.values), cfg) * (e.overflow ? 1.1 : 1);
-  return (plain > 0 ? eff / plain : 1) * managerEffects(traits).marketValue;
+  const body = traits.reduce((n, t) => {
+    const d = traitDef(t.code);
+    return n + (d?.category === 'body' ? BODY_VALUE[d.rarity] : 0);
+  }, 0);
+  return (plain > 0 ? eff / plain : 1) * (1 + body) * managerEffects(traits).marketValue;
 }
 
 /**

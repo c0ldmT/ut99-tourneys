@@ -364,6 +364,9 @@ export const udtEntries = sqliteTable(
     tournamentId: text('tournament_id').notNull(),
     userId: text('user_id').notNull(),
     createdAt: text('created_at').notNull(),
+    /** High stakes: the ticket paid on entering (0: none), refunded on leaving or calling off. */
+    ticket: integer('ticket').notNull().default(0),
+    ticketRef: text('ticket_ref'),
   },
   (t) => [primaryKey({ columns: [t.tournamentId, t.userId] })],
 );

@@ -145,7 +145,11 @@ export class UdtTestService {
       return specs.reduce((sum, b) => {
         const score = valueScore(b.traits ?? (b.id ? lib.get(b.id)?.traits : undefined));
         return (
-          sum + STRENGTH[Math.round(Math.min(7, Math.max(0, b.skill)))]! * (0.85 + 0.3 * score)
+          sum +
+          STRENGTH[Math.round(Math.min(7, Math.max(0, b.skill)))]! *
+            (0.85 + 0.3 * score) *
+            // Body traits (played by the mod): a little stronger each.
+            (1 + 0.06 * (b.gameTraits?.length ?? 0))
         );
       }, 0.5);
     };
