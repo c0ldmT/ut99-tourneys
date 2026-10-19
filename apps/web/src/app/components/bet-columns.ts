@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
@@ -11,7 +12,7 @@ import type { BetMatchView } from '../core/types';
  */
 @Component({
   selector: 'app-bet-columns',
-  imports: [TPipe, RouterLink, NeuroPipe],
+  imports: [TPipe, RouterLink, NeuroPipe, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="sides2">
@@ -35,7 +36,9 @@ import type { BetMatchView } from '../core/types';
                   <a [routerLink]="['/bots', x.id]">{{ x.name }}</a>
                   <span class="badge bot">BOT</span>
                 } @else {
-                  <a [routerLink]="['/stats/p', 'u:' + x.id]">{{ x.name }}</a>
+                  <a [routerLink]="['/stats/p', 'u:' + x.id]"
+                    ><na-name [name]="x.name" [id]="x.id"
+                  /></a>
                 }
               </span>
               <span class="res mono" [class]="x.status">

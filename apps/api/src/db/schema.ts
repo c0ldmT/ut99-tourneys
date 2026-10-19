@@ -15,6 +15,22 @@ export const users = sqliteTable('users', {
   lastLoginAt: text('last_login_at').notNull(),
   /** Discord direct messages from the bot (if one is configured). */
   notifyDm: integer('notify_dm', { mode: 'boolean' }).notNull().default(true),
+  /** Worn shop items per slot (title, color, frame, badge, banner, fanfare). */
+  lookJson: text('look_json'),
+});
+
+/** Neuro shop purchases: paid with the Neuro of a season, owned for good. */
+export const shopPurchases = sqliteTable('shop_purchases', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  itemId: text('item_id').notNull(),
+  season: integer('season').notNull(),
+  price: integer('price').notNull(),
+  at: text('at').notNull(),
+  /** ok; dedications: pending (waiting for an admin), approved, rejected (refunded). */
+  status: text('status').notNull().default('ok'),
+  /** Dedication lines. */
+  dataJson: text('data_json'),
 });
 
 export const sessions = sqliteTable('sessions', {

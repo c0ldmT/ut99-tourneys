@@ -396,6 +396,7 @@ export interface WebsiteSettings {
     windowSec: number;
     discord: boolean;
   };
+  shop: ShopSettings;
 }
 
 // --- Bot control center ---------------------------------------------------------------------
@@ -716,4 +717,71 @@ export interface KillFeedEntry {
   monster: boolean;
   spree: number;
   multi: number;
+}
+
+// --- Neuro shop -------------------------------------------------------------------------------
+
+export type ShopSlot = 'title' | 'color' | 'frame' | 'badge' | 'banner' | 'fanfare' | 'dedication';
+
+export interface LookView {
+  title?: string;
+  color?: string;
+  frame?: string;
+  badge?: string;
+  banner?: string;
+  fanfare?: boolean;
+}
+
+export interface ShopItem {
+  id: string;
+  slot: ShopSlot;
+  name: string;
+  price: number;
+  tier: 1 | 2 | 3 | 4;
+  value: string;
+  awarded?: boolean;
+  owned?: boolean;
+  hidden?: boolean;
+  basePrice?: number;
+}
+
+export interface ShopDedication {
+  status: 'pending' | 'approved' | 'rejected';
+  kill: string;
+  death: string;
+}
+
+export interface ShopView {
+  enabled: boolean;
+  wallet: {
+    season: number | null;
+    balance: number;
+    free: number;
+    floor: number;
+    spendable: number;
+  };
+  items: ShopItem[];
+  awards: ShopItem[];
+  /** Item id per slot. */
+  look: Partial<Record<Exclude<ShopSlot, 'dedication'>, string>>;
+  dedication: ShopDedication | null;
+}
+
+export interface ShopPurchaseView {
+  id: string;
+  userId: string;
+  name: string;
+  item: string;
+  itemName: string;
+  season: number;
+  price: number;
+  at: string;
+  status: 'ok' | 'pending' | 'approved' | 'rejected';
+  dedication?: { kill: string; death: string };
+}
+
+export interface ShopSettings {
+  enabled: boolean;
+  prices: Record<string, number>;
+  hidden: string[];
 }

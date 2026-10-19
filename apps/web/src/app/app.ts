@@ -6,10 +6,11 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { Avatar, NameTag } from './core/looks';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from './core/api';
 import { NeuroPipe } from './core/neuro';
-import { Coin, Logo, Wordmark } from './core/brand';
+import { Coin, Icon, Logo, Wordmark } from './core/brand';
 import { version } from '../../../../package.json';
 import { Auth } from './core/auth';
 import { I18n, TPipe } from './core/i18n';
@@ -17,7 +18,19 @@ import type { Lang } from './core/i18n-dict';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, TPipe, NeuroPipe, Logo, Wordmark, Coin],
+  imports: [
+    RouterOutlet,
+    RouterLink,
+    RouterLinkActive,
+    TPipe,
+    NeuroPipe,
+    Logo,
+    Wordmark,
+    Coin,
+    Avatar,
+    NameTag,
+    Icon,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <header>
@@ -35,6 +48,7 @@ import type { Lang } from './core/i18n-dict';
               >{{ 'nav.tournaments' | t }}</a
             >
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
+            <a routerLink="/shop" routerLinkActive="active">{{ 'shop.title' | t }}</a>
             @if (me.isAdmin) {
               <a routerLink="/new" routerLinkActive="active">{{ 'nav.new' | t }}</a>
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
@@ -64,10 +78,8 @@ import type { Lang } from './core/i18n-dict';
             >
           }
           <a routerLink="/profile" class="user" (click)="menu.set(false)">
-            @if (me.avatar) {
-              <img [src]="me.avatar" alt="" />
-            }
-            <span class="uname">{{ me.displayName }}</span>
+            <na-avatar [name]="me.displayName" [id]="me.id" [src]="me.avatar" [size]="28" />
+            <span class="uname"><na-name [name]="me.displayName" [id]="me.id" /></span>
           </a>
           <div class="desk">
             <select class="lang" (change)="setLang($event)" aria-label="Language">
@@ -75,7 +87,14 @@ import type { Lang } from './core/i18n-dict';
                 <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
               }
             </select>
-            <button class="link" (click)="logout()">{{ 'nav.logout' | t }}</button>
+            <button
+              class="icon"
+              (click)="logout()"
+              [title]="'nav.logout' | t"
+              [attr.aria-label]="'nav.logout' | t"
+            >
+              <na-icon name="logout" />
+            </button>
           </div>
           <button
             class="burger"
@@ -148,7 +167,7 @@ import type { Lang } from './core/i18n-dict';
       min-height: 64px;
       display: flex;
       align-items: center;
-      gap: 22px;
+      gap: 18px;
     }
     .brand {
       display: inline-flex;
@@ -169,7 +188,7 @@ import type { Lang } from './core/i18n-dict';
     nav a {
       color: var(--text-2);
       font-weight: 500;
-      padding: 8px 11px;
+      padding: 8px 9px;
       border-radius: 6px;
       white-space: nowrap;
     }
@@ -196,7 +215,7 @@ import type { Lang } from './core/i18n-dict';
     .desk {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 6px;
     }
     .wallet {
       display: inline-flex;
@@ -210,6 +229,7 @@ import type { Lang } from './core/i18n-dict';
     .user {
       display: inline-flex;
       align-items: center;
+      white-space: nowrap;
       gap: 8px;
       color: var(--text);
       font-weight: 600;

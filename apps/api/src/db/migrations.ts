@@ -257,4 +257,21 @@ export const MIGRATIONS: string[] = [
   );
   ALTER TABLE tournaments ADD COLUMN series_id TEXT REFERENCES series(id) ON DELETE SET NULL;
   `,
+  // 11: the Neuro shop: purchases (paid with the season's Neuro, kept for good) and the look a
+  // user wears (title, colour, frame, badge, banner, fanfare).
+  `
+  CREATE TABLE shop_purchases (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    item_id TEXT NOT NULL,
+    season INTEGER NOT NULL,
+    price INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'ok',
+    data_json TEXT
+  );
+  CREATE INDEX shop_purchases_user ON shop_purchases(user_id);
+  CREATE INDEX shop_purchases_season ON shop_purchases(season);
+  ALTER TABLE users ADD COLUMN look_json TEXT;
+  `,
 ];

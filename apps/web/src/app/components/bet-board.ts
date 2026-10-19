@@ -7,6 +7,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
@@ -19,7 +20,7 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
 /** Statistics tab "Bets": Neuro ranking and betting records of a season. */
 @Component({
   selector: 'app-bet-board',
-  imports: [TPipe, RouterLink, NeuroPipe],
+  imports: [TPipe, RouterLink, NeuroPipe, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (error()) {
@@ -54,7 +55,9 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
             <span class="muted small">{{ 'bets.rec.' + r.key | t }}</span>
             <span class="value">{{ value(r) }}</span>
             @if (r.userId) {
-              <a [routerLink]="['/stats/p', 'u:' + r.userId]">{{ r.name }}</a>
+              <a [routerLink]="['/stats/p', 'u:' + r.userId]"
+                ><na-name [name]="r.name ?? ''" [id]="r.userId"
+              /></a>
             } @else if (r.tournamentId) {
               <a [routerLink]="['/t', r.tournamentId]">{{ r.tournamentName }} · {{ r.matchId }}</a>
             }
@@ -108,7 +111,9 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
                     <a [routerLink]="['/bots', r.id]">{{ r.name }}</a>
                     <span class="badge bot">BOT</span>
                   } @else {
-                    <a [routerLink]="['/stats/p', 'u:' + r.userId]">{{ r.name }}</a>
+                    <a [routerLink]="['/stats/p', 'u:' + r.userId]"
+                      ><na-name [name]="r.name" [id]="r.userId"
+                    /></a>
                   }
                 </td>
                 <td class="num">

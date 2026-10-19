@@ -55,10 +55,19 @@ export const TeamNamesSchema = z
   .max(200)
   .refine((l) => new Set(l.map((n) => n.toLowerCase())).size === l.length, 'names must differ');
 
+/** Neuro shop: on/off, prices and items taken out (by item id). */
+export const ShopSettingsSchema = z.object({
+  enabled: z.boolean().default(true),
+  prices: z.record(z.string().max(64), z.number().int().min(1).max(1_000_000)).default({}),
+  hidden: z.array(z.string().max(64)).max(200).default([]),
+});
+export type ShopSettings = z.infer<typeof ShopSettingsSchema>;
+
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
   teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
   betting: BettingSettingsSchema.default(DEFAULT_BETTING),
+  shop: ShopSettingsSchema.default(ShopSettingsSchema.parse({})),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -85,7 +94,9 @@ export class SettingsService {
     const rating = RatingSettingsSchema.safeParse(raw['rating'] ?? {});
     const teamNames = TeamNamesSchema.safeParse(raw['teamNames']);
     const betting = BettingSettingsSchema.safeParse(raw['betting'] ?? {});
+    const shop = ShopSettingsSchema.safeParse(raw['shop'] ?? {});
     return {
+      shop: shop.success ? shop.data : ShopSettingsSchema.parse({}),
       betting: betting.success ? betting.data : { ...DEFAULT_BETTING },
       rating: rating.success ? rating.data : RatingSettingsSchema.parse({}),
       teamNames: teamNames.success ? teamNames.data : [...BOT_TEAM_NAMES],
@@ -101,6 +112,13 @@ export class SettingsService {
     const next = BettingSettingsSchema.safeParse({ ...this.get().betting, ...value });
     if (!next.success) throw badRequest(z.prettifyError(next.error));
     this.put('betting', next.data);
+    return this.get();
+  }
+
+  setShop(value: Partial<ShopSettings>): WebsiteSettings {
+    const next = ShopSettingsSchema.safeParse({ ...this.get().shop, ...value });
+    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    this.put('shop', next.data);
     return this.get();
   }
 

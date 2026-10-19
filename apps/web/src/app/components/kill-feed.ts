@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { NameTag } from '../core/looks';
 import { I18n, TPipe } from '../core/i18n';
 import type { KillFeedEntry } from '../core/types';
 
@@ -22,7 +23,7 @@ const MULTIS: Record<number, string> = {
  */
 @Component({
   selector: 'app-kill-feed',
-  imports: [TPipe],
+  imports: [TPipe, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="card feed">
@@ -39,12 +40,12 @@ const MULTIS: Record<number, string> = {
             <span class="t mono muted">{{ r.time }}</span>
             <span class="line">
               @if (r.e.suicide) {
-                <span class="nm" [class]="r.vSide">{{ r.e.victim }}</span>
+                <span class="nm" [class]="r.vSide"><na-name [name]="r.e.victim" /></span>
                 <span class="muted">{{ 'feed.suicide' | t }}</span>
               } @else {
-                <span class="nm" [class]="r.kSide">{{ r.e.killer }}</span>
+                <span class="nm" [class]="r.kSide"><na-name [name]="r.e.killer" /></span>
                 <span class="wp">{{ r.e.weapon }}</span>
-                <span class="nm" [class]="r.vSide">{{ r.e.victim }}</span>
+                <span class="nm" [class]="r.vSide"><na-name [name]="r.e.victim" /></span>
               }
             </span>
             <span class="tags">

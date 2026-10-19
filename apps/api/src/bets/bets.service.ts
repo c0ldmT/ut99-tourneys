@@ -8,7 +8,7 @@ import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { betBailouts, bets, tournaments } from '../db/schema.js';
+import { betBailouts, bets, shopPurchases, tournaments } from '../db/schema.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { headToHead } from '../stats/aggregate.js';
 import { botKey, userKey } from '../stats/facts.js';
@@ -142,6 +142,21 @@ export class BetsService {
       .map((r) => ({ userId: r.userId ?? botBettor(r.botId ?? ''), amount: r.amount, at: r.at }));
   }
 
+  /** Shop purchases of a season (refunded dedications do not count). */
+  private seasonSpends(season: number, userId?: string): Bailout[] {
+    return this.db
+      .select()
+      .from(shopPurchases)
+      .where(
+        userId
+          ? and(eq(shopPurchases.season, season), eq(shopPurchases.userId, userId))
+          : eq(shopPurchases.season, season),
+      )
+      .all()
+      .filter((p) => p.status !== 'rejected')
+      .map((p) => ({ userId: p.userId, amount: p.price, at: p.at }));
+  }
+
   /** Tops a wallet below the season's floor up to it; returns the (new) wallet. */
   private rescue(bettor: string, season: Season): Wallet {
     const w = this.wallet(bettor, season);
@@ -179,6 +194,7 @@ export class BetsService {
       this.seasonBailouts(season.number, userId),
       season.betting.startBalance,
       season.betting.floor,
+      this.seasonSpends(season.number, userId),
     );
     return ws.get(userId) ?? emptyWallet(userId, season.betting.startBalance);
   }
@@ -568,6 +584,7 @@ export class BetsService {
       this.seasonBailouts(season.number),
       season.betting.startBalance,
       season.betting.floor,
+      this.seasonSpends(season.number),
     );
     const names = this.names();
     const rows = [...ws.values()]
@@ -595,6 +612,7 @@ export class BetsService {
       this.seasonBailouts(season.number),
       season.betting.startBalance,
       season.betting.floor,
+      this.seasonSpends(season.number),
     );
     const names = this.names();
     const tnames = this.tournamentNames();
@@ -656,6 +674,7 @@ export class BetsService {
       this.seasonBailouts(season.number),
       season.betting.startBalance,
       season.betting.floor,
+      this.seasonSpends(season.number),
     );
     const w = ws.get(bettor) ?? emptyWallet(bettor, season.betting.startBalance);
     const tnames = this.tournamentNames();

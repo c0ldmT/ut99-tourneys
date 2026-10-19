@@ -21,6 +21,12 @@ import type {
   SeasonsOverview,
   SeriesFields,
   SeriesView,
+  LookView,
+  ShopView,
+  ShopItem,
+  ShopPurchaseView,
+  ShopSettings,
+  ShopDedication,
   KillFeedEntry,
   SiteConfig,
   StatMode,
@@ -181,6 +187,20 @@ export class Api {
   tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);
   killFeed = (id: string) => this.call<KillFeedEntry[]>('GET', `/tournaments/${id}/feed`);
+  looks = () => this.call<{ userId: string; name: string; look: LookView }[]>('GET', '/shop/looks');
+  shop = () => this.call<ShopView>('GET', '/shop');
+  buy = (item: string, dedication?: Pick<ShopDedication, 'kill' | 'death'>) =>
+    this.call<ShopView>('POST', '/shop/buy', { item, ...(dedication ? { dedication } : {}) });
+  wear = (slot: string, item: string | null) =>
+    this.call<ShopView>('PUT', '/shop/look', { slot, item });
+  setDedication = (d: Pick<ShopDedication, 'kill' | 'death'>) =>
+    this.call<ShopView>('PUT', '/shop/dedication', d);
+  shopAdmin = () =>
+    this.call<{ catalog: ShopItem[]; log: ShopPurchaseView[] }>('GET', '/shop/admin');
+  reviewDedication = (id: string, approve: boolean) =>
+    this.call<ShopPurchaseView[]>('POST', `/shop/admin/dedications/${id}`, { approve });
+  setShopSettings = (body: Partial<ShopSettings>) =>
+    this.call<WebsiteSettings>('PUT', '/settings/shop', body);
   series = () => this.call<SeriesView[]>('GET', '/series');
   createSeries = (body: SeriesFields & { fromTournament: string }) =>
     this.call<SeriesView>('POST', '/series', body);

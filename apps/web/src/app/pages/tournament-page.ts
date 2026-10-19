@@ -8,6 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { NameTag } from '../core/looks';
 import { Icon } from '../core/brand';
 import { PageTitle } from '../core/page-title';
 import { FormsModule } from '@angular/forms';
@@ -42,6 +43,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     BetPanel,
     BetColumns,
     Icon,
+    NameTag,
   ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -417,7 +419,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                             @if (libraryBotId(s.entrantId); as bid) {
                               <a [routerLink]="['/bots', bid]">{{ name(s.entrantId) }}</a>
                             } @else if (humanUserId(s.entrantId); as uid) {
-                              <a [routerLink]="['/stats/p', 'u:' + uid]">{{ name(s.entrantId) }}</a>
+                              <a [routerLink]="['/stats/p', 'u:' + uid]"
+                                ><na-name [name]="name(s.entrantId)" [id]="uid"
+                              /></a>
                             } @else {
                               <span>{{ name(s.entrantId) }}</span>
                             }

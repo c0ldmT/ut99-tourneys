@@ -9,6 +9,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { Avatar, NameTag, Looks } from '../core/looks';
 import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
@@ -31,7 +32,7 @@ import type {
 
 @Component({
   selector: 'app-stats-player',
-  imports: [TPipe, RouterLink, DatePipe, NeuroPipe, Coin, RatingChart],
+  imports: [TPipe, RouterLink, DatePipe, NeuroPipe, Coin, RatingChart, Avatar, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -55,17 +56,24 @@ import type {
       <p class="error">{{ error() }}</p>
     }
     @if (d(); as d) {
-      <h1>
-        {{ d.row.name }}
-        @if (d.row.bot) {
-          <span class="badge bot">{{ 'stats.bot' | t }}</span>
+      <div class="hero" [class]="banner() ? 'hero bn-' + banner() : 'hero'">
+        @if (userId(); as uid) {
+          <na-avatar [name]="d.row.name" [id]="uid" [size]="64" />
         }
-        @if (botId(); as id) {
-          <a class="profile-link small" [routerLink]="['/bots', id]">{{
-            'bots.profileLink' | t
-          }}</a>
-        }
-      </h1>
+        <div>
+          <h1>
+            <na-name [name]="d.row.name" [id]="userId()" [withTitle]="true" [badgeSize]="22" />
+            @if (d.row.bot) {
+              <span class="badge bot">{{ 'stats.bot' | t }}</span>
+            }
+            @if (botId(); as id) {
+              <a class="profile-link small" [routerLink]="['/bots', id]">{{
+                'bots.profileLink' | t
+              }}</a>
+            }
+          </h1>
+        </div>
+      </div>
       <div class="tiles">
         <div class="card tile">
           <div class="value">{{ d.row.titles }}</div>
@@ -394,6 +402,21 @@ import type {
       text-align: right;
       white-space: nowrap;
     }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 0;
+      margin-bottom: 8px;
+      border-radius: var(--radius);
+    }
+    .hero[class*='bn-'] {
+      padding: 26px 22px;
+      border: 1px solid var(--border);
+    }
+    .hero h1 {
+      margin: 0;
+    }
     .profile-link {
       margin-left: 10px;
       font-weight: 400;
@@ -509,6 +532,16 @@ import type {
 export class StatsPlayerPage {
   private readonly api = inject(Api);
   readonly key = input.required<string>();
+  private readonly looks = inject(Looks);
+  /** The website user of the page (players only). */
+  protected readonly userId = computed(() => {
+    const k = this.key();
+    return k.startsWith('u:') ? k.slice(2) : null;
+  });
+  protected readonly banner = computed(() => {
+    const id = this.userId();
+    return id ? this.looks.of(id)?.banner : undefined;
+  });
   /** ?season=N or lifetime (from the statistics page). */
   readonly season = input<string | undefined>(undefined);
   protected readonly overview = signal<SeasonsOverview | null>(null);

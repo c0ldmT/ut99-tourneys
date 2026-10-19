@@ -37,6 +37,8 @@ import { SeasonsService } from './seasons/seasons.service.js';
 import { BotsController } from './bots/bots.controller.js';
 import { BotsService } from './bots/bots.service.js';
 import { SeriesController } from './series/series.controller.js';
+import { ShopController } from './shop/shop.controller.js';
+import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
 
 export interface AppOverrides {
@@ -74,6 +76,7 @@ class AppModule {
         BotsController,
         BetsController,
         SeriesController,
+        ShopController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -108,6 +111,7 @@ class AppModule {
         BotsService,
         BetsService,
         SeriesService,
+        ShopService,
         AgentGateway,
       ],
     };

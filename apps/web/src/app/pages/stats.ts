@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
@@ -32,7 +33,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 
 @Component({
   selector: 'app-stats',
-  imports: [TPipe, RouterLink, DatePipe, BetBoardView],
+  imports: [TPipe, RouterLink, DatePipe, BetBoardView, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
@@ -164,9 +165,9 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                   <tr [class.provisional]="r.provisional">
                     <td class="muted sticky c0">{{ r.rank ?? '–' }}</td>
                     <td class="sticky c1">
-                      <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }">{{
-                        r.name
-                      }}</a>
+                      <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }"
+                        ><na-name [name]="r.name" [id]="userOf(r.key)"
+                      /></a>
                       @if (r.bot) {
                         <span class="badge bot">{{ 'stats.bot' | t }}</span>
                       }
@@ -271,9 +272,9 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                   <tr>
                     <td class="muted sticky c0">{{ i + 1 }}</td>
                     <td class="sticky c1">
-                      <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }">{{
-                        r.name
-                      }}</a>
+                      <a [routerLink]="link(r.key)" [queryParams]="{ season: scope() }"
+                        ><na-name [name]="r.name" [id]="userOf(r.key)"
+                      /></a>
                       @if (r.bot) {
                         <span class="badge bot">{{ 'stats.bot' | t }}</span>
                       }
@@ -749,6 +750,10 @@ export class StatsPage {
   }
 
   protected link = playerLink;
+  /** The user id of a statistics key ("u:<id>"), for the shop look. */
+  protected userOf(key: string): string | null {
+    return key.startsWith('u:') ? key.slice(2) : null;
+  }
   protected value = recordValue;
   protected pct = percent;
   protected time = (ms: number) => raceTime(ms);

@@ -8,6 +8,8 @@ import {
   BettingFieldsSchema,
   RatingSettingsSchema,
   SettingsService,
+  ShopSettingsSchema,
+  type ShopSettings,
   TeamNamesSchema,
   type BettingSettings,
   type RatingSettings,
@@ -55,6 +57,12 @@ export class SettingsController {
     const next = this.settings.setBetting(body);
     this.seasons.applyBetting(next.betting);
     return next;
+  }
+
+  /** Neuro shop: on/off, prices, items taken out. */
+  @Put('shop')
+  shop(@Body(new ZodPipe(ShopSettingsSchema.partial())) body: Partial<ShopSettings>) {
+    return this.settings.setShop(body);
   }
 
   /** Names for teams made of bots only. */

@@ -22,6 +22,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/stats-player').then((m) => m.StatsPlayerPage),
       },
       {
+        path: 'shop',
+        title: 'shop.title',
+        loadComponent: () => import('./pages/shop').then((m) => m.ShopPage),
+      },
+      {
         path: 'bots/:id',
         loadComponent: () => import('./pages/bot-profile').then((m) => m.BotProfilePage),
       },
