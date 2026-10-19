@@ -39,6 +39,7 @@ import { StatsService } from '../stats/stats.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { BotsService } from '../bots/bots.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { ShopService } from '../shop/shop.service.js';
 import { BetsService } from '../bets/bets.service.js';
 import { EventLogService } from './event-log.service.js';
 import { matchDetail, type MatchDetail } from './match-detail.js';
@@ -166,6 +167,7 @@ export class TournamentsService {
     @Inject(BotsService) private readonly bots: BotsService,
     @Inject(SettingsService) private readonly settingsSvc: SettingsService,
     @Inject(BetsService) private readonly bets: BetsService,
+    @Inject(ShopService) private readonly shop: ShopService,
   ) {}
 
   private now() {
@@ -1134,6 +1136,7 @@ export class TournamentsService {
         access: this.access(t),
         records: this.mapRecordsFor(t),
         bots: this.botPersonalities(t),
+        dedications: this.dedications(t),
         betWindowSec: this.betWindowSec(t),
       },
     });
@@ -1143,6 +1146,21 @@ export class TournamentsService {
   private betWindowSec(t: TournamentRow): number {
     const season = this.seasons.current();
     return t.seasonal && season ? season.betting.windowSec : 0;
+  }
+
+  /** Neuro shop: the approved dedications of the tournament's players. */
+  private dedications(t: TournamentRow) {
+    try {
+      const names = new Map<string, string>();
+      for (const e of Object.values(this.log.projection(t.id)?.entrants ?? {})) {
+        if (e.kind === 'human') names.set(e.userId, e.displayName);
+        if (e.kind === 'team') for (const m of e.members) names.set(m.userId, m.displayName);
+      }
+      return this.shop.dedications(names).slice(0, 64);
+    } catch (err) {
+      this.logger.warn(`dedications for ${t.id}: ${String(err)}`);
+      return [];
+    }
   }
 
   /** Personalities (chat lines, rivals) of the website bots of the pool and the entrants. */

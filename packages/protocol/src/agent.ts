@@ -285,6 +285,18 @@ export const BotPersonalitySchema = z.object({
 });
 export type BotPersonality = z.infer<typeof BotPersonalitySchema>;
 
+/**
+ * Neuro shop: a player's dedication (approved by an admin) – a line the website bots say when
+ * they frag the player (`kill`) or are fragged by them (`death`); "" = none.
+ */
+export const DedicationSchema = z.object({
+  /** The player's name in the game. */
+  name: z.string().min(1).max(32),
+  kill: z.string().max(120),
+  death: z.string().max(120),
+});
+export type Dedication = z.infer<typeof DedicationSchema>;
+
 /** Full event log or delta for a tournament (website -> bridge). */
 export const TournamentSync = envelope(
   'tournament.sync',
@@ -298,6 +310,8 @@ export const TournamentSync = envelope(
     records: MapRecordsSchema.optional(),
     /** Personalities of the tournament's website bots (chat lines, rivals). */
     bots: z.array(BotPersonalitySchema).max(256).optional(),
+    /** Dedications of the tournament's players (Neuro shop). */
+    dedications: z.array(DedicationSchema).max(64).optional(),
     /**
      * Betting: matches take bets at least this many seconds after being called (the first game's
      * countdown waits); 0 or missing = the tournament takes no bets now.

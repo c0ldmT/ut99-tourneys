@@ -9,6 +9,7 @@ import {
 import type {
   AccessEntry,
   BotPersonality,
+  Dedication,
   MapRecords,
   AgentCommand,
   AgentProfile,
@@ -60,6 +61,7 @@ export class WebsiteAgent {
   /** Monster Hunt map records (statistics) per tournament, from the website. */
   private records = new Map<string, MapRecords | undefined>();
   private botPersonas = new Map<string, BotPersonality[] | undefined>();
+  private dedications = new Map<string, Dedication[] | undefined>();
   private betWindows = new Map<string, number>();
   private runtime?: Runtime;
   private level?: string;
@@ -145,6 +147,8 @@ export class WebsiteAgent {
         this.records.set(p.tournamentId, p.records);
         const botsBefore = JSON.stringify(this.botPersonas.get(p.tournamentId));
         this.botPersonas.set(p.tournamentId, p.bots);
+        const dedBefore = JSON.stringify(this.dedications.get(p.tournamentId));
+        this.dedications.set(p.tournamentId, p.dedications);
         const betBefore = this.betWindows.get(p.tournamentId) ?? 0;
         this.betWindows.set(p.tournamentId, p.betWindowSec ?? 0);
         const rt = this.runtime;
@@ -153,6 +157,8 @@ export class WebsiteAgent {
           if (JSON.stringify(p.records) !== recordsBefore)
             await rt.director.setMapRecords(p.records);
           if (JSON.stringify(p.bots) !== botsBefore) await rt.director.setBotPersonalities(p.bots);
+          if (JSON.stringify(p.dedications) !== dedBefore)
+            await rt.director.setDedications(p.dedications);
           if ((p.betWindowSec ?? 0) !== betBefore) await rt.director.setBetWindow(p.betWindowSec);
           if (changed) await rt.director.refresh();
         }
@@ -319,6 +325,7 @@ export class WebsiteAgent {
       ...(this.botPersonas.get(tournamentId)
         ? { botPersonalities: this.botPersonas.get(tournamentId) }
         : {}),
+      dedications: this.dedications.get(tournamentId) ?? [],
       betWindowSec: this.betWindows.get(tournamentId) ?? 0,
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });

@@ -482,6 +482,7 @@ export function championEmbed(
   p: TournamentProjection,
   link: string,
   bets?: string | null,
+  fanfare?: { title?: string; color?: string } | null,
 ): DiscordPost {
   const name = (id: string) => md(p.entrants[id]?.displayName ?? id);
   const medal = ['🥇', '🥈', '🥉', '4.'];
@@ -498,10 +499,19 @@ export function championEmbed(
       name: p.name,
     }),
     url: link,
-    description: `[${fill(lang, 'eBracket')}](${link})`,
-    color: COLOR.gold,
+    description:
+      (fanfare ? `🎉🎊 ${fanfare.title ? `*${md(fanfare.title)}* ` : ''}🎊🎉\n` : '') +
+      `[${fill(lang, 'eBracket')}](${link})`,
+    color: fanfare ? fanfareColor(fanfare.color) : COLOR.gold,
     fields,
   });
+}
+
+/** Embed colour of a victory fanfare: the winner's name colour (first colour of a gradient). */
+export function fanfareColor(color?: string): number {
+  if (color === 'aurora') return COLOR.magenta;
+  const hex = /#([0-9a-f]{6})/i.exec(color ?? '');
+  return hex ? parseInt(hex[1]!, 16) : COLOR.gold;
 }
 
 export function betsOpenEmbed(

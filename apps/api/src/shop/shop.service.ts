@@ -286,17 +286,15 @@ export class ShopService {
     return this.log();
   }
 
-  /** Approved dedications of users (for the game server), by in-game name. */
-  dedications(userIds: readonly string[]): { name: string; kill: string; death: string }[] {
-    if (!userIds.length) return [];
-    const ids = new Set(userIds);
-    const names = new Map(this.users.list().map((u) => [u.id, u.displayName]));
+  /** Approved dedications for the game server; `names`: in-game names by user id. */
+  dedications(names: ReadonlyMap<string, string>): { name: string; kill: string; death: string }[] {
+    if (!names.size) return [];
     return this.db
       .select()
       .from(shopPurchases)
       .where(and(eq(shopPurchases.itemId, 'dedication'), eq(shopPurchases.status, 'approved')))
       .all()
-      .filter((p) => ids.has(p.userId) && names.has(p.userId))
+      .filter((p) => names.has(p.userId))
       .map((p) => ({
         name: names.get(p.userId)!,
         ...DedicationSchema.parse(p.dataJson ? JSON.parse(p.dataJson) : {}),

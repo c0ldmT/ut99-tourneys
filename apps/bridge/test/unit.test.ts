@@ -158,4 +158,19 @@ describe('website bot lines', () => {
     ]);
     for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
   });
+
+  it("sends the players' dedications (Neuro shop), empty lines left out", async () => {
+    const { dedicationLines } = await import('../src/snapshot.js');
+    const { encodeModLine } = await import('@tourney/protocol');
+    const lines = dedicationLines([
+      { name: 'Mario', kill: 'Too slow, {victim}!', death: '' },
+      { name: 'Anna', kill: '', death: 'Fine, {killer}.' },
+    ]);
+    expect(lines).toEqual([
+      { t: 'ded', to: 'Mario', k: 'kill', x: 'Too slow, {victim}!' },
+      { t: 'ded', to: 'Anna', k: 'death', x: 'Fine, {killer}.' },
+    ]);
+    for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
+    expect(dedicationLines(undefined)).toEqual([]);
+  });
 });

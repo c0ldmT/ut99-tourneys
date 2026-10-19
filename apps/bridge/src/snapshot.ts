@@ -6,6 +6,7 @@ import {
   type BotPersonality,
   type AccessEntry,
   type BotSpec,
+  type Dedication,
   type BridgeToMod,
   type Entrant,
   type ModPhase,
@@ -88,6 +89,15 @@ export function seriesWins(
   ] as [number, number];
 }
 
+/** Dedication lines (Neuro shop) for the mod; empty lines are left out. */
+export function dedicationLines(list: readonly Dedication[] | undefined): BridgeToMod[] {
+  const lines: BridgeToMod[] = [];
+  for (const d of list ?? [])
+    for (const k of ['kill', 'death'] as const)
+      if (d[k].trim()) lines.push({ t: 'ded', to: wireName(d.name), k, x: wireText(d[k], 120) });
+  return lines;
+}
+
 /** Bot personalities by lower-case name in the game. */
 export type Personalities = ReadonlyMap<string, BotPersonality>;
 
@@ -167,6 +177,7 @@ export function matchLines(
   entrants: readonly [string, string],
   teamBots?: Readonly<Record<string, readonly BotSpec[]>>,
   personas?: Personalities,
+  dedications?: readonly Dedication[],
 ): BridgeToMod[] {
   const node = proj.bracket?.byId[matchId];
   const [wa, wb] = seriesWins(proj, matchId, entrants);
@@ -193,6 +204,7 @@ export function matchLines(
     for (const b of teamBots?.[id] ?? [])
       lines.push(...botConfigLines(b, personas), botLine(side, b));
   });
+  lines.push(...dedicationLines(dedications));
   return lines;
 }
 

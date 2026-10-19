@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.7.3";
+const MOD_VERSION = "0.7.4";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -28,6 +28,8 @@ const MAXW = 8;     // weapons per player
 const MAXCFG = 16;  // website bots with a configuration
 const MAXSAY = 192; // their chat lines
 const MAXRIV = 96;  // their rivals
+const MAXDED = 64;  // dedications of the players (Neuro shop)
+const DEDCHANCE = 60; // percent: a bot says a dedication line on its occasion
 const SAYCOOLDOWN = 12.0; // seconds between two lines of one bot
 const SAYGAP = 2.0;       // seconds between two bot lines
 
@@ -139,6 +141,10 @@ var byte RivCfg[96];               // rivals: bot, rival's name in the game, 1 r
 var string RivName[96];
 var byte RivLevel[96];
 var int RivCount;
+var string DedTo[64];              // dedications (ded): player's name, kill/death, line
+var string DedKind[64];
+var string DedText[64];
+var int DedCount;
 var float NextBotSay;              // no bot line before this time (all bots)
 var int StartTalkLeft;             // seconds after the start in which bots may greet
 var int HuntTicks;
@@ -381,6 +387,15 @@ function HandleBridgeMessage(TourneyMsg M)
 				SayKind[SayCount] = M.Get("k");
 				SayText[SayCount] = M.Get("x");
 				SayCount++;
+			}
+			break;
+		case "ded":
+			if (DedCount < MAXDED && M.Get("to") != "" && M.Get("x") != "")
+			{
+				DedTo[DedCount] = M.Get("to");
+				DedKind[DedCount] = M.Get("k");
+				DedText[DedCount] = M.Get("x");
+				DedCount++;
 			}
 			break;
 		case "brv":
@@ -2617,6 +2632,7 @@ function ClearBotConfigs()
 	CfgCount = 0;
 	SayCount = 0;
 	RivCount = 0;
+	DedCount = 0;
 }
 
 // A new "bpers" line replaces the chat lines and rivals of that bot.
@@ -2877,8 +2893,6 @@ function string PickLine(int c, string Kind, string Victim, string Killer)
 // Bot c says a line of the occasion with Chance percent (bForce: no cooldown, no gap).
 function bool BotTalk(int c, string Kind, string Victim, string Killer, int Chance, bool bForce)
 {
-	local Bot B;
-	local Pawn P;
 	local string Msg;
 
 	if (c < 0 || Rand(100) >= Chance)
@@ -2886,6 +2900,15 @@ function bool BotTalk(int c, string Kind, string Victim, string Killer, int Chan
 	if (!bForce && (Level.TimeSeconds < CfgSayAt[c] || Level.TimeSeconds < NextBotSay))
 		return false;
 	Msg = PickLine(c, Kind, Victim, Killer);
+	return BotSay(c, Msg);
+}
+
+// Bot c says Msg now (no chance, no cooldown check).
+function bool BotSay(int c, string Msg)
+{
+	local Bot B;
+	local Pawn P;
+
 	if (Msg == "")
 		return false;
 	B = FindBotPawn(CfgName[c]);
@@ -2908,13 +2931,39 @@ function bool BotTalk(int c, string Kind, string Victim, string Killer, int Chan
 	return true;
 }
 
+// Neuro shop: bot c may say the dedication of player Who for the occasion (kill: c fragged Who,
+// death: Who fragged c). Placeholders {me} {victim} {killer} {map}.
+function bool BotTalkDed(int c, string Kind, string Who, string Victim, string Killer)
+{
+	local int i;
+	local string T;
+
+	if (DedCount == 0 || Rand(100) >= DEDCHANCE)
+		return false;
+	if (Level.TimeSeconds < CfgSayAt[c] || Level.TimeSeconds < NextBotSay)
+		return false;
+	for (i = 0; i < DedCount; i++)
+		if (DedKind[i] == Kind && Caps(DedTo[i]) == Caps(Who))
+		{
+			T = DedText[i];
+			break;
+		}
+	if (T == "")
+		return false;
+	T = TReplace(T, "{me}", CfgName[c]);
+	T = TReplace(T, "{victim}", Victim);
+	T = TReplace(T, "{killer}", Killer);
+	T = TReplace(T, "{map}", CurrentMapName());
+	return BotSay(c, T);
+}
+
 // From CountKill: the killer may brag, the victim may complain (more often about a rival).
 function BotTalkKill(Pawn Killer, Pawn Other)
 {
 	local int c;
 	local string KName, VName;
 
-	if (CfgCount == 0 || SayCount == 0 || Killer == None || Other == None || Killer == Other)
+	if (CfgCount == 0 || (SayCount == 0 && DedCount == 0) || Killer == None || Other == None || Killer == Other)
 		return;
 	if (Killer.PlayerReplicationInfo == None || Other.PlayerReplicationInfo == None)
 		return;
@@ -2925,12 +2974,16 @@ function BotTalkKill(Pawn Killer, Pawn Other)
 	if (Bot(Killer) != None)
 	{
 		c = FindCfg(KName, false);
+		if (c >= 0 && Bot(Other) == None && BotTalkDed(c, "kill", VName, VName, KName))
+			c = -1;
 		if (c >= 0 && !(RivalLevelOf(c, VName) > 0 && BotTalk(c, "rkill", VName, KName, Min(100, 2 * CfgTalk[c]), false)))
 			BotTalk(c, "kill", VName, KName, CfgTalk[c], false);
 	}
 	if (Bot(Other) != None)
 	{
 		c = FindCfg(VName, false);
+		if (c >= 0 && Bot(Killer) == None && BotTalkDed(c, "death", KName, VName, KName))
+			c = -1;
 		if (c >= 0 && !(RivalLevelOf(c, KName) > 0 && BotTalk(c, "rdeath", VName, KName, Min(100, 2 * CfgTalk[c]), false)))
 			BotTalk(c, "death", VName, KName, CfgTalk[c], false);
 	}

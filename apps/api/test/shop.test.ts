@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { lookView } from '../src/shop/catalog.js';
+import { ShopService } from '../src/shop/shop.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -78,6 +79,12 @@ describe('Neuro shop', () => {
     const p2 = (await admin.get('/shop/admin')).body.log.find((x: any) => x.item === 'dedication');
     await admin.post(`/shop/admin/dedications/${p2.id}`, { approve: true });
     expect((await mario.get('/shop')).body.dedication).toMatchObject({ status: 'approved' });
+    // The game server gets it under the player's name in the tournament.
+    const shop = api.app.get(ShopService);
+    expect(shop.dedications(new Map([[marioId, 'MarioT']]))).toEqual([
+      { name: 'MarioT', kill: 'GG {victim}', death: '' },
+    ]);
+    expect(shop.dedications(new Map([['nobody', 'X']]))).toEqual([]);
     // Players cannot open the admin view.
     expect((await mario.get('/shop/admin')).status).toBe(403);
     // A reset takes the purchases with the seasons.

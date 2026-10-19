@@ -8,6 +8,7 @@ import {
   type TournamentProjection,
 } from '@tourney/protocol';
 import { AgentsService } from '../agents/agents.service.js';
+import { ShopService } from '../shop/shop.service.js';
 import { BetsService } from '../bets/bets.service.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
@@ -47,6 +48,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     @Inject(AgentsService) private readonly agents: AgentsService,
     @Inject(DISCORD_OUT) private readonly out: DiscordOut,
     @Inject(BetsService) private readonly bets: BetsService,
+    @Inject(ShopService) private readonly shop: ShopService,
   ) {}
 
   onModuleInit(): void {
@@ -268,7 +270,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
           case 'tournament.finished': {
             const s = this.bets.discordTournament(t.id);
             const summary = s && M.betsTournament(this.lang, s, this.betNames(after));
-            this.post(t, M.championEmbed(this.lang, after, info.link, summary));
+            const w = after.entrants[after.championId ?? ''];
+            const fanfare = w?.kind === 'human' ? this.shop.fanfareLook(w.userId) : null;
+            this.post(t, M.championEmbed(this.lang, after, info.link, summary, fanfare));
             break;
           }
           default:

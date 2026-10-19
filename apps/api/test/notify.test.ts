@@ -139,6 +139,23 @@ describe('messages', () => {
     expect(M.dmPlacement('en', t, 1)).toBe('🏆 Congratulations! You won **Cup**.');
     expect(M.dmPlacement('de', t, 1, 'Red')).toBe('🏆 Glückwunsch! **Red** hat **Cup** gewonnen.');
   });
+
+  it("plays the victory fanfare in the winner's colour", () => {
+    const p: any = {
+      settings,
+      name: 'Cup',
+      championId: 'a',
+      entrants: { a: { displayName: 'Red' } },
+    };
+    const plain = M.championEmbed('en', p, 'http://x').embeds![0]!;
+    expect(plain.color).toBe(M.COLOR.gold);
+    const look = { title: 'Neuro Baron', color: 'linear-gradient(90deg, #ff4d5e, #fbbf24)' };
+    const e = M.championEmbed('en', p, 'http://x', null, look).embeds![0]!;
+    expect(e.color).toBe(0xff4d5e);
+    expect(e.description).toContain('*Neuro Baron*');
+    expect(M.fanfareColor('aurora')).toBe(M.COLOR.magenta);
+    expect(M.fanfareColor()).toBe(M.COLOR.gold);
+  });
 });
 
 describe('reminders', () => {

@@ -299,6 +299,17 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     k: z.enum(['start', 'kill', 'death', 'win', 'loss', 'rkill', 'rdeath', 'bwon', 'blost']),
     x: str(160),
   }),
+  /**
+   * Mod 0.7.4, after the bot lines of a match: a player's dedication (Neuro shop). A website bot
+   * that frags player `to` may say `x` (`k` kill), one fragged by `to` may say it (`k` death);
+   * placeholders as in `bsay`. Cleared by the next `match` line.
+   */
+  z.object({
+    t: z.literal('ded'),
+    to: str(MAX_NAME_CHARS),
+    k: z.enum(['kill', 'death']),
+    x: str(160),
+  }),
   z.object({
     t: z.literal('brv'),
     name: str(MAX_NAME_CHARS),

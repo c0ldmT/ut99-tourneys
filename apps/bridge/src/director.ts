@@ -15,6 +15,7 @@ import {
   type MapInfo,
   MAX_NAME_CHARS,
   type BotPersonality,
+  type Dedication,
   type MapRecords,
   type ModPhase,
   type ModToBridge,
@@ -123,6 +124,8 @@ export interface DirectorOptions {
   mapRecords?: MapRecords;
   /** Personalities of the website bots (chat lines, rivals). */
   botPersonalities?: readonly BotPersonality[];
+  /** Players' dedications (Neuro shop), sent with each match. */
+  dedications?: readonly Dedication[];
   /**
    * Betting (website): a match takes bets for at least this many seconds after it was called;
    * when everybody is ready earlier, the countdown of its first game waits. 0 = no betting.
@@ -260,6 +263,8 @@ export class MatchDirector extends EventEmitter {
   private calledAt = new Map<string, number>();
   /** Website bots' personalities by lower-case name in the game. */
   private personas = new Map<string, BotPersonality>();
+  /** Players' dedications (Neuro shop). */
+  private dedications: readonly Dedication[] = [];
   /**
    * Team games: line-up of the current game (user ids per entrant), fixed before the map loads.
    * Monster Hunt: per run, only the running team has a line-up.
@@ -296,6 +301,7 @@ export class MatchDirector extends EventEmitter {
     this.access = [...o.access];
     if (o.mapRecords) this.mapRecords = cloneRecords(o.mapRecords);
     this.setPersonas(o.botPersonalities);
+    this.dedications = [...(o.dedications ?? [])];
     this.betWindowMs = Math.max(0, (o.betWindowSec ?? 0) * 1000);
   }
 
@@ -487,7 +493,6 @@ export class MatchDirector extends EventEmitter {
     });
   }
 
-  /** New bot personalities from the website: used from the next bot lines on. */
   /** New betting window from the website (0: the tournament takes no bets). */
   setBetWindow(sec: number | undefined): Promise<void> {
     return this.enqueue(() => {
@@ -495,8 +500,16 @@ export class MatchDirector extends EventEmitter {
     });
   }
 
+  /** New bot personalities from the website: used from the next bot lines on. */
   setBotPersonalities(list: readonly BotPersonality[] | undefined): Promise<void> {
     return this.enqueue(() => this.setPersonas(list));
+  }
+
+  /** New dedications from the website: sent with the next match lines. */
+  setDedications(list: readonly Dedication[] | undefined): Promise<void> {
+    return this.enqueue(() => {
+      this.dedications = [...(list ?? [])];
+    });
   }
 
   private setPersonas(list: readonly BotPersonality[] | undefined) {
@@ -871,6 +884,7 @@ export class MatchDirector extends EventEmitter {
       entrants,
       this.teamMode ? this.teamBots() : undefined,
       this.personas,
+      this.dedications,
     );
     const cm = this.proj.currentMatch;
     const runner = this.raceMode ? this.runner() : undefined;

@@ -8,7 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
-import { NameTag } from '../core/looks';
+import { Looks, NameTag } from '../core/looks';
 import { Icon } from '../core/brand';
 import { PageTitle } from '../core/page-title';
 import { FormsModule } from '@angular/forms';
@@ -99,7 +99,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <p class="error">{{ 'tp.aborted' | t: { reason: t.projection?.abortedReason ?? '' } }}</p>
       }
       @if (champion(); as c) {
-        <div class="card champion">
+        <div class="card champion" [class.confetti]="c.fanfare">
           <svg width="28" height="28" viewBox="0 0 24 24" aria-hidden="true">
             <path
               d="M7 4h10v5a5 5 0 0 1-10 0zM5 5H3v2a4 4 0 0 0 4 4M19 5h2v2a4 4 0 0 1-4 4M12 14v4M8 21h8"
@@ -109,7 +109,17 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
               stroke-linecap="round"
             />
           </svg>
-          {{ 'tp.champion' | t: { name: c } }}
+          @if (c.fanfare) {
+            <span class="fanfare">
+              <na-name [name]="c.name" [id]="c.userId" [badgeSize]="24" />
+              {{ 'tp.championWins' | t }}
+              @if (c.title) {
+                <small>{{ c.title }}</small>
+              }
+            </span>
+          } @else {
+            {{ 'tp.champion' | t: { name: c.name } }}
+          }
         </div>
       }
 
@@ -819,6 +829,17 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       border-color: rgba(245, 184, 61, 0.35);
       background: linear-gradient(90deg, rgba(245, 184, 61, 0.1), transparent 60%), var(--panel);
     }
+    .fanfare {
+      position: relative;
+      font-size: 2rem;
+      line-height: 1.1;
+    }
+    .fanfare small {
+      display: block;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      color: var(--hot-text);
+    }
     @media (max-width: 640px) {
       .head h1 {
         font-size: 2.4rem;
@@ -922,6 +943,7 @@ export class TournamentPage {
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
   private readonly stream = inject(TournamentStream);
+  private readonly looks = inject(Looks);
   /** Matches that take bets now (from the bets panel). */
   protected readonly betOpen = signal<string[]>([]);
   /** Bets of the match being played (closed, from the bet panel). */
@@ -1026,9 +1048,14 @@ export class TournamentPage {
       (e) => e.kind === 'human' || (e.kind === 'team' && e.members.length > 0),
     ),
   );
+  /** The winner; `fanfare` when they bought the victory fanfare in the Neuro shop. */
   protected readonly champion = computed(() => {
     const p = this.t()?.projection;
-    return p?.championId ? (p.entrants[p.championId]?.displayName ?? null) : null;
+    const e = p?.championId ? p.entrants[p.championId] : undefined;
+    if (!e) return null;
+    const userId = e.kind === 'human' ? e.userId : null;
+    const look = this.looks.of(userId);
+    return { name: e.displayName, userId, fanfare: !!look?.fanfare, title: look?.title };
   });
 
   /** Admin: match picked in "set result". */
