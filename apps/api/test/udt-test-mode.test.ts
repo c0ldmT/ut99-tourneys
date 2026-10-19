@@ -119,3 +119,58 @@ describe('Dream Team high stakes', () => {
     expect(pots.sort((x, y) => y - x)).toEqual([840, 180]);
   });
 });
+
+describe('Dream Team AI managers', () => {
+  it('are off by default; on, they found teams, bid, line up and sign up after market days', async () => {
+    ({ api } = await startApi({ TEST_MODE: 'true' }));
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    for (let i = 0; i < 12; i++) await admin.post('/bots', { name: `Lib${i}`, skill: 1 + (i % 4) });
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    await mario.post('/udt/team', {
+      name: 'Nexus',
+      tag: 'NX',
+      starter: { name: 'Mira', skill: 3 },
+    });
+    await admin.post('/udt/test/market-day');
+    expect((await admin.get('/udt/ai')).body).toEqual([]);
+    expect((await admin.get('/udt/teams')).body).toHaveLength(1);
+    await admin.req('PUT', '/settings/udt', { aiEnabled: true, aiCount: 3 });
+    const made = (await admin.post('/udt/ai/ensure')).body.created as string[];
+    expect(made).toHaveLength(3);
+    const ai = (await admin.get('/udt/ai')).body;
+    expect(ai.map((a: { personality: string }) => a.personality)).toEqual([
+      'tactician',
+      'gambler',
+      'saver',
+    ]);
+    // Team names from the bot team names of the settings.
+    const names = (await admin.get('/settings')).body.teamNames as string[];
+    expect(names).toContain(ai[0].team.name);
+    // A cup to sign up for; the next market day lets them act.
+    const cup = await admin.post(
+      '/tournaments',
+      tournamentBody({ name: 'AI Cup', botPool: [], kind: 'udt' }, { size: 4, format: 'single' }),
+    );
+    await admin.post('/udt/test/advance', { hours: 24 });
+    const ev = (await mario.get('/udt/events')).body.find(
+      (e: { id: string }) => e.id === cup.body.id,
+    );
+    expect(ev.entries).toBeGreaterThanOrEqual(1);
+    // Trade partners include them; the betting ranking does not.
+    const partners = (await mario.get('/udt/trades/partners')).body;
+    expect(partners.filter((p: { ai: boolean }) => p.ai)).toHaveLength(3);
+    const lb = (await mario.get('/bets/leaderboard')).body;
+    expect(JSON.stringify(lb)).not.toMatch(/AI 1/);
+    // Switched off: no partners, they leave the open sign-ups at the next market day.
+    await admin.req('PUT', '/settings/udt', { aiEnabled: false });
+    expect((await mario.get('/udt/trades/partners')).body).toHaveLength(0);
+    await admin.post('/udt/test/advance', { hours: 24 });
+    const ev2 = (await mario.get('/udt/events')).body.find(
+      (e: { id: string }) => e.id === cup.body.id,
+    );
+    expect(ev2.entries).toBe(0);
+  });
+});

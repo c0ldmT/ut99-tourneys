@@ -16,6 +16,7 @@ import { ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
 import { ApproveBody, UdtCareerService } from './udt-career.service.js';
+import { UdtAiService } from './udt-ai.service.js';
 import {
   BuildBody,
   DevelopBody,
@@ -54,6 +55,7 @@ export class UdtController {
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
     @Inject(UdtAcademyService) private readonly academy: UdtAcademyService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
+    @Inject(UdtAiService) private readonly ai: UdtAiService,
   ) {}
 
   @Get()
@@ -347,5 +349,28 @@ export class UdtController {
   retire(@Param('botId') botId: string) {
     this.udt.assertOn();
     return this.career.retire(botId);
+  }
+
+  /** AI managers with their personality (admins). */
+  @AdminOnly()
+  @Get('ai')
+  aiManagers() {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    return this.ai.managers().map((m) => ({
+      userId: m.user.id,
+      n: m.n,
+      personality: m.personality,
+      team: this.udt.team(m.user.id, season),
+    }));
+  }
+
+  /** Creates the missing AI teams of the season now (instead of at the next market day). */
+  @AdminOnly()
+  @Post('ai/ensure')
+  @HttpCode(200)
+  aiEnsure() {
+    this.udt.assertOn();
+    return { created: this.ai.ensure(this.udt.season().number) };
   }
 }

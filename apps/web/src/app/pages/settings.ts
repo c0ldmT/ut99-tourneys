@@ -356,6 +356,33 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
         </label>
       </div>
       <p class="muted small">{{ 'udt.settings.tradeHint' | t }}</p>
+      <h3>{{ 'udt.settings.ai' | t }}</h3>
+      <label class="switch"
+        ><input type="checkbox" name="aiOn" [(ngModel)]="ai.aiEnabled" /><span class="tr"></span
+        >{{ 'udt.settings.aiOn' | t }}</label
+      >
+      <div class="row gap">
+        <label
+          >{{ 'udt.settings.aiCount' | t }}
+          <input
+            type="number"
+            name="aiCount"
+            min="0"
+            max="8"
+            [(ngModel)]="ai.aiCount"
+            class="narrow"
+          />
+        </label>
+        <label
+          >{{ 'udt.settings.aiStrength' | t }}
+          <select name="aiStrength" [(ngModel)]="ai.aiStrength">
+            @for (s of aiStrengths; track s) {
+              <option [ngValue]="s">{{ 'udt.settings.aiStrength.' + s | t }}</option>
+            }
+          </select>
+        </label>
+      </div>
+      <p class="muted small">{{ 'udt.settings.aiHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
         @if (savedUdt()) {
@@ -523,6 +550,8 @@ export class SettingsPage {
   protected readonly savedBetting = signal(false);
   protected botAiLevel = 2;
   protected udtOn = false;
+  protected ai = pickAi({});
+  protected readonly aiStrengths = ['calm', 'normal', 'ambitious'] as const;
   protected trade = pickTrade({
     tradeEnabled: true,
     tradeFeePct: 5,
@@ -587,6 +616,7 @@ export class SettingsPage {
         this.udtOffers = s.udt.offersPerDay;
         this.udtBudget = s.udt.starterBudget;
         this.trade = pickTrade(s.udt);
+        this.ai = pickAi(s.udt);
       }
       this.o.set(o);
       this.saved.set(false);
@@ -680,8 +710,12 @@ export class SettingsPage {
             typeof v === 'boolean' ? v : Math.round(Number(v)),
           ]),
         ),
+        aiEnabled: this.ai.aiEnabled,
+        aiCount: Math.max(0, Math.min(8, Math.round(Number(this.ai.aiCount) || 0))),
+        aiStrength: this.ai.aiStrength,
       });
       this.trade = pickTrade(s.udt);
+      this.ai = pickAi(s.udt);
       this.udtOn = s.udt.enabled;
       // The menu shows the Dream Team at once.
       this.auth.config.update((c) => ({ ...c, udt: s.udt.enabled }));
@@ -765,5 +799,14 @@ function pickTrade(u: Partial<UdtSettings>) {
     tradeLockDays: u.tradeLockDays ?? 3,
     tradeExpiryHours: u.tradeExpiryHours ?? 48,
     tradePairPerWeek: u.tradePairPerWeek ?? 2,
+  };
+}
+
+/** The AI manager fields of the Dream Team settings. */
+function pickAi(u: Partial<UdtSettings>) {
+  return {
+    aiEnabled: u.aiEnabled ?? false,
+    aiCount: u.aiCount ?? 4,
+    aiStrength: u.aiStrength ?? ('normal' as UdtSettings['aiStrength']),
   };
 }

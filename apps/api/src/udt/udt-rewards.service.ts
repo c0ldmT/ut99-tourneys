@@ -33,6 +33,8 @@ export interface TableRow {
   points: number;
   titles: number;
   events: number;
+  /** An AI manager's team. */
+  ai: boolean;
 }
 
 /**
@@ -166,8 +168,11 @@ export class UdtRewardsService implements OnModuleInit {
     const teamSize = proj.settings.teamSize;
     const index = this.udt.index(season);
     const standings = proj.bracket?.standings ?? [];
-    const managers = standings.filter((s) => udtManagerOf(s.entrantId));
-    const onlyBase = managers.length === 1;
+    const all = standings.filter((s) => udtManagerOf(s.entrantId));
+    const onlyBase = all.length === 1;
+    // Place rewards and the high stakes pot go to human managers only (not to AI managers).
+    const ai = this.udt.aiIds();
+    const managers = all.filter((s) => !ai.has(udtManagerOf(s.entrantId)!));
     const onBots = this.udt.traitsOnBots(season);
     for (const s of managers) {
       const userId = udtManagerOf(s.entrantId)!;
@@ -230,6 +235,8 @@ export class UdtRewardsService implements OnModuleInit {
     if (!s) return [];
     const from = new Date(dayStartMs(s.startDate, this.seasons.timeZone)).toISOString();
     const teams = new Map(this.udt.teams(season).map((t) => [t.userId, t]));
+    const ai = this.udt.aiIds();
+    const aiOn = this.udt.aiOn();
     const rows = new Map<string, TableRow>();
     for (const t of this.db
       .select()
@@ -244,10 +251,12 @@ export class UdtRewardsService implements OnModuleInit {
         const userId = udtManagerOf(st.entrantId);
         const team = userId ? teams.get(userId) : undefined;
         if (!userId || !team) continue;
+        if (ai.has(userId) && !aiOn) continue;
         const r = rows.get(userId) ?? {
           userId,
           name: team.name,
           tag: team.tag,
+          ai: ai.has(userId),
           points: 0,
           titles: 0,
           events: 0,

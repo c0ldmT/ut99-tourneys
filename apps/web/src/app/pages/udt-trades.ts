@@ -139,7 +139,9 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
               >{{ 'udt.trades.partner' | t }}
               <select [ngModel]="partnerId()" (ngModelChange)="setPartner($event)" name="partner">
                 @for (p of partners(); track p.userId) {
-                  <option [ngValue]="p.userId">[{{ p.tag }}] {{ p.name }} ({{ p.manager }})</option>
+                  <option [ngValue]="p.userId">
+                    [{{ p.tag }}] {{ p.name }} ({{ p.ai ? ('udt.ai' | t) : p.manager }})
+                  </option>
                 }
               </select>
             </label>

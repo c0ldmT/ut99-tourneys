@@ -493,4 +493,13 @@ export const MIGRATIONS: string[] = [
     career_json TEXT NOT NULL
   );
   `,
+  // 24: Dream Team AI managers (users with discord id "ai:<n>") and their personality.
+  `
+  CREATE TABLE udt_ai (
+    user_id TEXT PRIMARY KEY,
+    n INTEGER NOT NULL UNIQUE,
+    personality TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  `,
 ];

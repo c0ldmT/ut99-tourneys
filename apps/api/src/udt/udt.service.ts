@@ -23,7 +23,16 @@ import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, udtBots, udtDays, udtRoster, udtTeams, udtTraits, udtValues } from '../db/schema.js';
+import {
+  bots,
+  udtAi,
+  udtBots,
+  udtDays,
+  udtRoster,
+  udtTeams,
+  udtTraits,
+  udtValues,
+} from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { today } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
@@ -214,6 +223,22 @@ export class UdtService {
         .all()
         .map((b) => [b.botId, b]),
     );
+  }
+
+  /** User ids of the AI managers (whether they act or not). */
+  aiIds(): Set<string> {
+    return new Set(
+      this.db
+        .select({ id: udtAi.userId })
+        .from(udtAi)
+        .all()
+        .map((a) => a.id),
+    );
+  }
+
+  /** AI managers act (setting). */
+  aiOn(): boolean {
+    return this.settings.get().udt.aiEnabled;
   }
 
   /** A bot the manager made stays with the team: not sold, not traded, no salary. */

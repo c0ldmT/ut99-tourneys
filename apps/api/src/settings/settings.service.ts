@@ -97,6 +97,10 @@ export const UdtSettingsSchema = z.object({
   tradeExpiryHours: z.number().int().min(1).max(336).default(48),
   /** Trades between the same two managers per 7 days (0 = no limit). */
   tradePairPerWeek: z.number().int().min(0).max(50).default(2),
+  /** AI managers: teams of the website that play like managers (off: they do nothing). */
+  aiEnabled: z.boolean().default(false),
+  aiCount: z.number().int().min(0).max(8).default(4),
+  aiStrength: z.enum(['calm', 'normal', 'ambitious']).default('normal'),
 });
 export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
 

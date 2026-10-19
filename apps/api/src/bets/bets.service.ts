@@ -590,6 +590,16 @@ export class BetsService {
   }
 
   /** Ranking of a season: everybody who bet or was rescued, richest first; bots marked. */
+  /** Website users that are Dream Team AI managers (discord id "ai:..."): not in the rankings. */
+  private aiUsers(): Set<string> {
+    return new Set(
+      this.users
+        .list()
+        .filter((u) => u.discordId.startsWith('ai:'))
+        .map((u) => u.id),
+    );
+  }
+
   leaderboard(seasonNo?: number) {
     const season = this.seasonOr(seasonNo);
     if (!season) return { season: null, rows: [], versus: { humans: 0, bots: 0 } };
@@ -603,7 +613,9 @@ export class BetsService {
       this.seasonLedger(season.number),
     );
     const names = this.names();
+    const ai = this.aiUsers();
     const rows = [...ws.values()]
+      .filter((w) => !ai.has(w.userId))
       .map((w) => ({
         ...w,
         bot: isBotBettor(w.userId),
@@ -633,7 +645,9 @@ export class BetsService {
     );
     const names = this.names();
     const tnames = this.tournamentNames();
-    const part = (bot: boolean) => new Map([...ws].filter(([k]) => isBotBettor(k) === bot));
+    const ai = this.aiUsers();
+    const part = (bot: boolean) =>
+      new Map([...ws].filter(([k]) => isBotBettor(k) === bot && !ai.has(k)));
     const view = (r: ReturnType<typeof betRecords>[number]) => ({
       ...r,
       ...(r.userId

@@ -243,7 +243,14 @@ export class UdtEventsService implements OnModuleInit {
     const main: Entrant[] = [];
     const skills: number[] = [];
     const entered = this.entries(t.id);
+    const ai = this.udt.aiIds();
+    const aiOn = this.udt.aiOn();
+    let humans = 0;
     for (const userId of entered) {
+      if (ai.has(userId) && !aiOn) {
+        this.dropEntry(t.id, userId);
+        continue;
+      }
       const team = this.udt.team(userId, season);
       const l = team ? this.lineup(userId, settings, rules) : null;
       if (!team || !l || l.problems.length || main.length >= settings.size) {
@@ -265,13 +272,14 @@ export class UdtEventsService implements OnModuleInit {
             }
           : { id: udtEntrantId(userId), kind: 'bot', displayName: team.name, bot: specs[0]! },
       );
+      if (!ai.has(userId)) humans++;
     }
     // High stakes: too few human teams, everybody gets the ticket back.
-    if (rules.ticket && main.length < rules.minTeams) {
+    if (rules.ticket && humans < rules.minTeams) {
       this.refundTickets(t.id);
       this.db.delete(udtEntries).where(eq(udtEntries.tournamentId, t.id)).run();
       throw conflict(
-        `high stakes needs ${rules.minTeams} teams, ${main.length} can play: the tickets went back`,
+        `high stakes needs ${rules.minTeams} human teams, ${humans} can play: the tickets went back`,
       );
     }
     // Free library bots, closest to the managers' average skill first (ties at random).

@@ -107,6 +107,12 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .get();
   }
 
+  private readonly dayHooks: ((season: Season, day: string) => void)[] = [];
+  /** Called after every market day (the AI managers act then). */
+  afterDay(fn: (season: Season, day: string) => void): void {
+    this.dayHooks.push(fn);
+  }
+
   /** The market day (exposed for the test mode: "market day now"). */
   runDay(season: Season, day: string): void {
     const last = this.lastDay(season.number);
@@ -132,7 +138,9 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
           .where(and(eq(udtRoster.season, s), eq(udtRoster.botId, r.botId)))
           .run();
     // 4. Index from the managers' book net worth (balance + what their bots cost).
-    const teams = this.udt.teams(s);
+    // AI managers do not move the index.
+    const ai = this.udt.aiIds();
+    const teams = this.udt.teams(s).filter((t) => !ai.has(t.userId));
     const nets = teams.map((t) => {
       const w = this.bets.wallet(t.userId, season);
       const book = roster.filter((r) => r.userId === t.userId).reduce((n, r) => n + r.price, 0);
@@ -186,6 +194,12 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       })
       .run();
     this.log.info(`udt market day ${day}: index ${index}, ${n} offers`);
+    for (const fn of this.dayHooks)
+      try {
+        fn(season, day);
+      } catch (e) {
+        this.log.error(`udt after market day: ${e instanceof Error ? e.message : String(e)}`);
+      }
   }
 
   /** Highest bid wins (earlier one on a tie); the others are refunded. Returns bids per bot. */
@@ -198,6 +212,15 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .where(and(eq(udtBids.day, day), eq(udtBids.status, 'open')))
       .orderBy(desc(udtBids.amount), asc(udtBids.createdAt))
       .all();
+    // On the same amount a human manager wins over an AI manager.
+    const ai = this.udt.aiIds();
+    if (ai.size)
+      open.sort(
+        (a, b) =>
+          b.amount - a.amount ||
+          Number(ai.has(a.userId)) - Number(ai.has(b.userId)) ||
+          a.createdAt.localeCompare(b.createdAt),
+      );
     const owners = this.udt.owners(season);
     const won = new Set<string>();
     const size = new Map<string, number>();

@@ -144,14 +144,17 @@ export class UdtTradesService {
   partners(user: User) {
     this.assertOn();
     const season = this.udt.season().number;
+    const ai = this.udt.aiIds();
+    const aiOn = this.udt.aiOn();
     return this.udt
       .teams(season)
-      .filter((t) => t.userId !== user.id)
+      .filter((t) => t.userId !== user.id && (aiOn || !ai.has(t.userId)))
       .map((t) => ({
         userId: t.userId,
         name: t.name,
         tag: t.tag,
         manager: this.users.byId(t.userId)?.displayName ?? '?',
+        ai: ai.has(t.userId),
         roster: this.rosterFor(t.userId),
       }));
   }
@@ -275,6 +278,8 @@ export class UdtTradesService {
     if (body.to === user.id) throw badRequest('a trade needs two managers');
     if (!this.udt.team(user.id, season)) throw conflict('found your team first');
     if (!this.udt.team(body.to, season)) throw notFound('team of that manager');
+    if (!this.udt.aiOn() && this.udt.aiIds().has(body.to))
+      throw conflict('the AI managers are switched off');
     this.sweep(season);
     const c = this.check(
       season,

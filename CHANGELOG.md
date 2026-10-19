@@ -7,6 +7,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team AI managers (off by default; settings "Dream Team"): up to eight AI teams with a personality
+  play the Dream Team like managers - market, packs, traits, academy, lineups, sign-ups, trades. They do not bet, get a
+  small sponsor, and count neither for the betting rankings nor for the economy index, high stakes or place rewards.
 - Careers of all bots: age in seasons, career level, phase (rookie, rising, peak, veteran, decline) and form on the bot
   profile and on the Dream Team cards; the phase changes accuracy and market value in Dream Team games. Admins retire
   old bots into the hall of fame (yearbook page), which suggests candidates.

@@ -1018,6 +1018,7 @@ export interface UdtTableRow {
   points: number;
   titles: number;
   events: number;
+  ai?: boolean;
 }
 
 export interface UdtLedgerEntry {
@@ -1050,6 +1051,9 @@ export interface UdtSettings {
   tradeLockDays: number;
   tradeExpiryHours: number;
   tradePairPerWeek: number;
+  aiEnabled: boolean;
+  aiCount: number;
+  aiStrength: 'calm' | 'normal' | 'ambitious';
 }
 
 export interface UdtTradeBot {
@@ -1127,6 +1131,7 @@ export interface UdtPartner {
   name: string;
   tag: string;
   manager: string;
+  ai?: boolean;
   roster: UdtPartnerBot[];
 }
 

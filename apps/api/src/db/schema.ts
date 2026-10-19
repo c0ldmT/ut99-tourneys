@@ -487,3 +487,12 @@ export const udtHall = sqliteTable('udt_hall', {
   retiredAt: text('retired_at').notNull(),
   careerJson: text('career_json').notNull(),
 });
+
+/** AI managers of the Dream Team: a website user ("ai:<n>") with a personality. */
+export const udtAi = sqliteTable('udt_ai', {
+  userId: text('user_id').primaryKey(),
+  n: integer('n').notNull(),
+  /** "saver", "gambler", "tactician" or "breeder". */
+  personality: text('personality').notNull(),
+  createdAt: text('created_at').notNull(),
+});

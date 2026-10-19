@@ -17,6 +17,7 @@ import { EventLogService } from '../tournaments/event-log.service.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtMarketService } from './udt-market.service.js';
+import { UdtAiService } from './udt-ai.service.js';
 import { UdtTradesService } from './udt-trades.service.js';
 import { UdtService } from './udt.service.js';
 
@@ -54,6 +55,7 @@ export class UdtTestService {
     @Inject(UdtMarketService) private readonly market: UdtMarketService,
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
+    @Inject(UdtAiService) private readonly ai: UdtAiService,
   ) {}
 
   /** 404 outside the test mode (the endpoints do not exist then). */
@@ -253,6 +255,8 @@ export class UdtTestService {
             // bracket full
           }
     }
-    return { managers: managers.length, bids, entries, trades: traded };
+    // The AI managers (when switched on) act as after a market day.
+    const ai = this.ai.daily(this.udt.season(), this.udt.today());
+    return { managers: managers.length, bids, entries, trades: traded, ai };
   }
 }

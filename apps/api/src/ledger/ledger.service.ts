@@ -23,7 +23,8 @@ export type LedgerKind =
   | 'udt_ticket'
   | 'udt_pot'
   | 'udt_scout'
-  | 'udt_licence';
+  | 'udt_licence'
+  | 'udt_sponsor';
 
 export interface Booking {
   season: number;
