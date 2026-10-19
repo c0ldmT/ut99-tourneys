@@ -101,6 +101,8 @@ export const tournaments = sqliteTable('tournaments', {
   phase: text('phase').notNull().default('draft'),
   /** "standard", or "udt" (Unreal Dream Team: managers' lineups, not in the statistics). */
   kind: text('kind').notNull().default('standard'),
+  /** Dream Team tournaments: UdtEventRules (team value cap, star limit). */
+  udtJson: text('udt_json'),
   headSeq: integer('head_seq').notNull().default(0),
   /** Discord channel: "default" (DISCORD_WEBHOOK_URL), "custom" (webhookUrl) or "off". */
   notifyMode: text('notify_mode').notNull().default('default'),

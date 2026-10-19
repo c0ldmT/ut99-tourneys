@@ -1,4 +1,9 @@
-import { entrantUserIds, type TournamentEvent, type TournamentProjection } from '@tourney/protocol';
+import {
+  entrantUserIds,
+  udtManagerOf,
+  type TournamentEvent,
+  type TournamentProjection,
+} from '@tourney/protocol';
 
 /**
  * Betting (pure): which matches take bets, how a match settles, and the Neuro wallets and
@@ -75,7 +80,9 @@ export function matchBooks(
               : e.kind === 'team'
                 ? e.bots.flatMap((b) => (b.id ? [botBettor(b.id)] : []))
                 : [];
-          return [...entrantUserIds(e), ...bots];
+          // Dream Team: the manager of a lineup plays the match too (no bets on it).
+          const manager = udtManagerOf(id);
+          return [...entrantUserIds(e), ...(manager ? [manager] : []), ...bots];
         })
       : [];
     const book: MatchBook = { matchId: m.id, entrants, state: 'waiting', participants };

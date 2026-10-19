@@ -14,6 +14,7 @@ import {
   type AccessEntry,
   type BotSpec,
   type Entrant,
+  udtManagerOf,
   type MapRecords,
   type NewTournamentEvent,
   type TeamEntrant,
@@ -80,6 +81,30 @@ export const ACTIVE_PHASES = ['checkIn', 'running', 'paused'];
 /** The mod's access list holds 64 entries. */
 export const MAX_ACCESS = 64;
 
+/**
+ * Rules of a Dream Team tournament: the lineup's market value at most `valueCap` reference
+ * Neuro (× the economy index), at most `starLimit` bots of skill 6-7. Null = no limit.
+ */
+export const UdtEventRulesSchema = z.object({
+  valueCap: z.number().int().min(100).max(10_000_000).nullable().default(null),
+  starLimit: z.number().int().min(0).max(5).nullable().default(null),
+});
+export type UdtEventRules = z.infer<typeof UdtEventRulesSchema>;
+
+/** Kinds of tournaments: managers' Dream Team lineups play in "udt" ones. */
+export const TOURNAMENT_KINDS = ['standard', 'udt'] as const;
+export type TournamentKind = (typeof TOURNAMENT_KINDS)[number];
+
+/**
+ * Who plays in a tournament of another kind than "standard" (Dream Team): all entrants of the
+ * bracket, filled up to the bracket size; the seeding draws them into the slots.
+ */
+export type LineupProvider = (
+  t: TournamentRow,
+  settings: TournamentSettings,
+  rng: () => number,
+) => { entrants: Entrant[]; fill: Entrant[] };
+
 const TournamentFields = z.object({
   name: z.string().trim().min(1).max(100),
   agentId: z.string().min(1).max(64),
@@ -99,6 +124,9 @@ const TournamentFields = z.object({
   seasonal: z.boolean().optional(),
   /** Seeded and started by itself at the start time (needs `scheduledAt`). */
   autoStart: z.boolean().optional(),
+  /** "udt": the Dream Team managers' lineups play (draft only). */
+  kind: z.enum(TOURNAMENT_KINDS).optional(),
+  udt: UdtEventRulesSchema.optional(),
   webhookUrl: z
     .string()
     .trim()
@@ -351,6 +379,9 @@ export class TournamentsService {
         webhookUrl: body.webhookUrl || null,
         seasonal: body.seasonal ?? inSeason,
         seriesId: opts.seriesId ?? null,
+        kind: body.kind ?? 'standard',
+        udtJson:
+          body.kind === 'udt' ? JSON.stringify(UdtEventRulesSchema.parse(body.udt ?? {})) : null,
         createdBy: by.id,
         createdAt: this.now(),
       })
@@ -403,6 +434,15 @@ export class TournamentsService {
     }
     if (body.notifyMode !== undefined) set.notifyMode = body.notifyMode;
     if (body.autoStart !== undefined) set.autoStart = body.autoStart;
+    if (body.kind !== undefined || body.udt !== undefined) {
+      if (t.phase !== 'draft') throw conflict('the kind of a tournament changes in draft only');
+      const kind = body.kind ?? (t.kind as TournamentKind);
+      set.kind = kind;
+      set.udtJson =
+        kind === 'udt'
+          ? JSON.stringify(UdtEventRulesSchema.parse(body.udt ?? this.udtRules(t) ?? {}))
+          : null;
+    }
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
     if (body.seasonal !== undefined && body.seasonal !== t.seasonal) {
       if (body.seasonal && !this.seasons.current()) throw conflict('no season is running');
@@ -462,7 +502,9 @@ export class TournamentsService {
     if (!names.size) return proj;
     const entrants: Record<string, Entrant> = {};
     for (const [id, e] of Object.entries(proj.entrants)) {
-      if (e.kind === 'bot' && e.bot.id && names.has(e.bot.id)) {
+      // Dream Team lineups play under their manager's tag and team name.
+      if (udtManagerOf(id)) entrants[id] = e;
+      else if (e.kind === 'bot' && e.bot.id && names.has(e.bot.id)) {
         const name = names.get(e.bot.id)!;
         entrants[id] = { ...e, displayName: name, bot: { ...e.bot, name } };
       } else if (e.kind === 'team' && e.bots.some((b) => b.id && names.has(b.id))) {
@@ -854,11 +896,29 @@ export class TournamentsService {
   // Seeding
   // ------------------------------------------------------------------------------------------
 
+  private readonly lineupProviders = new Map<string, LineupProvider>();
+
+  /** Add-ons (Dream Team) say who plays in their kind of tournament. */
+  registerLineupProvider(kind: TournamentKind, provider: LineupProvider): void {
+    this.lineupProviders.set(kind, provider);
+  }
+
+  /** The rules of a Dream Team tournament (null for other kinds). */
+  udtRules(t: TournamentRow): UdtEventRules | null {
+    if (t.kind !== 'udt') return null;
+    try {
+      return UdtEventRulesSchema.parse(t.udtJson ? JSON.parse(t.udtJson) : {});
+    } catch {
+      return UdtEventRulesSchema.parse({});
+    }
+  }
+
   seed(id: string, body: Seed, by: User): TournamentProjection {
     const t = this.require(id);
     if (t.phase !== 'draft' && t.phase !== 'seeded') {
       throw conflict(`cannot seed in phase ${t.phase}`);
     }
+    if (t.kind !== 'standard') return this.seedByProvider(t, body, by);
     if (t.botsFromLibrary) {
       // The control center's bots as they are now: fixed for this bracket.
       t.botPoolJson = JSON.stringify(this.libraryPool(t.agentId, t.profileId));
@@ -990,6 +1050,64 @@ export class TournamentsService {
       },
     });
     const res = this.log.append(id, head, batch);
+    if (!res.accepted) throw conflict(res.reason);
+    this.syncToAgent(t, head);
+    return res.projection;
+  }
+
+  /**
+   * Seeding of a Dream Team (or other add-on) tournament: the provider's entrants, filled up with
+   * its fill entrants, drawn at random into the slots.
+   */
+  private seedByProvider(t: TournamentRow, body: Seed, by: User): TournamentProjection {
+    const provider = this.lineupProviders.get(t.kind);
+    if (!provider) throw conflict(`tournaments of kind ${t.kind} cannot be seeded now`);
+    const settings = this.settings(t);
+    const rngSeed = body.rngSeed ?? `${t.id}-${this.clock.now()}`;
+    const rng = createRng(rngSeed);
+    const { entrants: main, fill } = provider(t, settings, rng);
+    if (main.length > settings.size)
+      throw badRequest(`${main.length} teams do not fit into a bracket of ${settings.size}`);
+    let slots: string[];
+    try {
+      slots = buildSlots({
+        size: settings.size,
+        humans: main.map((e) => e.id),
+        botPool: fill.map((e) => e.id).slice(0, settings.size - main.length),
+        humanOrder: 'random',
+        botPlacement: 'random',
+        rng,
+      });
+    } catch (e) {
+      throw badRequest((e as Error).message);
+    }
+    const used = new Set(slots);
+    const entrants = [...main, ...fill].filter((e) => used.has(e.id));
+    const actor = { kind: 'admin' as const, id: by.id };
+    const batch: NewTournamentEvent[] = [];
+    const head = this.log.load(t.id).length;
+    if (head === 0)
+      batch.push({
+        type: 'tournament.created',
+        actor,
+        data: { tournamentId: t.id, name: t.name, settings },
+      });
+    batch.push({
+      type: 'seeding.set',
+      actor,
+      data: {
+        entrants,
+        rngSeed,
+        bracket: {
+          format: settings.format,
+          size: settings.size,
+          slots,
+          grandFinalReset: settings.grandFinalReset,
+          bestOf: settings.bestOf,
+        },
+      },
+    });
+    const res = this.log.append(t.id, head, batch);
     if (!res.accepted) throw conflict(res.reason);
     this.syncToAgent(t, head);
     return res.projection;
@@ -1165,6 +1283,7 @@ export class TournamentsService {
     const current = this.withCurrentBotNames(proj!);
     for (const s of d.entrants) {
       s.name = current.entrants[s.id]?.displayName ?? s.name;
+      if (udtManagerOf(s.id)) continue; // Dream Team: the names with the team tag
       for (const b of s.bots) if (b.id && names.has(b.id)) b.name = names.get(b.id)!;
     }
     for (const g of d.games)
@@ -1486,6 +1605,7 @@ export class TournamentsService {
         createdAt: t.createdAt,
         champion: proj?.championId ? proj.entrants[proj.championId]?.displayName : undefined,
         seasonal: t.seasonal,
+        kind: t.kind,
         /** The match being played now (running tournaments): names and series score. */
         ...(cm
           ? {
@@ -1549,6 +1669,8 @@ export class TournamentsService {
       registrationOpen: t.registrationOpen,
       seasonal: t.seasonal,
       season: this.seasonOf(t) ?? null,
+      kind: t.kind,
+      udt: this.udtRules(t),
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
       registrations: regs.map((u) => ({

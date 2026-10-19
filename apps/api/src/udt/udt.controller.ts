@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put } fro
 import { CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
+import { UdtEventsService } from './udt-events.service.js';
 import { BidBody, UdtMarketService, type BidInput } from './udt-market.service.js';
 import {
   LineupBody,
@@ -17,6 +18,7 @@ export class UdtController {
   constructor(
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtMarketService) private readonly market: UdtMarketService,
+    @Inject(UdtEventsService) private readonly events: UdtEventsService,
   ) {}
 
   @Get()
@@ -64,5 +66,22 @@ export class UdtController {
   @HttpCode(200)
   sell(@CurrentUser() user: User, @Param('botId') botId: string) {
     return this.market.sell(user, botId);
+  }
+
+  /** Dream Team tournaments with the manager's sign-up and what lineup would play. */
+  @Get('events')
+  eventList(@CurrentUser() user: User) {
+    return this.events.events(user);
+  }
+
+  @Post('events/:id/enter')
+  @HttpCode(200)
+  enter(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.events.enter(user, id);
+  }
+
+  @Delete('events/:id/enter')
+  leave(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.events.leave(user, id);
   }
 }

@@ -373,4 +373,8 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (tournament_id, user_id)
   );
   `,
+  // 16: Dream Team tournaments: their rules (team value cap, star limit) as JSON.
+  `
+  ALTER TABLE tournaments ADD COLUMN udt_json TEXT;
+  `,
 ];

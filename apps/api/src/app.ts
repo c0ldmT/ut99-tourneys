@@ -40,6 +40,7 @@ import { SeriesController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { UdtController } from './udt/udt.controller.js';
+import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
 import { UdtService } from './udt/udt.service.js';
 import { ShopService } from './shop/shop.service.js';
@@ -122,6 +123,7 @@ class AppModule {
         LedgerService,
         UdtService,
         UdtMarketService,
+        UdtEventsService,
         AgentGateway,
       ],
     };

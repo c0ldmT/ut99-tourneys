@@ -148,6 +148,12 @@ export function botEntrant(spec: BotSpec, id = botSpecEntrantId(spec)): Entrant 
 
 export type TeamEntrant = Extract<Entrant, { kind: 'team' }>;
 
+/** Unreal Dream Team: the entrant of a manager's team (bots only, the manager watches). */
+export const udtEntrantId = (userId: string) => `udt-${userId}`;
+/** The manager of a Dream Team entrant (undefined for other entrants). */
+export const udtManagerOf = (entrantId: string): string | undefined =>
+  entrantId.startsWith('udt-') ? entrantId.slice(4) : undefined;
+
 /** Starters of a team in lineup order (at most `teamSize`). */
 export const teamStarters = (team: TeamEntrant, teamSize: number) =>
   team.members.filter((m) => !m.sub).slice(0, teamSize);

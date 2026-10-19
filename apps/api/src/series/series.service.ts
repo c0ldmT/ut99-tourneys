@@ -236,6 +236,8 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       webhookUrl: t.webhookUrl,
       seasonal: t.seasonal,
       autoStart: t.autoStart,
+      kind: t.kind as 'standard' | 'udt',
+      ...(t.kind === 'udt' && t.udtJson ? { udt: JSON.parse(t.udtJson) } : {}),
     };
   }
 
