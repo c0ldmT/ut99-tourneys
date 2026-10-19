@@ -377,4 +377,30 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE tournaments ADD COLUMN udt_json TEXT;
   `,
+  // 17: Dream Team packs and traits: trait cards (in the inventory or on a roster bot), the
+  // pity counters per box and season, the manager's scrap.
+  `
+  CREATE TABLE udt_traits (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    bot_id TEXT,
+    weapon TEXT,
+    source TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    assigned_at TEXT
+  );
+  CREATE INDEX udt_traits_user ON udt_traits(season, user_id);
+  CREATE TABLE udt_pity (
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    box TEXT NOT NULL,
+    since_epic INTEGER NOT NULL DEFAULT 0,
+    since_legendary INTEGER NOT NULL DEFAULT 0,
+    opened INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (season, user_id, box)
+  );
+  ALTER TABLE udt_teams ADD COLUMN scrap INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

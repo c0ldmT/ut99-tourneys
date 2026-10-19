@@ -4,6 +4,14 @@ import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
+import {
+  AssignBody,
+  CraftBody,
+  OpenBody,
+  UdtPacksService,
+  type AssignInput,
+  type OpenInput,
+} from './udt-packs.service.js';
 import { BidBody, UdtMarketService, type BidInput } from './udt-market.service.js';
 import {
   LineupBody,
@@ -21,6 +29,7 @@ export class UdtController {
     @Inject(UdtMarketService) private readonly market: UdtMarketService,
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
     @Inject(UdtRewardsService) private readonly rewards: UdtRewardsService,
+    @Inject(UdtPacksService) private readonly packs: UdtPacksService,
   ) {}
 
   @Get()
@@ -99,5 +108,46 @@ export class UdtController {
   ledgerEntries(@CurrentUser() user: User) {
     this.udt.assertOn();
     return this.udt.ledgerOf(user.id);
+  }
+
+  /** Boxes (prices, rates, pity), scrap, the trait inventory and the crafting list. */
+  @Get('packs')
+  packsView(@CurrentUser() user: User) {
+    return this.packs.view(user);
+  }
+
+  @Post('packs/open')
+  @HttpCode(200)
+  open(@CurrentUser() user: User, @Body(new ZodPipe(OpenBody)) body: OpenInput) {
+    return this.packs.open(user, body);
+  }
+
+  @Post('packs/craft')
+  @HttpCode(200)
+  craft(@CurrentUser() user: User, @Body(new ZodPipe(CraftBody)) body: { code: string }) {
+    return this.packs.craft(user, body.code);
+  }
+
+  /** Puts a trait card on a roster bot. */
+  @Post('traits/:id/assign')
+  @HttpCode(200)
+  assign(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(AssignBody)) body: AssignInput,
+  ) {
+    return this.packs.assign(user, id, body);
+  }
+
+  /** Takes a trait off its bot (destroyed: scrap). */
+  @Delete('traits/:id/assign')
+  unassign(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.packs.remove(user, id);
+  }
+
+  /** Turns an inventory card into scrap. */
+  @Delete('traits/:id')
+  scrap(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.packs.scrap(user, id);
   }
 }

@@ -6,6 +6,7 @@ import {
   demandFactor,
   economyIndex,
   formFactor,
+  managerEffects,
   marketValue,
   sellPrice,
   staminaRecovered,
@@ -27,7 +28,7 @@ import { nextDay, zonedMs } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { StatsService } from '../stats/stats.service.js';
-import { UdtService } from './udt.service.js';
+import { UdtService, withTraits } from './udt.service.js';
 
 /** At most this many bots per manager (5 + 2 on the bench). */
 export const ROSTER_MAX = 7;
@@ -114,11 +115,17 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     // 2. Rest, 3. salaries (Mondays).
     const rest = last ? daysBetween(last.day, day) : 0;
     const roster = this.db.select().from(udtRoster).where(eq(udtRoster.season, s)).all();
+    const onBots = this.udt.traitsOnBots(s);
     if (rest > 0)
       for (const r of roster)
         this.db
           .update(udtRoster)
-          .set({ stamina: staminaRecovered(r.stamina, rest) })
+          .set({
+            stamina: staminaRecovered(
+              r.stamina,
+              rest * managerEffects(onBots.get(r.botId) ?? []).recovery,
+            ),
+          })
           .where(and(eq(udtRoster.season, s), eq(udtRoster.botId, r.botId)))
           .run();
     // 4. Index from the managers' book net worth (balance + what their bots cost).
@@ -150,7 +157,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
         .onConflictDoUpdate({ target: [udtValues.botId, udtValues.day], set: { value: v } })
         .run();
     }
-    if (weekday(day) === 1 && last) this.paySalaries(s, day, roster, values, byId);
+    if (weekday(day) === 1 && last) this.paySalaries(s, day, roster, values, byId, onBots);
     // 6. New offers: free bots of the library (active, not made by a manager, not owned).
     const free = library.filter((b) => b.active && !b.udtOwner && !owned.has(b.id));
     const n = Math.min(this.settings.get().udt.offersPerDay, free.length);
@@ -233,11 +240,22 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     roster: (typeof udtRoster.$inferSelect)[],
     values: Map<string, number>,
     byId: Map<string, LibraryBot>,
+    onBots: ReturnType<UdtService['traitsOnBots']>,
   ) {
     for (const r of roster) {
       if (r.starter) continue;
       const b = byId.get(r.botId);
-      const salary = weeklySalary(values.get(r.botId) ?? r.price, b?.skill ?? 4);
+      const traits = onBots.get(r.botId) ?? [];
+      const value = values.get(r.botId);
+      const salary =
+        Math.round(
+          (weeklySalary(
+            value !== undefined && b ? withTraits(value, b, traits) : r.price,
+            b?.skill ?? 4,
+          ) *
+            managerEffects(traits).salary) /
+            10,
+        ) * 10;
       const can = this.ledger.spendable(r.userId).spendable >= salary;
       if (can && salary > 0)
         this.ledger.book({
@@ -484,6 +502,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .delete(udtRoster)
       .where(and(eq(udtRoster.season, season.number), eq(udtRoster.botId, botId)))
       .run();
+    // Its traits do not go to the market: they turn into scrap.
+    this.udt.scrapBotTraits(season.number, user.id, botId);
     this.ledger.book({
       season: season.number,
       userId: user.id,

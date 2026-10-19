@@ -9,7 +9,7 @@ import {
   type Entrant,
   type TournamentSettings,
 } from '@tourney/protocol';
-import { bracketOf, tiredPenalty } from '@tourney/udt';
+import { bracketOf, effectiveValues, tiredPenalty } from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { conflict, notFound } from '../common/http.js';
@@ -109,7 +109,7 @@ export class UdtEventsService implements OnModuleInit {
     let starred = false;
     for (const r of order) {
       if (picked.length >= settings.teamSize) break;
-      const star = bracketOf(r.skill) === 'strong';
+      const star = bracketOf(r.effective.skill) === 'strong';
       if (star && rules.starLimit !== null && stars >= rules.starLimit) {
         starred = true;
         continue;
@@ -137,9 +137,11 @@ export class UdtEventsService implements OnModuleInit {
     const b = lib.get(r.botId);
     const base = this.bots.resolveSpec({ id: r.botId, name: r.name, skill: r.skill });
     const tired = tiredPenalty(r.stamina);
-    const traits = { ...(base.traits ?? b?.traits ?? {}) };
+    // Values traits (category A) raise the skill and the play-style values the game gets.
+    const eff = effectiveValues(base.skill, { ...(base.traits ?? b?.traits ?? {}) }, r.udtTraits);
+    const traits = eff.values;
     if (tired) traits.accuracy = Math.max(-1, (traits.accuracy ?? 0) - 0.2);
-    return { ...base, name: gameName(tag, r.name), traits };
+    return { ...base, skill: eff.skill, name: gameName(tag, r.name), traits };
   }
 
   /** Lineup provider for the seeding (TournamentsService). */
@@ -155,7 +157,7 @@ export class UdtEventsService implements OnModuleInit {
       const l = this.lineup(userId, settings, rules);
       if (l.problems.length) continue; // cannot play (any more): left out
       const specs = l.bots.map((r) => this.spec(r, team.tag, lib));
-      skills.push(...l.bots.map((r) => r.skill));
+      skills.push(...l.bots.map((r) => r.effective.skill));
       main.push(
         settings.teamSize > 1
           ? {

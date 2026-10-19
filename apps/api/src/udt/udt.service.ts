@@ -1,13 +1,27 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
 import { BotTraitsSchema } from '@tourney/protocol';
-import { baseValue, botRarity, economyIndex, marketValue, valueScore } from '@tourney/udt';
+import {
+  baseValue,
+  botRarity,
+  economyIndex,
+  effectiveValues,
+  levelOf,
+  marketValue,
+  SCRAP,
+  traitDef,
+  traitSlots,
+  traitValueFactor,
+  valueScore,
+  type TraitCode,
+  type TraitOnBot,
+} from '@tourney/udt';
 import { z } from 'zod';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, udtDays, udtRoster, udtTeams, udtValues } from '../db/schema.js';
+import { bots, udtDays, udtRoster, udtTeams, udtTraits, udtValues } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { today } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
@@ -69,6 +83,13 @@ export interface RosterBot {
   bench: number | null;
   stamina: number;
   xp: number;
+  level: number;
+  /** Trait slots at the bot's level. */
+  slots: number;
+  /** Trait cards on the bot (oldest first). */
+  udtTraits: (TraitOnBot & { id: string; rarity: string })[];
+  /** Skill and play-style values with the traits (what the game gets). */
+  effective: { skill: number; traits: LibraryBot['traits']; overflow: boolean };
   striking: boolean;
 }
 
@@ -127,16 +148,78 @@ export class UdtService {
     return d?.economyIndex ?? economyIndex([], undefined);
   }
 
-  /** Market value of a bot: the latest market day's value, else computed at the index. */
-  value(bot: Pick<LibraryBot, 'id' | 'skill' | 'traits'>, season: number): number {
+  /**
+   * Market value of a bot: the latest market day's value (else computed at the index), raised by
+   * the traits on it.
+   */
+  value(
+    bot: Pick<LibraryBot, 'id' | 'skill' | 'traits'>,
+    season: number,
+    traits: readonly TraitOnBot[] = this.botTraits(season, bot.id),
+  ): number {
     const v = this.db
       .select()
       .from(udtValues)
       .where(eq(udtValues.botId, bot.id))
       .orderBy(desc(udtValues.day))
       .get();
-    if (v) return v.value;
-    return marketValue(baseValue(bot.skill, valueScore(bot.traits)), 1, 1, this.index(season));
+    const plain =
+      v?.value ??
+      marketValue(baseValue(bot.skill, valueScore(bot.traits)), 1, 1, this.index(season));
+    return withTraits(plain, bot, traits);
+  }
+
+  /** Traits on the bots of a season: bot id -> trait cards, oldest first. */
+  traitsOnBots(season: number): Map<string, (TraitOnBot & { id: string })[]> {
+    const out = new Map<string, (TraitOnBot & { id: string })[]>();
+    for (const t of this.db
+      .select()
+      .from(udtTraits)
+      .where(and(eq(udtTraits.season, season), isNotNull(udtTraits.botId)))
+      .orderBy(asc(udtTraits.assignedAt), asc(udtTraits.id))
+      .all())
+      out.set(t.botId!, [
+        ...(out.get(t.botId!) ?? []),
+        { id: t.id, code: t.code as TraitCode, weapon: t.weapon },
+      ]);
+    return out;
+  }
+
+  botTraits(season: number, botId: string): (TraitOnBot & { id: string })[] {
+    return this.traitsOnBots(season).get(botId) ?? [];
+  }
+
+  /** Adds (or with a negative amount spends) scrap; false when there is not enough. */
+  addScrap(season: number, userId: string, amount: number): boolean {
+    const t = this.db
+      .select()
+      .from(udtTeams)
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, userId)))
+      .get();
+    if (!t || t.scrap + amount < 0) return false;
+    this.db
+      .update(udtTeams)
+      .set({ scrap: t.scrap + amount })
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, userId)))
+      .run();
+    return true;
+  }
+
+  /** Destroys the traits on a bot (it leaves the roster): their scrap goes to the manager. */
+  scrapBotTraits(season: number, userId: string, botId: string): number {
+    const cards = this.db
+      .select()
+      .from(udtTraits)
+      .where(and(eq(udtTraits.season, season), eq(udtTraits.botId, botId)))
+      .all();
+    if (!cards.length) return 0;
+    const scrap = cards.reduce((n, c) => n + SCRAP[traitDef(c.code)?.rarity ?? 'common'], 0);
+    this.db
+      .delete(udtTraits)
+      .where(and(eq(udtTraits.season, season), eq(udtTraits.botId, botId)))
+      .run();
+    this.addScrap(season, userId, scrap);
+    return scrap;
   }
 
   team(userId: string, season: number): UdtTeam | null {
@@ -172,6 +255,7 @@ export class UdtService {
   roster(userId: string, season: number): RosterBot[] {
     const team = this.team(userId, season);
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
+    const onBots = this.traitsOnBots(season);
     return this.db
       .select()
       .from(udtRoster)
@@ -180,6 +264,10 @@ export class UdtService {
       .flatMap((r) => {
         const b = lib.get(r.botId);
         if (!b) return [];
+        const level = levelOf(r.xp);
+        const slots = traitSlots(level);
+        const cards = (onBots.get(b.id) ?? []).slice(0, slots);
+        const eff = effectiveValues(b.skill, b.traits ?? {}, cards);
         return [
           {
             botId: b.id,
@@ -192,13 +280,17 @@ export class UdtService {
             face: b.face,
             traits: b.traits,
             price: r.price,
-            value: r.starter ? 0 : this.value(b, season),
+            value: r.starter ? 0 : this.value(b, season, cards),
             starter: r.starter,
             dmSlot: r.dmSlot,
             mhSlot: r.mhSlot,
             bench: r.bench,
             stamina: r.stamina,
             xp: r.xp,
+            level,
+            slots,
+            udtTraits: cards.map((c) => ({ ...c, rarity: traitDef(c.code)?.rarity ?? 'common' })),
+            effective: { skill: eff.skill, traits: eff.values, overflow: eff.overflow },
             striking: r.striking,
           },
         ];
@@ -331,4 +423,14 @@ export function gameName(tag: string, name: string): string {
 function slotOf(list: (string | null)[], id: string): number | null {
   const i = list.indexOf(id);
   return i < 0 ? null : i + 1;
+}
+
+/** A plain market value raised by the bot's traits. */
+export function withTraits(
+  plain: number,
+  bot: Pick<LibraryBot, 'skill' | 'traits'>,
+  traits: readonly TraitOnBot[],
+): number {
+  if (!traits.length) return plain;
+  return Math.round((plain * traitValueFactor(bot.skill, bot.traits ?? {}, traits)) / 10) * 10;
 }

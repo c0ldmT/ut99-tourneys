@@ -289,6 +289,8 @@ export const udtTeams = sqliteTable(
     tag: text('tag').notNull(),
     tagKey: text('tag_key').notNull(),
     createdAt: text('created_at').notNull(),
+    /** Scrap from duplicates and removed traits; crafting spends it. */
+    scrap: integer('scrap').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.userId] })],
 );
@@ -364,4 +366,36 @@ export const udtEntries = sqliteTable(
     createdAt: text('created_at').notNull(),
   },
   (t) => [primaryKey({ columns: [t.tournamentId, t.userId] })],
+);
+
+/**
+ * Trait cards of a season: in the manager's inventory (`botId` null) or on one of their roster
+ * bots. A bot sold to the market loses its traits.
+ */
+export const udtTraits = sqliteTable('udt_traits', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  userId: text('user_id').notNull(),
+  code: text('code').notNull(),
+  botId: text('bot_id'),
+  /** Gun nut: the favourite weapon chosen when it was put on the bot. */
+  weapon: text('weapon'),
+  /** "pack" or "craft". */
+  source: text('source').notNull(),
+  createdAt: text('created_at').notNull(),
+  assignedAt: text('assigned_at'),
+});
+
+/** Boxes opened per kind and season, and since the last epic / legendary (pity). */
+export const udtPity = sqliteTable(
+  'udt_pity',
+  {
+    season: integer('season').notNull(),
+    userId: text('user_id').notNull(),
+    box: text('box').notNull(),
+    sinceEpic: integer('since_epic').notNull().default(0),
+    sinceLegendary: integer('since_legendary').notNull().default(0),
+    opened: integer('opened').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.userId, t.box] })],
 );

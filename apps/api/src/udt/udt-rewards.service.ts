@@ -2,7 +2,14 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { ADAPTER_MH } from '@tourney/adapter-ut99';
 import { udtManagerOf, type TournamentEvent, type TournamentProjection } from '@tourney/protocol';
-import { matchReward, placeReward, staminaAfterGames } from '@tourney/udt';
+import {
+  DEFAULT_ECONOMY,
+  managerEffects,
+  matchReward,
+  placeReward,
+  rewardFactor,
+  roundNeuro,
+} from '@tourney/udt';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { DB, type Db } from '../db/database.js';
 import { tournaments, udtRoster } from '../db/schema.js';
@@ -101,9 +108,26 @@ export class UdtRewardsService implements OnModuleInit {
       const userId = udtManagerOf(me);
       if (!userId) continue;
       const won = result.winnerId === me;
-      const amount = matchReward(
-        { won, mvp: mvp === me, teamSize, vsBaseBots: !udtManagerOf(other) },
-        index,
+      const e = proj.entrants[me];
+      const botIds =
+        e?.kind === 'bot' ? [e.bot.id] : e?.kind === 'team' ? e.bots.map((b) => b.id) : [];
+      const ids = botIds.filter((x): x is string => !!x);
+      // Manager traits: crowd favourites in the lineup, Midas anywhere in the roster.
+      const onBots = this.udt.traitsOnBots(season);
+      const rosterIds = this.db
+        .select({ botId: udtRoster.botId })
+        .from(udtRoster)
+        .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
+        .all()
+        .map((r) => r.botId);
+      const factor = rewardFactor(
+        ids.map((id) => onBots.get(id) ?? []),
+        teamSize,
+        rosterIds.map((id) => onBots.get(id) ?? []),
+      );
+      const amount = roundNeuro(
+        matchReward({ won, mvp: mvp === me, teamSize, vsBaseBots: !udtManagerOf(other) }, index) *
+          factor,
       );
       const first = this.ledger.book({
         season,
@@ -114,24 +138,23 @@ export class UdtRewardsService implements OnModuleInit {
         meta: { tournamentId, matchId: result.matchId, won, mvp: mvp === me },
       });
       if (!first) continue; // booked before: stamina and experience too
-      const e = proj.entrants[me];
-      const botIds =
-        e?.kind === 'bot' ? [e.bot.id] : e?.kind === 'team' ? e.bots.map((b) => b.id) : [];
-      const ids = botIds.filter((x): x is string => !!x);
       if (!ids.length) continue;
       for (const r of this.db
         .select()
         .from(udtRoster)
         .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, ids)))
-        .all())
+        .all()) {
+        const fx = managerEffects(onBots.get(r.botId) ?? []);
+        const lost = Math.round(games * DEFAULT_ECONOMY.stamina.perGame * fx.fatigue);
         this.db
           .update(udtRoster)
           .set({
-            stamina: staminaAfterGames(r.stamina, games),
-            xp: r.xp + games * XP_GAME + (won ? XP_WIN : 0),
+            stamina: Math.max(0, r.stamina - lost),
+            xp: r.xp + Math.round((games * XP_GAME + (won ? XP_WIN : 0)) * fx.xp),
           })
           .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))
           .run();
+      }
     }
   }
 
@@ -141,10 +164,20 @@ export class UdtRewardsService implements OnModuleInit {
     const standings = proj.bracket?.standings ?? [];
     const managers = standings.filter((s) => udtManagerOf(s.entrantId));
     const onlyBase = managers.length === 1;
+    const onBots = this.udt.traitsOnBots(season);
     for (const s of managers) {
       const userId = udtManagerOf(s.entrantId)!;
       const place = s.placement ?? 99;
-      const amount = placeReward(place <= 4 ? place : 99, teamSize, index, onlyBase);
+      // Midas anywhere in the roster: +10 %.
+      const midas = this.db
+        .select({ botId: udtRoster.botId })
+        .from(udtRoster)
+        .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
+        .all()
+        .some((r) => managerEffects(onBots.get(r.botId) ?? []).team > 1);
+      const amount = roundNeuro(
+        placeReward(place <= 4 ? place : 99, teamSize, index, onlyBase) * (midas ? 1.1 : 1),
+      );
       this.ledger.book({
         season,
         userId,

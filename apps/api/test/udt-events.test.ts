@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
+import { DB, type Db } from '../src/db/database.js';
+import { udtTraits } from '../src/db/schema.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -40,6 +42,21 @@ describe('Unreal Dream Team: events', () => {
     const ev = (await mario.get('/udt/events')).body;
     expect(ev[0]).toMatchObject({ id, teamSize: 1, open: true, entered: false });
     expect(ev[0].lineup).toMatchObject({ bots: ['Mira'], problems: [] });
+    // Traits reach the game: Claudius' heir gives the starter (skill 3) one step more.
+    const mid = (await mario.get('/me')).body.id as string;
+    const mira = (await mario.get('/udt')).body.roster[0].botId as string;
+    const db = api!.app.get<Db>(DB);
+    db.insert(udtTraits)
+      .values({
+        id: 'tC',
+        season: 1,
+        userId: mid,
+        code: 'claudius',
+        source: 'pack',
+        createdAt: 'x',
+      })
+      .run();
+    expect((await mario.post('/udt/traits/tC/assign', { botId: mira })).status).toBe(200);
     expect((await mario.post(`/udt/events/${id}/enter`)).status).toBe(200);
     expect((await tim.post(`/udt/events/${id}/enter`)).status).toBe(200);
     expect((await anna.post(`/udt/events/${id}/enter`)).status).toBe(409); // no team
@@ -52,7 +69,7 @@ describe('Unreal Dream Team: events', () => {
     expect(nx, JSON.stringify(nx)).toMatchObject({
       kind: 'bot',
       displayName: 'Nexus',
-      bot: { name: '[NX]Mira' },
+      bot: { name: '[NX]Mira', skill: 4 },
     });
     // Two free library bots fill the bracket (not the managers' starter bots).
     const fill = entrants.filter((e) => !e.id.startsWith('udt-'));
