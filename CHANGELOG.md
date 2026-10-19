@@ -7,6 +7,11 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Series schedules: weekly on several weekdays (every n weeks) or daily; at fixed times (up to 24 a day) or every n
+  hours within a window ("daily, every 4 hours"); lead time in minutes, hours or days (whole days in local time);
+  {time} in the name; the form shows the next three tournaments. "Start by itself" (series and single tournaments):
+  at the start time the bracket is seeded by rating and check-in starts; a busy or offline server is waited for up
+  to an hour, then the tournament is called off. Starts missed while the website was down are skipped.
 - New tournament form: sections as cards (name and date, game and bracket, rules and maps, server, bots, Discord,
   advanced), segmented buttons and switches, map tiles with search and "all/none", a summary on the side with the
   create button (a bar at the bottom on phones). "Repeating series" right in the form: weekday, time, rhythm and

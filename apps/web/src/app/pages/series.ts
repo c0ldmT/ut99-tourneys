@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
+import { leadText, scheduleText } from '../core/series-text';
 import type { SeriesView } from '../core/types';
 
 /** Tournament series: weekly templates that create the next tournament by themselves. */
@@ -54,10 +55,15 @@ import type { SeriesView } from '../core/types';
                   </td>
                   <td>
                     {{ rhythm(s) }}
-                    <div class="muted small">{{ 'series.leadShort' | t: { n: s.leadDays } }}</div>
+                    <div class="muted small">
+                      {{ 'series.leadShort' | t: { lead: lead(s) } }}
+                      @if (s.autoStart) {
+                        · <span class="auto">{{ 'series.autoStart' | t }}</span>
+                      }
+                    </div>
                   </td>
                   <td>
-                    @if (s.active) {
+                    @if (s.active && s.nextStart && s.nextCreateAt) {
                       <b>{{ s.nextName }}</b>
                       <div class="muted small">
                         {{ date(s.nextStart) }} ·
@@ -142,6 +148,9 @@ import type { SeriesView } from '../core/types';
     .scroll {
       overflow-x: auto;
     }
+    .auto {
+      color: var(--live);
+    }
   `,
 })
 export class SeriesPage {
@@ -150,18 +159,6 @@ export class SeriesPage {
   protected readonly list = signal<SeriesView[]>([]);
   protected readonly busy = signal(false);
   protected readonly error = signal('');
-
-  protected readonly weekdays = computed(() => {
-    const loc = this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
-    // 2026-10-19 is a Monday.
-    return [1, 2, 3, 4, 5, 6, 7].map((n) => ({
-      n,
-      name: new Date(Date.UTC(2026, 9, 18 + n)).toLocaleDateString(loc, {
-        weekday: 'long',
-        timeZone: 'UTC',
-      }),
-    }));
-  });
 
   constructor() {
     void this.load();
@@ -193,7 +190,7 @@ export class SeriesPage {
   }
 
   protected runNow(s: SeriesView) {
-    if (!confirm(this.i18n.t('series.runNowConfirm', { name: s.nextName }))) return;
+    if (!confirm(this.i18n.t('series.runNowConfirm', { name: s.nextName ?? s.name }))) return;
     void this.run(() => this.api.runSeries(s.id));
   }
 
@@ -203,12 +200,11 @@ export class SeriesPage {
   }
 
   protected rhythm(s: SeriesView): string {
-    const day = this.weekdays().find((w) => w.n === s.weekday)?.name ?? '';
-    return this.i18n.t(s.everyWeeks > 1 ? 'series.rhythmN' : 'series.rhythm1', {
-      day,
-      time: s.time,
-      n: s.everyWeeks,
-    });
+    return scheduleText(this.i18n, s);
+  }
+
+  protected lead(s: SeriesView): string {
+    return leadText(this.i18n, s.leadMinutes);
   }
 
   protected mode(s: SeriesView): string {

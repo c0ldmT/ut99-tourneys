@@ -20,6 +20,7 @@ import type {
   Season,
   SeasonsOverview,
   SeriesFields,
+  SeriesPreview,
   SeriesView,
   LookView,
   ShopView,
@@ -208,6 +209,7 @@ export class Api {
     id: string,
     body: Partial<SeriesFields> & { active?: boolean; template?: unknown },
   ) => this.call<SeriesView>('PATCH', `/series/${id}`, body);
+  previewSeries = (body: unknown) => this.call<SeriesPreview>('POST', '/series/preview', body);
   runSeries = (id: string) => this.call<SeriesView>('POST', `/series/${id}/run`);
   deleteSeries = (id: string) => this.call<void>('DELETE', `/series/${id}`);
   createTournament = (body: unknown) => this.call<TournamentDetail>('POST', '/tournaments', body);

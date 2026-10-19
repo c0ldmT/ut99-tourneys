@@ -121,6 +121,8 @@ export interface TournamentDetail {
   /** The bots are the control center's active ones (fixed at the seeding). */
   botsFromLibrary: boolean;
   seriesId: string | null;
+  /** Seeded and started by itself at the start time. */
+  autoStart: boolean;
   settings: TournamentSettings;
   botPool: BotSpec[];
   registrationOpen: boolean;
@@ -681,21 +683,26 @@ export interface MatchDetailView {
 
 export interface SeriesFields {
   name: string;
-  /** ISO weekday 1 (Monday) .. 7 (Sunday). */
-  weekday: number;
-  /** "HH:MM", local time of the season time zone. */
-  time: string;
+  /** ISO weekdays 1 (Monday) .. 7 (Sunday); all seven = daily. */
+  days: number[];
+  /** Fixed start times "HH:MM", local time of the season time zone … */
+  times: string[];
+  /** … and/or every n hours from `from` to `to`. */
+  every: { hours: number; from: string; to: string } | null;
   everyWeeks: number;
-  leadDays: number;
+  /** The tournament is created this many minutes before its start. */
+  leadMinutes: number;
 }
 
 export interface SeriesView extends SeriesFields {
   id: string;
   active: boolean;
+  /** Its tournaments start by themselves. */
+  autoStart: boolean;
   nextNumber: number;
-  nextStart: string;
-  nextCreateAt: string;
-  nextName: string;
+  nextStart: string | null;
+  nextCreateAt: string | null;
+  nextName: string | null;
   lastStart: string | null;
   settings: TournamentSettings;
   /** What every tournament of the series gets (no botPool: the control center's bots). */
@@ -713,6 +720,14 @@ export interface SeriesTemplate {
   notifyMode?: 'default' | 'custom' | 'off';
   webhookUrl?: string | null;
   seasonal?: boolean;
+  autoStart?: boolean;
+}
+
+/** The next starts of a schedule (form preview). */
+export interface SeriesPreview {
+  timeZone: string;
+  perDay: number;
+  next: { start: string; name: string | null }[];
 }
 
 /** One kill of the game in progress (kill feed, live only). */

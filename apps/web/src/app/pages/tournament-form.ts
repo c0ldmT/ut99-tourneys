@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
@@ -6,10 +14,12 @@ import { Auth } from '../core/auth';
 import { Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { isLocalAddress } from '../core/connect';
+import { scheduleText, weekdayNames } from '../core/series-text';
 import { MH_ADAPTER } from '../core/race';
 import type {
   AgentView,
   LibraryBot,
+  SeriesPreview,
   SeriesView,
   TournamentDetail,
   TournamentSettings,
@@ -46,11 +56,19 @@ interface Model {
   connectAddress: string;
   scheduledAt: string;
   registrationOpen: boolean;
-  // series schedule
-  weekday: number;
-  time: string;
+  /** Seeded and started by itself at the start time. */
+  autoStart: boolean;
+  // series schedule: weekly on some days, or daily; fixed times or every n hours
+  repeat: 'weekly' | 'daily';
+  days: number[];
   everyWeeks: number;
-  leadDays: number;
+  timeMode: 'fixed' | 'interval';
+  times: string[];
+  everyHours: number;
+  fromTime: string;
+  toTime: string;
+  leadValue: number;
+  leadUnit: 'min' | 'h' | 'd';
   format: 'single' | 'double';
   size: number;
   teamSize: number;
@@ -99,7 +117,10 @@ interface Parts {
   webhookUrl: string | null;
   seasonal: boolean;
   registrationOpen: boolean;
+  autoStart: boolean;
 }
+
+const UNIT_MIN = { min: 1, h: 60, d: 1440 } as const;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -181,46 +202,147 @@ function toLocalInput(iso: string | null): string {
                 </div>
               </div>
             } @else {
-              <label>{{ 'series.weekday' | t }}</label>
-              <div class="seg days" role="group" [attr.aria-label]="'series.weekday' | t">
-                @for (w of weekdays(); track w.n) {
-                  <button
-                    type="button"
-                    [class.on]="f.weekday === w.n"
-                    (click)="f.weekday = w.n; touch()"
-                    [title]="w.long"
-                  >
-                    {{ w.short }}
-                  </button>
+              <div class="sched">
+                <div>
+                  <label>{{ 'series.repeat' | t }}</label>
+                  <div class="seg">
+                    <button
+                      type="button"
+                      [class.on]="f.repeat === 'weekly'"
+                      (click)="f.repeat = 'weekly'; touch()"
+                    >
+                      {{ 'series.weekly' | t }}
+                    </button>
+                    <button
+                      type="button"
+                      [class.on]="f.repeat === 'daily'"
+                      (click)="f.repeat = 'daily'; touch()"
+                    >
+                      {{ 'series.daily' | t }}
+                    </button>
+                  </div>
+                </div>
+                @if (f.repeat === 'weekly') {
+                  <div>
+                    <label for="fevery">{{ 'series.every' | t }}</label>
+                    <select
+                      id="fevery"
+                      class="auto"
+                      name="every"
+                      [(ngModel)]="f.everyWeeks"
+                      (ngModelChange)="touch()"
+                    >
+                      @for (n of [1, 2, 3, 4]; track n) {
+                        <option [ngValue]="n">
+                          {{ n === 1 ? ('series.everyWeek' | t) : ('series.everyN' | t: { n }) }}
+                        </option>
+                      }
+                    </select>
+                  </div>
                 }
               </div>
+              @if (f.repeat === 'weekly') {
+                <label>{{ 'series.days' | t }}</label>
+                <div class="seg days" role="group" [attr.aria-label]="'series.days' | t">
+                  @for (w of weekdays(); track w.n) {
+                    <button
+                      type="button"
+                      [class.on]="f.days.includes(w.n)"
+                      [attr.aria-pressed]="f.days.includes(w.n)"
+                      (click)="toggleDay(w.n)"
+                      [title]="w.long"
+                    >
+                      {{ w.short }}
+                    </button>
+                  }
+                </div>
+              }
+              <label>{{ 'series.times' | t }}</label>
+              <div class="seg tmode">
+                <button
+                  type="button"
+                  [class.on]="f.timeMode === 'fixed'"
+                  (click)="f.timeMode = 'fixed'; touch()"
+                >
+                  {{ 'series.fixedTimes' | t }}
+                </button>
+                <button
+                  type="button"
+                  [class.on]="f.timeMode === 'interval'"
+                  (click)="f.timeMode = 'interval'; touch()"
+                >
+                  {{ 'series.interval' | t }}
+                </button>
+              </div>
+              @if (f.timeMode === 'fixed') {
+                <div class="times">
+                  @for (tm of f.times; track $index) {
+                    <span class="tm">
+                      <input
+                        type="time"
+                        [name]="'tm' + $index"
+                        [(ngModel)]="f.times[$index]"
+                        (ngModelChange)="touch()"
+                        [attr.aria-label]="'series.time' | t"
+                        required
+                      />
+                      @if (f.times.length > 1) {
+                        <button
+                          type="button"
+                          class="icon"
+                          (click)="removeTime($index)"
+                          [title]="'common.delete' | t"
+                          [attr.aria-label]="'common.delete' | t"
+                        >
+                          <na-icon name="close" [size]="15" />
+                        </button>
+                      }
+                    </span>
+                  }
+                  <button type="button" (click)="addTime()" [disabled]="f.times.length >= 24">
+                    <na-icon name="plus" [size]="15" /> {{ 'series.addTime' | t }}
+                  </button>
+                </div>
+              } @else {
+                <div class="fields">
+                  <div class="field">
+                    <label for="fhours">{{ 'series.everyHoursLabel' | t }}</label>
+                    <select
+                      id="fhours"
+                      name="hours"
+                      [(ngModel)]="f.everyHours"
+                      (ngModelChange)="touch()"
+                    >
+                      @for (h of hourSteps; track h) {
+                        <option [ngValue]="h">{{ 'series.hoursN' | t: { n: h } }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="ffrom">{{ 'series.from' | t }}</label>
+                    <input
+                      id="ffrom"
+                      name="from"
+                      type="time"
+                      [(ngModel)]="f.fromTime"
+                      (ngModelChange)="touch()"
+                      required
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fto">{{ 'series.to' | t }}</label>
+                    <input
+                      id="fto"
+                      name="to"
+                      type="time"
+                      [(ngModel)]="f.toTime"
+                      (ngModelChange)="touch()"
+                      required
+                    />
+                  </div>
+                </div>
+              }
               <div class="fields">
-                <div class="field">
-                  <label for="ftime">{{ 'series.time' | t }}</label>
-                  <input
-                    id="ftime"
-                    name="time"
-                    type="time"
-                    [(ngModel)]="f.time"
-                    (ngModelChange)="touch()"
-                    required
-                  />
-                </div>
-                <div class="field">
-                  <label for="fevery">{{ 'series.every' | t }}</label>
-                  <select
-                    id="fevery"
-                    name="every"
-                    [(ngModel)]="f.everyWeeks"
-                    (ngModelChange)="touch()"
-                  >
-                    @for (n of [1, 2, 3, 4]; track n) {
-                      <option [ngValue]="n">
-                        {{ n === 1 ? ('series.everyWeek' | t) : ('series.everyN' | t: { n }) }}
-                      </option>
-                    }
-                  </select>
-                </div>
                 <div class="field">
                   <label for="flead">{{ 'series.lead' | t }}</label>
                   <div class="unit">
@@ -229,14 +351,42 @@ function toLocalInput(iso: string | null): string {
                       name="lead"
                       type="number"
                       min="0"
-                      max="28"
-                      [(ngModel)]="f.leadDays"
+                      [(ngModel)]="f.leadValue"
                       (ngModelChange)="touch()"
-                    /><span>{{ 'form.uDays' | t }}</span>
+                    /><select
+                      name="leadUnit"
+                      [(ngModel)]="f.leadUnit"
+                      (ngModelChange)="touch()"
+                      [attr.aria-label]="'series.lead' | t"
+                    >
+                      <option value="min">{{ 'unit.min' | t }}</option>
+                      <option value="h">{{ 'unit.h' | t }}</option>
+                      <option value="d">{{ 'unit.d' | t }}</option>
+                    </select>
                   </div>
                 </div>
               </div>
               <p class="muted small">{{ 'series.leadHint' | t }}</p>
+              @if (preview(); as pv) {
+                <div class="pv">
+                  <span class="pvh"
+                    >{{ 'series.preview' | t }}
+                    <span class="muted small"
+                      >· {{ 'series.perDay' | t: { n: pv.perDay } }} · {{ pv.timeZone }}</span
+                    ></span
+                  >
+                  <ol>
+                    @for (x of pv.next.slice(0, 3); track x.start) {
+                      <li>
+                        <b>{{ x.name }}</b> <span class="muted">{{ i18n.date(x.start) }}</span>
+                      </li>
+                    }
+                  </ol>
+                </div>
+              }
+              @if (previewError()) {
+                <p class="error small">{{ previewError() }}</p>
+              }
             }
 
             <div class="switches">
@@ -259,7 +409,19 @@ function toLocalInput(iso: string | null): string {
                   [disabled]="!currentSeason() && !f.seasonal && f.when === 'once'"
                 /><span class="tr"></span>{{ 'form.seasonal' | t }}</label
               >
+              <label class="switch"
+                ><input
+                  type="checkbox"
+                  name="autoStart"
+                  [(ngModel)]="f.autoStart"
+                  (ngModelChange)="touch()"
+                  [disabled]="f.when === 'once' && !f.scheduledAt && !f.autoStart"
+                /><span class="tr"></span>{{ 'form.autoStart' | t }}</label
+              >
             </div>
+            @if (f.autoStart) {
+              <p class="muted small">{{ 'form.autoStartHint' | t }}</p>
+            }
             <p class="muted small">
               {{ 'form.seasonalHint' | t }}
               @if (currentSeason(); as n) {
@@ -973,8 +1135,57 @@ function toLocalInput(iso: string | null): string {
     .seg.when {
       margin: 14px 0 12px;
     }
-    .seg.days {
+    .seg.days,
+    .seg.tmode {
       margin-bottom: 12px;
+    }
+    .sched {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 22px;
+      align-items: flex-end;
+      margin-bottom: 12px;
+    }
+    .times {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .tm {
+      display: inline-flex;
+      align-items: center;
+    }
+    .tm input {
+      width: 120px;
+    }
+    .unit select {
+      width: auto;
+      border-left: 0;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      background: var(--panel-2);
+    }
+    .unit:has(select) input {
+      max-width: 110px;
+    }
+    .pv {
+      border-left: 2px solid var(--accent-dim);
+      padding: 4px 0 4px 12px;
+      margin: 6px 0 4px;
+    }
+    .pvh {
+      font-weight: 600;
+      font-size: 0.86rem;
+      color: var(--text-2);
+    }
+    .pv li span {
+      margin-left: 8px;
+    }
+    .pv ol {
+      margin: 6px 0 0;
+      padding-left: 18px;
+      font-size: 0.9rem;
     }
     .seg.days button {
       min-width: 46px;
@@ -1349,10 +1560,14 @@ export class TournamentFormPage {
   );
 
   /** The model, re-read whenever the form changed it. */
-  private readonly model = computed(() => {
-    this.tick();
-    return this.m();
-  });
+  private readonly model = computed(
+    () => {
+      this.tick();
+      return this.m();
+    },
+    // The same object, changed in place: every tick counts as a change.
+    { equal: () => false },
+  );
   protected readonly agent = computed(() =>
     this.agents().find((a) => a.id === this.model()?.agentId),
   );
@@ -1398,16 +1613,9 @@ export class TournamentFormPage {
   });
 
   protected readonly weekdays = computed(() => {
-    const loc = this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
-    // 2026-10-19 is a Monday.
-    return [1, 2, 3, 4, 5, 6, 7].map((n) => {
-      const d = new Date(Date.UTC(2026, 9, 18 + n));
-      return {
-        n,
-        short: d.toLocaleDateString(loc, { weekday: 'short', timeZone: 'UTC' }).replace('.', ''),
-        long: d.toLocaleDateString(loc, { weekday: 'long', timeZone: 'UTC' }),
-      };
-    });
+    const short = weekdayNames(this.i18n);
+    const long = weekdayNames(this.i18n, 'long');
+    return short.map((name, i) => ({ n: i + 1, short: name, long: long[i] ?? name }));
   });
 
   protected boKeys = computed(() => {
@@ -1428,31 +1636,34 @@ export class TournamentFormPage {
     return !!f && !!(f.boSemi || f.boFinal || f.boLbFinal);
   });
 
-  /** The next start of a series as the browser sees it (local time). */
-  private readonly nextSeriesStart = computed(() => {
+  /** The schedule as the API takes it. */
+  private readonly scheduleBody = computed(() => {
     const f = this.model();
     if (!f || f.when !== 'series') return null;
-    const [h, min] = (f.time || '20:00').split(':').map(Number);
-    const d = new Date();
-    d.setSeconds(0, 0);
-    d.setHours(h ?? 20, min ?? 0);
-    const diff = (f.weekday - (((d.getDay() + 6) % 7) + 1) + 7) % 7;
-    d.setDate(d.getDate() + diff);
-    if (d.getTime() <= Date.now()) d.setDate(d.getDate() + 7);
-    return d;
+    return {
+      name: f.name.trim(),
+      days: f.repeat === 'daily' ? [1, 2, 3, 4, 5, 6, 7] : [...f.days].sort(),
+      times: f.timeMode === 'fixed' ? f.times.filter(Boolean) : [],
+      every:
+        f.timeMode === 'interval'
+          ? { hours: Number(f.everyHours), from: f.fromTime, to: f.toTime }
+          : null,
+      everyWeeks: f.repeat === 'daily' ? 1 : Number(f.everyWeeks),
+      leadMinutes: Math.max(0, Math.round(Number(f.leadValue) || 0)) * UNIT_MIN[f.leadUnit],
+    };
   });
+  /** The next starts of the series (asked from the API: season time zone, names). */
+  protected readonly preview = signal<SeriesPreview | null>(null);
+  protected readonly previewError = signal('');
+  private previewTimer?: ReturnType<typeof setTimeout>;
+  private previewSeq = 0;
+  protected readonly hourSteps = [1, 2, 3, 4, 6, 8, 12];
 
   protected readonly previewName = computed(() => {
     const f = this.model();
     if (!f) return '';
-    const name = f.name.trim();
-    if (f.when !== 'series' || !name) return name;
-    const n = String(this.seriesView()?.nextNumber ?? 1);
-    const at = this.nextSeriesStart();
-    const date = at ? `${pad(at.getDate())}.${pad(at.getMonth() + 1)}.` : '';
-    return /\{n\}|\{date\}/.test(name)
-      ? name.replace(/\{n\}/g, n).replace(/\{date\}/g, date)
-      : `${name} #${n}`;
+    if (f.when !== 'series') return f.name.trim();
+    return this.preview()?.next[0]?.name ?? f.name.trim();
   });
 
   protected readonly whenText = computed(() => {
@@ -1462,15 +1673,11 @@ export class TournamentFormPage {
       return f.scheduledAt
         ? this.i18n.date(new Date(f.scheduledAt).toISOString())
         : this.i18n.t('form.noDate');
-    const day = this.weekdays().find((w) => w.n === f.weekday)?.long ?? '';
-    const rhythm =
-      f.everyWeeks > 1
-        ? this.i18n.t('series.rhythmN', { n: f.everyWeeks, day, time: f.time })
-        : this.i18n.t('series.rhythm1', { day, time: f.time });
-    const at = this.nextSeriesStart();
-    return at
-      ? `${rhythm} · ${this.i18n.t('form.sumNext', { when: this.i18n.date(at.toISOString()) })}`
-      : rhythm;
+    const b = this.scheduleBody();
+    if (!b) return '';
+    const rhythm = scheduleText(this.i18n, b);
+    const at = this.preview()?.next[0]?.start;
+    return at ? `${rhythm} · ${this.i18n.t('form.sumNext', { when: this.i18n.date(at) })}` : rhythm;
   });
 
   protected readonly rulesText = computed(() => {
@@ -1493,6 +1700,53 @@ export class TournamentFormPage {
 
   constructor() {
     void this.init();
+    // The preview follows the schedule (a moment after the last change).
+    effect(() => {
+      const b = this.scheduleBody();
+      const nextNumber = this.seriesView()?.nextNumber;
+      clearTimeout(this.previewTimer);
+      if (!b) return;
+      this.previewTimer = setTimeout(() => void this.loadPreview({ ...b, nextNumber }), 300);
+    });
+  }
+
+  private async loadPreview(body: unknown) {
+    const seq = ++this.previewSeq;
+    try {
+      const pv = await this.api.previewSeries(body);
+      if (seq !== this.previewSeq) return;
+      this.preview.set(pv);
+      this.previewError.set('');
+    } catch (e) {
+      if (seq !== this.previewSeq) return;
+      this.preview.set(null);
+      this.previewError.set(errorText(e));
+    }
+  }
+
+  protected toggleDay(n: number) {
+    const f = this.m();
+    if (!f) return;
+    if (f.days.includes(n)) {
+      if (f.days.length > 1) f.days = f.days.filter((d) => d !== n);
+    } else f.days = [...f.days, n].sort();
+    this.touch();
+  }
+
+  protected addTime() {
+    const f = this.m();
+    if (!f || f.times.length >= 24) return;
+    const last = f.times.at(-1) ?? '18:00';
+    const h = (Number(last.slice(0, 2)) + 2) % 24;
+    f.times = [...f.times, `${pad(h)}:${last.slice(3, 5) || '00'}`];
+    this.touch();
+  }
+
+  protected removeTime(i: number) {
+    const f = this.m();
+    if (!f || f.times.length < 2) return;
+    f.times = f.times.filter((_, j) => j !== i);
+    this.touch();
   }
 
   protected touch() {
@@ -1550,10 +1804,17 @@ export class TournamentFormPage {
       connectAddress: '',
       scheduledAt: '',
       registrationOpen: true,
-      weekday: 5,
-      time: '20:00',
+      autoStart: false,
+      repeat: 'weekly',
+      days: [5],
       everyWeeks: 1,
-      leadDays: 7,
+      timeMode: 'fixed',
+      times: ['20:00'],
+      everyHours: 4,
+      fromTime: '00:00',
+      toTime: '23:59',
+      leadValue: 7,
+      leadUnit: 'd',
       format: 'double',
       size: 8,
       teamSize: 1,
@@ -1604,6 +1865,7 @@ export class TournamentFormPage {
       connectAddress: p.connectAddress ?? '',
       scheduledAt: toLocalInput(scheduledAt),
       registrationOpen: p.registrationOpen,
+      autoStart: p.autoStart,
       format: s.format,
       size: s.size,
       teamSize: s.teamSize ?? 1,
@@ -1651,6 +1913,7 @@ export class TournamentFormPage {
         webhookUrl: d.notify?.webhookUrl ?? null,
         seasonal: d.seasonal,
         registrationOpen: d.registrationOpen,
+        autoStart: d.autoStart,
       },
       d.name,
       d.scheduledAt,
@@ -1669,6 +1932,7 @@ export class TournamentFormPage {
         webhookUrl: t.webhookUrl ?? null,
         seasonal: !!t.seasonal,
         registrationOpen: true,
+        autoStart: !!t.autoStart,
       },
       s.name,
       null,
@@ -1676,11 +1940,23 @@ export class TournamentFormPage {
     return {
       ...f,
       when: 'series',
-      weekday: s.weekday,
-      time: s.time,
+      repeat: s.days.length === 7 ? 'daily' : 'weekly',
+      days: s.days.length === 7 ? [5] : [...s.days],
       everyWeeks: s.everyWeeks,
-      leadDays: s.leadDays,
+      timeMode: s.every ? 'interval' : 'fixed',
+      times: s.times.length ? [...s.times] : ['20:00'],
+      everyHours: s.every?.hours ?? 4,
+      fromTime: s.every?.from ?? '00:00',
+      toTime: s.every?.to ?? '23:59',
+      ...this.leadParts(s.leadMinutes),
     };
+  }
+
+  /** A lead time in minutes as value and unit (the largest unit that fits). */
+  private leadParts(min: number): Pick<Model, 'leadValue' | 'leadUnit'> {
+    if (min && min % 1440 === 0) return { leadValue: min / 1440, leadUnit: 'd' };
+    if (min && min % 60 === 0) return { leadValue: min / 60, leadUnit: 'h' };
+    return { leadValue: min, leadUnit: 'min' };
   }
 
   /** A series from the form's tournament: name pattern and schedule from its start. */
@@ -1690,8 +1966,10 @@ export class TournamentFormPage {
       f.name = `${f.name.replace(/\s*#?\d+$/, '')} #{n}`;
     if (f.scheduledAt) {
       const at = new Date(f.scheduledAt);
-      f.weekday = ((at.getDay() + 6) % 7) + 1;
-      f.time = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+      f.repeat = 'weekly';
+      f.days = [((at.getDay() + 6) % 7) + 1];
+      f.timeMode = 'fixed';
+      f.times = [`${pad(at.getHours())}:${pad(at.getMinutes())}`];
     }
     f.scheduledAt = '';
   }
@@ -1825,17 +2103,8 @@ export class TournamentFormPage {
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
       seasonal: f.seasonal,
+      autoStart: f.autoStart,
       settings: this.settings(f),
-    };
-  }
-
-  private schedule(f: Model) {
-    return {
-      name: f.name.trim(),
-      weekday: Number(f.weekday),
-      time: f.time,
-      everyWeeks: Number(f.everyWeeks),
-      leadDays: Math.max(0, Math.round(Number(f.leadDays) || 0)),
     };
   }
 
@@ -1848,10 +2117,10 @@ export class TournamentFormPage {
       const id = this.id();
       const sid = this.sid();
       if (sid) {
-        await this.api.updateSeries(sid, { ...this.schedule(f), template: this.template(f) });
+        await this.api.updateSeries(sid, { ...this.scheduleBody()!, template: this.template(f) });
         await this.router.navigate(['/admin/series']);
       } else if (f.when === 'series') {
-        await this.api.createSeries({ ...this.schedule(f), template: this.template(f) });
+        await this.api.createSeries({ ...this.scheduleBody()!, template: this.template(f) });
         await this.router.navigate(['/admin/series']);
       } else {
         const t = this.template(f);
@@ -1863,6 +2132,7 @@ export class TournamentFormPage {
           notifyMode: t.notifyMode,
           webhookUrl: t.webhookUrl,
           seasonal: t.seasonal,
+          autoStart: !!f.scheduledAt && f.autoStart,
         };
         if (id) {
           const patch: Record<string, unknown> = { ...common };
