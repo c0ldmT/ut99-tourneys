@@ -10,9 +10,14 @@ import { memoryLogger } from '../src/log.js';
 import { importBots, importBotsIntoInstallation } from '../src/ut99/import-bots.js';
 import { IniFile } from '../src/ut99/ini.js';
 import { scanInventory } from '../src/ut99/inventory.js';
-import { prepareServer, resolveBinary, ServerSetupError } from '../src/ut99/prepare.js';
+import {
+  botPackages,
+  prepareServer,
+  resolveBinary,
+  ServerSetupError,
+} from '../src/ut99/prepare.js';
 import { ServerProcess } from '../src/ut99/server-process.js';
-import { readLevelMeta } from '../src/ut99/unreal-package.js';
+import { listExports, readLevelMeta } from '../src/ut99/unreal-package.js';
 
 const tmpDirs: string[] = [];
 function tmp(): string {
@@ -128,6 +133,51 @@ function fakeMap(props: Record<string, string>, opts: { withStack?: boolean } = 
     i32(importOffset),
   ]);
   return Buffer.concat([head, nameTable, importTable, object, exportTable]);
+}
+
+/** A package with imports (class names) and exports [name, import index (-n) or 0 = class]. */
+function fakePackage(imports: string[], exports: [string, number][]): Buffer {
+  const names = [...new Set(['Core', 'Class', 'Engine', ...imports, ...exports.map((e) => e[0])])];
+  const n = (s: string) => names.indexOf(s);
+  const nameTable = Buffer.concat(names.map((s) => Buffer.concat([fstr(s), u32(0)])));
+  const importTable = Buffer.concat(
+    imports.map((c) =>
+      Buffer.concat([
+        compactIndex(n('Core')),
+        compactIndex(n('Class')),
+        i32(0),
+        compactIndex(n(c)),
+      ]),
+    ),
+  );
+  const exportTable = Buffer.concat(
+    exports.map(([name, cls]) =>
+      Buffer.concat([
+        compactIndex(cls),
+        compactIndex(0),
+        i32(0),
+        compactIndex(n(name)),
+        u32(0),
+        compactIndex(0),
+      ]),
+    ),
+  );
+  const header = 36;
+  const nameOffset = header;
+  const importOffset = nameOffset + nameTable.length;
+  const exportOffset = importOffset + importTable.length;
+  const head = Buffer.concat([
+    u32(0x9e2a83c1),
+    Buffer.from([69, 0, 0, 0]),
+    u32(0),
+    i32(names.length),
+    i32(nameOffset),
+    i32(exports.length),
+    i32(exportOffset),
+    i32(imports.length),
+    i32(importOffset),
+  ]);
+  return Buffer.concat([head, nameTable, importTable, exportTable]);
 }
 
 describe('IniFile', () => {
@@ -253,7 +303,65 @@ describe('inventory', () => {
       voices: [{ name: 'Botpack.VoiceMaleOne', label: 'Male 1' }],
       weapons: [{ name: 'Botpack.ShockRifle', label: 'ShockRifle' }],
       textures: [{ name: 'CommandoSkins.cmdo4Blake', label: 'Blake' }],
+      skinPackages: [],
     });
+  });
+
+  it('reads skins from the texture packages and bot classes of custom model packages', () => {
+    const root = tmp();
+    fs.mkdirSync(path.join(root, 'System'));
+    fs.mkdirSync(path.join(root, 'Textures'));
+    fs.writeFileSync(
+      path.join(root, 'Textures', 'CowSkins.utx'),
+      fakePackage(
+        ['Texture'],
+        [
+          ['WarCow', -1],
+          ['T_Cow', -1],
+          ['Brown', -1],
+        ],
+      ),
+    );
+    fs.writeFileSync(
+      path.join(root, 'Textures', 'Rocks.utx'),
+      fakePackage(['Texture'], [['Stone', -1]]),
+    );
+    fs.writeFileSync(
+      path.join(root, 'System', 'MultiMesh.u'),
+      fakePackage(
+        ['Texture'],
+        [
+          ['TCow', 0],
+          ['TCowBot', 0],
+          ['SomeTex', -1],
+        ],
+      ),
+    );
+    fs.writeFileSync(path.join(root, 'System', 'Botpack.u'), fakePackage([], [['TMale1Bot', 0]]));
+    const inv = scanInventory({ installDir: root });
+    expect(inv.assets.skinPackages).toEqual([
+      { pkg: 'CowSkins', textures: ['WarCow', 'T_Cow', 'Brown'] },
+    ]);
+    expect(inv.assets.botClasses).toEqual([{ name: 'MultiMesh.TCowBot', label: 'TCowBot' }]);
+    expect(listExports(Buffer.from('nope'))).toEqual([]);
+  });
+
+  it('names the installed custom packages of bot models and skins for the clients', () => {
+    const root = tmp();
+    fs.mkdirSync(path.join(root, 'System'));
+    fs.mkdirSync(path.join(root, 'Textures'));
+    fs.writeFileSync(path.join(root, 'System', 'CowPack.u'), 'x');
+    fs.writeFileSync(path.join(root, 'Textures', 'CowSkins.utx'), 'x');
+    expect(
+      botPackages(root, [
+        'CowPack.TCowBot',
+        'cowskins.Brown',
+        'Botpack.TMale1Bot',
+        'Missing.X',
+        null,
+        'CowPack.Other',
+      ]),
+    ).toEqual(['CowPack', 'cowskins']);
   });
 
   it('warns about missing folders and bots', () => {

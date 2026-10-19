@@ -135,6 +135,66 @@ function parse(buf: Buffer): LevelMeta {
   return {};
 }
 
+export interface PackageExport {
+  name: string;
+  /** Class of the object ("Texture", ...); "Class" for class objects. */
+  className: string;
+  /** Top-level object (not inside a group). */
+  topLevel: boolean;
+}
+
+/**
+ * The objects a package (.utx, .u) exports, from its name, import and export tables only
+ * (cheap). [] on anything unexpected.
+ */
+export function listExports(buf: Buffer, max = 20_000): PackageExport[] {
+  try {
+    const r = new Reader(buf);
+    if (r.u32() !== PACKAGE_TAG) return [];
+    const version = r.u16();
+    r.u16();
+    r.u32();
+    const nameCount = r.i32();
+    const nameOffset = r.i32();
+    const exportCount = r.i32();
+    const exportOffset = r.i32();
+    const importCount = r.i32();
+    const importOffset = r.i32();
+    if (version < 60 || nameCount <= 0 || nameCount > 200_000 || exportCount > 200_000) return [];
+    r.pos = nameOffset;
+    const names: string[] = [];
+    for (let i = 0; i < nameCount; i++) {
+      names.push(r.fstring());
+      r.u32();
+    }
+    r.pos = importOffset;
+    const importNames: string[] = [];
+    for (let i = 0; i < importCount; i++) {
+      r.index();
+      r.index();
+      r.i32();
+      importNames.push(names[r.index()] ?? '');
+    }
+    r.pos = exportOffset;
+    const out: PackageExport[] = [];
+    for (let i = 0; i < exportCount && out.length < max; i++) {
+      const classIdx = r.index();
+      r.index(); // super
+      const pkg = r.i32();
+      const name = names[r.index()] ?? '';
+      r.u32(); // flags
+      const size = r.index();
+      if (size > 0) r.index(); // offset
+      const className =
+        classIdx === 0 ? 'Class' : classIdx < 0 ? (importNames[-classIdx - 1] ?? '') : '';
+      out.push({ name, className, topLevel: pkg === 0 });
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 const WANTED: Record<string, keyof LevelMeta> = {
   title: 'title',
   author: 'author',

@@ -424,6 +424,7 @@ export class BotsService {
       textures: [],
       voices: STOCK_VOICES.map((v) => ({ name: v, label: v.split('.').pop() ?? v })),
       weapons: STOCK_WEAPONS.map((w) => ({ name: w, label: w.split('.').pop() ?? w })),
+      skinPackages: [],
     };
     const add = (
       list: { name: string; label: string }[],
@@ -456,6 +457,27 @@ export class BotsService {
         !faces.some((f) => f.name.toLowerCase() === `${face[1]}.${face[2]}`.toLowerCase())
       )
         faces.push({ name: `${face[1]}.${face[2]}`, label: t.label || face[2]!, pkg: face[1]! });
+    }
+    // Skin packages read from the texture files (also skins without a description in the .int).
+    for (const raw of this.agents.allInventories()) {
+      const inv = raw as { assets?: GameAssets } | undefined;
+      for (const sp of inv?.assets?.skinPackages ?? []) {
+        const multi = sp.textures.some((n) => /^[A-Za-z]+[1-4]$/.test(n));
+        for (const n of sp.textures) {
+          if (!multi) {
+            if (!/^t_/i.test(n)) add(skins, [{ name: `${sp.pkg}.${n}`, label: n }]);
+            continue;
+          }
+          const base = /^([A-Za-z]+)1$/.exec(n);
+          if (base) add(skins, [{ name: `${sp.pkg}.${base[1]}`, label: base[1]! }]);
+          const face = /^[A-Za-z]+\d([A-Za-z]\w*)$/.exec(n);
+          if (
+            face &&
+            !faces.some((f) => f.name.toLowerCase() === `${sp.pkg}.${face[1]}`.toLowerCase())
+          )
+            faces.push({ name: `${sp.pkg}.${face[1]}`, label: face[1]!, pkg: sp.pkg });
+        }
+      }
     }
     return {
       ...out,

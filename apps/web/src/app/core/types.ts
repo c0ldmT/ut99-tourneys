@@ -194,6 +194,12 @@ export interface Inventory {
   maps: MapInfo[];
   bots: BotSpec[];
   packages?: string[];
+  /** Models (bot classes), skins and faces, voices found on the server. */
+  assets?: {
+    botClasses?: AssetItem[];
+    textures?: AssetItem[];
+    skinPackages?: { pkg: string; textures: string[] }[];
+  };
   scannedAt: string;
   warnings: string[];
 }

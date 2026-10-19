@@ -185,6 +185,11 @@ export const GameAssetsSchema = z.object({
   textures: z.array(AssetSchema).max(5000).default([]),
   voices: z.array(AssetSchema).max(500).default([]),
   weapons: z.array(AssetSchema).max(500).default([]),
+  /** Texture packages with skins (Textures/*skin*.utx) and their textures, read from the files. */
+  skinPackages: z
+    .array(z.object({ pkg: z.string().max(64), textures: z.array(z.string().max(64)).max(300) }))
+    .max(200)
+    .default([]),
 });
 export type GameAssets = z.infer<typeof GameAssetsSchema>;
 

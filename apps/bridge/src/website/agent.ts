@@ -24,7 +24,7 @@ import { MatchDirector, type DirectorTiming, type LiveInfo } from '../director.j
 import type { Logger } from '../log.js';
 import type { ModHello, ModServer } from '../mod-server.js';
 import { scanInventory } from '../ut99/inventory.js';
-import { prepareServer } from '../ut99/prepare.js';
+import { botPackages, prepareServer } from '../ut99/prepare.js';
 import { ServerProcess } from '../ut99/server-process.js';
 import { WebsiteLink } from './link.js';
 import { RemoteEventStore } from './remote-store.js';
@@ -306,6 +306,7 @@ export class WebsiteAgent {
         undefined,
         mode,
         created.data.settings.teamSize,
+        botPackages(profile.installDir, botRefs(botPool, events)),
       );
       this.o.log.info(`wrote ${prepared.iniPath}`);
       server = new ServerProcess({ log: this.o.log, clock: this.o.clock });
@@ -398,4 +399,12 @@ export class WebsiteAgent {
       // not connected
     }
   }
+}
+
+/** Class, skin and face names of the tournament's bots (pool and the seeded entrants). */
+export function botRefs(botPool: readonly BotSpec[], events: readonly unknown[]): string[] {
+  const refs = botPool.flatMap((b) => [b.botClass, b.skin, b.face]);
+  const text = JSON.stringify(events);
+  for (const m of text.matchAll(/"(?:botClass|skin|face)":"([^"]{1,128})"/g)) refs.push(m[1]);
+  return refs.filter((r): r is string => !!r);
 }

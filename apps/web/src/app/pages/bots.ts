@@ -153,35 +153,49 @@ const emptyLines = () =>
               <div class="fields">
                 <div class="field">
                   <label for="bcls">{{ 'bots.class' | t }}</label>
-                  <select
+                  <input
                     id="bcls"
                     name="cls"
+                    list="bcls-list"
+                    [placeholder]="'bots.default' | t"
                     [ngModel]="d.botClass"
-                    (ngModelChange)="setClass(d, $event)"
-                  >
-                    <option value="">{{ 'bots.default' | t }}</option>
+                    (change)="setClass(d, $any($event.target).value.trim())"
+                  />
+                  <datalist id="bcls-list">
                     @for (c of withCurrent(assets()?.botClasses, d.botClass); track c.name) {
                       <option [value]="c.name">{{ c.label }}</option>
                     }
-                  </select>
+                  </datalist>
                 </div>
                 <div class="field">
                   <label for="bskin">{{ 'bots.skin' | t }}</label>
-                  <select id="bskin" name="skin" [(ngModel)]="d.skin">
-                    <option value="">{{ 'bots.default' | t }}</option>
+                  <input
+                    id="bskin"
+                    name="skin"
+                    list="bskin-list"
+                    [placeholder]="'bots.default' | t"
+                    [(ngModel)]="d.skin"
+                  />
+                  <datalist id="bskin-list">
                     @for (s of skinsFor(d); track s.name) {
-                      <option [value]="s.name">{{ s.name }}</option>
+                      <option [value]="s.name">{{ s.label }}</option>
                     }
-                  </select>
+                  </datalist>
                 </div>
                 <div class="field">
                   <label for="bface">{{ 'bots.face' | t }}</label>
-                  <select id="bface" name="face" [(ngModel)]="d.face">
-                    <option value="">{{ 'bots.default' | t }}</option>
+                  <input
+                    id="bface"
+                    name="face"
+                    list="bface-list"
+                    [placeholder]="'bots.default' | t"
+                    [(ngModel)]="d.face"
+                  />
+                  <datalist id="bface-list">
                     @for (f of facesFor(d); track f.name) {
                       <option [value]="f.name">{{ f.label }}</option>
                     }
-                  </select>
+                  </datalist>
                 </div>
                 <div class="field">
                   <label for="bvoice">{{ 'bots.voice' | t }}</label>

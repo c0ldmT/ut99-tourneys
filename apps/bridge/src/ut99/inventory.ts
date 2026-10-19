@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { BotSpec, BotTraits, GameAssets, MapInfo, ServerProfile } from '@tourney/protocol';
 import { IniFile } from './ini.js';
-import { readLevelMeta } from './unreal-package.js';
+import { listExports, readLevelMeta } from './unreal-package.js';
 
 /** Deathmatch maps shipped with UT99 GOTY: clients have them, no download needed. */
 const STOCK_DM = new Set(
@@ -225,7 +225,13 @@ export function parseIntObject(line: string): Record<string, string> | undefined
  * (MetaClass ...Bot), voice packs, weapons, and textures with a description (skins and faces).
  */
 export function readAssets(installDir: string): GameAssets {
-  const assets: GameAssets = { botClasses: [], textures: [], voices: [], weapons: [] };
+  const assets: GameAssets = {
+    botClasses: [],
+    textures: [],
+    voices: [],
+    weapons: [],
+    skinPackages: [],
+  };
   const system = findDir(installDir, 'System');
   if (!system) return assets;
   let files: string[];
@@ -259,5 +265,74 @@ export function readAssets(installDir: string): GameAssets {
       else if (cls === 'texture' && desc) add(assets.textures, o.name, desc, 5000);
     }
   }
+  assets.skinPackages = readSkinPackages(installDir);
+  // Bot classes of custom model packages that only declare their player class in the .int.
+  for (const c of readBotClasses(installDir))
+    add(assets.botClasses, c, c.split('.').pop() ?? c, 500);
   return assets;
+}
+
+/** Packages that come with UT: their bot classes are known (stock list). */
+const STOCK_PACKAGES = new Set(['botpack', 'unrealshare', 'unreali', 'engine', 'core', 'utmenu']);
+
+/** Texture packages with skins (Textures/*skin*.utx): their top-level textures. */
+export function readSkinPackages(installDir: string): { pkg: string; textures: string[] }[] {
+  const dir = findDir(installDir, 'Textures');
+  if (!dir) return [];
+  let files: string[];
+  try {
+    files = fs
+      .readdirSync(dir)
+      .filter((f) => f.toLowerCase().endsWith('.utx') && f.toLowerCase().includes('skin'));
+  } catch {
+    return [];
+  }
+  const out: { pkg: string; textures: string[] }[] = [];
+  for (const f of files.sort().slice(0, 200)) {
+    let buf: Buffer;
+    try {
+      buf = fs.readFileSync(path.join(dir, f));
+    } catch {
+      continue;
+    }
+    const textures = listExports(buf)
+      .filter((e) => e.topLevel && e.className === 'Texture' && /^\w{1,48}$/.test(e.name))
+      .map((e) => e.name)
+      .slice(0, 300);
+    if (textures.length) out.push({ pkg: f.slice(0, -4), textures });
+  }
+  return out;
+}
+
+/** Classes named *Bot in the System packages that do not come with UT (e.g. a model pack). */
+export function readBotClasses(installDir: string): string[] {
+  const system = findDir(installDir, 'System');
+  if (!system) return [];
+  const out: string[] = [];
+  let files: string[];
+  try {
+    files = fs.readdirSync(system).filter((f) => f.toLowerCase().endsWith('.u'));
+  } catch {
+    return [];
+  }
+  for (const f of files.sort()) {
+    const pkg = f.slice(0, -2);
+    if (STOCK_PACKAGES.has(pkg.toLowerCase())) continue;
+    let buf: Buffer;
+    try {
+      buf = fs.readFileSync(path.join(system, f));
+    } catch {
+      continue;
+    }
+    for (const e of listExports(buf))
+      if (
+        e.topLevel &&
+        e.className === 'Class' &&
+        /^\w+Bot$/i.test(e.name) &&
+        !/^(Bot|HumanBotPlus|MaleBotPlus|FemaleBotPlus)$/i.test(e.name)
+      )
+        out.push(`${pkg}.${e.name}`);
+    if (out.length >= 200) break;
+  }
+  return out;
 }

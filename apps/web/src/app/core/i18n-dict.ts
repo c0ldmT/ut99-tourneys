@@ -415,8 +415,12 @@ const en = {
   'agents.noAddress': 'not set (publicAddress in bridge.json)',
   'agents.localAddress':
     'Only the server PC itself can reach this address. Set the LAN or internet address as publicAddress in bridge.json and restart the bridge.',
-  'agents.rescan': 'Scan maps and bots',
-  'agents.inventory': '{maps} maps, {bots} bots',
+  'agents.rescan': 'Sync maps, models and skins',
+  'agents.inventory': '{maps} maps, {models} models, {skins} skins, {bots} ini bots',
+  'agents.importBots': 'Import bots',
+  'agents.importBotsHint':
+    'The bots of the server’s ini into the control center (existing names are skipped)',
+  'agents.imported': '{n} bots imported, {s} skipped.',
   'agents.noInventory': 'Not scanned yet.',
   'agents.noProfiles': 'The bridge has no "server" section in bridge.json.',
   'agents.add': 'Add a game server',
@@ -832,7 +836,7 @@ const en = {
   'bots.face': 'Face',
   'bots.voice': 'Voice',
   'bots.lookHint':
-    'The choices come from the stock game and the scanned servers. Skin and face must exist on the server (and for the players), else UT uses the default.',
+    'Suggestions come from the stock game and the synced servers (Servers → Sync maps, models and skins); any other name can be typed. Model and skin must exist on the server; the tournament server offers custom packages to the players for download.',
   'bots.weapon': 'Favourite weapon',
   'bots.trait.accuracy': 'Accuracy',
   'bots.trait.alertness': 'Alertness',
@@ -1908,8 +1912,12 @@ const de: Record<TKey, string> = {
   'agents.noAddress': 'nicht gesetzt (publicAddress in der bridge.json)',
   'agents.localAddress':
     'Diese Adresse erreicht nur der Server-PC selbst. LAN- oder Internet-Adresse als publicAddress in der bridge.json eintragen und die Bridge neu starten.',
-  'agents.rescan': 'Maps und Bots einlesen',
-  'agents.inventory': '{maps} Maps, {bots} Bots',
+  'agents.rescan': 'Maps, Models und Skins synchronisieren',
+  'agents.inventory': '{maps} Maps, {models} Models, {skins} Skins, {bots} ini-Bots',
+  'agents.importBots': 'Bots importieren',
+  'agents.importBotsHint':
+    'Die Bots aus der ini des Servers ins Kontrollzentrum (vorhandene Namen werden übersprungen)',
+  'agents.imported': '{n} Bots importiert, {s} übersprungen.',
   'agents.noInventory': 'Noch nicht eingelesen.',
   'agents.noProfiles': 'Die Bridge hat keinen Abschnitt "server" in der bridge.json.',
   'agents.add': 'Gameserver hinzufügen',
@@ -2330,7 +2338,7 @@ const de: Record<TKey, string> = {
   'bots.face': 'Gesicht',
   'bots.voice': 'Stimme',
   'bots.lookHint':
-    'Die Auswahl stammt aus dem Standardspiel und den gescannten Servern. Skin und Gesicht müssen auf dem Server (und bei den Spielern) vorhanden sein, sonst nimmt UT den Standard.',
+    'Die Vorschläge stammen aus dem Standardspiel und den synchronisierten Servern (Server → Maps, Models und Skins synchronisieren); jeder andere Name lässt sich eintippen. Model und Skin müssen auf dem Server vorhanden sein; eigene Pakete bietet der Turnierserver den Spielern zum Download an.',
   'bots.weapon': 'Lieblingswaffe',
   'bots.trait.accuracy': 'Treffsicherheit',
   'bots.trait.alertness': 'Wachsamkeit',

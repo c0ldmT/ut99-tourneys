@@ -5,7 +5,7 @@ import { Api, errorText } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
 import { isLocalAddress } from '../core/connect';
 import { I18n, TPipe } from '../core/i18n';
-import type { AgentView } from '../core/types';
+import type { AgentView, Inventory } from '../core/types';
 
 @Component({
   selector: 'app-agents',
@@ -19,6 +19,9 @@ import type { AgentView } from '../core/types';
     <p class="muted">{{ 'agents.intro' | t }}</p>
     @if (error()) {
       <p class="error">{{ error() }}</p>
+    }
+    @if (imported()) {
+      <p class="notice">{{ imported() }}</p>
     }
 
     @if (newToken(); as tk) {
@@ -106,13 +109,31 @@ import type { AgentView } from '../core/types';
                   <div class="small error">{{ 'agents.localAddress' | t }}</div>
                 }
               </div>
-              <button (click)="rescan(a, p.id)" [disabled]="!a.online || busy()">
-                {{ 'agents.rescan' | t }}
-              </button>
+              <div class="row">
+                <button (click)="rescan(a, p.id)" [disabled]="!a.online || busy()">
+                  {{ 'agents.rescan' | t }}
+                </button>
+                <button
+                  (click)="importBots(a, p.id)"
+                  [disabled]="busy() || !p.inventory?.bots?.length"
+                  [title]="'agents.importBotsHint' | t"
+                >
+                  {{ 'agents.importBots' | t }}
+                </button>
+              </div>
             </div>
             @if (p.inventory; as inv) {
               <p class="small">
-                {{ 'agents.inventory' | t: { maps: inv.maps.length, bots: inv.bots.length } }}
+                {{
+                  'agents.inventory'
+                    | t
+                      : {
+                          maps: inv.maps.length,
+                          bots: inv.bots.length,
+                          models: inv.assets?.botClasses?.length ?? 0,
+                          skins: skinCount(inv),
+                        }
+                }}
                 <span class="muted">({{ i18n.date(inv.scannedAt) }})</span>
               </p>
               @for (w of inv.warnings; track w) {
@@ -173,6 +194,7 @@ export class AgentsPage {
   protected readonly agents = signal<AgentView[]>([]);
   protected readonly error = signal('');
   protected readonly busy = signal(false);
+  protected readonly imported = signal('');
   protected readonly newToken = signal<{ id: string; token: string } | null>(null);
   protected id = '';
   protected name = '';
@@ -250,5 +272,21 @@ export class AgentsPage {
 
   protected rescan(a: AgentView, profileId: string) {
     return this.act(() => this.api.rescan(a.id, profileId));
+  }
+
+  /** Skins found on the server: texture packages read from the files plus .int skins. */
+  protected skinCount(inv: Inventory): number {
+    const fromFiles = (inv.assets?.skinPackages ?? []).reduce((n, p) => n + p.textures.length, 0);
+    return fromFiles + (inv.assets?.textures?.length ?? 0);
+  }
+
+  /** The server's ini bots into the control center (names that exist are skipped). */
+  protected importBots(a: AgentView, profileId: string) {
+    return this.act(async () => {
+      const r = await this.api.importBots(a.id, profileId);
+      this.imported.set(
+        this.i18n.t('agents.imported', { n: r.created.length, s: r.skipped.length }),
+      );
+    });
   }
 }

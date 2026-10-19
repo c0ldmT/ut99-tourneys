@@ -64,6 +64,58 @@ function firstExisting(paths: string[]): string | undefined {
  * Writes Tourney.ini / TourneyUser.ini next to the binary (copies of the installation's own ini
  * files plus our changes) and returns how to start the server. The user's ini files are untouched.
  */
+/** Packages that come with UT99 (clients have them). */
+const STOCK_PACKAGES = new Set(
+  [
+    'Botpack',
+    'UnrealShare',
+    'UnrealI',
+    'Engine',
+    'Core',
+    'CommandoSkins',
+    'SoldierSkins',
+    'FCommandoSkins',
+    'SGirlSkins',
+    'BossSkins',
+    'MultiMesh',
+  ].map((p) => p.toLowerCase()),
+);
+
+/**
+ * The non-stock packages that the bots' classes, skins and faces come from (only those installed
+ * on the server, in System/*.u or Textures/*.utx), e.g. a model pack.
+ */
+export function botPackages(
+  installDir: string,
+  refs: readonly (string | null | undefined)[],
+): string[] {
+  const out = new Map<string, string>();
+  const has = (dir: string, ext: string, pkg: string) => {
+    const d = fs
+      .readdirSync(installDir, { withFileTypes: true })
+      .find((x) => x.isDirectory() && x.name.toLowerCase() === dir);
+    if (!d) return false;
+    const target = `${pkg}${ext}`.toLowerCase();
+    return fs.readdirSync(path.join(installDir, d.name)).some((f) => f.toLowerCase() === target);
+  };
+  for (const r of refs) {
+    const pkg = r?.split('.')[0]?.trim();
+    if (
+      !pkg ||
+      !/^\w{1,64}$/.test(pkg) ||
+      STOCK_PACKAGES.has(pkg.toLowerCase()) ||
+      out.has(pkg.toLowerCase())
+    )
+      continue;
+    try {
+      if (has('system', '.u', pkg) || has('textures', '.utx', pkg)) out.set(pkg.toLowerCase(), pkg);
+    } catch {
+      // unreadable folder: leave it out
+    }
+  }
+  return [...out.values()];
+}
+
 export function prepareServer(
   profile: ServerProfile,
   rules: Ut99DmRules,
@@ -71,6 +123,7 @@ export function prepareServer(
   arch: CpuArch = currentArch(),
   mode: GameMode = 'dm',
   teamSize = 1,
+  extraPackages: readonly string[] = [],
 ): PreparedServer {
   const binary = resolveBinary(profile, arch);
   const systemDir = path.dirname(binary);
@@ -92,6 +145,8 @@ export function prepareServer(
 
   const ini = IniFile.parse(fs.readFileSync(baseIni, 'latin1'));
   ini.apply(iniChanges(rules, profile, mod, mode, teamSize));
+  // Custom models and skins of the tournament's bots: clients download them like the map.
+  for (const pkg of extraPackages) ini.ensure('Engine.GameEngine', 'ServerPackages', pkg);
   const iniPath = path.join(systemDir, GENERATED_FILES.ini);
   const userIniPath = path.join(systemDir, GENERATED_FILES.userIni);
   try {

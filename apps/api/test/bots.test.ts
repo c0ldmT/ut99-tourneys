@@ -229,6 +229,10 @@ describe('bot control center', () => {
           ],
           voices: [],
           weapons: [],
+          skinPackages: [
+            { pkg: 'CowSkins', textures: ['WarCow', 'T_Cow'] },
+            { pkg: 'RoboSkins', textures: ['robo1', 'robo2', 'robo5Zed'] },
+          ],
         },
       },
       new Date().toISOString(),
@@ -243,6 +247,11 @@ describe('bot control center', () => {
       label: 'Kenji',
       pkg: 'NinjaSkins',
     });
+    // From the texture files: single skins (no T_ textures) and multi skins with faces.
+    expect(assets.skins).toContainEqual({ name: 'CowSkins.WarCow', label: 'WarCow' });
+    expect(assets.skins).not.toContainEqual(expect.objectContaining({ name: 'CowSkins.T_Cow' }));
+    expect(assets.skins).toContainEqual({ name: 'RoboSkins.robo', label: 'robo' });
+    expect(assets.faces).toContainEqual({ name: 'RoboSkins.Zed', label: 'Zed', pkg: 'RoboSkins' });
     expect(assets.faces).toContainEqual({
       name: 'CommandoSkins.Blake',
       label: 'Blake',
