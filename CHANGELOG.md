@@ -7,6 +7,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team, groundwork: package `@tourney/udt` with the economy rules (market values from skill and play
+  style, economy index, salaries, rewards, stamina, packs with pity) and a season simulator on real betting data
+  (`pnpm --filter @tourney/api udt:sim <export.db>`, HTML report with index, wealth and roster curves per manager type).
 - Bot AI help in deathmatch and team deathmatch (mod 0.8.0, settings page "Bot AI help", on by default): bots
   that stand still or find no enemy for long get moving again, and in one-on-one games a bot without an enemy hunts
   its opponent, so bot duels no longer stall. Monster Hunt and other game modes are not touched.

@@ -10,7 +10,8 @@
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
     "start": "node dist/main.js",
-    "dev": "node --conditions=@tourney/source --env-file-if-exists=.env --import tsx src/main.ts"
+    "dev": "node --conditions=@tourney/source --env-file-if-exists=.env --import tsx src/main.ts",
+    "udt:sim": "node --conditions=@tourney/source --import tsx scripts/udt-sim.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
@@ -19,6 +20,7 @@
     "@tourney/adapter-ut99": "workspace:*",
     "@tourney/bracket": "workspace:*",
     "@tourney/protocol": "workspace:*",
+    "@tourney/udt": "workspace:*",
     "better-sqlite3": "^13.0.3",
     "drizzle-orm": "^0.45.4",
     "express": "^5.2.1",

@@ -53,6 +53,9 @@ importers:
       '@tourney/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@tourney/udt':
+        specifier: workspace:*
+        version: link:../../packages/udt
       better-sqlite3:
         specifier: ^13.0.3
         version: 13.0.3
@@ -190,6 +193,8 @@ importers:
       zod:
         specifier: ^4.6.5
         version: 4.6.5
+
+  packages/udt: {}
 
 packages:
 
