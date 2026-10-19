@@ -13,9 +13,14 @@ import type { z } from 'zod';
 import { AdminOnly, CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
-import { CreateSeriesBody, SeriesService, UpdateSeriesBody } from './series.service.js';
+import {
+  CreateSeriesBody,
+  PreviewSeriesBody,
+  SeriesService,
+  UpdateSeriesBody,
+} from './series.service.js';
 
-/** Tournament series (admins): weekly templates that create tournaments by themselves. */
+/** Tournament series (admins): templates that create tournaments by themselves. */
 @AdminOnly()
 @Controller('series')
 export class SeriesController {
@@ -32,6 +37,13 @@ export class SeriesController {
     @Body(new ZodPipe(CreateSeriesBody)) body: z.infer<typeof CreateSeriesBody>,
   ) {
     return this.series.create(body, user);
+  }
+
+  /** The next starts of a schedule (not saved). */
+  @Post('preview')
+  @HttpCode(200)
+  preview(@Body(new ZodPipe(PreviewSeriesBody)) body: z.infer<typeof PreviewSeriesBody>) {
+    return this.series.preview(body);
   }
 
   @Patch(':id')

@@ -76,6 +76,8 @@ export const tournaments = sqliteTable('tournaments', {
    * bracket is seeded. Off: the stored pool (older tournaments, API clients that send one).
    */
   botsFromLibrary: integer('bots_from_library', { mode: 'boolean' }).notNull().default(false),
+  /** Seeded and started by itself at `scheduledAt` (waits up to an hour for a free server). */
+  autoStart: integer('auto_start', { mode: 'boolean' }).notNull().default(false),
   registrationOpen: integer('registration_open', { mode: 'boolean' }).notNull().default(true),
   scheduledAt: text('scheduled_at'),
   createdBy: text('created_by').notNull(),
@@ -105,12 +107,16 @@ export const series = sqliteTable('series', {
   name: text('name').notNull(),
   /** The tournament's fields without name and start (agent, profile, settings, bots, ...). */
   templateJson: text('template_json').notNull(),
-  /** ISO weekday 1 (Monday) .. 7 (Sunday) and local time "HH:MM" in SEASON_TZ. */
+  /** First weekday and time of the schedule (older versions; the schedule is `scheduleJson`). */
   weekday: integer('weekday').notNull(),
   time: text('time').notNull(),
+  /** Weekdays, times or an hour interval (local times in SEASON_TZ), see series-time.ts. */
+  scheduleJson: text('schedule_json'),
   everyWeeks: integer('every_weeks').notNull().default(1),
-  /** The tournament is created (and announced) this many days before its start. */
+  /** Older versions: lead time in days (now `leadMinutes`). */
   leadDays: integer('lead_days').notNull().default(7),
+  /** The tournament is created (and announced) this many minutes before its start. */
+  leadMinutes: integer('lead_minutes').notNull().default(10080),
   /** A start date of the series (YYYY-MM-DD): the weeks count from it. */
   anchorDate: text('anchor_date').notNull(),
   nextNumber: integer('next_number').notNull().default(1),

@@ -278,4 +278,14 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE tournaments ADD COLUMN bots_from_library INTEGER NOT NULL DEFAULT 0;
   `,
+  // 13: series on several weekdays or daily, at several times or every n hours; the lead time in
+  // minutes; tournaments that start by themselves at their start time.
+  `
+  ALTER TABLE series ADD COLUMN schedule_json TEXT;
+  ALTER TABLE series ADD COLUMN lead_minutes INTEGER NOT NULL DEFAULT 10080;
+  UPDATE series SET
+    schedule_json = '{"days":[' || weekday || '],"times":["' || time || '"]}',
+    lead_minutes = lead_days * 1440;
+  ALTER TABLE tournaments ADD COLUMN auto_start INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

@@ -40,6 +40,7 @@ import { SeriesController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
 import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
+import { AutoStartService } from './tournaments/auto-start.service.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
@@ -111,6 +112,7 @@ class AppModule {
         BotsService,
         BetsService,
         SeriesService,
+        AutoStartService,
         ShopService,
         AgentGateway,
       ],

@@ -90,6 +90,8 @@ const TournamentFields = z.object({
    * statistics count every tournament). Can only be switched on while a season runs.
    */
   seasonal: z.boolean().optional(),
+  /** Seeded and started by itself at the start time (needs `scheduledAt`). */
+  autoStart: z.boolean().optional(),
   webhookUrl: z
     .string()
     .trim()
@@ -335,6 +337,7 @@ export class TournamentsService {
         settingsJson: JSON.stringify(body.settings),
         botPoolJson: JSON.stringify(body.botPool),
         botsFromLibrary: fromLibrary,
+        autoStart: body.autoStart ?? false,
         registrationOpen: body.registrationOpen ?? true,
         scheduledAt: body.scheduledAt ?? null,
         notifyMode: body.notifyMode ?? 'default',
@@ -392,6 +395,7 @@ export class TournamentsService {
       set.remindedAt = null; // a new start gets a new reminder
     }
     if (body.notifyMode !== undefined) set.notifyMode = body.notifyMode;
+    if (body.autoStart !== undefined) set.autoStart = body.autoStart;
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
     if (body.seasonal !== undefined && body.seasonal !== t.seasonal) {
       if (body.seasonal && !this.seasons.current()) throw conflict('no season is running');
@@ -1300,6 +1304,32 @@ export class TournamentsService {
     });
   }
 
+  /** Calls off a seeded tournament that never ran (autostart: no free server). */
+  cancelSeeded(id: string, reason: string, by: User): void {
+    const t = this.require(id);
+    if (t.phase !== 'seeded') throw conflict(`cannot cancel in phase ${t.phase}`);
+    const res = this.log.append(id, t.headSeq, [
+      { type: 'tournament.aborted', actor: { kind: 'admin', id: by.id }, data: { reason } },
+    ]);
+    if (!res.accepted) throw conflict(res.reason);
+  }
+
+  /** Tournaments that start by themselves and whose start time has come (oldest first). */
+  dueAutoStarts(now: number): TournamentRow[] {
+    return this.db
+      .select()
+      .from(tournaments)
+      .where(and(eq(tournaments.autoStart, true), inArray(tournaments.phase, ['draft', 'seeded'])))
+      .orderBy(asc(tournaments.scheduledAt))
+      .all()
+      .filter((t) => t.scheduledAt && Date.parse(t.scheduledAt) <= now);
+  }
+
+  /** Autostart gave up (seeding failed for an hour): the tournament waits for an admin. */
+  stopAutoStart(id: string): void {
+    this.db.update(tournaments).set({ autoStart: false }).where(eq(tournaments.id, id)).run();
+  }
+
   async command(id: string, cmd: Command, by: User): Promise<void> {
     const t = this.require(id);
     const online = this.connections.isOnline(t.agentId);
@@ -1441,6 +1471,7 @@ export class TournamentsService {
         registered,
         registeredMe: mine > 0,
         registrationOpen: t.registrationOpen,
+        autoStart: t.autoStart,
         scheduledAt: t.scheduledAt,
         createdAt: t.createdAt,
         champion: proj?.championId ? proj.entrants[proj.championId]?.displayName : undefined,
@@ -1504,6 +1535,7 @@ export class TournamentsService {
       botPool: this.botPool(t),
       botsFromLibrary: t.botsFromLibrary,
       seriesId: t.seriesId,
+      autoStart: t.autoStart,
       registrationOpen: t.registrationOpen,
       seasonal: t.seasonal,
       season: this.seasonOf(t) ?? null,

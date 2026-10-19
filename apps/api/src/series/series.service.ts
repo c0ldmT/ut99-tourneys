@@ -16,20 +16,45 @@ import {
   TournamentsService,
   type CreateTournament,
 } from '../tournaments/tournaments.service.js';
-import { firstDate, nextStart, seriesName } from './series-time.js';
+import {
+  createTime,
+  dayTimes,
+  nextStarts,
+  seriesName,
+  type SeriesSchedule,
+} from './series-time.js';
 
 type SeriesRow = typeof series.$inferSelect;
 type Template = Omit<CreateTournament, 'name' | 'scheduledAt' | 'id'>;
 
 const Time = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
-export const SeriesFields = z.object({
-  name: z.string().trim().min(1).max(90),
-  weekday: z.number().int().min(1).max(7),
-  time: Time,
-  everyWeeks: z.number().int().min(1).max(8).default(1),
-  leadDays: z.number().int().min(0).max(28).default(7),
+/** A series starts at most 24 tournaments a day. */
+const MAX_TIMES = 24;
+const ScheduleFields = z.object({
+  /** ISO weekdays 1 (Monday) .. 7 (Sunday); all seven = daily. */
+  days: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
+  /** Fixed local start times … */
+  times: z.array(Time).max(MAX_TIMES).optional(),
+  /** … and/or every n hours from `from` to `to` (null: none). */
+  every: z
+    .object({ hours: z.number().int().min(1).max(12), from: Time, to: Time })
+    .nullable()
+    .optional(),
+  everyWeeks: z.number().int().min(1).max(8).optional(),
+  /** The tournament is created (and announced) this long before its start. */
+  leadMinutes: z
+    .number()
+    .int()
+    .min(0)
+    .max(28 * 1440)
+    .optional(),
+  /** Older clients: one weekday and time, the lead time in days. */
+  weekday: z.number().int().min(1).max(7).optional(),
+  time: Time.optional(),
+  leadDays: z.number().int().min(0).max(28).optional(),
 });
-/** What every tournament of a series gets (server, settings, bots, Discord, season). */
+export const SeriesFields = ScheduleFields.extend({ name: z.string().trim().min(1).max(90) });
+/** What every tournament of a series gets (server, settings, bots, Discord, season, autostart). */
 export const TemplateBody = CreateTournamentBody.omit({ id: true, name: true, scheduledAt: true });
 export const CreateSeriesBody = SeriesFields.extend({
   /** The tournament whose settings, server and bots the series copies … */
@@ -41,10 +66,24 @@ export const UpdateSeriesBody = SeriesFields.partial().extend({
   active: z.boolean().optional(),
   template: TemplateBody.optional(),
 });
+export const PreviewSeriesBody = ScheduleFields.extend({
+  name: z.string().trim().max(90).optional(),
+  /** Number of the next tournament (an existing series). */
+  nextNumber: z.number().int().min(1).optional(),
+});
+type ScheduleInput = z.infer<typeof ScheduleFields>;
+
+/** The stored schedule of a series (rows of older versions: their weekday and time). */
+interface Schedule {
+  days: number[];
+  times: string[];
+  every: { hours: number; from: string; to: string } | null;
+}
 
 /**
- * Tournament series: a template that creates the next tournament of the series a few days
- * before its start (registration open, so the Discord channel announces it).
+ * Tournament series: a template that creates the next tournament of the series some time
+ * before its start (registration open, so the Discord channel announces it), on weekdays or
+ * daily, at fixed times or every n hours.
  */
 @Injectable()
 export class SeriesService implements OnModuleInit, OnModuleDestroy {
@@ -78,33 +117,72 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     return r;
   }
 
-  /** The next start and when its tournament is created. */
+  private schedule(r: SeriesRow): Schedule {
+    const s = r.scheduleJson ? (JSON.parse(r.scheduleJson) as Partial<Schedule>) : {};
+    return {
+      days: s.days?.length ? s.days : [r.weekday],
+      times: s.times ?? (s.every ? [] : [r.time]),
+      every: s.every ?? null,
+    };
+  }
+
+  private timing(r: SeriesRow): SeriesSchedule {
+    return { ...this.schedule(r), everyWeeks: r.everyWeeks, anchorDate: r.anchorDate };
+  }
+
+  /** The schedule of a body, on top of the current one (an update), checked. */
+  private scheduleOf(b: ScheduleInput, current?: Schedule): Schedule {
+    const days = b.days ?? (b.weekday ? [b.weekday] : current?.days);
+    const times = b.times ?? (b.time ? [b.time] : b.every !== undefined ? [] : current?.times);
+    const every =
+      b.every !== undefined ? b.every : b.times || b.time ? null : (current?.every ?? null);
+    if (!days?.length) throw badRequest('a series needs at least one weekday');
+    const s: Schedule = { days: [...new Set(days)].sort(), times: times ?? [], every };
+    const n = dayTimes(s).length;
+    if (!n) throw badRequest('a series needs a start time or an hour interval');
+    if (n > MAX_TIMES) throw badRequest(`at most ${MAX_TIMES} tournaments a day`);
+    return s;
+  }
+
+  private leadOf(b: ScheduleInput): number | undefined {
+    return b.leadMinutes ?? (b.leadDays !== undefined ? b.leadDays * 1440 : undefined);
+  }
+
+  /**
+   * The next start and when its tournament is created. Starts that passed without a
+   * tournament (the website was down) are skipped.
+   */
   private next(r: SeriesRow): { start: number; createAt: number } {
-    const after = r.lastStart ? Date.parse(r.lastStart) : this.clock.now();
-    const start = nextStart(r, after, this.tz);
-    return { start, createAt: start - r.leadDays * 86_400_000 };
+    const now = this.clock.now();
+    const after = Math.max(r.lastStart ? Date.parse(r.lastStart) : 0, now);
+    const start = nextStarts(this.timing(r), after, this.tz, 1)[0] ?? NaN;
+    return { start, createAt: createTime(start, r.leadMinutes, this.tz) };
   }
 
   view(r: SeriesRow) {
     const n = this.next(r);
     const t = JSON.parse(r.templateJson) as Template;
+    const s = this.schedule(r);
     const created = this.db
-      .select({ id: tournaments.id, name: tournaments.name, phase: tournaments.phase })
+      .select({ id: tournaments.id })
       .from(tournaments)
       .where(eq(tournaments.seriesId, r.id))
       .all();
+    const ok = Number.isFinite(n.start);
     return {
       id: r.id,
       name: r.name,
-      weekday: r.weekday,
-      time: r.time,
+      days: s.days,
+      times: s.times,
+      every: s.every,
       everyWeeks: r.everyWeeks,
-      leadDays: r.leadDays,
+      leadMinutes: r.leadMinutes,
+      autoStart: !!t.autoStart,
       active: r.active,
       nextNumber: r.nextNumber,
-      nextStart: new Date(n.start).toISOString(),
-      nextCreateAt: new Date(n.createAt).toISOString(),
-      nextName: seriesName(r.name, r.nextNumber, n.start, this.tz),
+      nextStart: ok ? new Date(n.start).toISOString() : null,
+      nextCreateAt: ok ? new Date(n.createAt).toISOString() : null,
+      nextName: ok ? seriesName(r.name, r.nextNumber, n.start, this.tz) : null,
       lastStart: r.lastStart,
       settings: t.settings,
       template: t,
@@ -119,6 +197,27 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       .from(series)
       .all()
       .map((r) => this.view(r));
+  }
+
+  /** The next starts of a schedule (the form shows them before saving). */
+  preview(b: z.infer<typeof PreviewSeriesBody>) {
+    const s = this.scheduleOf(b);
+    const now = this.clock.now();
+    const starts = nextStarts(
+      { ...s, everyWeeks: b.everyWeeks ?? 1, anchorDate: today(now, this.tz) },
+      now,
+      this.tz,
+      4,
+    );
+    const first = b.nextNumber ?? 1;
+    return {
+      timeZone: this.tz,
+      perDay: dayTimes(s).length,
+      next: starts.map((t, i) => ({
+        start: new Date(t).toISOString(),
+        name: b.name ? seriesName(b.name, first + i, t, this.tz) : null,
+      })),
+    };
   }
 
   /** A copy of a tournament's server, settings, bots and channel. */
@@ -136,6 +235,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       notifyMode: t.notifyMode as 'default' | 'custom' | 'off',
       webhookUrl: t.webhookUrl,
       seasonal: t.seasonal,
+      autoStart: t.autoStart,
     };
   }
 
@@ -144,6 +244,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       ? { ...body.template, registrationOpen: true }
       : this.templateOf(body.fromTournament!);
     this.tournaments.checkTemplate(template);
+    const s = this.scheduleOf(body);
     const id = `s${randomId(10)}`;
     this.db
       .insert(series)
@@ -151,11 +252,12 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
         id,
         name: body.name,
         templateJson: JSON.stringify(template),
-        weekday: body.weekday,
-        time: body.time,
-        everyWeeks: body.everyWeeks,
-        leadDays: body.leadDays,
-        anchorDate: firstDate(today(this.clock.now(), this.tz), body.weekday),
+        weekday: s.days[0]!,
+        time: dayTimes(s)[0]!,
+        scheduleJson: JSON.stringify(s),
+        everyWeeks: body.everyWeeks ?? 1,
+        leadMinutes: this.leadOf(body) ?? 7 * 1440,
+        anchorDate: today(this.clock.now(), this.tz),
         createdBy: by.id,
         createdAt: new Date(this.clock.now()).toISOString(),
       })
@@ -171,22 +273,26 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     const r = this.row(id);
     const patch: Partial<SeriesRow> = {};
     if (body.name !== undefined) patch.name = body.name;
-    if (body.time !== undefined) patch.time = body.time;
-    if (body.everyWeeks !== undefined) patch.everyWeeks = body.everyWeeks;
-    if (body.leadDays !== undefined) patch.leadDays = body.leadDays;
     if (body.active !== undefined) patch.active = body.active;
+    const lead = this.leadOf(body);
+    if (lead !== undefined) patch.leadMinutes = lead;
+    const touched =
+      body.days ?? body.times ?? body.every ?? body.weekday ?? body.time ?? body.everyWeeks;
+    if (touched !== undefined || body.every === null) {
+      const s = this.scheduleOf(body, this.schedule(r));
+      patch.scheduleJson = JSON.stringify(s);
+      patch.weekday = s.days[0]!;
+      patch.time = dayTimes(s)[0]!;
+      if (body.everyWeeks !== undefined) patch.everyWeeks = body.everyWeeks;
+      // A new rhythm counts from the week of the next start.
+      const next = this.next(r).start;
+      patch.anchorDate = today(Number.isFinite(next) ? next : this.clock.now(), this.tz);
+    }
     if (body.template) {
       const template: Template = { ...body.template, registrationOpen: true };
       this.tournaments.checkTemplate(template);
       patch.templateJson = JSON.stringify(template);
     }
-    if (body.weekday !== undefined && body.weekday !== r.weekday) {
-      patch.weekday = body.weekday;
-      patch.anchorDate = firstDate(today(this.clock.now(), this.tz), body.weekday);
-    }
-    if (body.everyWeeks !== undefined && body.everyWeeks !== r.everyWeeks && !patch.anchorDate)
-      // The rhythm counts from the next start.
-      patch.anchorDate = today(this.next(r).start, this.tz);
     if (Object.keys(patch).length) this.db.update(series).set(patch).where(eq(series.id, id)).run();
     this.tick();
     return this.view(this.row(id));
@@ -200,7 +306,9 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
   /** Creates the next tournament now (the start stays as scheduled). */
   runNow(id: string) {
     const r = this.row(id);
-    this.createNext(r, this.next(r).start);
+    const n = this.next(r);
+    if (!Number.isFinite(n.start)) throw badRequest('the series has no next start');
+    this.createNext(r, n.start);
     return this.view(this.row(id));
   }
 
@@ -210,7 +318,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     for (const r of this.db.select().from(series).where(eq(series.active, true)).all()) {
       try {
         const n = this.next(r);
-        if (now >= n.createAt) this.createNext(r, n.start);
+        if (Number.isFinite(n.start) && now >= n.createAt) this.createNext(r, n.start);
       } catch (e) {
         this.log.warn(`series ${r.name}: ${(e as Error).message}`);
       }
