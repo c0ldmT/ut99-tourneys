@@ -8,15 +8,39 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
-import { baseValue, bracketOf, valueScore, weeklySalary } from '@tourney/udt';
+import {
+  baseValue,
+  botRarity,
+  bracketOf,
+  managerEffects,
+  RARITIES,
+  SCRAP,
+  valueScore,
+  weeklySalary,
+} from '@tourney/udt';
 import { Api, errorText } from './api';
 import { Auth } from './auth';
 import { Coin } from './brand';
 import { I18n, TPipe } from './i18n';
 import { NeuroPipe } from './neuro';
-import type { BotTraitsView, UdtRarity, UdtTestState } from './types';
+import type { BotTraitsView, UdtRarity, UdtTestState, UdtTraitOnBot } from './types';
 
-export { baseValue, bracketOf, valueScore, weeklySalary };
+export {
+  baseValue,
+  botRarity,
+  bracketOf,
+  managerEffects,
+  RARITIES,
+  SCRAP,
+  valueScore,
+  weeklySalary,
+};
+
+/** Salary of a roster bot with its manager traits (the penny pincher). */
+export function salaryOf(b: { value: number; skill: number; udtTraits?: { code: string }[] }) {
+  const f = managerEffects((b.udtTraits ?? []) as Parameters<typeof managerEffects>[0]).salary;
+  return Math.round((weeklySalary(b.value, b.skill) * f) / 10) * 10;
+}
 
 /** UT99 skill names 0..7. */
 export const SKILL_NAMES = [
@@ -41,6 +65,11 @@ export interface CardBot {
   value?: number;
   tag?: string;
   stamina?: number;
+  /** Roster bots: traits, slots and the values with the traits. */
+  udtTraits?: UdtTraitOnBot[];
+  slots?: number;
+  level?: number;
+  effective?: { skill: number; traits: BotTraitsView; overflow: boolean };
 }
 
 /** A bot as a Dream Team card (rarity from the skill): skill, values, value, stamina. */
@@ -50,14 +79,21 @@ export interface CardBot {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let b = bot();
+    @let v = b.effective?.traits ?? b.traits;
+    @let sk = b.effective?.skill ?? b.skill;
     <div class="udt-card r-{{ b.rarity }}" [class.small]="small()">
       <div class="in">
         <div class="top">
           <div>
-            <div class="ovr">{{ round(b.skill) }}</div>
-            <div class="tier">{{ skillName(b.skill) }}</div>
+            <div class="ovr">{{ round(sk) }}{{ b.effective?.overflow ? '+' : '' }}</div>
+            <div class="tier">{{ skillName(sk) }}</div>
           </div>
-          <span class="rar">{{ rarityLabel() }}</span>
+          <span class="rar"
+            >{{ rarityLabel() }}
+            @if (b.level) {
+              <br /><span class="lvl">{{ 'udt.level' | t }} {{ b.level }}</span>
+            }
+          </span>
         </div>
         @if (!small()) {
           <div class="pic">
@@ -77,16 +113,25 @@ export interface CardBot {
           {{ b.name }}
         </div>
         <div class="stats">
-          <span
-            >GEN<b>{{ pct(b.traits.accuracy) }}</b></span
+          <span [class.up]="v.accuracy !== b.traits.accuracy"
+            >GEN<b>{{ pct(v.accuracy) }}</b></span
           >
-          <span
-            >WAC<b>{{ pct(b.traits.alertness) }}</b></span
+          <span [class.up]="v.alertness !== b.traits.alertness"
+            >WAC<b>{{ pct(v.alertness) }}</b></span
           >
-          <span
-            >STR<b>{{ pct(b.traits.strafing) }}</b></span
+          <span [class.up]="v.strafing !== b.traits.strafing"
+            >STR<b>{{ pct(v.strafing) }}</b></span
           >
         </div>
+        @if (b.udtTraits?.length) {
+          <div class="udt-traits">
+            @for (t of b.udtTraits; track t.id) {
+              <span class="udt-trait r-{{ t.rarity }}" [title]="'udt.traitE.' + t.code | t">{{
+                'udt.trait.' + t.code | t
+              }}</span>
+            }
+          </div>
+        }
         @if (b.stamina !== undefined) {
           <div class="udt-bar" [title]="'udt.stamina' | t">
             <i [style.width.%]="b.stamina" [style.background]="staminaColor(b.stamina)"></i>
@@ -131,6 +176,7 @@ export function staminaColor(s: number): string {
         'udt.nav.team' | t
       }}</a>
       <a routerLink="/udt/market" routerLinkActive="active">{{ 'udt.nav.market' | t }}</a>
+      <a routerLink="/udt/packs" routerLinkActive="active">{{ 'udt.nav.packs' | t }}</a>
       <a routerLink="/udt/events" routerLinkActive="active">{{ 'udt.nav.events' | t }}</a>
       <a routerLink="/udt/table" routerLinkActive="active">{{ 'udt.nav.table' | t }}</a>
     </nav>

@@ -851,7 +851,75 @@ export interface UdtRosterBot {
   bench: number | null;
   stamina: number;
   xp: number;
+  level: number;
+  slots: number;
+  udtTraits: UdtTraitOnBot[];
+  effective: { skill: number; traits: BotTraitsView; overflow: boolean };
   striking: boolean;
+}
+
+export interface UdtTraitOnBot {
+  id: string;
+  code: string;
+  rarity: UdtRarity;
+  weapon?: string | null;
+}
+
+export type UdtBox = 'standard' | 'premium' | 'elite';
+
+export interface UdtPackBox {
+  box: UdtBox;
+  price: number;
+  tenPrice: number;
+  rates: [number, number, number, number, number];
+  epicIn: number;
+  legendaryIn: number;
+  opened: number;
+}
+
+export interface UdtInventoryCard {
+  id: string;
+  code: string;
+  rarity: UdtRarity;
+  category: 'values' | 'manager';
+  needsWeapon: boolean;
+}
+
+export interface UdtCatalogTrait {
+  code: string;
+  rarity: UdtRarity;
+  category: 'values' | 'manager';
+  needsWeapon?: boolean;
+  scrap: number;
+  craft: number;
+  owned: boolean;
+}
+
+export interface UdtPacks {
+  index: number;
+  hasTeam: boolean;
+  scrap: number;
+  spendable: number;
+  boxes: UdtPackBox[];
+  inventory: UdtInventoryCard[];
+  weapons: AssetItem[];
+  catalog: UdtCatalogTrait[];
+}
+
+export interface UdtPullCard {
+  id: string | null;
+  code: string;
+  rarity: UdtRarity;
+  duplicate: boolean;
+  scrap: number;
+}
+
+export interface UdtPull {
+  box: UdtBox;
+  ten: boolean;
+  price: number;
+  cards: UdtPullCard[];
+  view: UdtPacks;
 }
 
 export interface UdtTeam {

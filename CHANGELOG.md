@@ -7,6 +7,12 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team packs and traits: page "Packs" with three boxes (standard, premium, elite) and 10-pulls, open
+  drop rates and pity, an opening animation (charge up, burst, cards dealt face down, flip one by one or all,
+  legendary banner); trait inventory, scrap and crafting. Traits go on roster bots within the slots of their level
+  (1, 3 from level 5, 5 from level 10): values traits change what the game gets (accuracy, alertness, strafing,
+  jumping, favourite weapon, aggressiveness, camping, Claudius' heir +1 skill), manager traits change stamina,
+  salary, rewards, market value and experience. Cards show the values with traits and the trait chips.
 - Unreal Dream Team on the website (add-on, off by default; settings page "Dream Team"): menu item "Dream Team" with
   My team (found a team with a self-built starter bot, lineups for deathmatch and Monster Hunt with bench, roster with
   stamina, value and sell-back, Neuro ledger), Market (daily offers as cards with rarity and value trend, hidden bids),

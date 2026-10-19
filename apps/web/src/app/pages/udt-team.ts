@@ -5,32 +5,21 @@ import { Api, errorText } from '../core/api';
 import { Coin } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
-import type { UdtLedgerEntry, UdtRarity, UdtRosterBot, UdtView } from '../core/types';
+import type { UdtLedgerEntry, UdtPacks, UdtRosterBot, UdtTraitOnBot, UdtView } from '../core/types';
 import {
   baseValue,
+  botRarity,
   bracketOf,
+  salaryOf,
+  SCRAP,
   staminaColor,
   UdtCard,
   UdtNav,
   valueScore,
-  weeklySalary,
   type CardBot,
 } from '../core/udt';
 
 type Mode = 'dm' | 'mh';
-
-const rarityOf = (skill: number): UdtRarity => {
-  const s = Math.round(skill);
-  return s <= 2
-    ? 'common'
-    : s === 3
-      ? 'uncommon'
-      : s <= 5
-        ? 'rare'
-        : s === 6
-          ? 'epic'
-          : 'legendary';
-};
 
 /** Dream Team: founding the team (starter bot), the lineups, the roster and the ledger. */
 @Component({
@@ -217,7 +206,7 @@ const rarityOf = (skill: number): UdtRarity => {
             @for (b of v.roster; track b.botId) {
               <div class="rrow">
                 <span class="udt-chip r-{{ b.rarity }}"
-                  ><span>{{ b.skill }}</span></span
+                  ><span>{{ b.effective.skill }}{{ b.effective.overflow ? '+' : '' }}</span></span
                 >
                 <span class="grow">
                   <b>{{ b.gameName }}</b>
@@ -234,8 +223,79 @@ const rarityOf = (skill: number): UdtRarity => {
                     <span class="udt-mark star">Star</span>
                   }
                   <span class="muted small block"
-                    >XP {{ b.xp }} · {{ 'udt.paid' | t }} {{ b.price | neuro }}</span
+                    >{{ 'udt.level' | t }} {{ b.level }} · XP {{ b.xp }} · {{ 'udt.paid' | t }}
+                    {{ b.price | neuro }}</span
                   >
+                  <span class="udt-traits tline">
+                    @for (tr of b.udtTraits; track tr.id) {
+                      <span
+                        class="udt-trait r-{{ tr.rarity }}"
+                        [title]="'udt.traitE.' + tr.code | t"
+                        >{{ 'udt.trait.' + tr.code | t }}
+                        <button
+                          type="button"
+                          class="x"
+                          [attr.aria-label]="'udt.traits.remove' | t"
+                          [disabled]="busy()"
+                          (click)="unassign(tr)"
+                        >
+                          ×
+                        </button></span
+                      >
+                    }
+                    @if (b.udtTraits.length < b.slots) {
+                      <button
+                        type="button"
+                        class="udt-trait slot add"
+                        [disabled]="busy()"
+                        (click)="openAssign(b)"
+                      >
+                        + {{ 'udt.traits.add' | t }} ({{
+                          'udt.traits.free' | t: { n: b.slots - b.udtTraits.length }
+                        }})
+                      </button>
+                    }
+                  </span>
+                  @if (assignFor() === b.botId) {
+                    <span class="assign">
+                      @if (inventory().length) {
+                        <select [(ngModel)]="pickCard" name="pick" (ngModelChange)="tick()">
+                          @for (c of inventory(); track c.id) {
+                            <option [ngValue]="c.id">
+                              {{ 'udt.trait.' + c.code | t }} – {{ 'udt.traitE.' + c.code | t }}
+                            </option>
+                          }
+                        </select>
+                        @if (needsWeapon()) {
+                          <select
+                            [(ngModel)]="pickWeapon"
+                            name="weapon"
+                            [attr.aria-label]="'udt.traits.weapon' | t"
+                          >
+                            @for (w of weapons(); track w.name) {
+                              <option [ngValue]="w.name">{{ w.label }}</option>
+                            }
+                          </select>
+                        }
+                        <button
+                          type="button"
+                          class="primary"
+                          [disabled]="busy() || !pickCard"
+                          (click)="assign(b)"
+                        >
+                          {{ 'udt.traits.put' | t }}
+                        </button>
+                      } @else {
+                        <span class="muted small"
+                          >{{ 'udt.traits.none' | t }}
+                          <a routerLink="/udt/packs">{{ 'udt.nav.packs' | t }}</a></span
+                        >
+                      }
+                      <button type="button" (click)="assignFor.set(null)">
+                        {{ 'common.cancel' | t }}
+                      </button>
+                    </span>
+                  }
                 </span>
                 <span class="stam"
                   ><span class="udt-bar"
@@ -328,6 +388,34 @@ const rarityOf = (skill: number): UdtRarity => {
     .stam .udt-bar {
       flex: 1;
     }
+    .tline {
+      margin-top: 6px;
+    }
+    .udt-trait .x {
+      min-height: 0;
+      height: 16px;
+      padding: 0 2px;
+      border: 0;
+      background: transparent;
+      color: inherit;
+      line-height: 1;
+    }
+    .udt-trait.add {
+      cursor: pointer;
+      min-height: 0;
+      font: inherit;
+      font-size: 0.68rem;
+    }
+    .assign {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-top: 8px;
+    }
+    .assign select {
+      max-width: 100%;
+    }
     .up {
       color: var(--live);
     }
@@ -368,6 +456,16 @@ export class UdtTeamPage {
     bench: [],
   });
   protected readonly dirty = signal(false);
+  protected readonly assignFor = signal<string | null>(null);
+  private readonly packs = signal<UdtPacks | null>(null);
+  protected readonly inventory = computed(() => this.packs()?.inventory ?? []);
+  protected readonly weapons = computed(() => this.packs()?.weapons ?? []);
+  protected pickCard: string | null = null;
+  protected pickWeapon: string | null = null;
+  protected readonly needsWeapon = computed(() => {
+    this.rev();
+    return !!this.inventory().find((c) => c.id === this.pickCard)?.needsWeapon;
+  });
 
   protected readonly budget = computed(() => this.view()?.starterBudget ?? 1500);
   protected readonly cost = computed(() => {
@@ -379,7 +477,7 @@ export class UdtTeamPage {
     return {
       name: this.botName || '?',
       skill: Number(this.skill),
-      rarity: rarityOf(Number(this.skill)),
+      rarity: botRarity(Number(this.skill)),
       traits: { ...this.values },
       tag: this.teamTag || undefined,
       value: this.cost(),
@@ -389,9 +487,7 @@ export class UdtTeamPage {
     (this.view()?.roster ?? []).reduce((s, b) => s + b.value, 0),
   );
   protected readonly salary = computed(() =>
-    (this.view()?.roster ?? [])
-      .filter((b) => !b.starter)
-      .reduce((s, b) => s + weeklySalary(b.value, b.skill), 0),
+    (this.view()?.roster ?? []).filter((b) => !b.starter).reduce((s, b) => s + salaryOf(b), 0),
   );
 
   constructor() {
@@ -435,7 +531,41 @@ export class UdtTeamPage {
   }
 
   protected star(b: UdtRosterBot) {
-    return bracketOf(b.skill) === 'strong';
+    return bracketOf(b.effective.skill) === 'strong';
+  }
+
+  protected async openAssign(b: UdtRosterBot) {
+    await this.act(async () => {
+      const p = await this.api.udtPacks();
+      this.packs.set(p);
+      this.pickCard = p.inventory[0]?.id ?? null;
+      this.pickWeapon = p.weapons[0]?.name ?? null;
+      this.assignFor.set(b.botId);
+      this.tick();
+    });
+  }
+
+  protected async assign(b: UdtRosterBot) {
+    const card = this.pickCard;
+    if (!card) return;
+    await this.act(async () => {
+      const v = await this.api.udtAssign(
+        card,
+        b.botId,
+        this.needsWeapon() ? (this.pickWeapon ?? undefined) : undefined,
+      );
+      this.view.set(v);
+      this.assignFor.set(null);
+    });
+  }
+
+  protected async unassign(t: UdtTraitOnBot) {
+    const name = this.i18n.t(`udt.trait.${t.code}`);
+    const n = SCRAP[t.rarity];
+    if (!confirm(this.i18n.t('udt.traits.removeConfirm', { name, n }))) return;
+    await this.act(async () => {
+      this.view.set(await this.api.udtUnassign(t.id));
+    });
   }
 
   protected color(s: number) {

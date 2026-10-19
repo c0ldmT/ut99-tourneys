@@ -6,6 +6,9 @@ import type {
   UdtLedgerEntry,
   UdtMarket,
   UdtRosterBot,
+  UdtBox,
+  UdtPacks,
+  UdtPull,
   UdtTableRow,
   UdtTestState,
   UdtView,
@@ -158,6 +161,19 @@ export class Api {
     this.call<UdtEvent[]>('POST', `/udt/events/${encodeURIComponent(id)}/enter`);
   udtLeave = (id: string) =>
     this.call<UdtEvent[]>('DELETE', `/udt/events/${encodeURIComponent(id)}/enter`);
+  udtPacks = () => this.call<UdtPacks>('GET', '/udt/packs');
+  udtOpen = (box: UdtBox, ten: boolean) =>
+    this.call<UdtPull>('POST', '/udt/packs/open', { box, ten });
+  udtCraft = (code: string) => this.call<UdtPacks>('POST', '/udt/packs/craft', { code });
+  udtAssign = (cardId: string, botId: string, weapon?: string) =>
+    this.call<UdtView>('POST', `/udt/traits/${encodeURIComponent(cardId)}/assign`, {
+      botId,
+      ...(weapon ? { weapon } : {}),
+    });
+  udtUnassign = (cardId: string) =>
+    this.call<UdtView>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}/assign`);
+  udtScrap = (cardId: string) =>
+    this.call<UdtPacks>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}`);
   udtTable = () => this.call<UdtTableRow[]>('GET', '/udt/table');
   udtLedger = () => this.call<UdtLedgerEntry[]>('GET', '/udt/ledger');
   udtTest = () => this.call<UdtTestState>('GET', '/udt/test');
