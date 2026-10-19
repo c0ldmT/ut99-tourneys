@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.11.0";
+const MOD_VERSION = "0.12.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -4003,6 +4003,17 @@ function bool BotSay(int c, string Msg)
 			else
 				P.TeamMessage(B.PlayerReplicationInfo, Msg, 'Say', true);
 		}
+	// Mod 0.12.0: the line also goes to the website (kill feed of the match page).
+	if (MatchId != "")
+	{
+		OutMsg.Begin("bs");
+		OutMsg.AddStr("mid", MatchId);
+		OutMsg.AddInt("g", GameNo);
+		OutMsg.AddStr("n", OutMsg.FitWire(FeedName(B), 32));
+		OutMsg.AddInt("sd", FeedSide(B));
+		OutMsg.AddStr("x", OutMsg.FitWire(Msg, 130));
+		Send();
+	}
 	return true;
 }
 

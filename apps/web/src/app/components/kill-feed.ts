@@ -19,7 +19,8 @@ const MULTIS: Record<number, string> = {
 
 /**
  * Live kill feed of the game in progress: newest on top, killer and victim in their side's
- * colour, weapon, headshots, first blood, sprees and multi kills like UT announces them.
+ * colour, weapon, headshots, first blood, sprees and multi kills like UT announces them; the
+ * website bots' chat lines in between.
  */
 @Component({
   selector: 'app-kill-feed',
@@ -36,10 +37,13 @@ const MULTIS: Record<number, string> = {
       }
       <ol aria-live="polite">
         @for (r of rows(); track r.key) {
-          <li [class.big]="r.badges.length > 0">
+          <li [class.big]="r.badges.length > 0" [class.chat]="r.e.chat !== undefined">
             <span class="t mono muted">{{ r.time }}</span>
             <span class="line">
-              @if (r.e.suicide) {
+              @if (r.e.chat !== undefined) {
+                <span class="nm" [class]="r.kSide"><na-name [name]="r.e.killer" /></span>
+                <q class="say">{{ r.e.chat }}</q>
+              } @else if (r.e.suicide) {
                 <span class="nm" [class]="r.vSide"><na-name [name]="r.e.victim" /></span>
                 <span class="muted">{{ 'feed.suicide' | t }}</span>
               } @else {
@@ -118,6 +122,20 @@ const MULTIS: Record<number, string> = {
     }
     .t {
       font-size: 0.78rem;
+    }
+    li.chat .say {
+      color: var(--text-2);
+      font-style: italic;
+      overflow-wrap: anywhere;
+    }
+    li.chat .say::before {
+      content: '“';
+    }
+    li.chat .say::after {
+      content: '”';
+    }
+    li.chat {
+      quotes: none;
     }
     .line {
       display: flex;

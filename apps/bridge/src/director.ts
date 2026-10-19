@@ -1914,6 +1914,38 @@ export class MatchDirector extends EventEmitter {
         } satisfies KillFeedEntry);
         return;
       }
+      case 'bs': {
+        const s = this.stage;
+        if (s.kind !== 'live' || s.matchId !== msg.mid) return;
+        const cm = this.proj.currentMatch;
+        if (!cm) return;
+        const side =
+          msg.sd === 2
+            ? null
+            : this.raceMode
+              ? (this.runner() ?? null)
+              : (cm.entrants[msg.sd] ?? null);
+        this.emit('feed', {
+          tournamentId: this.o.tournamentId,
+          matchId: msg.mid,
+          game: msg.g,
+          at: this.o.clock.now(),
+          killer: msg.n,
+          killerSide: side,
+          victim: '',
+          victimSide: null,
+          weapon: '',
+          headshot: false,
+          firstBlood: false,
+          suicide: false,
+          teamKill: false,
+          monster: false,
+          spree: 0,
+          multi: 0,
+          chat: msg.x,
+        } satisfies KillFeedEntry);
+        return;
+      }
       case 'lost': {
         const s = this.stage;
         if (this.teamMode || s.kind !== 'live' || s.matchId !== msg.mid) return;

@@ -32,6 +32,10 @@ describe('mod line protocol', () => {
     expect(() => encodeModLine({ t: 'cd', sec: 1.5 } as never)).toThrow(ModLineError);
     expect(() => decodeModToBridge('{"t":"hb","up":{"x":1}}')).toThrow(ModLineError);
     expect(() => decodeModToBridge('[1,2]')).toThrow(ModLineError);
+    // Mod 0.12.0: a bot's chat line for the kill feed.
+    expect(
+      decodeModToBridge('{"t":"bs","mid":"W1-1","g":2,"n":"[NX]Mira","sd":1,"x":"Gotcha, Tim!"}'),
+    ).toEqual({ t: 'bs', mid: 'W1-1', g: 2, n: '[NX]Mira', sd: 1, x: 'Gotcha, Tim!' });
     expect(() => decodeModToBridge('nope')).toThrow(ModLineError);
   });
 

@@ -110,6 +110,18 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
   }),
   /** A match player disconnected during a live game (the mod paused the game). 1v1 only. */
   z.object({ t: z.literal('lost'), mid: str(16), s: side }),
+  /**
+   * Mod 0.12.0: a website bot said one of its chat lines (`n` name, `sd` side 0 a / 1 b / 2
+   * none, `x` the line as said), for the kill feed.
+   */
+  z.object({
+    t: z.literal('bs'),
+    mid: str(16),
+    g: int.positive(),
+    n: str(MAX_NAME_CHARS),
+    sd: int.min(0).max(2),
+    x: str(160),
+  }),
   /** Monster Hunt race: progress of the running team (every few seconds and on every death). */
   z.object({
     t: z.literal('rp'),

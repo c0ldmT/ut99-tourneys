@@ -565,7 +565,10 @@ export class MatchPage {
       const k = this.stream.kill();
       if (!k || k.matchId !== this.matchId()) return;
       this.feed.update((l) =>
-        l.some((x) => x.at === k.at && x.killer === k.killer && x.victim === k.victim)
+        l.some(
+          (x) =>
+            x.at === k.at && x.killer === k.killer && x.victim === k.victim && x.chat === k.chat,
+        )
           ? l
           : [...l, k].slice(-80),
       );

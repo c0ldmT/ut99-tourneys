@@ -424,6 +424,8 @@ export const KillFeedEntrySchema = z.object({
   monster: z.boolean(),
   spree: z.number().int().nonnegative(),
   multi: z.number().int().nonnegative(),
+  /** A bot's chat line instead of a kill: `killer` is the bot, `killerSide` its side. */
+  chat: z.string().max(160).optional(),
 });
 export type KillFeedEntry = z.infer<typeof KillFeedEntrySchema>;
 export const MatchFeed = envelope('match.feed', KillFeedEntrySchema);

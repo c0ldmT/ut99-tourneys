@@ -774,6 +774,8 @@ export interface KillFeedEntry {
   monster: boolean;
   spree: number;
   multi: number;
+  /** A bot's chat line (mod 0.12.0): `killer` is the bot. */
+  chat?: string;
 }
 
 // --- Neuro shop -------------------------------------------------------------------------------
