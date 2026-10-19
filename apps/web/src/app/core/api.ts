@@ -21,6 +21,7 @@ import type {
   SeasonsOverview,
   SeriesFields,
   SeriesView,
+  KillFeedEntry,
   SiteConfig,
   StatMode,
   StatScope,
@@ -179,6 +180,7 @@ export class Api {
 
   tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);
+  killFeed = (id: string) => this.call<KillFeedEntry[]>('GET', `/tournaments/${id}/feed`);
   series = () => this.call<SeriesView[]>('GET', '/series');
   createSeries = (body: SeriesFields & { fromTournament: string }) =>
     this.call<SeriesView>('POST', '/series', body);

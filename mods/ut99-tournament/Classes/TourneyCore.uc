@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.7.2";
+const MOD_VERSION = "0.7.3";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -116,6 +116,7 @@ var int StWCount[256];
 var int StCount;
 var int StGameSec;
 var bool bFirstBlood;
+var int FeedFlags, FeedSpree, FeedMulti; // kill feed of the kill being counted (kf line)
 
 // Website bots (bridge lines bcfg/btr/bpers/bsay/brv, sent before their "bot" line): look, play
 // style, chat lines and rivals by name in the game. Bots without these lines use the ini.
@@ -1495,13 +1496,23 @@ function int StatIndex(Pawn P, bool bCreate)
 	return i;
 }
 
-// From the game's Killed (before Super): counts kills, deaths and the rest for both pawns.
+// From the game's Killed (before Super): counts the kill and sends it to the kill feed.
 function OnKilled(Pawn Killer, Pawn Other, name DamageType)
+{
+	if (!bGameLive || bEndReported || bTourneyPaused || Game.bGameEnded)
+		return;
+	FeedFlags = 0;
+	FeedSpree = 0;
+	FeedMulti = 0;
+	CountKill(Killer, Other, DamageType);
+	SendFeed(Killer, Other, DamageType);
+}
+
+// Counts kills, deaths and the rest for both pawns; notes the kill feed flags.
+function CountKill(Pawn Killer, Pawn Other, name DamageType)
 {
 	local int v, k;
 
-	if (!bGameLive || bEndReported || bTourneyPaused || Game.bGameEnded)
-		return;
 	BotTalkKill(Killer, Other);
 	v = StatIndex(Other, true);
 	if (v >= 0)
@@ -1513,10 +1524,13 @@ function OnKilled(Pawn Killer, Pawn Other, name DamageType)
 	}
 	if (Killer == None || Killer == Other)
 	{
+		FeedFlags = FeedFlags | 4;
 		if (v >= 0)
 			StSuicides[v]++;
 		return;
 	}
+	if (Other.IsA('ScriptedPawn'))
+		FeedFlags = FeedFlags | 16;
 	k = StatIndex(Killer, true);
 	if (k < 0)
 		return; // killed by a monster, a spectator's leftovers, ...
@@ -1532,15 +1546,20 @@ function OnKilled(Pawn Killer, Pawn Other, name DamageType)
 	{
 		bFirstBlood = true; // like UT's message: any kill of another player, team kills too
 		StFirst[k] = 1;
+		FeedFlags = FeedFlags | 2;
 	}
 	if ((TeamSize > 1 || Game.bTeamGame) && Killer.PlayerReplicationInfo.Team == Other.PlayerReplicationInfo.Team)
 	{
+		FeedFlags = FeedFlags | 8;
 		StTeamKills[k]++;
 		return;
 	}
 	StKills[k]++;
 	if (DamageType == 'Decapitated')
+	{
 		StHead[k]++;
+		FeedFlags = FeedFlags | 1;
+	}
 	StSpree[k]++;
 	if (StSpree[k] > StBestSpree[k])
 		StBestSpree[k] = StSpree[k];
@@ -1562,7 +1581,64 @@ function OnKilled(Pawn Killer, Pawn Other, name DamageType)
 	else
 		StMulti[k] = 0;
 	StLastKill[k] = Level.TimeSeconds;
+	FeedSpree = StSpree[k];
+	if (StMulti[k] > 0)
+		FeedMulti = StMulti[k] + 1;
 	AddWeaponKill(k, WeaponName(Killer, DamageType));
+}
+
+// Name of a pawn in the kill feed: the player's name, else the monster's.
+function string FeedName(Pawn P)
+{
+	local string S;
+
+	if (P == None)
+		return "";
+	if (P.PlayerReplicationInfo != None)
+		return P.PlayerReplicationInfo.PlayerName;
+	S = P.MenuName;
+	if (S == "")
+		S = string(P.Class.Name);
+	return S;
+}
+
+// Side of a pawn in the kill feed: 0 = a, 1 = b, 2 = none (monster).
+function int FeedSide(Pawn P)
+{
+	if (P == None || P.PlayerReplicationInfo == None)
+		return 2;
+	return StatSide(P);
+}
+
+// Kill feed (mod 0.7.3): one kf line per kill of a player or by a player. Flags: 1 headshot,
+// 2 first blood, 4 suicide, 8 team kill, 16 monster killed; sp = killer's spree, mk = multi kill.
+function SendFeed(Pawn Killer, Pawn Other, name DamageType)
+{
+	local Pawn K;
+
+	K = Killer;
+	if (K == Other)
+		K = None;
+	if (Other == None)
+		return;
+	// Monsters killing monsters are no news.
+	if (Other.PlayerReplicationInfo == None && (K == None || K.PlayerReplicationInfo == None))
+		return;
+	OutMsg.Begin("kf");
+	OutMsg.AddStr("mid", MatchId);
+	OutMsg.AddInt("g", GameNo);
+	OutMsg.AddStr("k", OutMsg.FitWire(FeedName(K), 32));
+	OutMsg.AddInt("ks", FeedSide(K));
+	OutMsg.AddStr("v", OutMsg.FitWire(FeedName(Other), 32));
+	OutMsg.AddInt("vs", FeedSide(Other));
+	if (K != None)
+		OutMsg.AddStr("w", OutMsg.FitWire(WeaponName(K, DamageType), 24));
+	else
+		OutMsg.AddStr("w", OutMsg.FitWire(string(DamageType), 24));
+	OutMsg.AddInt("f", FeedFlags);
+	OutMsg.AddInt("sp", FeedSpree);
+	OutMsg.AddInt("mk", FeedMulti);
+	Send();
 }
 
 function string WeaponName(Pawn Killer, name DamageType)
@@ -2832,7 +2908,7 @@ function bool BotTalk(int c, string Kind, string Victim, string Killer, int Chan
 	return true;
 }
 
-// From OnKilled: the killer may brag, the victim may complain (more often about a rival).
+// From CountKill: the killer may brag, the victim may complain (more often about a rival).
 function BotTalkKill(Pawn Killer, Pawn Other)
 {
 	local int c;

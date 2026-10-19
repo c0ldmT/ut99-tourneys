@@ -40,6 +40,8 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > "bet lost" line at the start of its next game (`bbet`, placeholders `{amount}` and `{pick}`).
 > Mod 0.7.2: Monster Hunt bots - a monster that takes no damage for seconds (cage, bars, wall) is left alone for a
 > while and the bots go to what opens the cage; a bot without ammo switches weapons or fetches ammo.
+> Mod 0.7.3: kill feed - every kill of or by a player goes to the bridge (`kf`: killer, victim, sides, weapon,
+> headshot, first blood, suicide, team kill, spree, multi kill); the website shows it live on the match page.
 
 ## Classes
 
@@ -220,6 +222,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 49 | Statistics | Play a game (or Monster Hunt run) to the end. Tournament page → Events (admin): a `match.playerStats` line right before the game's result with every player and bot and their kills (Monster Hunt: monsters, `12M`). Bridge log without `player statistics ... of ... players arrived` warnings |
 | 50 | Map record in the HUD | Monster Hunt tournament with statistics: the run banner at the top shows a third line `Map record: none yet - reach the exit to set it` on a fresh database. Finish a run: the bridge says `New map record on MAP: m:ss.s by TEAM` and the HUD shows it at once; the second run of the game shows `Map record: m:ss.s by TEAM`. A tournament with statistics switched off shows `(this tournament does not count)` and never announces a record. The record also appears on the statistics page (Records → maps) |
 | 51 | Caged targets and ammo (mod 0.7.2) | Bot-only Monster Hunt run on MH-NaliVillage][ or MH-Forbidden, then `grep "UTTourney: bot" Tourney.log`: `target X takes no damage (in the way: ...), bots leave it for now` and, with a mover in the way, `target X behind MoverN (tag) ..., opened by: ...`; later `target X is free (MoverN moves)`/`takes damage`/`is tried again`. The bots no longer shoot at the cage for minutes. A bot with an empty weapon: `no ammo for ..., switches to ...`, with no ammo at all `no weapon with ammo left, fetches ...` and `has ammo again` |
+| 52 | **Kill feed** (mod 0.7.3) | During a game the match page on the website shows every kill within a second or two: killer and victim in their side's colour, weapon, "HS" for a headshot, "First Blood", sprees ("Killing Spree" at 5) and multi kills ("Double Kill"), suicides and team kills; the live score above it and in the banner of the tournament list. Monster Hunt: kills of monsters and deaths by monsters. Bridge log without `kf` parse errors |
 
 ## SmartStockBots (optional)
 

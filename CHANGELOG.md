@@ -7,6 +7,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Live kill feed on the match page (mod 0.7.3, `kf` line): killer and victim in their side's colour, weapon,
+  headshots, first blood, sprees and multi kills as UT announces them, suicides and team kills; the live score above
+  it. The bridge relays the kills (`match.feed`), the website streams them and keeps the last 40 for late visitors.
 - Tournament series (admins): made from a tournament (organizer panel → "Make a series"); weekday, local start time,
   every n weeks, created n days ahead (default 7) with registration open, so the Discord channel announces it. Names
   with {n} or {date}; pause, resume, "create the next one now", edit, delete on the page "Series" (button on the

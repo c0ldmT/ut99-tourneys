@@ -155,6 +155,11 @@ const en = {
   'form.options': 'Options',
   'nav.logout': 'Log out',
   'nav.menu': 'Menu',
+  'feed.title': 'Kill feed',
+  'feed.empty': 'No frags yet – the kills of the game appear here live.',
+  'feed.suicide': 'took the easy way out',
+  'feed.headshot': 'Headshot',
+  'feed.teamKill': 'team kill',
   'series.title': 'Series',
   'series.intro':
     'A series creates its next tournament by itself, a few days before the start, with registration open (the Discord channel announces it). Server, mode, rules and bots come from the tournament it was made from.',
@@ -1053,6 +1058,11 @@ const de: Record<TKey, string> = {
   'form.options': 'Optionen',
   'nav.logout': 'Abmelden',
   'nav.menu': 'Menü',
+  'feed.title': 'Killfeed',
+  'feed.empty': 'Noch keine Frags – die Kills des Spiels erscheinen hier live.',
+  'feed.suicide': 'hat sich selbst erledigt',
+  'feed.headshot': 'Kopfschuss',
+  'feed.teamKill': 'Teamkill',
   'series.title': 'Serien',
   'series.intro':
     'Eine Serie legt ihr nächstes Turnier selbst an, ein paar Tage vor dem Start und mit offener Anmeldung (der Discord-Channel kündigt es an). Server, Modus, Regeln und Bots kommen vom Turnier, aus dem sie gemacht wurde.',

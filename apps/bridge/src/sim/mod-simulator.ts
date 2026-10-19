@@ -290,6 +290,36 @@ export class ModSimulator {
     this.send({ t: 'join', pid: j.pid, tk: p.token, name: p.name, role });
   }
 
+  /** Kill feed (mod 0.7.3): a frag of a random player of `side` against the other side. */
+  private sendKill(m: { mid: string; g: number }, side: 'a' | 'b'): void {
+    const names = (s: 'a' | 'b') => [
+      ...this.matchPlayers()
+        .filter((j) => (j.role === 'b' ? 'b' : 'a') === s)
+        .map((j) => this.o.players.find((p) => p.token === j.token)?.name ?? j.token),
+      ...this.matchBots.filter((b) => b.s === s).map((b) => b.name),
+    ];
+    const other = side === 'a' ? 'b' : 'a';
+    const k = names(side);
+    const v = names(other);
+    if (!k.length || !v.length) return;
+    const pick = (l: string[]) => l[Math.floor(this.rng() * l.length)]!;
+    const weapons = ['Shock Rifle', 'Flak Cannon', 'Rocket Launcher', 'Sniper Rifle', 'Minigun'];
+    const w = pick(weapons);
+    this.send({
+      t: 'kf',
+      mid: m.mid,
+      g: m.g,
+      k: pick(k),
+      ks: side === 'a' ? 0 : 1,
+      v: pick(v),
+      vs: other === 'a' ? 0 : 1,
+      w,
+      f: w === 'Sniper Rifle' && this.rng() < 0.5 ? 1 : 0,
+      sp: 0,
+      mk: 0,
+    });
+  }
+
   private matchPlayers(): Joined[] {
     return [...this.joined.values()].filter((j) => j.role !== 's');
   }
@@ -336,8 +366,12 @@ export class ModSimulator {
     const tick = () => {
       if (!this.inGame) return;
       if (!this.paused) {
-        sa += Math.floor(this.rng() * 3);
-        sb += Math.floor(this.rng() * 3);
+        const da = Math.floor(this.rng() * 3);
+        const db = Math.floor(this.rng() * 3);
+        sa += da;
+        sb += db;
+        if (da && sa <= 19) this.sendKill(m, 'a');
+        if (db && sb <= 19) this.sendKill(m, 'b');
         this.send({
           t: 'score',
           mid: m.mid,

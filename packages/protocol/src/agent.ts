@@ -380,6 +380,30 @@ export const AgentLog = envelope(
   z.object({ level: z.enum(['debug', 'info', 'warn', 'error']), message: z.string().max(2000) }),
 );
 
+/** Kill feed of the game in progress (live only, not persisted). */
+export const KillFeedEntrySchema = z.object({
+  tournamentId: Id,
+  matchId: Id,
+  game: z.number().int().positive(),
+  /** Unix ms. */
+  at: z.number().int(),
+  killer: z.string().max(64),
+  /** Entrant id of the killer's side; null: a monster or the world (suicide). */
+  killerSide: Id.nullable(),
+  victim: z.string().max(64),
+  victimSide: Id.nullable(),
+  weapon: z.string().max(64),
+  headshot: z.boolean(),
+  firstBlood: z.boolean(),
+  suicide: z.boolean(),
+  teamKill: z.boolean(),
+  monster: z.boolean(),
+  spree: z.number().int().nonnegative(),
+  multi: z.number().int().nonnegative(),
+});
+export type KillFeedEntry = z.infer<typeof KillFeedEntrySchema>;
+export const MatchFeed = envelope('match.feed', KillFeedEntrySchema);
+
 export const BridgeToWebsiteSchema = z.discriminatedUnion('type', [
   AgentHello,
   AgentInventory,
@@ -387,6 +411,7 @@ export const BridgeToWebsiteSchema = z.discriminatedUnion('type', [
   EventsAppend,
   CommandAck,
   MatchLive,
+  MatchFeed,
   AgentLog,
 ]);
 export const WebsiteToBridgeSchema = z.discriminatedUnion('type', [

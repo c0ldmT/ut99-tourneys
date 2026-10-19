@@ -697,3 +697,23 @@ export interface SeriesView extends SeriesFields {
   tournaments: number;
   timeZone: string;
 }
+
+/** One kill of the game in progress (kill feed, live only). */
+export interface KillFeedEntry {
+  tournamentId: string;
+  matchId: string;
+  game: number;
+  at: number;
+  killer: string;
+  killerSide: string | null;
+  victim: string;
+  victimSide: string | null;
+  weapon: string;
+  headshot: boolean;
+  firstBlood: boolean;
+  suicide: boolean;
+  teamKill: boolean;
+  monster: boolean;
+  spree: number;
+  multi: number;
+}

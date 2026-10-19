@@ -12,6 +12,9 @@ import { DB, type Db } from '../src/db/database.js';
 import { users } from '../src/db/schema.js';
 import { TournamentsService } from '../src/tournaments/tournaments.service.js';
 import type { DiscordOut, DiscordPost } from '../src/notify/discord-out.js';
+import { LiveHub } from '../src/tournaments/hub.js';
+
+const d0 = (v: unknown) => typeof v === 'string' && v.length > 0;
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 import { eq } from 'drizzle-orm';
 
@@ -244,11 +247,20 @@ describe('website + bridge + simulated UT server', () => {
     env.startSim();
 
     let sawLive = false;
+    // Kill feed: the simulated server reports frags, the website relays them to the streams.
+    const kills: any[] = [];
+    const off = env.api.app
+      .get(LiveHub)
+      .subscribe(id, (m) => void (m.type === 'feed' && kills.push(m.data)));
     await env.run(async () => {
       const d = (await admin.get(`/tournaments/${id}`)).body;
       if (d.live) sawLive = true;
       return d.phase === 'finished';
     });
+    off();
+    expect(kills.length).toBeGreaterThan(0);
+    expect(kills[0]).toMatchObject({ tournamentId: id, suicide: false });
+    expect(d0(kills[0].killerSide)).toBe(true);
     const d = (await admin.get(`/tournaments/${id}`)).body;
     expect(d.projection.championId).toBeDefined();
     expect(d.projection.bracket.status).toBe('finished');

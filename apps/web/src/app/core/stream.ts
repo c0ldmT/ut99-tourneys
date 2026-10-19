@@ -1,5 +1,5 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
-import type { LiveInfo } from './types';
+import type { KillFeedEntry, LiveInfo } from './types';
 
 /**
  * Server-sent events of one tournament: `change` means "fetch the detail again", `live` carries
@@ -8,6 +8,8 @@ import type { LiveInfo } from './types';
 @Injectable()
 export class TournamentStream {
   readonly live = signal<LiveInfo | null>(null);
+  /** Kills arriving while the stream is open (see `feed` on the match page). */
+  readonly kill = signal<KillFeedEntry | null>(null);
   readonly connected = signal(false);
   private source?: EventSource;
   private onChange: () => void = () => {};
@@ -27,6 +29,13 @@ export class TournamentStream {
     es.onerror = () => this.connected.set(false);
     es.addEventListener('change', () => this.onChange());
     es.addEventListener('agent', () => this.onChange());
+    es.addEventListener('feed', (ev) => {
+      try {
+        this.kill.set(JSON.parse((ev as MessageEvent<string>).data) as KillFeedEntry);
+      } catch {
+        // ignore a malformed kill
+      }
+    });
     es.addEventListener('live', (ev) => {
       try {
         this.live.set(JSON.parse((ev as MessageEvent<string>).data) as LiveInfo);

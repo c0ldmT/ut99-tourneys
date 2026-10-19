@@ -279,7 +279,14 @@ export class TournamentsController {
     this.svc.override(id, body, user);
   }
 
-  /** Server-sent events: "change" (refetch the detail) and "live" (match telemetry). */
+  /** Kill feed of the game in progress (the last kills; then the "feed" events of the stream). */
+  @Get(':id/feed')
+  feed(@Param('id') id: string) {
+    this.svc.require(id);
+    return this.hub.latestFeed(id);
+  }
+
+  /** Server-sent events: "change" (refetch the detail), "live" (match telemetry), "feed" (kills). */
   @Get(':id/stream')
   stream(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
     this.svc.require(id);
@@ -291,7 +298,7 @@ export class TournamentsController {
     });
     const send = (msg: HubMessage) => {
       res.write(
-        `event: ${msg.type}\ndata: ${JSON.stringify(msg.type === 'live' ? msg.data : msg)}\n\n`,
+        `event: ${msg.type}\ndata: ${JSON.stringify(msg.type === 'live' || msg.type === 'feed' ? msg.data : msg)}\n\n`,
       );
     };
     res.write(': connected\n\n');

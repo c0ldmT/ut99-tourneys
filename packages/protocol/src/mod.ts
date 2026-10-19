@@ -89,6 +89,25 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     w: side,
     why: z.enum(['frag', 'time', 'sd', 'forfeit']),
   }),
+  /**
+   * Mod 0.7.3, kill feed: one line per kill of a player or by a player. `ks`/`vs` side of
+   * killer and victim (0 = a, 1 = b, 2 = none: monster, world). `f` flags: 1 headshot, 2 first
+   * blood, 4 suicide, 8 team kill, 16 monster killed. `sp` the killer's spree after the kill,
+   * `mk` multi kill (2 = double, 3 = multi, ...; 0 = none).
+   */
+  z.object({
+    t: z.literal('kf'),
+    mid: str(16),
+    g: int.positive(),
+    k: str(MAX_NAME_CHARS),
+    ks: int.min(0).max(2),
+    v: str(MAX_NAME_CHARS),
+    vs: int.min(0).max(2),
+    w: str(32),
+    f: int.nonnegative(),
+    sp: int.nonnegative(),
+    mk: int.nonnegative(),
+  }),
   /** A match player disconnected during a live game (the mod paused the game). 1v1 only. */
   z.object({ t: z.literal('lost'), mid: str(16), s: side }),
   /** Monster Hunt race: progress of the running team (every few seconds and on every death). */

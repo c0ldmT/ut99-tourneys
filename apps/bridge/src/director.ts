@@ -10,6 +10,7 @@ import {
   projectTournament,
   type AccessEntry,
   type BotSpec,
+  type KillFeedEntry,
   type BridgeToMod,
   type MapInfo,
   MAX_NAME_CHARS,
@@ -1855,6 +1856,34 @@ export class MatchDirector extends EventEmitter {
         s.scores = [msg.sa, msg.sb];
         const { entrants } = this.current();
         this.telemetry('live', { scores: { [entrants[0]]: msg.sa, [entrants[1]]: msg.sb } });
+        return;
+      }
+      case 'kf': {
+        const s = this.stage;
+        if (s.kind !== 'live' || s.matchId !== msg.mid) return;
+        const cm = this.proj.currentMatch;
+        if (!cm) return;
+        // Race mode: the running team plays alone, its side is the runner.
+        const sideOf = (n: number): string | null =>
+          n === 2 ? null : this.raceMode ? (this.runner() ?? null) : (cm.entrants[n] ?? null);
+        this.emit('feed', {
+          tournamentId: this.o.tournamentId,
+          matchId: msg.mid,
+          game: msg.g,
+          at: this.o.clock.now(),
+          killer: msg.k,
+          killerSide: msg.k ? sideOf(msg.ks) : null,
+          victim: msg.v,
+          victimSide: sideOf(msg.vs),
+          weapon: msg.w,
+          headshot: (msg.f & 1) !== 0,
+          firstBlood: (msg.f & 2) !== 0,
+          suicide: (msg.f & 4) !== 0,
+          teamKill: (msg.f & 8) !== 0,
+          monster: (msg.f & 16) !== 0,
+          spree: msg.sp,
+          multi: msg.mk,
+        } satisfies KillFeedEntry);
         return;
       }
       case 'lost': {

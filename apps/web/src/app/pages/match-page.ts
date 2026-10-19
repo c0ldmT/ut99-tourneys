@@ -9,6 +9,8 @@ import {
   signal,
 } from '@angular/core';
 import { PageTitle } from '../core/page-title';
+import { TournamentStream } from '../core/stream';
+import { KillFeed } from '../components/kill-feed';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
@@ -17,6 +19,7 @@ import { playTime } from '../core/stats-format';
 import { BetColumns } from '../components/bet-columns';
 import type {
   BetMatchView,
+  KillFeedEntry,
   MatchDetailView,
   MatchGameView,
   MatchPlayerView,
@@ -60,7 +63,8 @@ const SUM_KEYS = [
 /** Match page: entrants, series score, every game with the players' statistics, bets. */
 @Component({
   selector: 'app-match-page',
-  imports: [TPipe, RouterLink, BetColumns],
+  imports: [TPipe, RouterLink, BetColumns, KillFeed],
+  providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (t(); as t) {
@@ -246,7 +250,18 @@ const SUM_KEYS = [
             </div>
             <p class="muted small">{{ (race() ? 'match.mvpHintMh' : 'match.mvpHint') | t }}</p>
           } @else if (v.game?.live) {
-            <p class="muted">{{ 'match.statsAfter' | t }}</p>
+            @if (liveScore(); as ls) {
+              <div class="livescore">
+                <span class="nm">{{ d.entrants[0]!.name }}</span>
+                <span class="sc"
+                  ><b class="sa">{{ ls[0] }}</b
+                  ><i>:</i><b class="sb">{{ ls[1] }}</b></span
+                >
+                <span class="nm">{{ d.entrants[1]!.name }}</span>
+              </div>
+            }
+            <app-kill-feed [entries]="gameFeed(v.game!.game)" [sideA]="d.entrants[0]!.id" />
+            <p class="muted small">{{ 'match.statsAfter' | t }}</p>
           }
         }
       } @else {
@@ -425,6 +440,37 @@ const SUM_KEYS = [
     .lost {
       color: var(--danger);
     }
+    .livescore {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 16px;
+      margin: 4px 0 14px;
+    }
+    .livescore .nm {
+      font-weight: 700;
+      font-size: 1.1rem;
+    }
+    .livescore .nm:first-child {
+      text-align: right;
+    }
+    .livescore .sc {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 3rem;
+      line-height: 1;
+    }
+    .livescore i {
+      color: var(--muted);
+      font-style: normal;
+      padding: 0 8px;
+    }
+    .sa {
+      color: var(--side-a);
+    }
+    .sb {
+      color: var(--side-b);
+    }
     .bets-title {
       margin-top: 24px;
     }
@@ -483,6 +529,20 @@ export class MatchPage {
   );
 
   private readonly title = inject(PageTitle);
+  private readonly stream = inject(TournamentStream);
+  /** Kills of the game in progress (live only). */
+  protected readonly feed = signal<KillFeedEntry[]>([]);
+  /** Frags of the game in progress (telemetry). */
+  protected readonly liveScore = computed(() => {
+    const l = this.stream.live() ?? this.t()?.live ?? null;
+    const d = this.d();
+    if (!l || !d || l.matchId !== d.matchId || !l.scores) return null;
+    return [l.scores[d.entrants[0]!.id] ?? 0, l.scores[d.entrants[1]!.id] ?? 0] as const;
+  });
+
+  protected gameFeed(game: number): KillFeedEntry[] {
+    return this.feed().filter((e) => e.game === game);
+  }
 
   constructor() {
     effect(() =>
@@ -493,6 +553,22 @@ export class MatchPage {
       const id = this.id();
       const m = this.matchId();
       void this.load(id, m, true);
+      this.feed.set([]);
+      this.api.killFeed(id).then(
+        (l) => this.feed.set(l.filter((e) => e.matchId === m)),
+        () => undefined,
+      );
+      this.stream.open(id, () => void this.load(this.id(), this.matchId(), false));
+    });
+    // New kills from the stream.
+    effect(() => {
+      const k = this.stream.kill();
+      if (!k || k.matchId !== this.matchId()) return;
+      this.feed.update((l) =>
+        l.some((x) => x.at === k.at && x.killer === k.killer && x.victim === k.victim)
+          ? l
+          : [...l, k].slice(-80),
+      );
     });
     // While the match is not decided, refresh now and then (games end, stats arrive).
     const timer = setInterval(() => {

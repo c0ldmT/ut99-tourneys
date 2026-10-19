@@ -191,6 +191,11 @@ export class AgentGateway {
         if (t && t.agentId === agentId) this.hub.publish(t.id, { type: 'live', data: msg.payload });
         return;
       }
+      case 'match.feed': {
+        const t = this.tournaments.get(msg.payload.tournamentId);
+        if (t && t.agentId === agentId) this.hub.publish(t.id, { type: 'feed', data: msg.payload });
+        return;
+      }
       case 'agent.log': {
         const line = `agent ${agentId}: ${msg.payload.message}`;
         if (msg.payload.level === 'error') this.logger.error(line);

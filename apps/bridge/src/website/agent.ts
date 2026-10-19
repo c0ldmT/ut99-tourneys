@@ -13,6 +13,7 @@ import type {
   AgentCommand,
   AgentProfile,
   BotSpec,
+  KillFeedEntry,
   MapInfo,
   WebsiteToBridge,
 } from '@tourney/protocol';
@@ -326,6 +327,13 @@ export class WebsiteAgent {
         this.link.send('match.live', info);
       } catch {
         // telemetry is best effort
+      }
+    });
+    director.on('feed', (entry: KillFeedEntry) => {
+      try {
+        this.link.send('match.feed', entry);
+      } catch {
+        // the kill feed is best effort
       }
     });
     director.on('finished', (champion: string) =>
