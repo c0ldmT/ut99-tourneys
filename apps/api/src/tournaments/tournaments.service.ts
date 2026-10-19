@@ -120,7 +120,9 @@ export type LineupProvider = (
 export interface SignupProvider {
   enter(t: TournamentRow, user: User): void;
   leave(t: TournamentRow, userId: string): void;
-  entries(tournamentId: string): { userId: string; label: string }[];
+  entries(tournamentId: string): { userId: string; label: string; ai?: boolean }[];
+  /** Extra facts for the tournament page (Dream Team: whether AI managers play). */
+  info?(t: TournamentRow): Record<string, unknown>;
 }
 
 const TournamentFields = z.object({
@@ -408,6 +410,7 @@ export class TournamentsService {
       .run();
     this.logger.info(`tournament ${id} created by ${by.displayName}`);
     this.notify.announceIfOpen(id);
+    this.saved(id);
     return this.require(id);
   }
 
@@ -482,8 +485,27 @@ export class TournamentsService {
       }
       this.notifyDraft(id);
       this.notify.announceIfOpen(id);
+      this.saved(id);
     }
     return this.require(id);
+  }
+
+  /** Called after a tournament was created or changed (the Dream Team lets AI managers enter). */
+  private readonly saveHooks: ((t: TournamentRow) => void)[] = [];
+  onSaved(fn: (t: TournamentRow) => void): void {
+    this.saveHooks.push(fn);
+  }
+
+  private saved(id: string): void {
+    const t = this.get(id);
+    if (!t) return;
+    for (const fn of this.saveHooks) {
+      try {
+        fn(t);
+      } catch (err) {
+        this.logger.warn(`after saving ${id}: ${String(err)}`);
+      }
+    }
   }
 
   /** Called before a tournament is deleted (the Dream Team gives entry tickets back). */
@@ -1733,8 +1755,8 @@ export class TournamentsService {
   detail(id: string, user: User) {
     const t = this.require(id);
     const regs = this.registered(id);
-    const labels = new Map(
-      (this.signupProviders.get(t.kind)?.entries(id) ?? []).map((e) => [e.userId, e.label]),
+    const provided = new Map(
+      (this.signupProviders.get(t.kind)?.entries(id) ?? []).map((e) => [e.userId, e]),
     );
     const watching = this.watching(id);
     const proj = this.log.projection(id);
@@ -1769,10 +1791,15 @@ export class TournamentsService {
       season: this.seasonOf(t) ?? null,
       kind: t.kind,
       udt: this.udtRules(t),
+      ...(this.signupProviders.get(t.kind)?.info
+        ? { signup: this.signupProviders.get(t.kind)!.info!(t) }
+        : {}),
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
       registrations: regs.map((u) => ({
-        ...(labels.has(u.id) ? { label: labels.get(u.id) } : {}),
+        ...(provided.has(u.id)
+          ? { label: provided.get(u.id)!.label, ai: !!provided.get(u.id)!.ai }
+          : {}),
         userId: u.id,
         displayName: u.displayName,
         avatar: u.avatar,

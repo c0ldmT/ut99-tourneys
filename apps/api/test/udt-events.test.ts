@@ -125,6 +125,42 @@ describe('Unreal Dream Team: events', () => {
     expect((await admin.get(`/tournaments/${id}`)).body.registrations).toHaveLength(0);
   });
 
+  it('AI managers enter when the sign-up opens; a human takes the place of the last AI team', async () => {
+    const { admin, mario, tim } = await setup();
+    await admin.req('PUT', '/settings/udt', { aiEnabled: true, aiCount: 4 });
+    // The cup opens: the four AI teams fill it at once.
+    const t = await admin.post('/tournaments', udtCup(1));
+    const id = t.body.id as string;
+    let page = (await admin.get(`/tournaments/${id}`)).body;
+    expect(page.registrations).toHaveLength(4);
+    expect(page.registrations.every((r: any) => r.ai)).toBe(true);
+    expect(page.signup).toMatchObject({ aiOn: true, aiCount: 4 });
+    // Humans first: Mario and Tim enter the full bracket, two AI teams make room.
+    expect((await mario.post(`/tournaments/${id}/registration`)).status).toBe(204);
+    expect((await tim.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    page = (await admin.get(`/tournaments/${id}`)).body;
+    expect(page.registrations).toHaveLength(4);
+    expect(page.registrations.filter((r: any) => !r.ai)).toHaveLength(2);
+    // The seeding plays them all.
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    expect(
+      Object.keys(seeded.body.projection.entrants).filter((k) => k.startsWith('udt-')),
+    ).toHaveLength(4);
+  });
+
+  it('the seeding lets AI managers fill free places (AI switched on later)', async () => {
+    const { admin, mario } = await setup();
+    const t = await admin.post('/tournaments', udtCup(1));
+    const id = t.body.id as string;
+    expect((await mario.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    await admin.req('PUT', '/settings/udt', { aiEnabled: true, aiCount: 2 });
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    const ids = Object.keys(seeded.body.projection.entrants);
+    expect(ids.filter((k) => k.startsWith('udt-'))).toHaveLength(3); // Mario and two AI teams
+  });
+
   it('2v2: a team needs two playable bots; value cap and star limit apply', async () => {
     const { admin, mario } = await setup();
     const t = await admin.post('/tournaments', udtCup(2, { starLimit: 0 }));

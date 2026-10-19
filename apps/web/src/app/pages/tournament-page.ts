@@ -552,6 +552,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 @if (r.label) {
                   <b>{{ r.label }}</b
                   ><span class="muted small">&nbsp;· {{ r.displayName }}</span>
+                  @if (r.ai) {
+                    <span class="udt-mark" style="margin-left: 6px">{{ 'udt.ai' | t }}</span>
+                  }
                 } @else {
                   {{ r.displayName }}
                 }
@@ -578,7 +581,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             <button [class.active]="tab() === 'control'" (click)="tab.set('control')">
               {{ 'admin.control' | t }}
             </button>
-            @if (t.phase === 'draft' || t.phase === 'seeded') {
+            @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode()) {
               <button [class.active]="tab() === 'seeding'" (click)="tab.set('seeding')">
                 {{ 'admin.seeding' | t }}
               </button>
@@ -611,7 +614,49 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                   <button class="danger" (click)="remove()">{{ 'common.delete' | t }}</button>
                 }
               </div>
-              @if (t.phase === 'draft' || t.phase === 'seeded') {
+              @if ((t.phase === 'draft' || t.phase === 'seeded') && udtMode()) {
+                <div class="udt-seed">
+                  <b><na-udt-mark [size]="18" /> {{ 'tp.udtSeedTitle' | t }}</b>
+                  <ul class="small">
+                    @if (t.udt?.finale) {
+                      <li>{{ 'tp.udtSeedFinale' | t }}</li>
+                    } @else {
+                      <li>
+                        {{
+                          'tp.udtSeedTeams'
+                            | t: { humans: humanTeams(t), ai: aiTeams(t), size: t.settings.size }
+                        }}
+                      </li>
+                      <li>
+                        @if (t.signup?.aiOn) {
+                          {{ 'tp.udtSeedAiOn' | t: { n: t.signup?.aiCount ?? 0 } }}
+                        } @else {
+                          {{ 'tp.udtSeedAiOff' | t }}
+                        }
+                      </li>
+                    }
+                    <li>{{ 'tp.udtSeedFill' | t }}</li>
+                    @if (t.udt?.ticket) {
+                      <li>{{ 'tp.udtSeedTicket' | t: { n: t.udt?.minTeams ?? 2 } }}</li>
+                    }
+                  </ul>
+                  <div class="row">
+                    <button
+                      class="primary udt"
+                      (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'random' }))"
+                      [disabled]="busy()"
+                    >
+                      {{ (t.phase === 'seeded' ? 'tp.udtSeedAgain' : 'tp.udtSeed') | t }}
+                    </button>
+                    @if (t.phase === 'seeded') {
+                      <button (click)="act(api.reset(t.id))" [disabled]="busy()">
+                        {{ 'admin.reset' | t }}
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+              @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode()) {
                 <div class="row">
                   <button
                     (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'random' }))"
@@ -1041,6 +1086,14 @@ export class TournamentPage {
   protected readonly teamMode = computed(() => (this.t()?.settings.teamSize ?? 1) > 1);
   /** Dream Team: managers enter their teams, the lineups play. */
   protected readonly udtMode = computed(() => this.t()?.kind === 'udt');
+
+  protected humanTeams(t: TournamentDetail): number {
+    return t.registrations.filter((r) => !r.ai).length;
+  }
+
+  protected aiTeams(t: TournamentDetail): number {
+    return t.registrations.filter((r) => r.ai).length;
+  }
   /** Monster Hunt time race. */
   protected readonly race = computed(() => isRace(this.t()?.settings));
   protected readonly penaltySec = computed(

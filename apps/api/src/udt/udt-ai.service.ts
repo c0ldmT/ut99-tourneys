@@ -72,6 +72,36 @@ export class UdtAiService implements OnModuleInit {
 
   onModuleInit(): void {
     this.market.afterDay((season, day) => this.daily(season, day));
+    this.events.aiFill = (id) => this.fill(id);
+  }
+
+  /**
+   * A Dream Team tournament opened its sign-up or is seeded: the AI managers (while switched on)
+   * enter it where their lineup can play, as on a market day (no high stakes; calm ones by
+   * chance). Humans keep priority: a human entering a full bracket takes an AI team's place.
+   */
+  fill(tournamentId: string): number {
+    const cfg = this.cfg();
+    const n0 = this.udt.seasonNumber();
+    if (!cfg.enabled || !cfg.aiEnabled || n0 === null) return 0;
+    const season = { number: n0 };
+    this.ensure(season.number);
+    let n = 0;
+    for (const m of this.managers().slice(0, cfg.aiCount)) {
+      if (!this.udt.team(m.user.id, season.number)) continue;
+      const e = this.events.events(m.user).find((x) => x.id === tournamentId);
+      if (!e || !e.open || e.entered || e.ticketNow > 0 || e.lineup?.problems.length) continue;
+      if (cfg.aiStrength === 'calm' && createRng(`ai-fill-${tournamentId}-${m.n}`)() > 0.5)
+        continue;
+      try {
+        this.events.enter(m.user, tournamentId);
+        n++;
+      } catch {
+        break; // the bracket is full
+      }
+    }
+    if (n) this.log.info(`udt AI managers: ${n} entered ${tournamentId}`);
+    return n;
   }
 
   private cfg() {

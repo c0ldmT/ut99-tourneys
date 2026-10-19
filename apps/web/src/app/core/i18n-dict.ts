@@ -570,6 +570,19 @@ const en = {
   'tp.championWins': 'wins the tournament!',
   'tp.registration': 'Registration',
   'tp.registered': '{n} of {size} slots taken; empty slots are filled with bots.',
+  'tp.udtSeedTitle': 'Dream Team draw',
+  'tp.udtSeedTeams': '{humans} human and {ai} AI teams in, {size} places.',
+  'tp.udtSeedAiOn':
+    'AI managers play ({n}): they enter as soon as the sign-up opens and at the draw take free places; a human entering a full bracket takes the place of the last AI team.',
+  'tp.udtSeedAiOff': 'AI managers are switched off (Settings → Dream Team).',
+  'tp.udtSeedFill':
+    'Teams that cannot play (lineup, team gone) drop out with their ticket back; free places get free library bots close to the managers’ skill; the positions in the bracket are drawn.',
+  'tp.udtSeedFinale':
+    'Season finale: the best teams of the season table that can play are drawn (no sign-up).',
+  'tp.udtSeedTicket':
+    'High stakes: at least {n} human teams, otherwise all tickets go back and there is no draw.',
+  'tp.udtSeed': 'Draw the bracket',
+  'tp.udtSeedAgain': 'Draw again',
   'tp.udtSignup': 'Dream Team sign-up',
   'tp.udtHint':
     'Managers enter their Dream Team here or on the Dream Team events page: the lineup plays, you watch and cheer.',
@@ -2084,6 +2097,19 @@ const de: Record<TKey, string> = {
   'tp.championWins': 'gewinnt das Turnier!',
   'tp.registration': 'Anmeldung',
   'tp.registered': '{n} von {size} Plätzen belegt; freie Plätze bekommen Bots.',
+  'tp.udtSeedTitle': 'Dream-Team-Auslosung',
+  'tp.udtSeedTeams': '{humans} menschliche und {ai} KI-Teams angemeldet, {size} Plätze.',
+  'tp.udtSeedAiOn':
+    'KI-Manager spielen mit ({n}): Sie melden sich an, sobald die Anmeldung offen ist, und nehmen bei der Auslosung freie Plätze; meldet sich ein Mensch bei vollem Bracket an, macht das zuletzt angemeldete KI-Team Platz.',
+  'tp.udtSeedAiOff': 'KI-Manager sind ausgeschaltet (Einstellungen → Dream Team).',
+  'tp.udtSeedFill':
+    'Teams, die nicht spielen können (Aufstellung, Team weg), fallen raus und bekommen ihr Ticket zurück; freie Plätze bekommen freie Bibliotheks-Bots nahe am Skill der Manager; die Plätze im Bracket werden gelost.',
+  'tp.udtSeedFinale':
+    'Season-Finale: Die besten spielfähigen Teams der Season-Tabelle werden gelost (keine Anmeldung).',
+  'tp.udtSeedTicket':
+    'High Stakes: mindestens {n} menschliche Teams, sonst gehen alle Tickets zurück und es wird nicht gelost.',
+  'tp.udtSeed': 'Bracket auslosen',
+  'tp.udtSeedAgain': 'Neu auslosen',
   'tp.udtSignup': 'Dream-Team-Anmeldung',
   'tp.udtHint':
     'Manager melden hier oder unter Dream Team › Events ihr Dream Team an: Die Aufstellung spielt, du schaust zu und fieberst mit.',

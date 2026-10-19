@@ -1497,3 +1497,24 @@ details.look[open] > summary {
   border-radius: var(--radius);
   background: rgba(178, 107, 255, 0.05);
 }
+
+/* Dream Team draw on the tournament page */
+.udt-seed {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid rgba(178, 107, 255, 0.4);
+  border-radius: var(--radius);
+  background: rgba(178, 107, 255, 0.06);
+}
+.udt-seed b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.udt-seed ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}

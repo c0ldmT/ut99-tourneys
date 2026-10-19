@@ -154,7 +154,7 @@ describe('Dream Team AI managers', () => {
       '/tournaments',
       tournamentBody({ name: 'AI Cup', botPool: [], kind: 'udt' }, { size: 4, format: 'single' }),
     );
-    await admin.post('/udt/test/advance', { hours: 24 });
+    await admin.post('/udt/test/market-day'); // the next one (time of day independent)
     const ev = (await mario.get('/udt/events')).body.find(
       (e: { id: string }) => e.id === cup.body.id,
     );
@@ -167,7 +167,7 @@ describe('Dream Team AI managers', () => {
     // Switched off: no partners, they leave the open sign-ups at the next market day.
     await admin.req('PUT', '/settings/udt', { aiEnabled: false });
     expect((await mario.get('/udt/trades/partners')).body).toHaveLength(0);
-    await admin.post('/udt/test/advance', { hours: 24 });
+    await admin.post('/udt/test/market-day');
     const ev2 = (await mario.get('/udt/events')).body.find(
       (e: { id: string }) => e.id === cup.body.id,
     );

@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { ADAPTER_MH } from '@tourney/adapter-ut99';
 import {
   botEntrant,
@@ -71,11 +71,20 @@ export class UdtEventsService implements OnModuleInit {
       if (t.kind === 'udt' && t.phase === 'draft') this.refundTickets(t.id);
     });
     this.tournaments.onResetAll(() => this.udt.wipeAll());
+    // AI managers enter as soon as a Dream Team tournament opens its sign-up.
+    this.tournaments.onSaved((t) => {
+      if (t.kind === 'udt' && t.phase === 'draft' && t.registrationOpen && !this.rules(t).finale)
+        this.aiFill(t.id);
+    });
     // The tournament page signs up through the Dream Team: the manager enters the team.
     this.tournaments.registerSignupProvider('udt', {
       enter: (t, user) => void this.enter(user, t.id),
       leave: (t, userId) => this.withdraw(t.id, userId),
       entries: (id) => this.labelledEntries(id),
+      info: () => {
+        const cfg = this.settings.get().udt;
+        return { aiOn: this.udt.aiOn(), aiCount: cfg.aiEnabled ? cfg.aiCount : 0 };
+      },
     });
   }
 
@@ -107,6 +116,9 @@ export class UdtEventsService implements OnModuleInit {
    * AI managers count when they play along.
    */
   tableOf: (season: number) => { userId: string; points: number; ai: boolean }[] = () => [];
+
+  /** AI managers enter the tournament where they can (set by the AI service). */
+  aiFill: (tournamentId: string) => void = () => {};
 
   /** Finale: the top `size` teams of the season table that can play. */
   qualified(t: TournamentRow, settings: TournamentSettings): string[] {
@@ -175,6 +187,7 @@ export class UdtEventsService implements OnModuleInit {
       .select()
       .from(udtEntries)
       .where(eq(udtEntries.tournamentId, tournamentId))
+      .orderBy(asc(udtEntries.createdAt))
       .all()
       .map((e) => e.userId);
   }
@@ -268,6 +281,8 @@ export class UdtEventsService implements OnModuleInit {
     const main: Entrant[] = [];
     const skills: number[] = [];
     // The finale: no sign-up, the top of the season table plays.
+    // Free places: AI managers that can play enter first (humans already have theirs).
+    if (!rules.finale) this.aiFill(t.id);
     const entered = rules.finale ? this.qualified(t, settings) : this.entries(t.id);
     const ai = this.udt.aiIds();
     const aiOn = this.udt.aiOn();
@@ -432,7 +447,13 @@ export class UdtEventsService implements OnModuleInit {
     if (l.problems.length) throw conflict(`your team cannot play: ${l.problems.join('; ')}`);
     const who = this.entries(id);
     if (who.includes(user.id)) return this.events(user);
-    if (who.length >= s.size) throw conflict('the bracket is full');
+    const ai = this.udt.aiIds();
+    if (who.length >= s.size) {
+      // Humans first: the AI team that entered last makes room.
+      const last = [...who].reverse().find((u) => ai.has(u));
+      if (ai.has(user.id) || !last) throw conflict('the bracket is full');
+      this.dropEntry(id, last);
+    }
     // High stakes: the ticket is paid on entering (back on leaving or when it is called off).
     const ticket = this.ticketNow(this.rules(t));
     const ticketRef = ticket ? `ticket:${id}:${user.id}:${randomId(6)}` : null;
@@ -474,11 +495,12 @@ export class UdtEventsService implements OnModuleInit {
   }
 
   /** The entries as the tournament page shows them: tag and team name. */
-  private labelledEntries(id: string): { userId: string; label: string }[] {
+  private labelledEntries(id: string): { userId: string; label: string; ai: boolean }[] {
     const season = this.udt.seasonNumber();
+    const ai = this.udt.aiIds();
     return this.entries(id).map((userId) => {
       const team = season === null ? null : this.udt.team(userId, season);
-      return { userId, label: team ? `${team.tag} ${team.name}` : userId };
+      return { userId, label: team ? `${team.tag} ${team.name}` : userId, ai: ai.has(userId) };
     });
   }
 }

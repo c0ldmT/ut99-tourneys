@@ -121,6 +121,8 @@ export interface TournamentDetail {
   /** "udt": Dream Team managers' lineups play. */
   kind?: 'standard' | 'udt';
   udt?: UdtEventRules | null;
+  /** Dream Team: whether AI managers play (and how many). */
+  signup?: { aiOn?: boolean; aiCount?: number };
   phase: Phase;
   headSeq: number;
   agentId: string;
@@ -144,6 +146,8 @@ export interface TournamentDetail {
   registrations: {
     /** Dream Team: the team as it signed up (tag and name). */
     label?: string;
+    /** Dream Team: an AI manager's team. */
+    ai?: boolean;
     userId: string;
     displayName: string;
     avatar: string | null;
