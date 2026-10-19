@@ -277,6 +277,13 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     jmp: z.boolean(),
   }),
   /**
+   * Mod 0.9.0, Unreal Dream Team: the bot's game traits (after `btr`), `c` codes separated by
+   * commas: sa start armour 25, tf -10 % damage taken, ad faster for 3 s after a kill, gc +20 %
+   * damage dealt and taken, vp 15 % of the damage dealt as health, px survives one lethal hit
+   * per game with 50 health. Unknown codes are ignored.
+   */
+  z.object({ t: z.literal('btrt'), name: str(MAX_NAME_CHARS), c: str(64) }),
+  /**
    * A bot's personality (sent with its config): `tk` chance in percent to say something on an
    * occasion; then up to BOT_MAX_LINES `bsay` lines (`k` occasion, `x` text with placeholders
    * {me} {victim} {killer} {map}) and `brv` lines (`r` rival's name in the game, `lv` 1 rival,

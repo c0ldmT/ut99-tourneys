@@ -50,6 +50,10 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > 4 s it hunts its opponent. Only roaming or wandering bots with freelance or attack orders; camping bots are left
 > alone (duel mode: 10 s at most); the game classes are compared exactly, so later modes (CTF, ...) and Monster Hunt
 > keep their own AI. Novice bots (skill 0-3) now really hunt a target set from outside (also the nemesis hunt).
+> Mod 0.9.0: Unreal Dream Team game traits (`btrt` after the bot's `btr` line): start armour (25), thick skin (-10 %
+> damage taken), adrenaline (30 % faster for 3 s after a kill), glass cannon (+20 % damage dealt and taken), vampire
+> (15 % of the damage dealt as health, up to 100), phoenix (once per game a lethal hit leaves 50 health, announced in
+> the chat). The mod's mutator is also the damage mutator; bots without game traits play as before.
 
 ## Classes
 
@@ -233,6 +237,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 52 | **Kill feed** (mod 0.7.3) | During a game the match page on the website shows every kill within a second or two: killer and victim in their side's colour, weapon, "HS" for a headshot, "First Blood", sprees ("Killing Spree" at 5) and multi kills ("Double Kill"), suicides and team kills; the live score above it and in the banner of the tournament list. Monster Hunt: kills of monsters and deaths by monsters. Bridge log without `kf` parse errors |
 | 53 | **Dedication** (mod 0.7.4) | Buy the dedication in the Neuro shop with both lines, approve it (Shop → Manage), start a tournament with you and website bots that talk. When a bot frags you it says your kill line now and then (`{victim}` = you), when you frag one it says your death line; other kills keep the bots' own lines. Bridge log without `ded` parse errors |
 | 54 | **Bot AI help** (mod 0.8.0) | Settings → "Bot AI help" on "Failsafe and duel mode". 1v1 bot-only tournament on maps where bots used to stand still (and a small one like DM-Tempest): the bots look for each other, a game with 10 frags ends in about 4-6 minutes, no bot stands in one place for long. 2on2 bot-only: normal play, a bot that stops moving gets going within ~10 s. Monster Hunt run: bots behave as before. Setting "Off": behaviour as in 0.7.4. Server log without `Accessed None` from `AntiIdle` |
+| 55 | **Dream Team game traits** (mod 0.9.0) | Test instance with Dream Team on: give a roster bot a body trait (Packs → craft, My team → add trait), enter it in a Dream Team 1v1 with a real server. Start armour: the bot spawns with 25 armour (spectate: armour in the HUD of the bot view). Phoenix: the first lethal hit of a game leaves it alive, chat `[TAG]Name rises from the ashes!`, server log `game trait phoenix: ... survives`; the second hit kills. Glass cannon/thick skin/vampire: compare damage numbers with `stat` or by feel (a glass cannon bot dies faster, a vampire recovers health). Adrenaline: visibly faster for a few seconds after a frag. Bots without traits and normal tournaments behave as in 0.8.0; server log without `Accessed None` |
 
 ## SmartStockBots (optional)
 

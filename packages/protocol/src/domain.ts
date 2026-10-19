@@ -83,6 +83,11 @@ export const BotSpecSchema = z.object({
   skin: z.string().max(128).optional(),
   face: z.string().max(128).optional(),
   traits: BotTraitsSchema.optional(),
+  /** Unreal Dream Team: codes of the traits the mod plays (`btrt`, mod 0.9.0). */
+  gameTraits: z
+    .array(z.string().regex(/^[a-z]{2}$/))
+    .max(5)
+    .optional(),
 });
 export type BotSpec = z.infer<typeof BotSpecSchema>;
 

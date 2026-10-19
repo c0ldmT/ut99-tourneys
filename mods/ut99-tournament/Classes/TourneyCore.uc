@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.8.0";
+const MOD_VERSION = "0.9.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -133,6 +133,11 @@ var byte CfgBet[16];               // latest bet with Neuro: 0 none, 1 won, 2 lo
 var int CfgBetAmt[16];             // Neuro won or lost
 var string CfgBetPick[16];         // whom the bot backed
 var int CfgCount;
+var byte CfgBody[16];              // Dream Team game traits (btrt): 1 start armour, 2 thick skin,
+                                   // 4 adrenaline, 8 glass cannon, 16 vampire, 32 phoenix
+var byte CfgPhoenix[16];           // 1 = the phoenix was used this game
+var float CfgAdrUntil[16];         // adrenaline: faster until then (0 = not boosted)
+var float CfgAdrSpeed[16];         // the ground speed before the boost
 var byte SayCfg[192];              // chat lines: bot (index into Cfg*), occasion, text
 var string SayKind[192];
 var string SayText[192];
@@ -193,6 +198,7 @@ function OnPostBeginPlay()
 	TMut.Game = self;
 	Game.BaseMutator.AddMutator(TMut);
 	Game.RegisterMessageMutator(TMut);
+	Game.RegisterDamageMutator(TMut);
 	// Chat commands come from the listener (it also hears spectators); the mutator only handles "mutate".
 	ChatListener = Spawn(class'TourneyChatListener');
 	if (ChatListener != None)
@@ -368,6 +374,11 @@ function HandleBridgeMessage(TourneyMsg M)
 					CfgJump[i] = 0;
 				CfgTraits[i] = 1;
 			}
+			break;
+		case "btrt":
+			i = FindCfg(M.Get("name"), true);
+			if (i >= 0)
+				CfgBody[i] = byte(ParseGameTraits(M.Get("c")));
 			break;
 		case "bpers":
 			i = FindCfg(M.Get("name"), true);
@@ -1234,6 +1245,7 @@ function int TimerStep()
 	{
 		BotTick();
 		AntiIdle();
+		AdrenalineTick();
 	}
 	if (!bGameLive)
 	{
@@ -1391,6 +1403,7 @@ function StartTournamentMatch()
 	ApplyMatchRules();
 	bGameLive = true;
 	bEndReported = false;
+	ResetGameTraits();
 	LastSentA = -1;
 	StartTalkLeft = 8;
 	HuntTicks = 0;
@@ -1534,6 +1547,7 @@ function OnKilled(Pawn Killer, Pawn Other, name DamageType)
 	FeedMulti = 0;
 	CountKill(Killer, Other, DamageType);
 	SendFeed(Killer, Other, DamageType);
+	GameTraitKill(Killer, Other);
 }
 
 // Counts kills, deaths and the rest for both pawns; notes the kill feed flags.
@@ -2638,6 +2652,9 @@ function int FindCfg(string BName, bool bCreate)
 	CfgBet[i] = 0;
 	CfgBetAmt[i] = 0;
 	CfgBetPick[i] = "";
+	CfgBody[i] = 0;
+	CfgPhoenix[i] = 0;
+	CfgAdrUntil[i] = 0;
 	return i;
 }
 
@@ -3243,6 +3260,165 @@ function LoadCache()
 		BotSide[i] = class'TournamentConfig'.default.CachedBotSide[i];
 	}
 	Phase = "lobby";
+}
+
+//=============================================================================
+// Unreal Dream Team: game traits of website bots (btrt, mod 0.9.0)
+//=============================================================================
+
+// "px,vp" -> bits of CfgBody; unknown codes are ignored.
+function int ParseGameTraits(string S)
+{
+	local int Bits, p;
+	local string Code;
+	Bits = 0;
+	while (S != "")
+	{
+		p = InStr(S, ",");
+		if (p < 0)
+		{
+			Code = S;
+			S = "";
+		}
+		else
+		{
+			Code = Left(S, p);
+			S = Mid(S, p + 1);
+		}
+		if (Code == "sa")
+			Bits = Bits | 1;
+		else if (Code == "tf")
+			Bits = Bits | 2;
+		else if (Code == "ad")
+			Bits = Bits | 4;
+		else if (Code == "gc")
+			Bits = Bits | 8;
+		else if (Code == "vp")
+			Bits = Bits | 16;
+		else if (Code == "px")
+			Bits = Bits | 32;
+	}
+	return Bits;
+}
+
+// The configuration of a website bot with game traits (-1: none).
+function int GameTraitCfg(Pawn P)
+{
+	local int c;
+	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
+		return -1;
+	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
+	if (c >= 0 && CfgBody[c] == 0)
+		return -1;
+	return c;
+}
+
+// A new game: the phoenix can rise again, no boost is left over.
+function ResetGameTraits()
+{
+	local int c;
+	for (c = 0; c < CfgCount; c++)
+	{
+		CfgPhoenix[c] = 0;
+		CfgAdrUntil[c] = 0;
+	}
+}
+
+// From the damage mutator, after armour: glass cannon (+20 % dealt and taken), thick skin
+// (-10 % taken), vampire (15 % of the damage dealt as health, up to 100), phoenix (one lethal hit
+// per game leaves 50 health).
+function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name DamageType)
+{
+	local int cv, ci, Heal;
+	if (ActualDamage <= 0 || Victim == None)
+		return;
+	cv = GameTraitCfg(Victim);
+	ci = -1;
+	if (InstigatedBy != Victim)
+		ci = GameTraitCfg(InstigatedBy);
+	if (cv < 0 && ci < 0)
+		return;
+	if (ci >= 0 && (CfgBody[ci] & 8) != 0)
+		ActualDamage = int(ActualDamage * 1.2 + 0.5);
+	if (cv >= 0 && (CfgBody[cv] & 8) != 0)
+		ActualDamage = int(ActualDamage * 1.2 + 0.5);
+	if (cv >= 0 && (CfgBody[cv] & 2) != 0)
+		ActualDamage = Max(1, int(ActualDamage * 0.9 + 0.5));
+	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
+	{
+		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.15 + 0.5);
+		if (Heal > 0)
+			InstigatedBy.Health = Min(100, InstigatedBy.Health + Heal);
+	}
+	if (cv >= 0 && (CfgBody[cv] & 32) != 0 && CfgPhoenix[cv] == 0 && bGameLive && Victim.Health > 0 && ActualDamage >= Victim.Health && DamageType != 'Suicided')
+	{
+		CfgPhoenix[cv] = 1;
+		if (Victim.Health <= 50)
+		{
+			ActualDamage = 0;
+			Victim.Health = 50;
+		}
+		else
+			ActualDamage = Victim.Health - 50;
+		Game.BroadcastMessage(CfgName[cv] @ "rises from the ashes!", false);
+		Log("game trait phoenix:" @ CfgName[cv] @ "survives", 'UTTourney');
+	}
+}
+
+// From the mutator's ModifyPlayer at every spawn: start armour (25), the boost ends.
+function OnModifyPlayer(Pawn P)
+{
+	local int c;
+	local Pickup A;
+	c = GameTraitCfg(P);
+	if (c < 0)
+		return;
+	if (CfgAdrUntil[c] > 0)
+	{
+		P.GroundSpeed = CfgAdrSpeed[c];
+		CfgAdrUntil[c] = 0;
+	}
+	if ((CfgBody[c] & 1) != 0 && P.FindInventoryType(class'Botpack.ThighPads') == None)
+	{
+		A = Spawn(class'Botpack.ThighPads', P,, P.Location);
+		if (A != None)
+		{
+			A.RespawnTime = 0.0;
+			A.Charge = 25;
+			A.bHeldItem = true;
+			A.GiveTo(P);
+		}
+	}
+}
+
+// Adrenaline: 30 % faster for 3 s after a kill.
+function GameTraitKill(Pawn Killer, Pawn Other)
+{
+	local int c;
+	if (Killer == None || Killer == Other || Killer.Health <= 0)
+		return;
+	c = GameTraitCfg(Killer);
+	if (c < 0 || (CfgBody[c] & 4) == 0)
+		return;
+	if (CfgAdrUntil[c] <= 0)
+		CfgAdrSpeed[c] = Killer.GroundSpeed;
+	Killer.GroundSpeed = CfgAdrSpeed[c] * 1.3;
+	CfgAdrUntil[c] = Level.TimeSeconds + 3.0;
+}
+
+// Once a second: boosts that ran out.
+function AdrenalineTick()
+{
+	local int c;
+	local Bot B;
+	for (c = 0; c < CfgCount; c++)
+		if (CfgAdrUntil[c] > 0 && Level.TimeSeconds >= CfgAdrUntil[c])
+		{
+			B = FindBotPawn(CfgName[c]);
+			if (B != None)
+				B.GroundSpeed = CfgAdrSpeed[c];
+			CfgAdrUntil[c] = 0;
+		}
 }
 
 defaultproperties

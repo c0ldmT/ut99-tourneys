@@ -159,6 +159,20 @@ describe('website bot lines', () => {
     for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
   });
 
+  it('sends the Dream Team game traits after the play style (mod 0.9.0)', async () => {
+    const { botConfigLines } = await import('../src/snapshot.js');
+    const { encodeModLine } = await import('@tourney/protocol');
+    const lines = botConfigLines({
+      id: 'bX',
+      name: '[NX]Mira',
+      skill: 4,
+      gameTraits: ['px', 'vp'],
+    });
+    expect(lines.map((l) => l.t)).toEqual(['bcfg', 'btr', 'btrt']);
+    expect(lines[2]).toEqual({ t: 'btrt', name: '[NX]Mira', c: 'px,vp' });
+    for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
+  });
+
   it("sends the players' dedications (Neuro shop), empty lines left out", async () => {
     const { dedicationLines } = await import('../src/snapshot.js');
     const { encodeModLine } = await import('@tourney/protocol');

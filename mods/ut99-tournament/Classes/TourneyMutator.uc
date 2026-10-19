@@ -1,6 +1,7 @@
 //=============================================================================
 // TourneyMutator
 // Console commands: mutate tourney ready | vote 3 1 5 | bracket | standings
+// Also the damage mutator and ModifyPlayer for the Dream Team game traits.
 // (bindable to a key). Chat commands (!ready, !vote ...) arrive via TourneyChatListener.
 //=============================================================================
 class TourneyMutator extends Mutator;
@@ -16,6 +17,24 @@ function bool MutatorTeamMessage(Actor Sender, Pawn Receiver, PlayerReplicationI
 	if (NextMessageMutator != None)
 		return NextMessageMutator.MutatorTeamMessage(Sender, Receiver, PRI, S, Type, bBeep);
 	return true;
+}
+
+// Dream Team game traits (mod 0.9.0): damage of and against website bots with body traits.
+function MutatorTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, out Vector HitLocation, out Vector Momentum, name DamageType)
+{
+	if (Game != None)
+		Game.OnTakeDamage(ActualDamage, Victim, InstigatedBy, DamageType);
+	if (NextDamageMutator != None)
+		NextDamageMutator.MutatorTakeDamage(ActualDamage, Victim, InstigatedBy, HitLocation, Momentum, DamageType);
+}
+
+// Every spawn: start armour of website bots with that trait.
+function ModifyPlayer(Pawn Other)
+{
+	if (Game != None)
+		Game.OnModifyPlayer(Other);
+	if (NextMutator != None)
+		NextMutator.ModifyPlayer(Other);
 }
 
 function Mutate(string MutateString, PlayerPawn Sender)
