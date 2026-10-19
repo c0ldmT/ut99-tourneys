@@ -48,6 +48,9 @@ import type { Lang } from './core/i18n-dict';
               >{{ 'nav.tournaments' | t }}</a
             >
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
+            @if (auth.config().udt) {
+              <a routerLink="/udt" routerLinkActive="active" class="udt">{{ 'udt.title' | t }}</a>
+            }
             @if (me.isAdmin) {
               <a routerLink="/new" routerLinkActive="active">{{ 'nav.new' | t }}</a>
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
@@ -175,7 +178,7 @@ import type { Lang } from './core/i18n-dict';
       min-height: 64px;
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 14px;
     }
     .brand {
       display: inline-flex;
@@ -196,7 +199,8 @@ import type { Lang } from './core/i18n-dict';
     nav a {
       color: var(--text-2);
       font-weight: 500;
-      padding: 8px 9px;
+      font-size: 0.95rem;
+      padding: 8px 7px;
       border-radius: 6px;
       white-space: nowrap;
     }
@@ -208,6 +212,9 @@ import type { Lang } from './core/i18n-dict';
       color: var(--text);
       background: var(--panel-2);
       box-shadow: inset 0 -2px 0 var(--accent);
+    }
+    nav a.udt.active {
+      box-shadow: inset 0 -2px 0 var(--udt);
     }
     .nav-foot {
       display: none;

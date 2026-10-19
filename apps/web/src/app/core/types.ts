@@ -26,6 +26,10 @@ export interface SiteConfig {
   devLogin: boolean;
   /** The website can send Discord direct messages (a bot is configured). */
   notify?: { directMessages: boolean; defaultChannel: boolean };
+  /** Unreal Dream Team switched on. */
+  udt?: boolean;
+  /** Dream Team test mode (local test instance). */
+  testMode?: boolean;
 }
 
 export interface Me {
@@ -112,6 +116,9 @@ export interface LiveInfo {
 export interface TournamentDetail {
   id: string;
   name: string;
+  /** "udt": Dream Team managers' lineups play. */
+  kind?: 'standard' | 'udt';
+  udt?: UdtEventRules | null;
   phase: Phase;
   headSeq: number;
   agentId: string;
@@ -404,6 +411,7 @@ export interface WebsiteSettings {
   shop: ShopSettings;
   /** Bot AI help in deathmatch: 0 off, 1 failsafe, 2 failsafe and duel mode. */
   botAi: { level: number };
+  udt: UdtSettings;
 }
 
 // --- Bot control center ---------------------------------------------------------------------
@@ -723,6 +731,8 @@ export interface SeriesTemplate {
   webhookUrl?: string | null;
   seasonal?: boolean;
   autoStart?: boolean;
+  kind?: 'standard' | 'udt';
+  udt?: UdtEventRules;
 }
 
 /** The next starts of a schedule (form preview). */
@@ -817,4 +827,136 @@ export interface ShopSettings {
   enabled: boolean;
   prices: Record<string, number>;
   hidden: string[];
+}
+
+// --- Unreal Dream Team ----------------------------------------------------------------------
+
+export type UdtRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export interface UdtRosterBot {
+  botId: string;
+  name: string;
+  gameName: string;
+  skill: number;
+  rarity: UdtRarity;
+  botClass: string | null;
+  skin: string | null;
+  face: string | null;
+  traits: BotTraitsView;
+  price: number;
+  value: number;
+  starter: boolean;
+  dmSlot: number | null;
+  mhSlot: number | null;
+  bench: number | null;
+  stamina: number;
+  xp: number;
+  striking: boolean;
+}
+
+export interface UdtTeam {
+  userId: string;
+  name: string;
+  tag: string;
+  createdAt: string;
+}
+
+export interface UdtWallet {
+  season: number | null;
+  balance: number;
+  free: number;
+  floor: number;
+  spendable: number;
+}
+
+export interface UdtView {
+  enabled: boolean;
+  season: number | null;
+  today?: string;
+  index: number;
+  team: UdtTeam | null;
+  roster: UdtRosterBot[];
+  wallet?: UdtWallet;
+  starterBudget?: number;
+}
+
+export interface UdtOffer {
+  botId: string;
+  name: string;
+  skill: number;
+  rarity: UdtRarity;
+  botClass: string | null;
+  skin: string | null;
+  face: string | null;
+  traits: BotTraitsView;
+  minPrice: number;
+  value: number;
+  history: { day: string; value: number }[];
+  sold: boolean;
+  myBid: number | null;
+}
+
+export interface UdtMarket {
+  day: string | null;
+  index: number;
+  /** Next market day (epoch ms). */
+  nextAt: number;
+  offers: UdtOffer[];
+  bids: { botId: string; amount: number; status: string }[];
+}
+
+export interface UdtEventRules {
+  valueCap: number | null;
+  starLimit: number | null;
+}
+
+export interface UdtEvent {
+  id: string;
+  name: string;
+  phase: string;
+  scheduledAt: string | null;
+  teamSize: number;
+  size: number;
+  game: 'dm' | 'mh';
+  rules: UdtEventRules;
+  valueCapNow: number | null;
+  entries: number;
+  entered: boolean;
+  open: boolean;
+  lineup: { bots: string[]; value: number; problems: string[] } | null;
+}
+
+export interface UdtTableRow {
+  userId: string;
+  name: string;
+  tag: string;
+  points: number;
+  titles: number;
+  events: number;
+}
+
+export interface UdtLedgerEntry {
+  id: string;
+  season: number;
+  kind: string;
+  amount: number;
+  ref: string;
+  at: string;
+  meta: Record<string, unknown> | null;
+}
+
+export interface UdtTestState {
+  testMode: boolean;
+  now: string;
+  offsetHours: number;
+  today: string;
+  season: number | null;
+  udt: boolean;
+}
+
+export interface UdtSettings {
+  enabled: boolean;
+  marketTime: string;
+  offersPerDay: number;
+  starterBudget: number;
 }

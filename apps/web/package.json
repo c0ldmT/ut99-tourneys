@@ -30,6 +30,7 @@
     "@angular/cli": "~21.2.26",
     "@angular/compiler-cli": "~21.2.25",
     "@tourney/bracket": "workspace:*",
-    "@tourney/protocol": "workspace:*"
+    "@tourney/protocol": "workspace:*",
+    "@tourney/udt": "workspace:*"
   }
 }

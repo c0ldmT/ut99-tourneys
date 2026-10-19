@@ -3,6 +3,7 @@ import { Icon } from '../core/brand';
 import { ShopSettings } from '../components/shop-settings';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
+import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import type { Season, SeasonsOverview } from '../core/types';
 
@@ -255,6 +256,49 @@ import type { Season, SeasonsOverview } from '../core/types';
       </div>
     </form>
 
+    <form class="card" (ngSubmit)="saveUdt()">
+      <h2>{{ 'udt.settings.title' | t }}</h2>
+      <p class="muted small">{{ 'udt.settings.hint' | t }}</p>
+      <label class="switch"
+        ><input type="checkbox" name="udtOn" [(ngModel)]="udtOn" /><span class="tr"></span
+        >{{ 'udt.settings.enabled' | t }}</label
+      >
+      <div class="row gap">
+        <label
+          >{{ 'udt.settings.marketTime' | t }}
+          <input type="time" name="udtTime" [(ngModel)]="udtTime" class="narrow" />
+        </label>
+        <label
+          >{{ 'udt.settings.offers' | t }}
+          <input
+            type="number"
+            name="udtOffers"
+            min="1"
+            max="40"
+            [(ngModel)]="udtOffers"
+            class="narrow"
+          />
+        </label>
+        <label
+          >{{ 'udt.settings.budget' | t }}
+          <input
+            type="number"
+            name="udtBudget"
+            min="100"
+            step="100"
+            [(ngModel)]="udtBudget"
+            class="narrow"
+          />
+        </label>
+      </div>
+      <div class="row">
+        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
+        @if (savedUdt()) {
+          <span class="muted small">{{ 'settings.saved' | t }}</span>
+        }
+      </div>
+    </form>
+
     <app-shop-settings />
 
     <section class="card danger-zone">
@@ -393,6 +437,7 @@ import type { Season, SeasonsOverview } from '../core/types';
 })
 export class SettingsPage {
   private readonly api = inject(Api);
+  private readonly auth = inject(Auth);
   private readonly i18n = inject(I18n);
   protected readonly botGames = signal(true);
   protected readonly levelPoints = signal(100);
@@ -412,6 +457,11 @@ export class SettingsPage {
   protected botsPerMatch = 6;
   protected readonly savedBetting = signal(false);
   protected botAiLevel = 2;
+  protected udtOn = false;
+  protected udtTime = '04:00';
+  protected udtOffers = 8;
+  protected udtBudget = 1500;
+  protected readonly savedUdt = signal(false);
   protected readonly savedBotAi = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
   protected readonly resetWord = 'RESET';
@@ -458,6 +508,12 @@ export class SettingsPage {
       this.windowSec = s.betting.windowSec;
       this.betsDiscord = s.betting.discord;
       this.botAiLevel = s.botAi?.level ?? 2;
+      if (s.udt) {
+        this.udtOn = s.udt.enabled;
+        this.udtTime = s.udt.marketTime;
+        this.udtOffers = s.udt.offersPerDay;
+        this.udtBudget = s.udt.starterBudget;
+      }
       this.o.set(o);
       this.saved.set(false);
     } catch (e) {
@@ -527,6 +583,28 @@ export class SettingsPage {
       this.startBalance = s.betting.startBalance;
       this.floor = s.betting.floor;
       this.savedBetting.set(true);
+    } catch (e) {
+      this.error.set(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async saveUdt() {
+    this.busy.set(true);
+    this.error.set('');
+    this.savedUdt.set(false);
+    try {
+      const s = await this.api.setUdtSettings({
+        enabled: this.udtOn,
+        marketTime: this.udtTime,
+        offersPerDay: Math.round(Number(this.udtOffers)),
+        starterBudget: Math.round(Number(this.udtBudget)),
+      });
+      this.udtOn = s.udt.enabled;
+      // The menu shows the Dream Team at once.
+      this.auth.config.update((c) => ({ ...c, udt: s.udt.enabled }));
+      this.savedUdt.set(true);
     } catch (e) {
       this.error.set(errorText(e));
     } finally {

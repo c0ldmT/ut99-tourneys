@@ -736,3 +736,283 @@ label.switch input:disabled + .tr {
   font-size: 0.85rem;
   white-space: nowrap;
 }
+
+/* --- Unreal Dream Team (style board "UDT"): rarity, bot cards, arena, sub navigation -------- */
+:root {
+  --udt: #b26bff; /* violet: Dream Team accent */
+  --holo: linear-gradient(135deg, #22d3ee, #8b5cf6 35%, #f0468c 65%, #a3e635);
+}
+.r-common {
+  --rc: #9aa4b6;
+  --rg: rgba(154, 164, 182, 0.16);
+  --rt: #c3cad6;
+}
+.r-uncommon {
+  --rc: #4fd18b;
+  --rg: rgba(79, 209, 139, 0.2);
+  --rt: #86e8b4;
+}
+.r-rare {
+  --rc: #4f9dff;
+  --rg: rgba(79, 157, 255, 0.24);
+  --rt: #9cc8ff;
+}
+.r-epic {
+  --rc: #b26bff;
+  --rg: rgba(178, 107, 255, 0.3);
+  --rt: #d4adff;
+}
+.r-legendary {
+  --rc: var(--holo);
+  --rg: rgba(139, 92, 246, 0.42);
+  --rt: #ecdcff;
+}
+@keyframes udt-holo {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+.udt-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: -8px 0 20px;
+}
+.udt-nav a {
+  color: var(--text-2);
+  padding: 10px 14px;
+  font-weight: 600;
+  border-bottom: 2px solid transparent;
+}
+.udt-nav a.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+.udt-test {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  border: 1px dashed #f59e0b;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.06);
+  font-size: 0.9rem;
+}
+.udt-test b {
+  color: #fbbf5c;
+  letter-spacing: 0.08em;
+}
+.udt-test button {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+.udt-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  padding: 24px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(60% 140% at 90% 0%, rgba(139, 92, 246, 0.14), transparent 60%), var(--bg-2);
+}
+.udt-head h1 {
+  margin: 2px 0 0;
+  font-size: 2.6rem;
+  line-height: 0.95;
+}
+.udt-kpis {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 28px;
+}
+.udt-kpis .v {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.25rem;
+}
+.udt-card {
+  width: 180px;
+  flex: none;
+  padding: 2px;
+  border-radius: 16px;
+  background: var(--rc);
+  box-shadow: 0 10px 32px var(--rg);
+}
+.udt-card.r-legendary,
+.udt-chip.r-legendary {
+  background-size: 200% 200%;
+  animation: udt-holo 6s linear infinite;
+}
+.udt-card.small {
+  width: 150px;
+}
+.udt-card .in {
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  background: radial-gradient(120% 70% at 50% 0%, var(--rg), transparent 65%), #0c0f16;
+}
+.udt-card .top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.udt-card .ovr {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 2.4rem;
+  line-height: 0.85;
+}
+.udt-card .tier,
+.udt-card .rar {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rt);
+}
+.udt-card .pic {
+  height: 70px;
+  border-radius: 10px;
+  background: #0a0d13;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+.udt-card .pic .vis {
+  fill: var(--rt);
+}
+.udt-card .name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  line-height: 1;
+}
+.udt-card .tag {
+  color: var(--hot-text);
+}
+.udt-card .stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 2px 6px;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.udt-card .stats b {
+  font-family: var(--font-mono);
+  color: var(--text);
+  margin-left: 3px;
+}
+.udt-card .foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  padding-top: 6px;
+  font-size: 0.85rem;
+}
+.udt-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.udt-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+.udt-arena {
+  border-radius: var(--radius);
+  padding: 22px 16px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  background:
+    radial-gradient(70% 80% at 50% 45%, rgba(34, 211, 238, 0.08), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 40px),
+    #090b11;
+}
+.udt-chip {
+  width: 44px;
+  height: 56px;
+  flex: none;
+  border-radius: 9px;
+  padding: 2px;
+  background: var(--rc);
+}
+.udt-chip span {
+  height: 100%;
+  border-radius: 7px;
+  background: #0c0f16;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-style: italic;
+  font-size: 1.5rem;
+  color: var(--rt);
+}
+.udt-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 4px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+}
+.udt-mark.strike {
+  color: #fbbf5c;
+  border-color: rgba(245, 158, 11, 0.4);
+}
+.udt-mark.tired {
+  color: #ff9aa4;
+  border-color: rgba(255, 122, 135, 0.4);
+}
+.udt-mark.star {
+  color: #d4adff;
+  border-color: rgba(178, 107, 255, 0.45);
+}
+.udt-mark.own {
+  color: var(--accent-hover);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+@media (max-width: 560px) {
+  .udt-card.small {
+    width: 128px;
+  }
+  .udt-arena {
+    gap: 10px;
+    padding: 14px 8px;
+  }
+}
+@media (max-width: 560px) {
+  .udt-arena {
+    --slot-w: 128px;
+  }
+}

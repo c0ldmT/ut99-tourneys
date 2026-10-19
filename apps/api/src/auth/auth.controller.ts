@@ -20,6 +20,7 @@ import type { ApiLogger } from '../common/logger.js';
 import { LOGGER } from '../common/logger.js';
 import { DISCORD, type DiscordApi } from './discord.js';
 import { isWebhookUrl } from '../notify/discord-out.js';
+import { SettingsService } from '../settings/settings.service.js';
 import { AdminOnly, CurrentUser, Public, type AuthedRequest } from './guard.js';
 import { SESSION_COOKIE, SessionsService } from './sessions.service.js';
 import { publicUser, UsersService, type User } from './users.service.js';
@@ -45,6 +46,7 @@ export class AuthController {
     @Inject(SessionsService) private readonly sessions: SessionsService,
     @Inject(DISCORD) private readonly discord: DiscordApi | null,
     @Inject(LOGGER) private readonly log: ApiLogger,
+    @Inject(SettingsService) private readonly settings: SettingsService,
   ) {}
 
   /** What the frontend needs before login. */
@@ -55,6 +57,9 @@ export class AuthController {
       siteName: this.config.siteName,
       discordLogin: this.config.discord.enabled,
       devLogin: this.config.devLogin,
+      /** Unreal Dream Team switched on (menu), test mode of a local instance. */
+      udt: this.settings.get().udt.enabled,
+      testMode: this.config.testMode,
       notify: {
         directMessages: Boolean(this.config.notify.botToken),
         defaultChannel: isWebhookUrl(this.config.notify.webhookUrl),

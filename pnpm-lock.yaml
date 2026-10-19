@@ -170,6 +170,9 @@ importers:
       '@tourney/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@tourney/udt':
+        specifier: workspace:*
+        version: link:../../packages/udt
 
   packages/adapter-ut99:
     dependencies:

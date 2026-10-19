@@ -2,6 +2,13 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import type {
+  UdtEvent,
+  UdtLedgerEntry,
+  UdtMarket,
+  UdtRosterBot,
+  UdtTableRow,
+  UdtTestState,
+  UdtView,
   AgentView,
   BetBoard,
   BetRecordView,
@@ -128,6 +135,35 @@ export class Api {
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/rating', body);
+  setUdtSettings = (body: Partial<WebsiteSettings['udt']>) =>
+    this.call<WebsiteSettings>('PUT', '/settings/udt', body);
+
+  // --- Unreal Dream Team
+  udt = () => this.call<UdtView>('GET', '/udt');
+  udtCreateTeam = (body: unknown) => this.call<UdtView>('POST', '/udt/team', body);
+  udtLineup = (body: {
+    dm?: (string | null)[];
+    mh?: (string | null)[];
+    bench?: (string | null)[];
+  }) => this.call<UdtRosterBot[]>('PUT', '/udt/lineup', body);
+  udtMarket = () => this.call<UdtMarket>('GET', '/udt/market');
+  udtBid = (botId: string, amount: number) =>
+    this.call<UdtMarket>('POST', '/udt/market/bid', { botId, amount });
+  udtWithdraw = (botId: string) =>
+    this.call<UdtMarket>('DELETE', `/udt/market/bid/${encodeURIComponent(botId)}`);
+  udtSell = (botId: string) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/sell`);
+  udtEvents = () => this.call<UdtEvent[]>('GET', '/udt/events');
+  udtEnter = (id: string) =>
+    this.call<UdtEvent[]>('POST', `/udt/events/${encodeURIComponent(id)}/enter`);
+  udtLeave = (id: string) =>
+    this.call<UdtEvent[]>('DELETE', `/udt/events/${encodeURIComponent(id)}/enter`);
+  udtTable = () => this.call<UdtTableRow[]>('GET', '/udt/table');
+  udtLedger = () => this.call<UdtLedgerEntry[]>('GET', '/udt/ledger');
+  udtTest = () => this.call<UdtTestState>('GET', '/udt/test');
+  udtTestDo = (what: string, body?: unknown) =>
+    this.call<unknown>('POST', `/udt/test/${what}`, body ?? {});
+
   setBotAiSettings = (body: Partial<WebsiteSettings['botAi']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/bot-ai', body);
   setBettingSettings = (body: Partial<WebsiteSettings['betting']>) =>

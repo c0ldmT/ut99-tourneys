@@ -7,6 +7,12 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team on the website (add-on, off by default; settings page "Dream Team"): menu item "Dream Team" with
+  My team (found a team with a self-built starter bot, lineups for deathmatch and Monster Hunt with bench, roster with
+  stamina, value and sell-back, Neuro ledger), Market (daily offers as cards with rarity and value trend, hidden bids),
+  Events (enter Dream Team tournaments, see which lineup plays and why not) and the season table. The tournament form
+  marks Dream Team tournaments with value cap and star limit. A test instance (`TEST_MODE=true`) shows admins a test
+  bar to move time, run market days, add test managers and end the season.
 - Unreal Dream Team, groundwork: package `@tourney/udt` with the economy rules (market values from skill and play
   style, economy index, salaries, rewards, stamina, packs with pity) and a season simulator on real betting data
   (`pnpm --filter @tourney/api udt:sim <export.db>`, HTML report with index, wealth and roster curves per manager type).

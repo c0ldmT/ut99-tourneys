@@ -27,6 +27,26 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/shop').then((m) => m.ShopPage),
       },
       {
+        path: 'udt',
+        title: 'udt.title',
+        loadComponent: () => import('./pages/udt-team').then((m) => m.UdtTeamPage),
+      },
+      {
+        path: 'udt/market',
+        title: 'udt.nav.market',
+        loadComponent: () => import('./pages/udt-market').then((m) => m.UdtMarketPage),
+      },
+      {
+        path: 'udt/events',
+        title: 'udt.nav.events',
+        loadComponent: () => import('./pages/udt-events').then((m) => m.UdtEventsPage),
+      },
+      {
+        path: 'udt/table',
+        title: 'udt.nav.table',
+        loadComponent: () => import('./pages/udt-events').then((m) => m.UdtTablePage),
+      },
+      {
         path: 'bots/:id',
         loadComponent: () => import('./pages/bot-profile').then((m) => m.BotProfilePage),
       },

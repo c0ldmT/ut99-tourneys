@@ -105,6 +105,10 @@ interface Model {
   /** Season tournament: ratings and season statistics (only while a season runs). */
   seasonal: boolean;
   webhookUrl: string;
+  /** Dream Team tournament: managers' lineups; cap in reference Neuro (0 = none), star limit (-1 = none). */
+  udt: boolean;
+  udtCap: number;
+  udtStars: number;
 }
 
 /** What a stored tournament or series template contributes to the model. */
@@ -118,6 +122,8 @@ interface Parts {
   seasonal: boolean;
   registrationOpen: boolean;
   autoStart: boolean;
+  kind?: 'standard' | 'udt';
+  udt?: { valueCap: number | null; starLimit: number | null } | null;
 }
 
 const UNIT_MIN = { min: 1, h: 60, d: 1440 } as const;
@@ -421,6 +427,49 @@ function toLocalInput(iso: string | null): string {
             </div>
             @if (f.autoStart) {
               <p class="muted small">{{ 'form.autoStartHint' | t }}</p>
+            }
+            @if (auth.config().udt || f.udt) {
+              <label class="switch"
+                ><input
+                  type="checkbox"
+                  name="udt"
+                  [(ngModel)]="f.udt"
+                  (ngModelChange)="touch()"
+                  [disabled]="locked()"
+                /><span class="tr"></span>{{ 'form.udt' | t }}</label
+              >
+              @if (f.udt) {
+                <div class="row gap">
+                  <label
+                    >{{ 'form.udtCap' | t }}
+                    <input
+                      type="number"
+                      name="udtCap"
+                      min="0"
+                      step="100"
+                      class="narrow"
+                      [(ngModel)]="f.udtCap"
+                      (ngModelChange)="touch()"
+                      [disabled]="locked()"
+                    />
+                  </label>
+                  <label
+                    >{{ 'form.udtStars' | t }}
+                    <select
+                      name="udtStars"
+                      [(ngModel)]="f.udtStars"
+                      (ngModelChange)="touch()"
+                      [disabled]="locked()"
+                    >
+                      <option [ngValue]="-1">{{ 'form.udtNoLimit' | t }}</option>
+                      @for (n of [0, 1, 2, 3, 4, 5]; track n) {
+                        <option [ngValue]="n">{{ n }}</option>
+                      }
+                    </select>
+                  </label>
+                </div>
+                <p class="muted small">{{ 'form.udtHint' | t }}</p>
+              }
             }
             <p class="muted small">
               {{ 'form.seasonalHint' | t }}
@@ -1494,7 +1543,7 @@ export class TournamentFormPage {
   readonly from = input<string | undefined>(undefined);
   private readonly api = inject(Api);
   private readonly router = inject(Router);
-  private readonly auth = inject(Auth);
+  protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
 
   protected readonly agents = signal<AgentView[]>([]);
@@ -1849,6 +1898,9 @@ export class TournamentFormPage {
       seasonal: this.currentSeason() !== null,
       mapPool: [...STOCK_POOL],
       clanTeams: false,
+      udt: false,
+      udtCap: 0,
+      udtStars: -1,
     };
   }
 
@@ -1899,6 +1951,9 @@ export class TournamentFormPage {
       seasonal: p.seasonal,
       mapPool: Array.isArray(r['mapPool']) ? [...(r['mapPool'] as string[])] : [],
       clanTeams: s.clanTeams ?? false,
+      udt: p.kind === 'udt',
+      udtCap: p.udt?.valueCap ?? 0,
+      udtStars: p.udt?.starLimit ?? -1,
     };
   }
 
@@ -1914,6 +1969,8 @@ export class TournamentFormPage {
         seasonal: d.seasonal,
         registrationOpen: d.registrationOpen,
         autoStart: d.autoStart,
+        kind: d.kind ?? 'standard',
+        udt: d.udt ?? null,
       },
       d.name,
       d.scheduledAt,
@@ -1933,6 +1990,8 @@ export class TournamentFormPage {
         seasonal: !!t.seasonal,
         registrationOpen: true,
         autoStart: !!t.autoStart,
+        kind: t.kind ?? 'standard',
+        udt: t.udt ?? null,
       },
       s.name,
       null,
@@ -2105,6 +2164,15 @@ export class TournamentFormPage {
       seasonal: f.seasonal,
       autoStart: f.autoStart,
       settings: this.settings(f),
+      kind: f.udt ? ('udt' as const) : ('standard' as const),
+      ...(f.udt
+        ? {
+            udt: {
+              valueCap: Number(f.udtCap) > 0 ? Math.round(Number(f.udtCap)) : null,
+              starLimit: Number(f.udtStars) >= 0 ? Number(f.udtStars) : null,
+            },
+          }
+        : {}),
     };
   }
 
@@ -2134,6 +2202,7 @@ export class TournamentFormPage {
           seasonal: t.seasonal,
           autoStart: !!f.scheduledAt && f.autoStart,
         };
+        const udt = { kind: t.kind, ...(t.udt ? { udt: t.udt } : {}) };
         if (id) {
           const patch: Record<string, unknown> = { ...common };
           if (!this.locked())
@@ -2141,6 +2210,7 @@ export class TournamentFormPage {
               agentId: t.agentId,
               profileId: t.profileId,
               settings: t.settings,
+              ...udt,
             });
           // An older tournament with its own list takes the control center's bots.
           if (this.ownPool()) patch['botPool'] = [];
@@ -2152,6 +2222,7 @@ export class TournamentFormPage {
             agentId: t.agentId,
             profileId: t.profileId,
             settings: t.settings,
+            ...udt,
           });
           await this.router.navigate(['/t', d.id]);
         }
