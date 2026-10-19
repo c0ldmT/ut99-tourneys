@@ -274,4 +274,8 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX shop_purchases_season ON shop_purchases(season);
   ALTER TABLE users ADD COLUMN look_json TEXT;
   `,
+  // 12: the bot pool comes from the bot control center (active bots) until the seeding.
+  `
+  ALTER TABLE tournaments ADD COLUMN bots_from_library INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

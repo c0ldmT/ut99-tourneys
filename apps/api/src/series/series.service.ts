@@ -11,7 +11,11 @@ import { DB, type Db } from '../db/database.js';
 import { series, tournaments } from '../db/schema.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { today } from '../seasons/season-time.js';
-import { TournamentsService, type CreateTournament } from '../tournaments/tournaments.service.js';
+import {
+  CreateTournamentBody,
+  TournamentsService,
+  type CreateTournament,
+} from '../tournaments/tournaments.service.js';
 import { firstDate, nextStart, seriesName } from './series-time.js';
 
 type SeriesRow = typeof series.$inferSelect;
@@ -25,11 +29,18 @@ export const SeriesFields = z.object({
   everyWeeks: z.number().int().min(1).max(8).default(1),
   leadDays: z.number().int().min(0).max(28).default(7),
 });
+/** What every tournament of a series gets (server, settings, bots, Discord, season). */
+export const TemplateBody = CreateTournamentBody.omit({ id: true, name: true, scheduledAt: true });
 export const CreateSeriesBody = SeriesFields.extend({
-  /** The tournament whose settings, server and bots the series copies. */
-  fromTournament: z.string().min(1).max(64),
+  /** The tournament whose settings, server and bots the series copies … */
+  fromTournament: z.string().min(1).max(64).optional(),
+  /** … or the settings themselves (the form "New tournament"). */
+  template: TemplateBody.optional(),
+}).refine((b) => !!b.fromTournament !== !!b.template, 'either fromTournament or template');
+export const UpdateSeriesBody = SeriesFields.partial().extend({
+  active: z.boolean().optional(),
+  template: TemplateBody.optional(),
 });
-export const UpdateSeriesBody = SeriesFields.partial().extend({ active: z.boolean().optional() });
 
 /**
  * Tournament series: a template that creates the next tournament of the series a few days
@@ -96,6 +107,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       nextName: seriesName(r.name, r.nextNumber, n.start, this.tz),
       lastStart: r.lastStart,
       settings: t.settings,
+      template: t,
       tournaments: created.length,
       timeZone: this.tz,
     };
@@ -109,24 +121,29 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       .map((r) => this.view(r));
   }
 
-  create(body: z.infer<typeof CreateSeriesBody>, by: { id: string }) {
-    const t = this.db
-      .select()
-      .from(tournaments)
-      .where(eq(tournaments.id, body.fromTournament))
-      .get();
-    if (!t) throw notFound(`tournament ${body.fromTournament}`);
-    const template: Template = {
+  /** A copy of a tournament's server, settings, bots and channel. */
+  private templateOf(id: string): Template {
+    const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
+    if (!t) throw notFound(`tournament ${id}`);
+    return {
       agentId: t.agentId,
       profileId: t.profileId,
       connectAddress: t.connectAddress,
       settings: TournamentSettingsSchema.parse(JSON.parse(t.settingsJson)),
-      botPool: JSON.parse(t.botPoolJson),
+      // A control-center tournament: the series follows the control center too.
+      botPool: t.botsFromLibrary ? [] : JSON.parse(t.botPoolJson),
       registrationOpen: true,
       notifyMode: t.notifyMode as 'default' | 'custom' | 'off',
       webhookUrl: t.webhookUrl,
       seasonal: t.seasonal,
     };
+  }
+
+  create(body: z.infer<typeof CreateSeriesBody>, by: { id: string }) {
+    const template: Template = body.template
+      ? { ...body.template, registrationOpen: true }
+      : this.templateOf(body.fromTournament!);
+    this.tournaments.checkTemplate(template);
     const id = `s${randomId(10)}`;
     this.db
       .insert(series)
@@ -143,7 +160,9 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
         createdAt: new Date(this.clock.now()).toISOString(),
       })
       .run();
-    this.log.info(`series ${body.name} created from ${t.id}`);
+    this.log.info(
+      `series ${body.name} created${body.fromTournament ? ` from ${body.fromTournament}` : ''}`,
+    );
     this.tick();
     return this.view(this.row(id));
   }
@@ -156,6 +175,11 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     if (body.everyWeeks !== undefined) patch.everyWeeks = body.everyWeeks;
     if (body.leadDays !== undefined) patch.leadDays = body.leadDays;
     if (body.active !== undefined) patch.active = body.active;
+    if (body.template) {
+      const template: Template = { ...body.template, registrationOpen: true };
+      this.tournaments.checkTemplate(template);
+      patch.templateJson = JSON.stringify(template);
+    }
     if (body.weekday !== undefined && body.weekday !== r.weekday) {
       patch.weekday = body.weekday;
       patch.anchorDate = firstDate(today(this.clock.now(), this.tz), body.weekday);

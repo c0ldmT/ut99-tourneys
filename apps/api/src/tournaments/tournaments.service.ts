@@ -56,6 +56,18 @@ import { shapeOf, TeamsService, type TeamView } from './teams.service.js';
 
 export type TournamentRow = typeof tournaments.$inferSelect;
 
+/** Bots of a tournament when the control center has no active bot and the server none. */
+const STOCK_BOTS: BotSpec[] = [
+  'Xan',
+  'Loque',
+  'Malcolm',
+  'Brock',
+  'Lauren',
+  'Visse',
+  'Tamika',
+  'Dominator',
+].map((name, i) => ({ name, skill: [6, 5, 5, 4, 4, 3, 3, 2][i] ?? 3 }));
+
 /** Phases in which the bridge runs the tournament. */
 export const ACTIVE_PHASES = ['checkIn', 'running', 'paused'];
 /** The mod's access list holds 64 entries. */
@@ -67,7 +79,8 @@ const TournamentFields = z.object({
   profileId: z.string().min(1).max(64),
   connectAddress: z.string().trim().max(128).nullable().optional(),
   settings: TournamentSettingsSchema,
-  botPool: z.array(BotSpecSchema).min(1).max(64),
+  /** Missing or empty: the active bots of the control center (fixed at the seeding). */
+  botPool: z.array(BotSpecSchema).max(64).optional(),
   registrationOpen: z.boolean().optional(),
   scheduledAt: z.iso.datetime().nullable().optional(),
   /** Discord channel for this tournament: the default webhook, its own, or none. */
@@ -192,12 +205,46 @@ export class TournamentsService {
     return TournamentSettingsSchema.parse(JSON.parse(t.settingsJson));
   }
 
-  /** The bot pool; website bots with their current name, look and play style. */
+  /**
+   * The bot pool; website bots with their current name, look and play style. Until the seeding
+   * a control-center tournament takes the active bots as they are now.
+   */
   botPool(t: TournamentRow): BotSpec[] {
+    if (t.botsFromLibrary && t.phase === 'draft') return this.libraryPool(t.agentId, t.profileId);
     return z
       .array(BotSpecSchema)
       .parse(JSON.parse(t.botPoolJson))
       .map((b) => this.bots.resolveSpec(b));
+  }
+
+  /**
+   * The active bots of the control center with their skill (at most 64). Without any: the
+   * bots of the server's configuration, else the stock bots.
+   */
+  libraryPool(agentId?: string, profileId?: string): BotSpec[] {
+    const active = this.bots
+      .list()
+      .filter((b) => b.active)
+      .slice(0, 64)
+      .map((b) => this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill }));
+    if (active.length) return active;
+    const inv = z
+      .object({ bots: z.array(BotSpecSchema).max(64) })
+      .safeParse(agentId && profileId ? this.agents.inventory(agentId, profileId) : undefined);
+    if (inv.success && inv.data.bots.length) return inv.data.bots;
+    return STOCK_BOTS.map((b) => ({ ...b }));
+  }
+
+  /** Checks a series template (as a tournament would be checked when it is created). */
+  checkTemplate(t: Omit<CreateTournament, 'name'>): void {
+    this.checkFields({
+      settings: t.settings,
+      botPool: t.botPool?.length
+        ? t.botPool.map((b) => this.bots.resolveSpec(b))
+        : this.libraryPool(t.agentId, t.profileId),
+      agentId: t.agentId,
+      profileId: t.profileId,
+    });
   }
 
   /**
@@ -262,7 +309,13 @@ export class TournamentsService {
 
   create(input: CreateTournament, by: User, opts: { seriesId?: string } = {}): TournamentRow {
     // Website bots get their current name (with clan tag) for the checks and the stored pool.
-    const body = { ...input, botPool: input.botPool.map((b) => this.bots.resolveSpec(b)) };
+    const fromLibrary = !input.botPool?.length;
+    const body = {
+      ...input,
+      botPool: fromLibrary
+        ? this.libraryPool(input.agentId, input.profileId)
+        : input.botPool!.map((b) => this.bots.resolveSpec(b)),
+    };
     this.checkFields(body);
     const inSeason = !!this.seasons.current();
     if (body.seasonal && !inSeason) throw conflict('no season is running');
@@ -281,6 +334,7 @@ export class TournamentsService {
         connectAddress: body.connectAddress || null,
         settingsJson: JSON.stringify(body.settings),
         botPoolJson: JSON.stringify(body.botPool),
+        botsFromLibrary: fromLibrary,
         registrationOpen: body.registrationOpen ?? true,
         scheduledAt: body.scheduledAt ?? null,
         notifyMode: body.notifyMode ?? 'default',
@@ -298,8 +352,15 @@ export class TournamentsService {
 
   update(id: string, input: UpdateTournament): TournamentRow {
     const t = this.require(id);
+    // An empty pool switches to the control center's bots.
+    const fromLibrary = input.botPool ? !input.botPool.length : undefined;
     const body = input.botPool
-      ? { ...input, botPool: input.botPool.map((b) => this.bots.resolveSpec(b)) }
+      ? {
+          ...input,
+          botPool: fromLibrary
+            ? this.libraryPool(input.agentId ?? t.agentId, input.profileId ?? t.profileId)
+            : input.botPool.map((b) => this.bots.resolveSpec(b)),
+        }
       : input;
     const structural =
       body.settings !== undefined || body.agentId !== undefined || body.profileId !== undefined;
@@ -324,6 +385,7 @@ export class TournamentsService {
     if (body.connectAddress !== undefined) set.connectAddress = body.connectAddress || null;
     if (body.settings !== undefined) set.settingsJson = JSON.stringify(body.settings);
     if (body.botPool !== undefined) set.botPoolJson = JSON.stringify(body.botPool);
+    if (fromLibrary !== undefined) set.botsFromLibrary = fromLibrary;
     if (body.registrationOpen !== undefined) set.registrationOpen = body.registrationOpen;
     if (body.scheduledAt !== undefined && body.scheduledAt !== t.scheduledAt) {
       set.scheduledAt = body.scheduledAt;
@@ -783,6 +845,15 @@ export class TournamentsService {
     const t = this.require(id);
     if (t.phase !== 'draft' && t.phase !== 'seeded') {
       throw conflict(`cannot seed in phase ${t.phase}`);
+    }
+    if (t.botsFromLibrary) {
+      // The control center's bots as they are now: fixed for this bracket.
+      t.botPoolJson = JSON.stringify(this.libraryPool(t.agentId, t.profileId));
+      this.db
+        .update(tournaments)
+        .set({ botPoolJson: t.botPoolJson })
+        .where(eq(tournaments.id, id))
+        .run();
     }
     const settings = this.settings(t);
     const teamMode = settings.teamSize > 1;
@@ -1431,6 +1502,8 @@ export class TournamentsService {
       connectAddressOverride: t.connectAddress,
       settings: this.settings(t),
       botPool: this.botPool(t),
+      botsFromLibrary: t.botsFromLibrary,
+      seriesId: t.seriesId,
       registrationOpen: t.registrationOpen,
       seasonal: t.seasonal,
       season: this.seasonOf(t) ?? null,

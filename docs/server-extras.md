@@ -93,7 +93,8 @@ The import replaces the server's whole bot section (backup `User.ini.bak-<time>`
 of the server's `User.ini` alone (keys, player name and so on are not taken from the PC). It warns if a bot uses
 a character or skin package the server does not have (custom models or skins): copy that package into the
 server's `System` or `Textures` folder, otherwise the bot cannot use it. Then **Servers → Scan** on the website;
-the bots appear in the bot pool of the tournament form with their skill.
+the bots can be imported into the bot control center (**Bots → Import**); tournaments play with the active bots
+of the control center (with no active bot there, with the server's bots).
 
 ## Tick rate and client rate
 

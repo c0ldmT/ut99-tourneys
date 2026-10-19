@@ -71,6 +71,11 @@ export const tournaments = sqliteTable('tournaments', {
   connectAddress: text('connect_address'),
   settingsJson: text('settings_json').notNull(),
   botPoolJson: text('bot_pool_json').notNull(),
+  /**
+   * The pool is the active bots of the control center (their skill); it is fixed when the
+   * bracket is seeded. Off: the stored pool (older tournaments, API clients that send one).
+   */
+  botsFromLibrary: integer('bots_from_library', { mode: 'boolean' }).notNull().default(false),
   registrationOpen: integer('registration_open', { mode: 'boolean' }).notNull().default(true),
   scheduledAt: text('scheduled_at'),
   createdBy: text('created_by').notNull(),

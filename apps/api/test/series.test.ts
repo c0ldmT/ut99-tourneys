@@ -88,4 +88,83 @@ describe('series', () => {
       await api.close();
     }
   });
+
+  it('is created and changed with its settings (form "New tournament")', async () => {
+    const clock = new FakeClock(Date.parse('2026-10-19T10:00:00Z'));
+    const { api } = await startApi({}, { clock });
+    try {
+      const admin = await Client.login(api, 'Boss', true);
+      await admin.post('/agents', { id: 'pi', name: 'Pi' });
+      const { name: _n, botPool: _b, ...template } = tournamentBody();
+      const when = { weekday: 1, time: '20:00', leadDays: 3 };
+      // Either a tournament or the settings, not both or none.
+      expect((await admin.post('/series', { name: 'X', ...when })).status).toBe(400);
+      const bad = { ...template, settings: { ...template.settings, size: 3 } };
+      expect((await admin.post('/series', { name: 'X', ...when, template: bad })).status).toBe(400);
+      const s = await admin.post('/series', { name: 'Monday Cup #{n}', ...when, template });
+      expect(s.status, JSON.stringify(s.body)).toBe(201);
+      expect(s.body.template).toMatchObject({ agentId: 'pi', settings: { size: 8 } });
+      const changed = await admin.patch(`/series/${s.body.id}`, {
+        template: { ...template, settings: { ...template.settings, size: 16 } },
+      });
+      expect(changed.body.settings.size).toBe(16);
+      // Created today (the start is in the lead time): bots from the control center.
+      const t = ((await admin.get('/tournaments')).body as any[])[0];
+      const d = (await admin.get(`/tournaments/${t.id}`)).body;
+      expect(d).toMatchObject({
+        name: 'Monday Cup #1',
+        seriesId: s.body.id,
+        botsFromLibrary: true,
+      });
+    } finally {
+      await api.close();
+    }
+  });
+});
+
+describe('bot pool from the control center', () => {
+  it('follows the active bots until the seeding, then stays', async () => {
+    const { api } = await startApi();
+    try {
+      const admin = await Client.login(api, 'Boss', true);
+      await admin.post('/agents', { id: 'pi', name: 'Pi' });
+      const { botPool: _b, ...body } = tournamentBody({}, { size: 4 });
+      // No website bots yet: the stock bots.
+      const t = (await admin.post('/tournaments', body)).body;
+      expect(t.botsFromLibrary).toBe(true);
+      expect(t.botPool.map((b: any) => b.name)).toContain('Xan');
+      const ids: string[] = [];
+      for (const [name, skill] of [
+        ['Gorn', 2],
+        ['Sara', 6],
+        ['Rankin', 5],
+        ['Vex', 3],
+        ['Ada', 4],
+      ] as const)
+        ids.push((await admin.post('/bots', { name, skill })).body.id);
+      const pool = async () => (await admin.get(`/tournaments/${t.id}`)).body.botPool;
+      expect((await pool()).map((b: any) => [b.name, b.skill])).toEqual([
+        ['Ada', 4],
+        ['Gorn', 2],
+        ['Rankin', 5],
+        ['Sara', 6],
+        ['Vex', 3],
+      ]);
+      await admin.patch(`/bots/${ids[1]}`, { active: false });
+      const four = ['Ada', 'Gorn', 'Rankin', 'Vex'];
+      expect((await pool()).map((b: any) => b.name)).toEqual(four);
+      const seeded = await admin.post(`/tournaments/${t.id}/seed`, { mode: 'auto' });
+      expect(seeded.status).toBe(200);
+      await admin.patch(`/bots/${ids[1]}`, { active: true });
+      expect((await pool()).map((b: any) => b.name)).toEqual(four);
+      // An old tournament with its own pool switches with an empty pool.
+      const own = (await admin.post('/tournaments', tournamentBody({ name: 'Own' }))).body;
+      expect(own.botsFromLibrary).toBe(false);
+      const sw = await admin.patch(`/tournaments/${own.id}`, { botPool: [] });
+      expect(sw.body).toMatchObject({ botsFromLibrary: true });
+      expect(sw.body.botPool).toHaveLength(5);
+    } finally {
+      await api.close();
+    }
+  });
 });
