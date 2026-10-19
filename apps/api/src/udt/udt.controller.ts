@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Inject, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put } from '@nestjs/common';
 import { CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
+import { BidBody, UdtMarketService, type BidInput } from './udt-market.service.js';
 import {
   LineupBody,
   TeamBody,
@@ -13,7 +14,10 @@ import {
 /** Unreal Dream Team: a manager's team, roster and lineups. */
 @Controller('udt')
 export class UdtController {
-  constructor(@Inject(UdtService) private readonly udt: UdtService) {}
+  constructor(
+    @Inject(UdtService) private readonly udt: UdtService,
+    @Inject(UdtMarketService) private readonly market: UdtMarketService,
+  ) {}
 
   @Get()
   view(@CurrentUser() user: User) {
@@ -36,5 +40,29 @@ export class UdtController {
   @Put('lineup')
   lineup(@CurrentUser() user: User, @Body(new ZodPipe(LineupBody)) body: LineupInput) {
     return this.udt.setLineup(user, body);
+  }
+
+  /** Today's offers (values, last 14 days), the manager's hidden bids, the next market day. */
+  @Get('market')
+  marketView(@CurrentUser() user: User) {
+    return this.market.view(user);
+  }
+
+  @Post('market/bid')
+  @HttpCode(200)
+  bid(@CurrentUser() user: User, @Body(new ZodPipe(BidBody)) body: BidInput) {
+    return this.market.bid(user, body);
+  }
+
+  @Delete('market/bid/:botId')
+  withdraw(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.market.withdraw(user, botId);
+  }
+
+  /** Sells a roster bot to the market (85 % of its value). */
+  @Post('roster/:botId/sell')
+  @HttpCode(200)
+  sell(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.market.sell(user, botId);
   }
 }
