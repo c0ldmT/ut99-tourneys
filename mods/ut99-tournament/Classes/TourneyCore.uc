@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.9.0";
+const MOD_VERSION = "0.10.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -138,6 +138,10 @@ var byte CfgBody[16];              // Dream Team game traits (btrt): 1 start arm
 var byte CfgPhoenix[16];           // 1 = the phoenix was used this game
 var float CfgAdrUntil[16];         // adrenaline: faster until then (0 = not boosted)
 var float CfgAdrSpeed[16];         // the ground speed before the boost
+var byte CfgBeh[16];               // behaviour traits (btrt, mod 0.10.0): 1 vulture, 2 kamikaze,
+                                   // 4 berserker, 8 revenant, 16 bounty hunter
+var byte CfgAggr[16];              // 1 = the hurt bot's aggressiveness was changed by a trait
+var string CfgAvenge[16];          // revenant: its last killer
 var byte SayCfg[192];              // chat lines: bot (index into Cfg*), occasion, text
 var string SayKind[192];
 var string SayText[192];
@@ -378,7 +382,10 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "btrt":
 			i = FindCfg(M.Get("name"), true);
 			if (i >= 0)
+			{
 				CfgBody[i] = byte(ParseGameTraits(M.Get("c")));
+				CfgBeh[i] = byte(ParseBehaviourTraits(M.Get("c")));
+			}
 			break;
 		case "bpers":
 			i = FindCfg(M.Get("name"), true);
@@ -1246,6 +1253,7 @@ function int TimerStep()
 		BotTick();
 		AntiIdle();
 		AdrenalineTick();
+		BehaviourTick();
 	}
 	if (!bGameLive)
 	{
@@ -2655,6 +2663,9 @@ function int FindCfg(string BName, bool bCreate)
 	CfgBody[i] = 0;
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
+	CfgBeh[i] = 0;
+	CfgAggr[i] = 0;
+	CfgAvenge[i] = "";
 	return i;
 }
 
@@ -2739,6 +2750,7 @@ function ApplyBotConfig(Bot B, string BName)
 			B.bJumpy = CfgJump[c] == 1;
 			B.StrafingAbility = CfgStrafe[c];
 		}
+		ApplyBehaviourTraits(B, c);
 	}
 	// Without a voice the bot stays silent in voice messages: the class's own, as UT does.
 	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
@@ -3308,7 +3320,7 @@ function int GameTraitCfg(Pawn P)
 	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
 		return -1;
 	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
-	if (c >= 0 && CfgBody[c] == 0)
+	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0)
 		return -1;
 	return c;
 }
@@ -3321,6 +3333,8 @@ function ResetGameTraits()
 	{
 		CfgPhoenix[c] = 0;
 		CfgAdrUntil[c] = 0;
+		CfgAggr[c] = 0;
+		CfgAvenge[c] = "";
 	}
 }
 
@@ -3391,13 +3405,19 @@ function OnModifyPlayer(Pawn P)
 	}
 }
 
-// Adrenaline: 30 % faster for 3 s after a kill.
+// Adrenaline: 30 % faster for 3 s after a kill. Revenant: remembers its killer, forgets him
+// once it got him.
 function GameTraitKill(Pawn Killer, Pawn Other)
 {
 	local int c;
+	c = GameTraitCfg(Other);
+	if (c >= 0 && (CfgBeh[c] & 8) != 0 && Killer != None && Killer != Other && Killer.PlayerReplicationInfo != None && !SameTeam(Killer, Other))
+		CfgAvenge[c] = Killer.PlayerReplicationInfo.PlayerName;
 	if (Killer == None || Killer == Other || Killer.Health <= 0)
 		return;
 	c = GameTraitCfg(Killer);
+	if (c >= 0 && CfgAvenge[c] != "" && Other != None && Other.PlayerReplicationInfo != None && SameBotName(CfgAvenge[c], Other.PlayerReplicationInfo.PlayerName))
+		CfgAvenge[c] = "";
 	if (c < 0 || (CfgBody[c] & 4) == 0)
 		return;
 	if (CfgAdrUntil[c] <= 0)
@@ -3419,6 +3439,144 @@ function AdrenalineTick()
 				B.GroundSpeed = CfgAdrSpeed[c];
 			CfgAdrUntil[c] = 0;
 		}
+}
+
+// "aa,kz" -> bits of CfgBeh (behaviour traits, mod 0.10.0); unknown codes are ignored.
+function int ParseBehaviourTraits(string S)
+{
+	local int Bits, p;
+	local string Code;
+	Bits = 0;
+	while (S != "")
+	{
+		p = InStr(S, ",");
+		if (p < 0)
+		{
+			Code = S;
+			S = "";
+		}
+		else
+		{
+			Code = Left(S, p);
+			S = Mid(S, p + 1);
+		}
+		if (Code == "aa")
+			Bits = Bits | 1;
+		else if (Code == "kz")
+			Bits = Bits | 2;
+		else if (Code == "bs")
+			Bits = Bits | 4;
+		else if (Code == "rg")
+			Bits = Bits | 8;
+		else if (Code == "bh")
+			Bits = Bits | 16;
+	}
+	return Bits;
+}
+
+// Two pawns on the same team (team games only).
+function bool SameTeam(Pawn A, Pawn B)
+{
+	if (A == None || B == None || A.PlayerReplicationInfo == None || B.PlayerReplicationInfo == None)
+		return false;
+	if (TeamSize <= 1 && !Game.bTeamGame)
+		return false;
+	return A.PlayerReplicationInfo.Team == B.PlayerReplicationInfo.Team;
+}
+
+// At the spawn, after the play style: kamikaze (flak as favourite weapon unless one is set,
+// charges more), berserker (a little more aggressive).
+function ApplyBehaviourTraits(Bot B, int c)
+{
+	if (B == None || c < 0 || CfgBeh[c] == 0)
+		return;
+	if ((CfgBeh[c] & 2) != 0)
+	{
+		if (CfgWeapon[c] == "")
+			B.FavoriteWeapon = class'Botpack.UT_FlakCannon';
+		B.CombatStyle = FMin(1.0, B.CombatStyle + 0.5);
+		B.BaseAggressiveness = FMin(1.0, B.BaseAggressiveness + 0.3);
+	}
+	if ((CfgBeh[c] & 4) != 0)
+		B.BaseAggressiveness = FMin(1.0, B.BaseAggressiveness + 0.2);
+	B.Aggressiveness = B.BaseAggressiveness;
+}
+
+// The opponent of B with the highest score (bounty hunter), None while nobody has scored.
+function Pawn LeaderFor(Bot B)
+{
+	local Pawn P, Best;
+	local float S;
+	S = 0;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (P != B && P.bIsPlayer && !P.bDeleteMe && P.Health > 0 && P.PlayerReplicationInfo != None
+			&& !P.PlayerReplicationInfo.bIsSpectator && !SameTeam(P, B) && P.PlayerReplicationInfo.Score > S)
+		{
+			Best = P;
+			S = P.PlayerReplicationInfo.Score;
+		}
+	return Best;
+}
+
+// Once a second while the game runs: vulture (hurt: cautious, so it retreats to health and
+// armour), berserker (hurt: no retreat), revenant and bounty hunter (deathmatch games: without
+// an enemy they hunt their last killer or the leader, like a nemesis).
+function BehaviourTick()
+{
+	local int c;
+	local Bot B;
+	local Pawn N;
+	local float A;
+	for (c = 0; c < CfgCount; c++)
+	{
+		if (CfgBeh[c] == 0)
+			continue;
+		B = FindBotPawn(CfgName[c]);
+		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
+			continue;
+		A = B.BaseAggressiveness;
+		if ((CfgBeh[c] & 1) != 0 && B.Health < 50)
+			A -= 0.6;
+		if ((CfgBeh[c] & 4) != 0 && B.Health < 40)
+			A += 0.6;
+		if (A != B.BaseAggressiveness)
+		{
+			B.Aggressiveness = FClamp(A, -1.0, 1.5);
+			CfgAggr[c] = 1;
+		}
+		else if (CfgAggr[c] == 1)
+		{
+			B.Aggressiveness = B.BaseAggressiveness;
+			CfgAggr[c] = 0;
+		}
+		if (!AntiIdleAllowed() || B.Enemy != None || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
+			continue;
+		N = None;
+		if ((CfgBeh[c] & 8) != 0 && CfgAvenge[c] != "")
+			N = FindOpponent(B, CfgAvenge[c]);
+		if (N == None && (CfgBeh[c] & 16) != 0)
+			N = LeaderFor(B);
+		if (N != None && B.SetEnemy(N))
+			KeepHunting(B, N);
+	}
+}
+
+// The game's GameThreatAdd: revenants prefer their last killer, bounty hunters the leader.
+function float BehaviourThreat(Bot B, Pawn Other)
+{
+	local int c;
+	local float F;
+	if (B == None || Other == None || CfgCount == 0 || Other.PlayerReplicationInfo == None)
+		return 0;
+	c = GameTraitCfg(B);
+	if (c < 0 || CfgBeh[c] == 0)
+		return 0;
+	F = 0;
+	if ((CfgBeh[c] & 8) != 0 && CfgAvenge[c] != "" && SameBotName(CfgAvenge[c], Other.PlayerReplicationInfo.PlayerName))
+		F += 0.6;
+	if ((CfgBeh[c] & 16) != 0 && LeaderFor(B) == Other)
+		F += 0.5;
+	return F;
 }
 
 defaultproperties

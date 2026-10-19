@@ -124,13 +124,16 @@ function EndGame(string Reason)
 		Core.OnEndGame(Reason, bWasOvertime);
 }
 
-// Website bots prefer their rivals as targets (see TourneyCore.RivalThreat).
+// Website bots prefer their rivals as targets (see TourneyCore.RivalThreat), Dream Team
+// revenants their last killer and bounty hunters the leader (BehaviourThreat).
 function float GameThreatAdd(Bot aBot, Pawn Other)
 {
 	local float F;
 	F = Super.GameThreatAdd(aBot, Other);
 	if (Core != None)
 		F += Core.RivalThreat(aBot, Other);
+	if (Core != None)
+		F += Core.BehaviourThreat(aBot, Other);
 	return F;
 }
 

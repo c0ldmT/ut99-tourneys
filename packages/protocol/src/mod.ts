@@ -280,7 +280,9 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * Mod 0.9.0, Unreal Dream Team: the bot's game traits (after `btr`), `c` codes separated by
    * commas: sa start armour 25, tf -10 % damage taken, ad faster for 3 s after a kill, gc +20 %
    * damage dealt and taken, vp 15 % of the damage dealt as health, px survives one lethal hit
-   * per game with 50 health. Unknown codes are ignored.
+   * per game with 50 health; mod 0.10.0 behaviour: aa vulture (hurt: retreats to health), kz
+   * kamikaze (flak, charges), bs berserker (hurt: no retreat), rg revenant (hunts its last
+   * killer), bh bounty hunter (hunts the leader). Unknown codes are ignored.
    */
   z.object({ t: z.literal('btrt'), name: str(MAX_NAME_CHARS), c: str(64) }),
   /**

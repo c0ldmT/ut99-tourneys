@@ -54,6 +54,10 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > damage taken), adrenaline (30 % faster for 3 s after a kill), glass cannon (+20 % damage dealt and taken), vampire
 > (15 % of the damage dealt as health, up to 100), phoenix (once per game a lethal hit leaves 50 health, announced in
 > the chat). The mod's mutator is also the damage mutator; bots without game traits play as before.
+> Mod 0.10.0: Dream Team behaviour traits (codes in the same `btrt` line): vulture (below 50 health it plays
+> cautiously, so it retreats to health and armour), kamikaze (flak cannon as favourite weapon unless one is set, charges
+> more), berserker (a little more aggressive, below 40 health it never retreats), revenant (prefers its last killer and
+> hunts him when it has no enemy), bounty hunter (prefers the leader and hunts him); the hunts in deathmatch games only.
 
 ## Classes
 
@@ -238,6 +242,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 53 | **Dedication** (mod 0.7.4) | Buy the dedication in the Neuro shop with both lines, approve it (Shop → Manage), start a tournament with you and website bots that talk. When a bot frags you it says your kill line now and then (`{victim}` = you), when you frag one it says your death line; other kills keep the bots' own lines. Bridge log without `ded` parse errors |
 | 54 | **Bot AI help** (mod 0.8.0) | Settings → "Bot AI help" on "Failsafe and duel mode". 1v1 bot-only tournament on maps where bots used to stand still (and a small one like DM-Tempest): the bots look for each other, a game with 10 frags ends in about 4-6 minutes, no bot stands in one place for long. 2on2 bot-only: normal play, a bot that stops moving gets going within ~10 s. Monster Hunt run: bots behave as before. Setting "Off": behaviour as in 0.7.4. Server log without `Accessed None` from `AntiIdle` |
 | 55 | **Dream Team game traits** (mod 0.9.0) | Test instance with Dream Team on: give a roster bot a body trait (Packs → craft, My team → add trait), enter it in a Dream Team 1v1 with a real server. Start armour: the bot spawns with 25 armour (spectate: armour in the HUD of the bot view). Phoenix: the first lethal hit of a game leaves it alive, chat `[TAG]Name rises from the ashes!`, server log `game trait phoenix: ... survives`; the second hit kills. Glass cannon/thick skin/vampire: compare damage numbers with `stat` or by feel (a glass cannon bot dies faster, a vampire recovers health). Adrenaline: visibly faster for a few seconds after a frag. Bots without traits and normal tournaments behave as in 0.8.0; server log without `Accessed None` |
+| 56 | **Dream Team behaviour traits** (mod 0.10.0) | Dream Team 1v1 or 2on2 with a real server and roster bots with behaviour traits. Revenant: after it was fragged it goes after its killer (spectate it). Bounty hunter: goes after the player or bot with the most frags. Kamikaze without a favourite weapon: picks up and uses the flak cannon, charges. Vulture: below 50 health it runs for health or armour instead of fighting on; berserker: keeps fighting when low. Monster Hunt: no hunts, the rest works. Bots without traits as in 0.9.0; server log without `Accessed None` |
 
 ## SmartStockBots (optional)
 
