@@ -7,6 +7,11 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team body traits (mod 0.9.0): starter armour, thick skin, adrenaline, glass cannon, vampire and phoenix
+  are played by the game server (one per bot, in the packs). Needs mod 0.9.0 on the game server.
+- Unreal Dream Team high stakes: Dream Team tournaments with an entry ticket (fixed or at the economy index) and a
+  smallest number of human teams; the best team takes 60 % of the tickets plus one ticket, the second best 20 %.
+  Tickets come back when a team leaves, is left out or too few teams enter, or the tournament is called off.
 - Unreal Dream Team trades (page "Trades", badge for waiting offers): offer bots and Neuro to another manager and ask
   for bots and Neuro; the partner accepts or declines, the proposer can withdraw, offers expire after 48 hours. Brakes
   against moving Neuro (settings "Dream Team"): balance of both sides, fee on what each side receives, lock after

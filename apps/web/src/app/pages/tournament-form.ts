@@ -23,6 +23,7 @@ import type {
   SeriesView,
   TournamentDetail,
   TournamentSettings,
+  UdtEventRules,
 } from '../core/types';
 
 const STOCK_POOL = [
@@ -109,6 +110,10 @@ interface Model {
   udt: boolean;
   udtCap: number;
   udtStars: number;
+  /** High stakes: ticket in Neuro (0 = none), at the index, fewest human teams. */
+  udtTicket: number;
+  udtTicketIndexed: boolean;
+  udtMinTeams: number;
 }
 
 /** What a stored tournament or series template contributes to the model. */
@@ -123,7 +128,7 @@ interface Parts {
   registrationOpen: boolean;
   autoStart: boolean;
   kind?: 'standard' | 'udt';
-  udt?: { valueCap: number | null; starLimit: number | null } | null;
+  udt?: UdtEventRules | null;
 }
 
 const UNIT_MIN = { min: 1, h: 60, d: 1440 } as const;
@@ -469,6 +474,46 @@ function toLocalInput(iso: string | null): string {
                   </label>
                 </div>
                 <p class="muted small">{{ 'form.udtHint' | t }}</p>
+                <div class="row gap">
+                  <label
+                    >{{ 'form.udtTicket' | t }}
+                    <input
+                      type="number"
+                      name="udtTicket"
+                      min="0"
+                      step="100"
+                      class="narrow"
+                      [(ngModel)]="f.udtTicket"
+                      (ngModelChange)="touch()"
+                      [disabled]="locked()"
+                    />
+                  </label>
+                  @if (f.udtTicket > 0) {
+                    <label
+                      >{{ 'form.udtMinTeams' | t }}
+                      <input
+                        type="number"
+                        name="udtMinTeams"
+                        min="2"
+                        max="16"
+                        class="narrow"
+                        [(ngModel)]="f.udtMinTeams"
+                        (ngModelChange)="touch()"
+                        [disabled]="locked()"
+                      />
+                    </label>
+                    <label class="switch"
+                      ><input
+                        type="checkbox"
+                        name="udtTicketIndexed"
+                        [(ngModel)]="f.udtTicketIndexed"
+                        (ngModelChange)="touch()"
+                        [disabled]="locked()"
+                      /><span class="tr"></span>{{ 'form.udtTicketIndexed' | t }}</label
+                    >
+                  }
+                </div>
+                <p class="muted small">{{ 'form.udtTicketHint' | t }}</p>
               }
             }
             <p class="muted small">
@@ -1901,6 +1946,9 @@ export class TournamentFormPage {
       udt: false,
       udtCap: 0,
       udtStars: -1,
+      udtTicket: 0,
+      udtTicketIndexed: true,
+      udtMinTeams: 4,
     };
   }
 
@@ -1954,6 +2002,9 @@ export class TournamentFormPage {
       udt: p.kind === 'udt',
       udtCap: p.udt?.valueCap ?? 0,
       udtStars: p.udt?.starLimit ?? -1,
+      udtTicket: p.udt?.ticket ?? 0,
+      udtTicketIndexed: p.udt?.ticketIndexed ?? true,
+      udtMinTeams: p.udt?.minTeams ?? 4,
     };
   }
 
@@ -2170,6 +2221,9 @@ export class TournamentFormPage {
             udt: {
               valueCap: Number(f.udtCap) > 0 ? Math.round(Number(f.udtCap)) : null,
               starLimit: Number(f.udtStars) >= 0 ? Number(f.udtStars) : null,
+              ticket: Number(f.udtTicket) > 0 ? Math.round(Number(f.udtTicket)) : null,
+              ticketIndexed: !!f.udtTicketIndexed,
+              minTeams: Math.min(16, Math.max(2, Math.round(Number(f.udtMinTeams) || 4))),
             },
           }
         : {}),

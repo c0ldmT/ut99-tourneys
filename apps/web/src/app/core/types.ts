@@ -881,14 +881,14 @@ export interface UdtInventoryCard {
   id: string;
   code: string;
   rarity: UdtRarity;
-  category: 'values' | 'manager';
+  category: 'values' | 'body' | 'manager';
   needsWeapon: boolean;
 }
 
 export interface UdtCatalogTrait {
   code: string;
   rarity: UdtRarity;
-  category: 'values' | 'manager';
+  category: 'values' | 'body' | 'manager';
   needsWeapon?: boolean;
   scrap: number;
   craft: number;
@@ -978,6 +978,10 @@ export interface UdtMarket {
 export interface UdtEventRules {
   valueCap: number | null;
   starLimit: number | null;
+  /** High stakes: entry ticket (null: none), at the index or fixed, fewest human teams. */
+  ticket?: number | null;
+  ticketIndexed?: boolean;
+  minTeams?: number;
 }
 
 export interface UdtEvent {
@@ -990,6 +994,9 @@ export interface UdtEvent {
   game: 'dm' | 'mh';
   rules: UdtEventRules;
   valueCapNow: number | null;
+  /** High stakes: the ticket now and the tickets paid in. */
+  ticketNow: number;
+  pot: number;
   entries: number;
   entered: boolean;
   open: boolean;

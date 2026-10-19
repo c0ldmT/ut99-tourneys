@@ -43,6 +43,16 @@ import { UdtNav } from '../core/udt';
                 'udt.events.stars' | t: { n: e.rules.starLimit }
               }}</span>
             }
+            @if (e.ticketNow) {
+              <span class="udt-mark hs"
+                >{{ 'udt.events.highStakes' | t }} · {{ 'udt.events.ticket' | t }}
+                {{ e.ticketNow | neuro }}</span
+              >
+              <span class="udt-mark">{{ 'udt.events.pot' | t }} {{ e.pot | neuro }}</span>
+              <span class="udt-mark">{{
+                'udt.events.minTeams' | t: { n: e.rules.minTeams ?? 4 }
+              }}</span>
+            }
             @if (e.entered) {
               <span class="udt-mark own">{{ 'udt.events.entered' | t }}</span>
             }
@@ -65,6 +75,9 @@ import { UdtNav } from '../core/udt';
                 (click)="enter(e)"
               >
                 {{ 'udt.events.enter' | t }}
+                @if (e.ticketNow) {
+                  · {{ e.ticketNow | neuro }}
+                }
               </button>
             }
             @if (e.open && e.entered) {
@@ -106,6 +119,10 @@ import { UdtNav } from '../core/udt';
     .name {
       font-size: 1.3rem;
       font-weight: 700;
+    }
+    .hs {
+      color: #f5c75e;
+      border-color: rgba(245, 199, 94, 0.45);
     }
     .rules {
       display: flex;
