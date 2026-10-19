@@ -21,7 +21,10 @@ import type { TournamentSummary } from '../core/types';
     <div class="head">
       <h1>{{ 'list.title' | t }}</h1>
       @if (auth.me()?.isAdmin) {
-        <a class="btn primary" routerLink="/new">+ {{ 'list.new' | t }}</a>
+        <div class="row">
+          <a class="btn" routerLink="/admin/series">{{ 'series.title' | t }}</a>
+          <a class="btn primary" routerLink="/new">+ {{ 'list.new' | t }}</a>
+        </div>
       }
     </div>
     @if (error()) {

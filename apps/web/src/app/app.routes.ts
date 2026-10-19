@@ -69,6 +69,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/settings').then((m) => m.SettingsPage),
       },
       {
+        path: 'admin/series',
+        title: 'series.title',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./pages/series').then((m) => m.SeriesPage),
+      },
+      {
         path: 'admin/users',
         title: 'nav.users',
         canActivate: [adminOnly],

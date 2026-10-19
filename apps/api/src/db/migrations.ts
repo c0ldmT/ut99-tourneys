@@ -238,4 +238,23 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE bet_bailouts_new RENAME TO bet_bailouts;
   CREATE INDEX bet_bailouts_season ON bet_bailouts(season);
   `,
+  // 10: tournament series: a template that creates a tournament every week (or every n weeks).
+  `
+  CREATE TABLE series (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    template_json TEXT NOT NULL,
+    weekday INTEGER NOT NULL,
+    time TEXT NOT NULL,
+    every_weeks INTEGER NOT NULL DEFAULT 1,
+    lead_days INTEGER NOT NULL DEFAULT 7,
+    anchor_date TEXT NOT NULL,
+    next_number INTEGER NOT NULL DEFAULT 1,
+    last_start TEXT,
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  ALTER TABLE tournaments ADD COLUMN series_id TEXT REFERENCES series(id) ON DELETE SET NULL;
+  `,
 ];

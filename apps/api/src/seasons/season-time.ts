@@ -47,6 +47,16 @@ export function dayStartMs(date: string, timeZone: string): number {
   return t;
 }
 
+/** A local date and time ("HH:MM") in the time zone, as epoch ms. */
+export function zonedMs(date: string, time: string, timeZone: string): number {
+  const [y, m, d] = date.split('-').map(Number) as [number, number, number];
+  const [h, min] = time.split(':').map(Number) as [number, number];
+  const guess = Date.UTC(y, m - 1, d, h, min);
+  let t = guess - offsetMs(guess, timeZone);
+  t = guess - offsetMs(t, timeZone);
+  return t;
+}
+
 /** The day after (YYYY-MM-DD). */
 export function nextDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number) as [number, number, number];

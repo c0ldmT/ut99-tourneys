@@ -258,7 +258,7 @@ export class TournamentsService {
     }
   }
 
-  create(input: CreateTournament, by: User): TournamentRow {
+  create(input: CreateTournament, by: User, opts: { seriesId?: string } = {}): TournamentRow {
     // Website bots get their current name (with clan tag) for the checks and the stored pool.
     const body = { ...input, botPool: input.botPool.map((b) => this.bots.resolveSpec(b)) };
     this.checkFields(body);
@@ -284,6 +284,7 @@ export class TournamentsService {
         notifyMode: body.notifyMode ?? 'default',
         webhookUrl: body.webhookUrl || null,
         seasonal: body.seasonal ?? inSeason,
+        seriesId: opts.seriesId ?? null,
         createdBy: by.id,
         createdAt: this.now(),
       })

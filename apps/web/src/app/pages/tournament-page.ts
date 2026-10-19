@@ -525,6 +525,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             <div class="stack">
               <div class="row">
                 <a class="btn" [routerLink]="['/t', t.id, 'edit']">{{ 'admin.edit' | t }}</a>
+                <a class="btn" routerLink="/admin/series" [queryParams]="{ from: t.id }">{{
+                  'series.makeFrom' | t
+                }}</a>
                 @if (t.phase === 'draft') {
                   <button
                     (click)="

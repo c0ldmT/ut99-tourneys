@@ -36,6 +36,8 @@ import { SeasonsController } from './seasons/seasons.controller.js';
 import { SeasonsService } from './seasons/seasons.service.js';
 import { BotsController } from './bots/bots.controller.js';
 import { BotsService } from './bots/bots.service.js';
+import { SeriesController } from './series/series.controller.js';
+import { SeriesService } from './series/series.service.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
@@ -71,6 +73,7 @@ class AppModule {
         SeasonsController,
         BotsController,
         BetsController,
+        SeriesController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -104,6 +107,7 @@ class AppModule {
         SeasonsService,
         BotsService,
         BetsService,
+        SeriesService,
         AgentGateway,
       ],
     };

@@ -73,6 +73,31 @@ export const tournaments = sqliteTable('tournaments', {
    * season of its first game. Lifetime statistics count every tournament.
    */
   seasonal: integer('seasonal', { mode: 'boolean' }).notNull().default(true),
+  /** Created by a tournament series. */
+  seriesId: text('series_id'),
+});
+
+/** Tournament series: a template that creates a tournament every n weeks before its start. */
+export const series = sqliteTable('series', {
+  id: text('id').primaryKey(),
+  /** Name of the tournaments; {n} = number, {date} = start date. */
+  name: text('name').notNull(),
+  /** The tournament's fields without name and start (agent, profile, settings, bots, ...). */
+  templateJson: text('template_json').notNull(),
+  /** ISO weekday 1 (Monday) .. 7 (Sunday) and local time "HH:MM" in SEASON_TZ. */
+  weekday: integer('weekday').notNull(),
+  time: text('time').notNull(),
+  everyWeeks: integer('every_weeks').notNull().default(1),
+  /** The tournament is created (and announced) this many days before its start. */
+  leadDays: integer('lead_days').notNull().default(7),
+  /** A start date of the series (YYYY-MM-DD): the weeks count from it. */
+  anchorDate: text('anchor_date').notNull(),
+  nextNumber: integer('next_number').notNull().default(1),
+  /** Start (ISO) of the last tournament created. */
+  lastStart: text('last_start'),
+  active: integer('active', { mode: 'boolean' }).notNull().default(true),
+  createdBy: text('created_by').notNull(),
+  createdAt: text('created_at').notNull(),
 });
 
 /** Bot clans: their tag is put in front of the members' names in the game. */

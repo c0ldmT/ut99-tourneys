@@ -672,3 +672,28 @@ export interface MatchDetailView {
   games: MatchGameView[];
   wins: Partial<Record<string, number>>;
 }
+
+// --- Tournament series ------------------------------------------------------------------------
+
+export interface SeriesFields {
+  name: string;
+  /** ISO weekday 1 (Monday) .. 7 (Sunday). */
+  weekday: number;
+  /** "HH:MM", local time of the season time zone. */
+  time: string;
+  everyWeeks: number;
+  leadDays: number;
+}
+
+export interface SeriesView extends SeriesFields {
+  id: string;
+  active: boolean;
+  nextNumber: number;
+  nextStart: string;
+  nextCreateAt: string;
+  nextName: string;
+  lastStart: string | null;
+  settings: TournamentSettings;
+  tournaments: number;
+  timeZone: string;
+}

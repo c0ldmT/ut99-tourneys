@@ -19,6 +19,8 @@ import type {
   RatingRow,
   Season,
   SeasonsOverview,
+  SeriesFields,
+  SeriesView,
   SiteConfig,
   StatMode,
   StatScope,
@@ -177,6 +179,13 @@ export class Api {
 
   tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);
+  series = () => this.call<SeriesView[]>('GET', '/series');
+  createSeries = (body: SeriesFields & { fromTournament: string }) =>
+    this.call<SeriesView>('POST', '/series', body);
+  updateSeries = (id: string, body: Partial<SeriesFields> & { active?: boolean }) =>
+    this.call<SeriesView>('PATCH', `/series/${id}`, body);
+  runSeries = (id: string) => this.call<SeriesView>('POST', `/series/${id}/run`);
+  deleteSeries = (id: string) => this.call<void>('DELETE', `/series/${id}`);
   createTournament = (body: unknown) => this.call<TournamentDetail>('POST', '/tournaments', body);
   updateTournament = (id: string, body: unknown) =>
     this.call<TournamentDetail>('PATCH', `/tournaments/${id}`, body);
