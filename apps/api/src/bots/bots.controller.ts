@@ -12,7 +12,7 @@ import {
 import { z } from 'zod';
 import { UsersService } from '../auth/users.service.js';
 import { AdminOnly } from '../auth/guard.js';
-import { notFound, ZodPipe } from '../common/http.js';
+import { notFound, PatchPipe, ZodPipe } from '../common/http.js';
 import { botKey, userKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
 import { BotBody, BotsService, ClanBody, type BotInput, type ClanInput } from './bots.service.js';
@@ -98,7 +98,7 @@ export class BotsController {
 
   @AdminOnly()
   @Patch('bots/:id')
-  update(@Param('id') id: string, @Body(new ZodPipe(BotBody.partial())) body: Partial<BotInput>) {
+  update(@Param('id') id: string, @Body(new PatchPipe(BotBody.partial())) body: Partial<BotInput>) {
     return this.bots.update(id, body);
   }
 
@@ -135,7 +135,7 @@ export class BotsController {
   @Patch('bot-clans/:id')
   updateClan(
     @Param('id') id: string,
-    @Body(new ZodPipe(ClanBody.partial())) body: Partial<ClanInput>,
+    @Body(new PatchPipe(ClanBody.partial())) body: Partial<ClanInput>,
   ) {
     return this.bots.updateClan(id, body);
   }

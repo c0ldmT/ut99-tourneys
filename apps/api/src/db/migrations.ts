@@ -403,4 +403,30 @@ export const MIGRATIONS: string[] = [
   );
   ALTER TABLE udt_teams ADD COLUMN scrap INTEGER NOT NULL DEFAULT 0;
   `,
+  // 18: Dream Team trades between managers: bots (with their traits) and Neuro both ways, the
+  // proposer's Neuro and fee held until the offer is decided.
+  `
+  CREATE TABLE udt_trades (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    from_user TEXT NOT NULL,
+    to_user TEXT NOT NULL,
+    give_json TEXT NOT NULL,
+    take_json TEXT NOT NULL,
+    give_neuro INTEGER NOT NULL DEFAULT 0,
+    take_neuro INTEGER NOT NULL DEFAULT 0,
+    give_value INTEGER NOT NULL,
+    take_value INTEGER NOT NULL,
+    fee_from INTEGER NOT NULL DEFAULT 0,
+    fee_to INTEGER NOT NULL DEFAULT 0,
+    message TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    reason TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    decided_at TEXT
+  );
+  CREATE INDEX udt_trades_to ON udt_trades(season, to_user, status);
+  CREATE INDEX udt_trades_from ON udt_trades(season, from_user, status);
+  `,
 ];

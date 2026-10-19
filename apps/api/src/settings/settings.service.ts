@@ -86,6 +86,17 @@ export const UdtSettingsSchema = z.object({
     .default('04:00'),
   offersPerDay: z.number().int().min(1).max(40).default(8),
   starterBudget: z.number().int().min(100).max(100_000).default(1500),
+  /** Trading between managers (phase 3) and its brakes against moving Neuro to a friend. */
+  tradeEnabled: z.boolean().default(true),
+  /** Fee in percent of what each side receives (bots' market value + Neuro). */
+  tradeFeePct: z.number().int().min(0).max(50).default(5),
+  /** The smaller side must be worth at least this percent of the bigger side. */
+  tradeBalancePct: z.number().int().min(0).max(100).default(50),
+  /** A bot can be traded this many days after it was bought or traded. */
+  tradeLockDays: z.number().int().min(0).max(30).default(3),
+  tradeExpiryHours: z.number().int().min(1).max(336).default(48),
+  /** Trades between the same two managers per 7 days (0 = no limit). */
+  tradePairPerWeek: z.number().int().min(0).max(50).default(2),
 });
 export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
 

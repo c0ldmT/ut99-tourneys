@@ -4,6 +4,7 @@ import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
+import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.service.js';
 import {
   AssignBody,
   CraftBody,
@@ -30,11 +31,15 @@ export class UdtController {
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
     @Inject(UdtRewardsService) private readonly rewards: UdtRewardsService,
     @Inject(UdtPacksService) private readonly packs: UdtPacksService,
+    @Inject(UdtTradesService) private readonly trades: UdtTradesService,
   ) {}
 
   @Get()
   view(@CurrentUser() user: User) {
-    return this.udt.view(user);
+    const v = this.udt.view(user);
+    // Offers waiting for the manager (badge on "Trades").
+    const tradesIn = v.team && v.season !== null ? this.trades.incoming(user.id) : 0;
+    return { ...v, tradesIn };
   }
 
   /** All teams of the running season. */
@@ -149,5 +154,47 @@ export class UdtController {
   @Delete('traits/:id')
   scrap(@CurrentUser() user: User, @Param('id') id: string) {
     return this.packs.scrap(user, id);
+  }
+
+  /** Open and recent trade offers of the manager, the trade rules. */
+  @Get('trades')
+  tradeList(@CurrentUser() user: User) {
+    return this.trades.list(user);
+  }
+
+  /** Other managers with their rosters (what can be traded, why not). */
+  @Get('trades/partners')
+  partners(@CurrentUser() user: User) {
+    return this.trades.partners(user);
+  }
+
+  /** Values, balance and fees of a planned offer (409 with the reason when it is not allowed). */
+  @Post('trades/preview')
+  @HttpCode(200)
+  preview(@CurrentUser() user: User, @Body(new ZodPipe(TradeBody)) body: TradeInput) {
+    return this.trades.preview(user, body);
+  }
+
+  @Post('trades')
+  propose(@CurrentUser() user: User, @Body(new ZodPipe(TradeBody)) body: TradeInput) {
+    return this.trades.propose(user, body);
+  }
+
+  @Post('trades/:id/accept')
+  @HttpCode(200)
+  accept(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.trades.accept(user, id);
+  }
+
+  @Post('trades/:id/decline')
+  @HttpCode(200)
+  decline(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.trades.decline(user, id);
+  }
+
+  /** The proposer takes the offer back (held Neuro and fee come back). */
+  @Delete('trades/:id')
+  withdrawTrade(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.trades.withdraw(user, id);
   }
 }

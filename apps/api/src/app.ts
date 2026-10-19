@@ -44,6 +44,7 @@ import { UdtTestController } from './udt/udt-test.controller.js';
 import { UdtTestService } from './udt/udt-test.service.js';
 import { UdtRewardsService } from './udt/udt-rewards.service.js';
 import { UdtPacksService } from './udt/udt-packs.service.js';
+import { UdtTradesService } from './udt/udt-trades.service.js';
 import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
 import { UdtService } from './udt/udt.service.js';
@@ -134,6 +135,7 @@ class AppModule {
         UdtEventsService,
         UdtRewardsService,
         UdtPacksService,
+        UdtTradesService,
         UdtTestService,
         AgentGateway,
       ],

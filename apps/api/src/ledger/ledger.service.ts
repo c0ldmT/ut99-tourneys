@@ -17,7 +17,9 @@ export type LedgerKind =
   | 'udt_salary'
   | 'udt_refund'
   | 'udt_breeder'
-  | 'udt_pack';
+  | 'udt_pack'
+  | 'udt_trade'
+  | 'udt_trade_fee';
 
 export interface Booking {
   season: number;

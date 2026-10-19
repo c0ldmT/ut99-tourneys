@@ -17,6 +17,22 @@ export class ZodPipe<T> implements PipeTransform<unknown, T> {
   }
 }
 
+/**
+ * For partial updates: like ZodPipe, but keeps only the fields the request sent. Zod fills in
+ * the defaults of a `.partial()` schema, which would reset the fields that were left out.
+ */
+export class PatchPipe<T extends object> implements PipeTransform<unknown, Partial<T>> {
+  constructor(private readonly schema: z.ZodType<T>) {}
+  transform(value: unknown): Partial<T> {
+    const parsed = this.schema.safeParse(value);
+    if (!parsed.success) throw new BadRequestException(z.prettifyError(parsed.error));
+    const sent = value && typeof value === 'object' ? Object.keys(value) : [];
+    return Object.fromEntries(
+      Object.entries(parsed.data).filter(([k]) => sent.includes(k)),
+    ) as Partial<T>;
+  }
+}
+
 export const notFound = (what: string) => new NotFoundException(`${what} not found`);
 export const conflict = (msg: string) => new ConflictException(msg);
 export const badRequest = (msg: string) => new BadRequestException(msg);

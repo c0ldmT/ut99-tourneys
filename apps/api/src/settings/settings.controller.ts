@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Post, Put } from '@nestjs/common';
 import { z } from 'zod';
 import { AdminOnly } from '../auth/guard.js';
-import { ZodPipe } from '../common/http.js';
+import { PatchPipe, ZodPipe } from '../common/http.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
 import {
@@ -45,7 +45,7 @@ export class SettingsController {
   }
 
   @Put('rating')
-  rating(@Body(new ZodPipe(RatingSettingsSchema.partial())) body: Partial<RatingSettings>) {
+  rating(@Body(new PatchPipe(RatingSettingsSchema.partial())) body: Partial<RatingSettings>) {
     const next = this.settings.setRating(body);
     // The running and the planned season use the new settings; ended seasons keep theirs.
     this.seasons.applyRating(next.rating);
@@ -55,7 +55,7 @@ export class SettingsController {
   /** Betting with Neuro: start balance and rescue floor (running and planned season too). */
   @Put('betting')
   betting(
-    @Body(new ZodPipe(BettingFieldsSchema.partial()))
+    @Body(new PatchPipe(BettingFieldsSchema.partial()))
     body: Partial<BettingSettings>,
   ) {
     const next = this.settings.setBetting(body);
@@ -65,19 +65,19 @@ export class SettingsController {
 
   /** Neuro shop: on/off, prices, items taken out. */
   @Put('shop')
-  shop(@Body(new ZodPipe(ShopSettingsSchema.partial())) body: Partial<ShopSettings>) {
+  shop(@Body(new PatchPipe(ShopSettingsSchema.partial())) body: Partial<ShopSettings>) {
     return this.settings.setShop(body);
   }
 
   /** Help for the bot AI in deathmatch games (sent to the bridge with the next sync). */
   @Put('bot-ai')
-  botAi(@Body(new ZodPipe(BotAiSettingsSchema.partial())) body: Partial<BotAiSettings>) {
+  botAi(@Body(new PatchPipe(BotAiSettingsSchema.partial())) body: Partial<BotAiSettings>) {
     return this.settings.setBotAi(body);
   }
 
   /** Unreal Dream Team: on/off, market time, offers per day, starter budget. */
   @Put('udt')
-  udt(@Body(new ZodPipe(UdtSettingsSchema.partial())) body: Partial<UdtSettings>) {
+  udt(@Body(new PatchPipe(UdtSettingsSchema.partial())) body: Partial<UdtSettings>) {
     return this.settings.setUdt(body);
   }
 

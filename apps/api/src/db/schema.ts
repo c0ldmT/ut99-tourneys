@@ -399,3 +399,31 @@ export const udtPity = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.season, t.userId, t.box] })],
 );
+
+/**
+ * Trade offers between managers: the proposer gives bots and Neuro and asks for bots and Neuro.
+ * Status open, accepted, declined, withdrawn, expired or void (a bot left a roster).
+ */
+export const udtTrades = sqliteTable('udt_trades', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  fromUser: text('from_user').notNull(),
+  toUser: text('to_user').notNull(),
+  /** Bot ids the proposer gives (JSON array). */
+  giveJson: text('give_json').notNull(),
+  /** Bot ids the proposer asks for (JSON array). */
+  takeJson: text('take_json').notNull(),
+  giveNeuro: integer('give_neuro').notNull().default(0),
+  takeNeuro: integer('take_neuro').notNull().default(0),
+  /** Market value of each side when the offer was made (bots + Neuro). */
+  giveValue: integer('give_value').notNull(),
+  takeValue: integer('take_value').notNull(),
+  feeFrom: integer('fee_from').notNull().default(0),
+  feeTo: integer('fee_to').notNull().default(0),
+  message: text('message'),
+  status: text('status').notNull().default('open'),
+  reason: text('reason'),
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  decidedAt: text('decided_at'),
+});

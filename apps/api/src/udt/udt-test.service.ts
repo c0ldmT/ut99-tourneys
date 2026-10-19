@@ -17,6 +17,7 @@ import { EventLogService } from '../tournaments/event-log.service.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtMarketService } from './udt-market.service.js';
+import { UdtTradesService } from './udt-trades.service.js';
 import { UdtService } from './udt.service.js';
 
 export const AdvanceBody = z.object({
@@ -52,6 +53,7 @@ export class UdtTestService {
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtMarketService) private readonly market: UdtMarketService,
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
+    @Inject(UdtTradesService) private readonly trades: UdtTradesService,
   ) {}
 
   /** 404 outside the test mode (the endpoints do not exist then). */
@@ -204,8 +206,24 @@ export class UdtTestService {
     const managers = this.users.list().filter((u) => u.discordId.startsWith('dev:test'));
     let bids = 0;
     let entries = 0;
+    let traded = 0;
     for (const u of managers) {
       if (!this.udt.team(u.id, season)) continue;
+      // Trade offers: accepted when the test manager gets at least as much as it gives.
+      try {
+        for (const t of this.trades.list(u).open.filter((x) => x.incoming)) {
+          try {
+            if (t.giveValue >= t.takeValue) this.trades.accept(u, t.id);
+            else this.trades.decline(u, t.id);
+            traded++;
+          } catch {
+            this.trades.decline(u, t.id);
+            traded++;
+          }
+        }
+      } catch {
+        // trading switched off
+      }
       try {
         const m = this.market.view(u);
         const budget = this.udt.view(u).wallet?.spendable ?? 0;
@@ -231,6 +249,6 @@ export class UdtTestService {
             // bracket full
           }
     }
-    return { managers: managers.length, bids, entries };
+    return { managers: managers.length, bids, entries, trades: traded };
   }
 }
