@@ -3,6 +3,7 @@ import { CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
+import { UdtRewardsService } from './udt-rewards.service.js';
 import { BidBody, UdtMarketService, type BidInput } from './udt-market.service.js';
 import {
   LineupBody,
@@ -19,6 +20,7 @@ export class UdtController {
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtMarketService) private readonly market: UdtMarketService,
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
+    @Inject(UdtRewardsService) private readonly rewards: UdtRewardsService,
   ) {}
 
   @Get()
@@ -83,5 +85,19 @@ export class UdtController {
   @Delete('events/:id/enter')
   leave(@CurrentUser() user: User, @Param('id') id: string) {
     return this.events.leave(user, id);
+  }
+
+  /** Season table: points from the places of finished Dream Team tournaments. */
+  @Get('table')
+  table() {
+    this.udt.assertOn();
+    return this.rewards.table(this.udt.season().number);
+  }
+
+  /** The manager's ledger bookings of the season (newest first). */
+  @Get('ledger')
+  ledgerEntries(@CurrentUser() user: User) {
+    this.udt.assertOn();
+    return this.udt.ledgerOf(user.id);
   }
 }

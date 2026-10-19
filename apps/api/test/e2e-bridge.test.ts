@@ -43,6 +43,10 @@ async function setup(
     beforeCreate?: (api: RunningApi) => void;
     /** Out of season: no season is started before the tournament is created. */
     noSeason?: boolean;
+    /** Extra fields of the tournament (e.g. a Dream Team tournament). */
+    tournament?: Record<string, unknown>;
+    /** Runs after the season started, before the tournament is created. */
+    afterSeason?: (admin: Client, players: Client[]) => Promise<void>;
   } = {},
 ) {
   const clock = new FakeClock();
@@ -95,13 +99,17 @@ async function setup(
   const players = await Promise.all(names.map((n) => Client.login(api, n)));
   opts.beforeCreate?.(api);
   if (!opts.noSeason) await startSeason(admin);
+  await opts.afterSeason?.(admin, players);
   const created = await admin.post(
     '/tournaments',
-    tournamentBody({}, { ...(opts.size ? { size: opts.size } : {}), ...opts.settings }),
+    tournamentBody(opts.tournament ?? {}, {
+      ...(opts.size ? { size: opts.size } : {}),
+      ...opts.settings,
+    }),
   );
   expect(created.status).toBe(201);
   const id: string = created.body.id;
-  if (!opts.settings?.['teamSize'])
+  if (!opts.settings?.['teamSize'] && !opts.tournament?.['kind'])
     for (const p of players) await p.post(`/tournaments/${id}/registration`);
   const tokens = await Promise.all(players.map(async (p) => (await p.get('/me')).body));
 
@@ -141,6 +149,58 @@ async function setup(
 }
 
 describe('website + bridge + simulated UT server', () => {
+  it("plays a Dream Team cup: managers' lineups, rewards, tired bots, season table", async () => {
+    const env = await setup({
+      players: ['Mario', 'Tim'],
+      settings: { size: 4, format: 'single' },
+      tournament: { name: 'Daily Cup', botPool: [], kind: 'udt' },
+      afterSeason: async (admin, [mario, tim]) => {
+        for (let i = 0; i < 4; i++) await admin.post('/bots', { name: `Lib${i}`, skill: 2 + i });
+        await admin.req('PUT', '/settings/udt', { enabled: true });
+        await mario!.post('/udt/team', {
+          name: 'Nexus',
+          tag: 'NX',
+          starter: { name: 'Mira', skill: 3 },
+        });
+        await tim!.post('/udt/team', {
+          name: 'Iron',
+          tag: 'IG',
+          starter: { name: 'Tox', skill: 3 },
+        });
+      },
+    });
+    const { admin, id, players } = env;
+    const [mario, tim] = players;
+    expect((await mario!.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    expect((await tim!.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    expect(
+      (await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 'u' })).status,
+    ).toBe(200);
+    expect((await admin.post(`/tournaments/${id}/run`)).status).toBe(204);
+    env.startSim();
+    await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
+    const d = (await admin.get(`/tournaments/${id}`)).body;
+    expect(d.projection.results).toHaveLength(3);
+    // The bots played under the team tags.
+    const names = Object.values(d.projection.entrants).map((e: any) => e.bot?.name);
+    expect(names).toEqual(expect.arrayContaining(['[NX]Mira', '[IG]Tox']));
+    // Every manager got paid per match and a place; the bots are tired and learned.
+    for (const c of [mario!, tim!]) {
+      const ledger = (await c.get('/udt/ledger')).body as { kind: string; amount: number }[];
+      expect(ledger.filter((l) => l.kind === 'udt_reward').length).toBeGreaterThanOrEqual(1);
+      expect(ledger.filter((l) => l.kind === 'udt_place')).toHaveLength(1);
+      const r = (await c.get('/udt')).body.roster[0];
+      expect(r.stamina).toBeLessThan(100);
+      expect(r.xp).toBeGreaterThan(0);
+    }
+    const table = (await mario!.get('/udt/table')).body as { tag: string; points: number }[];
+    expect(table.map((r) => r.tag).sort()).toEqual(['IG', 'NX']);
+    expect(table[0]!.points).toBeGreaterThan(0);
+    // Dream Team games stay out of the statistics.
+    const stats = (await mario!.get('/stats/players?mode=dm&bots=1')).body as any[];
+    expect(stats.some((r) => /Mira|Tox|Lib/.test(r.name))).toBe(false);
+  });
+
   it('runs a 2on2 team tournament with a line-up change during a game', async () => {
     const env = await setup({
       players: ['Mario', 'Anna', 'Jonas', 'Lea', 'Tim'],

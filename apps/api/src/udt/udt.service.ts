@@ -225,6 +225,11 @@ export class UdtService {
     };
   }
 
+  /** The manager's bookings of the running season. */
+  ledgerOf(userId: string) {
+    return this.ledger.entries(userId, this.season().number, 50);
+  }
+
   /** Founds the manager's team of the season with its starter bot (made by the manager). */
   createTeam(user: User, body: TeamInput): UdtTeam {
     this.assertOn();
