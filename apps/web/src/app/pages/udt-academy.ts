@@ -1,3 +1,10 @@
+import {
+  emptyLook,
+  lookBody,
+  UdtBotLook,
+  type LookDraft,
+  type UdtLooks,
+} from '../components/udt-bot-look';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -22,7 +29,7 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
  */
 @Component({
   selector: 'app-udt-academy',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
+  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtBotLook],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -57,6 +64,13 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
           {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt">{{ 'udt.nav.team' | t }}</a>
         </p>
       } @else {
+        <details class="card look">
+          <summary>
+            <b>{{ 'udt.look.next' | t }}</b>
+            <span class="muted small">{{ 'udt.look.nextHint' | t }}</span>
+          </summary>
+          <app-udt-bot-look [draft]="look()" [looks]="looks()" />
+        </details>
         <section class="card">
           <div class="row between">
             <h2>{{ 'udt.academy.scouting' | t }}</h2>
@@ -442,6 +456,10 @@ export class UdtAcademyPage {
   });
   protected readonly bpCost = computed(() => buildCost(this.bpSkill(), this.bpTraits()));
 
+  /** Look and chat lines for the next bot made here (sign, apprentice, build). */
+  protected readonly look = signal<LookDraft>(emptyLook());
+  protected readonly looks = signal<UdtLooks | null>(null);
+
   constructor() {
     void this.load();
   }
@@ -450,6 +468,7 @@ export class UdtAcademyPage {
     try {
       const v = await this.api.udtAcademy();
       this.a.set(v);
+      if (v.hasTeam && !this.looks()) this.looks.set(await this.api.udtLooks().catch(() => null));
       if (v.hasTeam) this.grad.set(await this.api.udtGraduation());
       this.error.set('');
     } catch (e) {
@@ -493,7 +512,9 @@ export class UdtAcademyPage {
         skill: this.bpSkill(),
         traits: this.bpTraits(),
         ...(this.bpClass ? { botClass: this.bpClass } : {}),
+        look: lookBody(this.look()),
       });
+      this.look.set(emptyLook());
       this.a.set(v);
       this.bpId.set(null);
       this.bpName = '';
@@ -562,14 +583,16 @@ export class UdtAcademyPage {
   protected async sign(i: number, t: UdtTalentReport) {
     const name = (this.names()[i] ?? t.name).trim();
     await this.act(async () => {
-      this.a.set(await this.api.udtSign(i, name));
+      this.a.set(await this.api.udtSign(i, name, lookBody(this.look())));
+      this.look.set(emptyLook());
       this.grad.set(await this.api.udtGraduation());
     });
   }
 
   protected async apprentice(m: UdtMentor) {
     await this.act(async () => {
-      const v = await this.api.udtApprentice(m.botId, this.mentorName(m));
+      const v = await this.api.udtApprentice(m.botId, this.mentorName(m), lookBody(this.look()));
+      this.look.set(emptyLook());
       this.a.set(v);
       this.grad.set(await this.api.udtGraduation());
       if (v.apprentice?.inherited)

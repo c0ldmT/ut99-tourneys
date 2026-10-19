@@ -1476,3 +1476,24 @@ button.primary.udt {
 a.badge.udt:hover {
   color: #fff;
 }
+
+/* Dream Team: look and chat lines of own bots */
+details.look > summary {
+  cursor: pointer;
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+details.look[open] > summary {
+  margin-bottom: 12px;
+}
+.lookedit {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid rgba(178, 107, 255, 0.35);
+  border-radius: var(--radius);
+  background: rgba(178, 107, 255, 0.05);
+}

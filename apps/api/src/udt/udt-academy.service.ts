@@ -31,7 +31,7 @@ import { DB, type Db } from '../db/database.js';
 import { bots, udtBlueprints, udtBots, udtRoster, udtScouts, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { ROSTER_MAX } from './udt-market.service.js';
-import { gameName, UdtService } from './udt.service.js';
+import { BotLookBody, gameName, lookFields, UdtService, type BotLook } from './udt.service.js';
 
 const BotName = z
   .string()
@@ -40,8 +40,16 @@ const BotName = z
   .max(20)
   .regex(/^[\x20-\x7e]+$/, 'ASCII letters, digits and signs only (UT99 names)');
 
-export const SignBody = z.object({ pick: z.number().int().min(0).max(2), name: BotName });
-export const MentorBody = z.object({ mentorId: z.string().min(1).max(40), name: BotName });
+export const SignBody = z.object({
+  pick: z.number().int().min(0).max(2),
+  name: BotName,
+  look: BotLookBody.optional(),
+});
+export const MentorBody = z.object({
+  mentorId: z.string().min(1).max(40),
+  name: BotName,
+  look: BotLookBody.optional(),
+});
 const Value = z.number().min(-1).max(1);
 export const BuildBody = z.object({
   blueprintId: z.string().min(1).max(40),
@@ -49,6 +57,7 @@ export const BuildBody = z.object({
   skill: z.number().int().min(0).max(7),
   traits: z.object({ accuracy: Value, alertness: Value, strafing: Value }),
   botClass: z.string().max(128).optional(),
+  look: BotLookBody.optional(),
 });
 export type BuildInput = z.infer<typeof BuildBody>;
 
@@ -206,17 +215,20 @@ export class UdtAcademyService {
     origin: 'academy' | 'apprentice' | 'blueprint',
     mentorId: string | null,
     botClass?: string,
+    look?: BotLook,
   ): string {
     const bot = this.bots.create({
       name,
       skill: t.skill,
       ...(botClass ? { botClass } : {}),
+      ...lookFields(look),
       traits: {
         accuracy: t.values.accuracy,
         alertness: t.values.alertness,
         strafing: t.values.strafing,
         combatStyle: t.values.combatStyle,
         camping: t.values.camping,
+        ...(look?.voice ? { voice: look.voice } : {}),
       },
       active: false,
     });
@@ -256,7 +268,7 @@ export class UdtAcademyService {
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict(`a bot is called ${body.name} already`);
     this.licence(user, season, body.name);
-    this.create(user, season, talent, body.name, 'academy', null);
+    this.create(user, season, talent, body.name, 'academy', null, undefined, body.look);
     this.db
       .delete(udtScouts)
       .where(and(eq(udtScouts.season, season), eq(udtScouts.userId, user.id)))
@@ -287,7 +299,7 @@ export class UdtAcademyService {
       m.udtTraits.some((x) => x.code === 'mentor'),
       rng,
     );
-    const id = this.create(user, season, t, body.name, 'apprentice', m.botId);
+    const id = this.create(user, season, t, body.name, 'apprentice', m.botId, undefined, body.look);
     if (t.inherited)
       this.db
         .insert(udtTraits)
@@ -356,6 +368,7 @@ export class UdtAcademyService {
       'blueprint',
       null,
       body.botClass,
+      body.look,
     );
     let startTrait: string | null = null;
     if (rule.startTrait) {

@@ -205,7 +205,7 @@ export class UdtEventsPage {
 /** Dream Team season table. */
 @Component({
   selector: 'app-udt-table',
-  imports: [TPipe, UdtNav],
+  imports: [TPipe, UdtNav, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -229,7 +229,9 @@ export class UdtEventsPage {
             <tr>
               <td class="mono">{{ i + 1 }}.</td>
               <td>
-                <b style="color: var(--hot-text)">{{ r.tag }}</b> {{ r.name }}
+                <a [routerLink]="['/udt/squads', r.userId]"
+                  ><b style="color: var(--hot-text)">{{ r.tag }}</b> {{ r.name }}</a
+                >
                 @if (r.ai) {
                   <span class="udt-mark">{{ 'udt.ai' | t }}</span>
                 }

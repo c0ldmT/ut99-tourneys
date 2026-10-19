@@ -519,6 +519,8 @@ export class BotsService {
     ids: readonly string[],
     /** Latest bets with Neuro per bot id (betting), to talk about in the next game. */
     news?: ReadonlyMap<string, NonNullable<BotPersonality['bet']>>,
+    /** The bot's name in this game when it differs (a Dream Team tag in front). */
+    names?: ReadonlyMap<string, string>,
   ): BotPersonality[] {
     const all = this.list();
     const users = new Map(this.users.list().map((u) => [u.id, u.displayName]));
@@ -537,7 +539,7 @@ export class BotsService {
       const bet = news?.get(b.id);
       if (!b.personality.lines.length && !rivals.length) continue;
       out.push({
-        name: b.gameName,
+        name: names?.get(b.id) ?? b.gameName,
         talk: b.personality.talk,
         lines: spreadLines(b.personality.lines, BOT_MAX_LINES),
         rivals,

@@ -1449,11 +1449,21 @@ export class TournamentsService {
   private botPersonalities(t: TournamentRow) {
     try {
       const ids = this.botPool(t).flatMap((b) => (b.id ? [b.id] : []));
+      // The names in the game (Dream Team bots play under their manager's tag).
+      const names = new Map<string, string>();
       for (const e of Object.values(this.log.projection(t.id)?.entrants ?? {})) {
-        if (e.kind === 'bot' && e.bot.id) ids.push(e.bot.id);
-        if (e.kind === 'team') for (const b of e.bots) if (b.id) ids.push(b.id);
+        if (e.kind === 'bot' && e.bot.id) {
+          ids.push(e.bot.id);
+          names.set(e.bot.id, e.bot.name);
+        }
+        if (e.kind === 'team')
+          for (const b of e.bots)
+            if (b.id) {
+              ids.push(b.id);
+              names.set(b.id, b.name);
+            }
       }
-      return this.bots.personalities(ids, this.bets.botBetNews([...new Set(ids)]));
+      return this.bots.personalities(ids, this.bets.botBetNews([...new Set(ids)]), names);
     } catch (err) {
       this.logger.warn(`bot personalities for ${t.id}: ${String(err)}`);
       return [];

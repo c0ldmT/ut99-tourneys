@@ -1,7 +1,11 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import type { UdtLooks } from '../components/udt-bot-look';
 import type {
+  UdtBotLookBody,
+  UdtSquad,
+  UdtSquadRow,
   UdtEvent,
   UdtLedgerEntry,
   UdtMarket,
@@ -199,17 +203,24 @@ export class Api {
     this.call<UdtTrades>('DELETE', `/udt/trades/${encodeURIComponent(id)}`);
   udtAcademy = () => this.call<UdtAcademy>('GET', '/udt/academy');
   udtScout = () => this.call<UdtAcademy>('POST', '/udt/academy/scout');
-  udtSign = (pick: number, name: string) =>
-    this.call<UdtAcademy>('POST', '/udt/academy/sign', { pick, name });
-  udtApprentice = (mentorId: string, name: string) =>
-    this.call<UdtAcademy>('POST', '/udt/academy/mentor', { mentorId, name });
+  udtSign = (pick: number, name: string, look?: UdtBotLookBody) =>
+    this.call<UdtAcademy>('POST', '/udt/academy/sign', { pick, name, look });
+  udtApprentice = (mentorId: string, name: string, look?: UdtBotLookBody) =>
+    this.call<UdtAcademy>('POST', '/udt/academy/mentor', { mentorId, name, look });
   udtBuild = (body: {
     blueprintId: string;
     name: string;
     skill: number;
     traits: { accuracy: number; alertness: number; strafing: number };
     botClass?: string;
+    look?: UdtBotLookBody;
   }) => this.call<UdtAcademy>('POST', '/udt/academy/build', body);
+  udtLooks = () => this.call<UdtLooks>('GET', '/udt/looks');
+  udtEditBot = (botId: string, body: UdtBotLookBody) =>
+    this.call<LibraryBot>('PUT', `/udt/bots/${encodeURIComponent(botId)}`, body);
+  udtSquads = () => this.call<UdtSquadRow[]>('GET', '/udt/squads');
+  udtSquad = (userId: string) =>
+    this.call<UdtSquad>('GET', `/udt/teams/${encodeURIComponent(userId)}`);
   udtDevelop = (botId: string, stat: 'accuracy' | 'alertness' | 'strafing' | 'skill') =>
     this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/develop`, { stat });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');

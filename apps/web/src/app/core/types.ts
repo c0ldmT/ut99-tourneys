@@ -1296,3 +1296,26 @@ export interface UdtHall {
   retired: UdtHallEntry[];
   candidates: { botId: string; name: string; career: UdtCareer }[];
 }
+
+/** Look and chat lines of a manager's own bot (API body). */
+export interface UdtBotLookBody {
+  skin?: string;
+  face?: string;
+  voice?: string;
+  personality?: { talk?: number; lines?: { kind: BotLineKind; text: string }[] };
+}
+
+export interface UdtSquadRow extends UdtTeam {
+  manager: string;
+  ai: boolean;
+  mine: boolean;
+  bots: number;
+  value: number;
+}
+
+export interface UdtSquad {
+  team: UdtTeam;
+  manager: string;
+  ai: boolean;
+  roster: UdtRosterBot[];
+}

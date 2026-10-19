@@ -117,3 +117,61 @@ describe('Unreal Dream Team: website reset', () => {
     expect(again.body.season).toBe(1);
   });
 });
+
+describe('Unreal Dream Team: looks, chat lines and squads', () => {
+  it('sets look and lines of own bots, shows every squad', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    const tim = await Client.login(api, 'Tim');
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    const made = await mario.post(
+      '/udt/team',
+      team({
+        starter: {
+          name: 'Mira',
+          skill: 3,
+          skin: 'SGirlSkins.army',
+          traits: { voice: 'BotPack.VoiceFemaleOne' },
+          personality: { talk: 60, lines: [{ kind: 'kill', text: 'Gotcha, {victim}!' }] },
+        },
+      }),
+    );
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    const miraId = made.body.roster[0].botId as string;
+    const bot = (await mario.get(`/bots/${miraId}`)).body;
+    expect(bot).toMatchObject({ skin: 'SGirlSkins.army', personality: { talk: 60 } });
+    expect(bot.personality.lines).toEqual([{ kind: 'kill', text: 'Gotcha, {victim}!' }]);
+    // Looks to choose from.
+    const looks = (await mario.get('/udt/looks')).body;
+    expect(looks.skins.length).toBeGreaterThan(0);
+    // Later: new lines, face and voice; the values stay.
+    const edited = await mario.req('PUT', `/udt/bots/${miraId}`, {
+      face: 'SGirlSkins.Lilith',
+      voice: 'BotPack.VoiceFemaleTwo',
+      personality: { lines: [{ kind: 'death', text: 'Not again' }] },
+    });
+    expect(edited.status, JSON.stringify(edited.body)).toBe(200);
+    expect(edited.body).toMatchObject({
+      face: 'SGirlSkins.Lilith',
+      skill: 3,
+      traits: { voice: 'BotPack.VoiceFemaleTwo' },
+      personality: { talk: 60, lines: [{ kind: 'death', text: 'Not again' }] },
+    });
+    // Only the owner.
+    expect((await tim.req('PUT', `/udt/bots/${miraId}`, { skin: 'X.y' })).status).toBe(403);
+    // Squads: everybody sees every team and its roster.
+    await tim.post(
+      '/udt/team',
+      team({ name: 'Iron', tag: '[IG]', starter: { name: 'Tox', skill: 2 } }),
+    );
+    const squads = (await tim.get('/udt/squads')).body;
+    expect(squads.map((s: any) => s.name).sort()).toEqual(['Iron', 'Nexus Rising']);
+    const marioId = (await mario.get('/me')).body.id as string;
+    const sq = (await tim.get(`/udt/teams/${marioId}`)).body;
+    expect(sq).toMatchObject({ manager: 'Mario', ai: false, team: { name: 'Nexus Rising' } });
+    expect(sq.roster[0]).toMatchObject({ name: 'Mira', gameName: '[NX]Mira' });
+    expect((await tim.get('/udt/teams/nobody')).status).toBe(404);
+  });
+});

@@ -1,3 +1,11 @@
+import {
+  emptyLook,
+  lookBody,
+  lookFromBot,
+  UdtBotLook,
+  type LookDraft,
+  type UdtLooks,
+} from '../components/udt-bot-look';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -24,7 +32,7 @@ type Mode = 'dm' | 'mh';
 /** Dream Team: founding the team (starter bot), the lineups, the roster and the ledger. */
 @Component({
   selector: 'app-udt-team',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
+  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtBotLook],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -98,6 +106,10 @@ type Mode = 'dm' | 'mh';
                   />
                 </label>
               }
+              <details class="look">
+                <summary>{{ 'udt.look.title' | t }}</summary>
+                <app-udt-bot-look [draft]="foundLook" [looks]="looks()" [allowClass]="true" />
+              </details>
               <p [class.error]="cost() > budget()" class="small">
                 {{ 'udt.found.cost' | t: { cost: cost(), budget: budget() } }}
               </p>
@@ -322,7 +334,37 @@ type Mode = 'dm' | 'mh';
                     {{ 'udt.sell' | t }}
                   </button>
                 }
+                @if (b.own) {
+                  <button
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="openLook(b)"
+                    [title]="'udt.look.edit' | t"
+                  >
+                    {{ 'udt.look.button' | t }}
+                  </button>
+                }
               </div>
+              @if (lookFor() === b.botId) {
+                @if (lookDraft(); as ld) {
+                  <div class="lookedit">
+                    <app-udt-bot-look [draft]="ld" [looks]="looks()" />
+                    <span class="row">
+                      <button
+                        type="button"
+                        class="primary"
+                        [disabled]="busy()"
+                        (click)="saveLook(b)"
+                      >
+                        {{ 'common.save' | t }}
+                      </button>
+                      <button type="button" (click)="lookFor.set(null)">
+                        {{ 'common.cancel' | t }}
+                      </button>
+                    </span>
+                  </div>
+                }
+              }
             }
           </div>
         </section>
@@ -459,6 +501,11 @@ export class UdtTeamPage {
     strafing: 0,
   };
   private readonly rev = signal(0);
+  // Look and chat lines: of the starter (founding) and of an own bot (editing)
+  protected readonly foundLook = emptyLook();
+  protected readonly looks = signal<UdtLooks | null>(null);
+  protected readonly lookFor = signal<string | null>(null);
+  protected readonly lookDraft = signal<LookDraft | null>(null);
   // Lineup draft (bot ids per slot) and whether it differs from the saved one
   private readonly draft = signal<{
     dm: (string | null)[];
@@ -513,6 +560,8 @@ export class UdtTeamPage {
       const v = await this.api.udt();
       this.view.set(v);
       this.resetDraft(v);
+      if (v.enabled && v.season !== null && !this.looks())
+        this.looks.set(await this.api.udtLooks().catch(() => null));
       if (v.team) this.ledger.set(await this.api.udtLedger());
       this.error.set('');
     } catch (e) {
@@ -634,11 +683,41 @@ export class UdtTeamPage {
         starter: {
           name: this.botName.trim(),
           skill: Number(this.skill),
-          traits: { ...this.values },
+          ...(this.foundLook.botClass.trim() ? { botClass: this.foundLook.botClass.trim() } : {}),
+          ...(this.foundLook.skin.trim() ? { skin: this.foundLook.skin.trim() } : {}),
+          ...(this.foundLook.face.trim() ? { face: this.foundLook.face.trim() } : {}),
+          traits: {
+            ...this.values,
+            ...(this.foundLook.voice ? { voice: this.foundLook.voice } : {}),
+          },
+          personality: lookBody(this.foundLook).personality,
         },
       });
       this.view.set(v);
       this.resetDraft(v);
+    });
+  }
+
+  /** Opens the look and lines of an own bot (its current values from the library). */
+  protected async openLook(b: UdtRosterBot) {
+    if (this.lookFor() === b.botId) {
+      this.lookFor.set(null);
+      return;
+    }
+    await this.act(async () => {
+      const bot = await this.api.botProfile(b.botId);
+      this.lookDraft.set(lookFromBot(bot));
+      this.lookFor.set(b.botId);
+    });
+  }
+
+  protected async saveLook(b: UdtRosterBot) {
+    const d = this.lookDraft();
+    if (!d) return;
+    await this.act(async () => {
+      await this.api.udtEditBot(b.botId, lookBody(d));
+      this.lookFor.set(null);
+      await this.load();
     });
   }
 

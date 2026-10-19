@@ -11,8 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { AdminOnly, CurrentUser } from '../auth/guard.js';
-import type { User } from '../auth/users.service.js';
-import { ZodPipe } from '../common/http.js';
+import { UsersService, type User } from '../auth/users.service.js';
+import { notFound, ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
 import { ApproveBody, UdtCareerService } from './udt-career.service.js';
@@ -36,9 +36,11 @@ import {
 } from './udt-packs.service.js';
 import { BidBody, UdtMarketService, type BidInput } from './udt-market.service.js';
 import {
+  BotLookBody,
   LineupBody,
   TeamBody,
   UdtService,
+  type BotLook,
   type LineupInput,
   type TeamInput,
 } from './udt.service.js';
@@ -56,6 +58,7 @@ export class UdtController {
     @Inject(UdtAcademyService) private readonly academy: UdtAcademyService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
     @Inject(UdtAiService) private readonly ai: UdtAiService,
+    @Inject(UsersService) private readonly users: UsersService,
   ) {}
 
   @Get()
@@ -76,6 +79,64 @@ export class UdtController {
   teams() {
     this.udt.assertOn();
     return this.udt.teams(this.udt.season().number);
+  }
+
+  /** The squads of the season: every human team (AI teams while they play), bots and value. */
+  @Get('squads')
+  squads(@CurrentUser() user: User) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const ai = this.udt.aiIds();
+    const aiOn = this.udt.aiOn();
+    return this.udt
+      .teams(season)
+      .filter((t) => aiOn || !ai.has(t.userId))
+      .map((t) => {
+        const roster = this.udt.roster(t.userId, season);
+        return {
+          ...t,
+          manager: this.users.byId(t.userId)?.displayName ?? '?',
+          ai: ai.has(t.userId),
+          mine: t.userId === user.id,
+          bots: roster.length,
+          value: roster.reduce((n, r) => n + r.value, 0),
+        };
+      })
+      .sort((a, b) => Number(a.ai) - Number(b.ai) || b.value - a.value);
+  }
+
+  /** A manager's squad to look at (everybody can see every team). */
+  @Get('teams/:userId')
+  squad(@Param('userId') userId: string) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const team = this.udt.team(userId, season);
+    if (!team) throw notFound('team');
+    const careers = this.career.careers();
+    return {
+      team,
+      manager: this.users.byId(userId)?.displayName ?? '?',
+      ai: this.udt.aiIds().has(userId),
+      roster: this.udt
+        .roster(userId, season)
+        .map((r) => ({ ...r, career: careers.get(r.botId) ?? null })),
+    };
+  }
+
+  /** Models, skins, faces and voices to choose for own bots. */
+  @Get('looks')
+  looks() {
+    return this.udt.looks();
+  }
+
+  /** Skin, face, voice and chat lines of an own bot. */
+  @Put('bots/:id')
+  editBot(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(BotLookBody)) body: BotLook,
+  ) {
+    return this.udt.editBot(user, id, body);
   }
 
   @Post('team')

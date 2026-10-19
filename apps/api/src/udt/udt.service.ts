@@ -19,7 +19,7 @@ import {
   type TraitOnBot,
 } from '@tourney/udt';
 import { z } from 'zod';
-import { BotsService, type LibraryBot } from '../bots/bots.service.js';
+import { BotsService, PersonalitySchema, type LibraryBot } from '../bots/bots.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
@@ -52,6 +52,31 @@ import type { User } from '../auth/users.service.js';
 const GAME_NAME_CHARS = 24;
 const ASCII = /^[\x20-\x7e]+$/;
 
+const LookRef = z.string().trim().max(48);
+/** Chat chance and lines (no defaults: what is left out stays as it is). */
+const BotLines = z.object({
+  talk: z.number().int().min(0).max(100).optional(),
+  lines: PersonalitySchema.shape.lines.unwrap().optional(),
+});
+/** What a manager sets on an own bot: skin, face, voice and chat lines (not the values). */
+export const BotLookBody = z.object({
+  skin: LookRef.optional(),
+  face: LookRef.optional(),
+  voice: LookRef.optional(),
+  personality: BotLines.optional(),
+});
+export type BotLook = z.infer<typeof BotLookBody>;
+
+/** The look and the lines for BotsService.create/update (empty strings: the default). */
+export function lookFields(look: BotLook | undefined) {
+  if (!look) return {};
+  return {
+    ...(look.skin !== undefined ? { skin: look.skin } : {}),
+    ...(look.face !== undefined ? { face: look.face } : {}),
+    ...(look.personality ? { personality: look.personality } : {}),
+  };
+}
+
 export const TeamBody = z.object({
   name: z.string().trim().min(2).max(32).regex(ASCII, 'ASCII letters, digits and signs only'),
   /** In front of the bots' names as it is (brackets only if the manager types them). */
@@ -68,6 +93,7 @@ export const TeamBody = z.object({
     skin: z.string().trim().max(48).optional(),
     face: z.string().trim().max(48).optional(),
     traits: BotTraitsSchema.optional(),
+    personality: BotLines.optional(),
   }),
 });
 export type TeamInput = z.infer<typeof TeamBody>;
@@ -418,6 +444,29 @@ export class UdtService {
   }
 
   /** The Dream Team page of a manager. */
+  /** The models, skins, faces and voices a manager can choose (stock and the synced servers). */
+  looks() {
+    this.assertOn();
+    const a = this.bots.assets();
+    return {
+      botClasses: a.botClasses,
+      skins: a.skins,
+      faces: a.faces,
+      voices: a.voices,
+      packages: a.packages,
+    };
+  }
+
+  /** The manager changes skin, face, voice and chat lines of an own bot (never its values). */
+  editBot(user: User, botId: string, body: BotLook): LibraryBot {
+    this.assertOn();
+    const b = this.bots.get(botId);
+    if (!b || b.udtOwner !== user.id)
+      throw forbidden('only your own bots (starter, academy, blueprint) can be changed');
+    const traits = body.voice !== undefined ? { traits: { ...b.traits, voice: body.voice } } : {};
+    return this.bots.update(b.id, { ...lookFields(body), ...traits });
+  }
+
   view(user: User) {
     const enabled = this.enabled();
     const season = this.seasons.current();
@@ -468,6 +517,7 @@ export class UdtService {
       ...(body.starter.skin ? { skin: body.starter.skin } : {}),
       ...(body.starter.face ? { face: body.starter.face } : {}),
       ...(body.starter.traits ? { traits: body.starter.traits } : {}),
+      ...(body.starter.personality ? { personality: body.starter.personality } : {}),
       active: false,
     });
     this.db
