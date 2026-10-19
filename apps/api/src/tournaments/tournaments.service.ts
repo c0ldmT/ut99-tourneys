@@ -474,6 +474,12 @@ export class TournamentsService {
     this.removeHooks.push(fn);
   }
 
+  /** Called by the website reset after the tournaments are gone (the Dream Team wipes its data). */
+  private readonly resetHooks: (() => void)[] = [];
+  onResetAll(fn: () => void): void {
+    this.resetHooks.push(fn);
+  }
+
   remove(id: string): void {
     const t = this.require(id);
     if (ACTIVE_PHASES.includes(t.phase)) throw conflict('abort the tournament before deleting it');
@@ -485,8 +491,9 @@ export class TournamentsService {
 
   /**
    * Website reset (settings page): deletes every tournament with its log, registrations and
-   * teams, and every season; statistics, ratings and records are gone with them. Users, bots,
-   * clans, servers and settings stay. Not while a tournament is checking in or running.
+   * teams, and every season; statistics, ratings and records are gone with them, and the data of
+   * add-ons (Dream Team) through their reset hooks. Users, bots, clans, servers and settings
+   * stay. Not while a tournament is checking in or running.
    */
   resetAll(): { tournaments: number; seasons: number } {
     const all = this.db.select().from(tournaments).all();
@@ -496,6 +503,7 @@ export class TournamentsService {
         `abort the running tournaments first: ${active.map((t) => t.name).join(', ')}`,
       );
     for (const t of all) this.remove(t.id);
+    for (const fn of this.resetHooks) fn();
     // Shop purchases were paid with the seasons' Neuro: they go with them (looks too).
     this.db.delete(shopPurchases).run();
     // So do the ledger's bookings (Dream Team rewards, purchases, salaries).

@@ -165,3 +165,78 @@ export class Icon {
   readonly size = input(17);
   protected readonly path = computed(() => ICONS[this.name()] ?? '');
 }
+
+/**
+ * The Dream Team mark: two fanned bot cards (violet) with a dream star on the front one and
+ * a rank chevron below it; the star turns and glows on hover of the link around it.
+ */
+@Component({
+  selector: 'na-udt-mark',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `<svg
+    [attr.width]="size()"
+    [attr.height]="size()"
+    viewBox="0 0 32 32"
+    aria-hidden="true"
+  >
+    <rect
+      x="6.5"
+      y="5"
+      width="15"
+      height="21"
+      rx="2.5"
+      transform="rotate(-14 14 15.5)"
+      fill="none"
+      stroke="var(--udt)"
+      stroke-width="1.8"
+      opacity="0.55"
+    />
+    <rect
+      x="11"
+      y="5.5"
+      width="15"
+      height="21"
+      rx="2.5"
+      transform="rotate(8 18.5 16)"
+      fill="var(--bg-2)"
+      stroke="var(--udt)"
+      stroke-width="2.2"
+    />
+    <g transform="rotate(8 18.5 16)">
+      <path
+        class="star"
+        d="M18.5 8.6l1.75 3.55 3.9.57-2.82 2.75.67 3.88-3.5-1.84-3.5 1.84.67-3.88-2.82-2.75 3.9-.57z"
+        fill="var(--neuro)"
+      />
+      <path
+        d="M14.5 23.6l4-2.6 4 2.6"
+        fill="none"
+        stroke="var(--hot)"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    </g>
+  </svg>`,
+  styles: `
+    :host {
+      display: inline-flex;
+      flex: none;
+    }
+    .star {
+      transform-box: fill-box;
+      transform-origin: center;
+      transition:
+        transform 0.4s ease,
+        filter 0.4s ease;
+    }
+    :host-context(a:hover) .star,
+    :host-context(a.active) .star {
+      transform: rotate(72deg) scale(1.12);
+      filter: drop-shadow(0 0 2px var(--neuro));
+    }
+  `,
+})
+export class UdtMark {
+  readonly size = input(26);
+}

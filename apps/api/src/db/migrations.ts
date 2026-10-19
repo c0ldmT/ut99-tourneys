@@ -502,4 +502,8 @@ export const MIGRATIONS: string[] = [
     created_at TEXT NOT NULL
   );
   `,
+  // 25: Dream Team tags are used as they are (any signs); the old ones get the brackets they had.
+  `
+  UPDATE udt_teams SET tag = '[' || tag || ']', tag_key = '[' || tag_key || ']';
+  `,
 ];

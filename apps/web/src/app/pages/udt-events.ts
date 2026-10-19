@@ -229,7 +229,7 @@ export class UdtEventsPage {
             <tr>
               <td class="mono">{{ i + 1 }}.</td>
               <td>
-                <b style="color: var(--hot-text)">[{{ r.tag }}]</b> {{ r.name }}
+                <b style="color: var(--hot-text)">{{ r.tag }}</b> {{ r.name }}
                 @if (r.ai) {
                   <span class="udt-mark">{{ 'udt.ai' | t }}</span>
                 }

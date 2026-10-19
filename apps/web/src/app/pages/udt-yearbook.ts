@@ -35,8 +35,8 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
             <span class="grow"
               ><b>{{ n.name }}</b>
               <span class="muted small"
-                >[{{ n.tag }}] {{ n.team }} · {{ n.breeder }} · {{ 'udt.level' | t }}
-                {{ n.level }} · {{ n.games }} {{ 'udt.academy.games' | t }}</span
+                >{{ n.tag }} {{ n.team }} · {{ n.breeder }} · {{ 'udt.level' | t }} {{ n.level }} ·
+                {{ n.games }} {{ 'udt.academy.games' | t }}</span
               >
               @if (n.honours) {
                 <span class="udt-mark star">{{ 'udt.yearbook.honours' | t }}</span>
@@ -87,7 +87,7 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
                   (b.honours ? 'udt.yearbook.withHonours' : 'udt.yearbook.graduated') | t
                 }}</span>
               }
-              <div class="small">[{{ b.tag }}] {{ b.team }}</div>
+              <div class="small">{{ b.tag }} {{ b.team }}</div>
               <div class="muted small">
                 {{ 'udt.yearbook.breeder' | t }} {{ b.breeder }} ·
                 {{ 'udt.academy.origin.' + b.origin | t }}

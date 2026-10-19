@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import { BotTraitsSchema } from '@tourney/protocol';
 import {
   baseValue,
@@ -26,12 +26,21 @@ import { DB, type Db } from '../db/database.js';
 import {
   bots,
   udtAi,
+  udtBids,
+  udtBlueprints,
   udtBots,
   udtDays,
+  udtEntries,
+  udtHall,
+  udtOffers,
+  udtPity,
   udtRoster,
+  udtScouts,
   udtTeams,
+  udtTrades,
   udtTraits,
   udtValues,
+  users,
 } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { today } from '../seasons/season-time.js';
@@ -39,18 +48,14 @@ import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import type { User } from '../auth/users.service.js';
 
-/** The longest name in the game (UT cuts there): "[TAG]" + bot name. */
+/** The longest name in the game (UT cuts there): tag + bot name. */
 const GAME_NAME_CHARS = 24;
 const ASCII = /^[\x20-\x7e]+$/;
 
 export const TeamBody = z.object({
   name: z.string().trim().min(2).max(32).regex(ASCII, 'ASCII letters, digits and signs only'),
-  tag: z
-    .string()
-    .trim()
-    .min(2)
-    .max(5)
-    .regex(/^[A-Za-z0-9]+$/, 'letters and digits only'),
+  /** In front of the bots' names as it is (brackets only if the manager types them). */
+  tag: z.string().trim().min(1).max(8).regex(ASCII, 'ASCII letters, digits and signs only'),
   starter: z.object({
     name: z
       .string()
@@ -135,6 +140,51 @@ export class UdtService {
     @Inject(BotsService) private readonly bots: BotsService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
   ) {}
+
+  /**
+   * Website reset: every Dream Team season is gone. Teams, rosters, market, packs, trades,
+   * academy, yearbook and hall of fame go; so do the bots the managers made and still own and
+   * the AI managers (they come back with new teams while they are switched on). Graduated bots
+   * are library bots and stay. The ledger is emptied by the reset itself.
+   */
+  wipeAll(): { teams: number; bots: number; ai: number } {
+    return this.db.transaction((tx) => {
+      const teams = tx.select({ u: udtTeams.userId }).from(udtTeams).all().length;
+      const own = tx
+        .select({ id: bots.id })
+        .from(bots)
+        .where(isNotNull(bots.udtOwner))
+        .all()
+        .map((b) => b.id);
+      const ai = tx
+        .select({ id: udtAi.userId })
+        .from(udtAi)
+        .all()
+        .map((a) => a.id);
+      for (const t of [
+        udtRoster,
+        udtDays,
+        udtValues,
+        udtOffers,
+        udtBids,
+        udtEntries,
+        udtTraits,
+        udtPity,
+        udtTrades,
+        udtBots,
+        udtScouts,
+        udtBlueprints,
+        udtHall,
+        udtAi,
+        udtTeams,
+      ])
+        tx.delete(t).run();
+      if (own.length) tx.delete(bots).where(inArray(bots.id, own)).run();
+      tx.update(bots).set({ udtOrigin: null }).run();
+      if (ai.length) tx.delete(users).where(inArray(users.id, ai)).run();
+      return { teams, bots: own.length, ai: ai.length };
+    });
+  }
 
   enabled(): boolean {
     return this.settings.get().udt.enabled;
@@ -398,9 +448,9 @@ export class UdtService {
       throw conflict(`the team name ${body.name} is taken`);
     if (others.some((t) => t.tag.toLowerCase() === tagKey))
       throw conflict(`the tag ${body.tag} is taken`);
-    if (gameName(body.tag, body.starter.name).length < `[${body.tag}]${body.starter.name}`.length)
+    if (gameName(body.tag, body.starter.name).length < `${body.tag}${body.starter.name}`.length)
       throw badRequest(
-        `tag and bot name are too long for the game: [${body.tag}]${body.starter.name} (at most ${GAME_NAME_CHARS})`,
+        `tag and bot name are too long for the game: ${body.tag}${body.starter.name} (at most ${GAME_NAME_CHARS})`,
       );
     const budget = this.settings.get().udt.starterBudget;
     const cost = Math.round(baseValue(body.starter.skill, valueScore(body.starter.traits)));
@@ -492,7 +542,7 @@ export class UdtService {
 
 /** "[TAG]Name", cut to what UT shows. */
 export function gameName(tag: string, name: string): string {
-  return `${tag ? `[${tag}]` : ''}${name}`.slice(0, GAME_NAME_CHARS);
+  return `${tag}${name}`.slice(0, GAME_NAME_CHARS);
 }
 
 function slotOf(list: (string | null)[], id: string): number | null {

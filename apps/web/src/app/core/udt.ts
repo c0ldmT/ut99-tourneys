@@ -124,7 +124,7 @@ export interface CardBot {
         }
         <div class="name">
           @if (b.tag) {
-            <span class="tag">[{{ b.tag }}]</span>
+            <span class="tag">{{ b.tag }}</span>
           }
           {{ b.name }}
         </div>

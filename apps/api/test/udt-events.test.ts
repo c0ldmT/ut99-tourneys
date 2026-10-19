@@ -21,8 +21,12 @@ async function setup() {
     await admin.post('/bots', { name: `Lib${i}`, skill: [1, 2, 2, 3, 3, 4, 5, 6, 7, 2][i] });
   await admin.req('PUT', '/settings/udt', { enabled: true });
   await startSeason(admin);
-  await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: { name: 'Mira', skill: 3 } });
-  await tim.post('/udt/team', { name: 'Iron', tag: 'IG', starter: { name: 'Tox', skill: 2 } });
+  await mario.post('/udt/team', {
+    name: 'Nexus',
+    tag: '[NX]',
+    starter: { name: 'Mira', skill: 3 },
+  });
+  await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: { name: 'Tox', skill: 2 } });
   return { admin, mario, tim, anna };
 }
 

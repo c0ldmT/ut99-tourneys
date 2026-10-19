@@ -159,12 +159,12 @@ describe('website + bridge + simulated UT server', () => {
         await admin.req('PUT', '/settings/udt', { enabled: true });
         await mario!.post('/udt/team', {
           name: 'Nexus',
-          tag: 'NX',
+          tag: '[NX]',
           starter: { name: 'Mira', skill: 3 },
         });
         await tim!.post('/udt/team', {
           name: 'Iron',
-          tag: 'IG',
+          tag: '[IG]',
           starter: { name: 'Tox', skill: 3 },
         });
       },
@@ -194,7 +194,7 @@ describe('website + bridge + simulated UT server', () => {
       expect(r.xp).toBeGreaterThan(0);
     }
     const table = (await mario!.get('/udt/table')).body as { tag: string; points: number }[];
-    expect(table.map((r) => r.tag).sort()).toEqual(['IG', 'NX']);
+    expect(table.map((r) => r.tag).sort()).toEqual(['[IG]', '[NX]']);
     expect(table[0]!.points).toBeGreaterThan(0);
     // Dream Team games stay out of the statistics.
     const stats = (await mario!.get('/stats/players?mode=dm&bots=1')).body as any[];

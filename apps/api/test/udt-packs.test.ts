@@ -30,7 +30,7 @@ async function setup() {
   const v = (
     await mario.post('/udt/team', {
       name: 'Nexus Rising',
-      tag: 'NX',
+      tag: '[NX]',
       starter: { name: 'Mira', skill: 3, traits: { accuracy: 0, alertness: 0, strafing: 0 } },
     })
   ).body;

@@ -25,8 +25,8 @@ async function setup() {
   await admin.req('PUT', '/settings/udt', { enabled: true, offersPerDay: 6 });
   await startSeason(admin);
   const starter = (name: string) => ({ name, skill: 2 });
-  await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: starter('Mira') });
-  await tim.post('/udt/team', { name: 'Iron', tag: 'IG', starter: starter('Tox') });
+  await mario.post('/udt/team', { name: 'Nexus', tag: '[NX]', starter: starter('Mira') });
+  await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: starter('Tox') });
   const market = api.app.get(UdtMarketService);
   const ledger = api.app.get(LedgerService);
   return { clock, admin, mario, tim, market, ledger };

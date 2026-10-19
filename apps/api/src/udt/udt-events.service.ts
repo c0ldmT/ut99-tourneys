@@ -70,6 +70,7 @@ export class UdtEventsService implements OnModuleInit {
     this.tournaments.onRemove((t) => {
       if (t.kind === 'udt' && t.phase === 'draft') this.refundTickets(t.id);
     });
+    this.tournaments.onResetAll(() => this.udt.wipeAll());
   }
 
   private row(id: string): TournamentRow {

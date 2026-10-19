@@ -28,8 +28,12 @@ async function setup() {
     ['Delta', 2],
   ] as const)
     lib[name] = (await admin.post('/bots', { name, skill })).body.id as string;
-  await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: { name: 'Mira', skill: 3 } });
-  await tim.post('/udt/team', { name: 'Iron', tag: 'IG', starter: { name: 'Tox', skill: 2 } });
+  await mario.post('/udt/team', {
+    name: 'Nexus',
+    tag: '[NX]',
+    starter: { name: 'Mira', skill: 3 },
+  });
+  await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: { name: 'Tox', skill: 2 } });
   const marioId = (await mario.get('/me')).body.id as string;
   const timId = (await tim.get('/me')).body.id as string;
   const db = api.app.get<Db>(DB);

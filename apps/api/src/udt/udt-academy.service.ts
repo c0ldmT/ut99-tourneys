@@ -182,8 +182,8 @@ export class UdtAcademyService {
     if (!team) throw conflict('found your team first');
     if (this.udt.roster(user.id, season).length >= ROSTER_MAX)
       throw conflict(`at most ${ROSTER_MAX} bots: make room first`);
-    if (gameName(team.tag, name).length < `[${team.tag}]${name}`.length)
-      throw badRequest(`[${team.tag}]${name} is too long for the game`);
+    if (gameName(team.tag, name).length < `${team.tag}${name}`.length)
+      throw badRequest(`${team.tag}${name} is too long for the game`);
     const made = this.made(season, user.id);
     const price = licencePrice(made, this.udt.index(season));
     if (price === null) throw conflict(`at most ${made} own bots per season`);

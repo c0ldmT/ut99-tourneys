@@ -11,7 +11,7 @@ afterEach(async () => {
 
 const team = (over: Record<string, unknown> = {}) => ({
   name: 'Nexus Rising',
-  tag: 'NX',
+  tag: '[NX]',
   starter: { name: 'Mira', skill: 3, traits: { accuracy: 0, alertness: 0, strafing: 0 } },
   ...over,
 });
@@ -35,7 +35,7 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect(made.body).toMatchObject({
       enabled: true,
       season: 1,
-      team: { name: 'Nexus Rising', tag: 'NX' },
+      team: { name: 'Nexus Rising', tag: '[NX]' },
       roster: [
         { name: 'Mira', gameName: '[NX]Mira', starter: true, dmSlot: 1, rarity: 'uncommon' },
       ],
@@ -48,12 +48,12 @@ describe('Unreal Dream Team: teams and rosters', () => {
     );
     const t2 = await tim.post(
       '/udt/team',
-      team({ name: 'Iron Guard', tag: 'IG', starter: { name: 'Tox', skill: 2 } }),
+      team({ name: 'Iron Guard', tag: '[IG]', starter: { name: 'Tox', skill: 2 } }),
     );
     expect(t2.status).toBe(201);
     expect((await tim.get('/udt/teams')).body.map((t: { tag: string }) => t.tag).sort()).toEqual([
-      'IG',
-      'NX',
+      '[IG]',
+      '[NX]',
     ]);
     // The starter bot is in the library, but inactive, owned and not in the control center.
     const lib = api.app.get(BotsService).list();
@@ -61,6 +61,24 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect(lib.find((b) => b.name === 'Mira')?.udtOwner).toBeTruthy();
     const cc = (await admin.get('/bots')).body.bots as { name: string }[];
     expect(cc.some((b) => b.name === 'Mira')).toBe(false);
+  });
+
+  it('takes the tag as it is: any signs, no brackets added', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    const made = await mario.post('/udt/team', team({ tag: "td'" }));
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    expect(made.body.roster[0]).toMatchObject({ gameName: "td'Mira" });
+    // Too long for the game together with the bot name.
+    const tim = await Client.login(api, 'Tim');
+    const long = await tim.post(
+      '/udt/team',
+      team({ name: 'Long', tag: '<<XXXX>>', starter: { name: 'Abcdefghijklmnopq', skill: 2 } }),
+    );
+    expect(long.status).toBe(400);
   });
 
   it('sets lineups and the bench with own bots only', async () => {
@@ -76,5 +94,26 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect((put.body as unknown[])[0]).toMatchObject({ dmSlot: 2, mhSlot: 1, bench: null });
     expect((await mario.req('PUT', '/udt/lineup', { dm: [mira, mira] })).status).toBe(400);
     expect((await mario.req('PUT', '/udt/lineup', { dm: ['bNope'] })).status).toBe(400);
+  });
+});
+
+describe('Unreal Dream Team: website reset', () => {
+  it('wipes teams, rosters and the bots managers made; graduated library bots stay', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    expect((await mario.post('/udt/team', team())).status).toBe(201);
+    const lib = api.app.get(BotsService);
+    expect(lib.list().some((b) => b.name === 'Mira')).toBe(true);
+    expect((await admin.post('/settings/reset', { confirm: 'RESET' })).status).toBe(200);
+    expect(lib.list().some((b) => b.name === 'Mira')).toBe(false);
+    expect((await mario.get('/udt')).body).toMatchObject({ team: null });
+    // A fresh start: the same name and tag can be founded again in the new season.
+    await startSeason(admin);
+    const again = await mario.post('/udt/team', team());
+    expect(again.status, JSON.stringify(again.body)).toBe(201);
+    expect(again.body.season).toBe(1);
   });
 });

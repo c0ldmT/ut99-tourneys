@@ -132,6 +132,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Website reset wipes the Dream Team too (teams, rosters, market, packs, trades, academy, yearbook, hall of fame, manager-made bots, AI managers); before only its ledger bookings went, the teams stayed.
 - Partial settings updates (API) no longer reset the fields they leave out to their defaults.
 - Bots of the control center show with their current name everywhere (statistics, records, ranking, tournament
   pages); bot profiles are linked from the standings and team lists.
@@ -147,6 +148,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team tags: 1-8 signs of any kind (e.g. `td'`), used as typed, no brackets added; existing tags keep theirs.
+- Navigation: the Dream Team is a self-drawn mark left of the menu; "New tournament" left the menu (button on the tournament list).
 - Discord channel posts are embeds: registration, check-in, results (series and games as fields, bets payout),
   champion (medals, bets summary), bets open and closed (odds, pools, biggest bet as fields), coloured by type and
   linked to the tournament or match page. Direct messages stay plain text.

@@ -62,7 +62,7 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
                 (t.incoming ? 'udt.trades.incoming' : 'udt.trades.outgoing') | t
               }}</span>
               <b
-                ><span class="tag">[{{ other(t).tag }}]</span> {{ other(t).team }}
+                ><span class="tag">{{ other(t).tag }}</span> {{ other(t).team }}
                 <span class="muted small">({{ other(t).manager }})</span></b
               >
               <span class="muted small grow"
@@ -140,7 +140,7 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
               <select [ngModel]="partnerId()" (ngModelChange)="setPartner($event)" name="partner">
                 @for (p of partners(); track p.userId) {
                   <option [ngValue]="p.userId">
-                    [{{ p.tag }}] {{ p.name }} ({{ p.ai ? ('udt.ai' | t) : p.manager }})
+                    {{ p.tag }} {{ p.name }} ({{ p.ai ? ('udt.ai' | t) : p.manager }})
                   </option>
                 }
               </select>
@@ -261,7 +261,7 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
           <div class="hrow">
             <span class="udt-mark st-{{ t.status }}">{{ 'udt.trades.st.' + t.status | t }}</span>
             <span class="grow"
-              ><span class="tag">[{{ other(t).tag }}]</span> {{ other(t).team }}:
+              ><span class="tag">{{ other(t).tag }}</span> {{ other(t).team }}:
               {{ names(youGive(t)) || '–' }}
               @if (neuroOut(t)) {
                 + {{ neuroOut(t) | neuro }}

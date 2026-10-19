@@ -886,9 +886,9 @@ const en = {
     'Bot teams are formed from the clans in the pool first (enough members needed), the other bots fill the remaining teams.',
   'reset.title': 'Danger zone: reset the website',
   'reset.what':
-    'Deletes every tournament (with brackets, results, logs and bets), all statistics, ratings, records and Neuro, and all seasons. This cannot be undone.',
+    'Deletes every tournament (with brackets, results, logs and bets), all statistics, ratings, records and Neuro, all seasons and the whole Dream Team (teams, rosters, market, packs, trades, academy, yearbook, hall of fame, the bots managers made and the AI managers). This cannot be undone.',
   'reset.keeps':
-    'Kept: users, bots and clans of the control center, servers and settings. Running tournaments must be aborted first. Tip: copy the database file (data folder) before.',
+    'Kept: users, bots and clans of the control center (graduated Dream Team bots too), servers and settings. Running tournaments must be aborted first. Tip: copy the database file (data folder) before.',
   'reset.open': 'Delete tournaments, statistics and seasons…',
   'reset.warning':
     'Everything listed above will be gone for good - there is no undo and no backup on the website.',
@@ -1070,7 +1070,7 @@ const en = {
   'udt.found.intro':
     'Name and tag (shown in front of your bots in the game) and your starter bot: build it within the budget.',
   'udt.found.name': 'Team name',
-  'udt.found.tag': 'Tag (2-5 letters/digits)',
+  'udt.found.tag': 'Tag (1–8 signs, as it stands in front of the bot names)',
   'udt.found.bot': 'Name of your starter bot',
   'udt.found.skill': 'Skill',
   'udt.found.cost': 'Costs {cost} of {budget} points',
@@ -2361,9 +2361,9 @@ const de: Record<TKey, string> = {
     'Bot-Teams werden zuerst aus den Clans im Pool gebildet (genug Mitglieder nötig), die übrigen Bots füllen die restlichen Teams.',
   'reset.title': 'Gefahrenzone: Website zurücksetzen',
   'reset.what':
-    'Löscht alle Turniere (mit Brackets, Ergebnissen, Logs und Wetten), alle Statistiken, Ratings, Rekorde und Neuro sowie alle Seasons. Das lässt sich nicht rückgängig machen.',
+    'Löscht alle Turniere (mit Brackets, Ergebnissen, Logs und Wetten), alle Statistiken, Ratings, Rekorde und Neuro, alle Seasons und das ganze Dream Team (Teams, Kader, Markt, Packs, Tausch, Akademie, Jahrbuch, Hall of Fame, die von Managern gebauten Bots und die KI-Manager). Das lässt sich nicht rückgängig machen.',
   'reset.keeps':
-    'Bleiben erhalten: Benutzer, Bots und Clans des Kontrollzentrums, Server und Einstellungen. Laufende Turniere müssen vorher abgebrochen werden. Tipp: vorher die Datenbankdatei (Datenordner) sichern.',
+    'Bleiben erhalten: Benutzer, Bots und Clans des Kontrollzentrums (auch graduierte Dream-Team-Bots), Server und Einstellungen. Laufende Turniere müssen vorher abgebrochen werden. Tipp: vorher die Datenbankdatei (Datenordner) sichern.',
   'reset.open': 'Turniere, Statistiken und Seasons löschen…',
   'reset.warning':
     'Alles oben Genannte ist danach endgültig weg – es gibt kein Rückgängig und kein Backup auf der Website.',
@@ -2546,7 +2546,7 @@ const de: Record<TKey, string> = {
   'udt.found.intro':
     'Name und Tag (stehen im Spiel vor deinen Bots) und dein Starter-Bot: Bau ihn im Rahmen des Budgets.',
   'udt.found.name': 'Teamname',
-  'udt.found.tag': 'Tag (2–5 Buchstaben/Ziffern)',
+  'udt.found.tag': 'Tag (1–8 Zeichen, steht so vor den Botnamen)',
   'udt.found.bot': 'Name deines Starter-Bots',
   'udt.found.skill': 'Skill',
   'udt.found.cost': 'Kostet {cost} von {budget} Punkten',

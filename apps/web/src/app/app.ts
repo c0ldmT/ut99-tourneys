@@ -10,7 +10,7 @@ import { Avatar, NameTag } from './core/looks';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Api } from './core/api';
 import { NeuroPipe } from './core/neuro';
-import { Coin, Icon, Logo, Wordmark } from './core/brand';
+import { Coin, Icon, Logo, UdtMark, Wordmark } from './core/brand';
 import { version } from '../../../../package.json';
 import { Auth } from './core/auth';
 import { I18n, TPipe } from './core/i18n';
@@ -25,6 +25,7 @@ import type { Lang } from './core/i18n-dict';
     TPipe,
     NeuroPipe,
     Logo,
+    UdtMark,
     Wordmark,
     Coin,
     Avatar,
@@ -41,6 +42,17 @@ import type { Lang } from './core/i18n-dict';
         </a>
         @if (auth.me(); as me) {
           <nav [class.open]="menu()" (click)="menu.set(false)">
+            @if (auth.config().udt) {
+              <a
+                routerLink="/udt"
+                routerLinkActive="active"
+                class="udt"
+                [title]="'udt.title' | t"
+                [attr.aria-label]="'udt.title' | t"
+                ><na-udt-mark [size]="28" /><span class="udt-label">{{ 'udt.title' | t }}</span></a
+              >
+              <span class="udt-sep" aria-hidden="true"></span>
+            }
             <a
               routerLink="/"
               routerLinkActive="active"
@@ -48,11 +60,7 @@ import type { Lang } from './core/i18n-dict';
               >{{ 'nav.tournaments' | t }}</a
             >
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
-            @if (auth.config().udt) {
-              <a routerLink="/udt" routerLinkActive="active" class="udt">{{ 'udt.title' | t }}</a>
-            }
             @if (me.isAdmin) {
-              <a routerLink="/new" routerLinkActive="active">{{ 'nav.new' | t }}</a>
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
               <a routerLink="/admin/bots" routerLinkActive="active">{{ 'nav.bots' | t }}</a>
               <a routerLink="/admin/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
@@ -213,8 +221,30 @@ import type { Lang } from './core/i18n-dict';
       background: var(--panel-2);
       box-shadow: inset 0 -2px 0 var(--accent);
     }
+    nav {
+      align-items: center;
+    }
+    nav a.udt {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 4px 6px;
+    }
+    nav a.udt:hover {
+      background: color-mix(in srgb, var(--udt) 14%, transparent);
+    }
     nav a.udt.active {
+      background: color-mix(in srgb, var(--udt) 18%, transparent);
       box-shadow: inset 0 -2px 0 var(--udt);
+    }
+    .udt-label {
+      display: none;
+    }
+    .udt-sep {
+      width: 1px;
+      height: 22px;
+      margin: 0 6px 0 4px;
+      background: var(--border);
     }
     .nav-foot {
       display: none;
@@ -328,6 +358,23 @@ import type { Lang } from './core/i18n-dict';
       }
       nav a.active {
         box-shadow: inset 3px 0 0 var(--accent);
+      }
+      nav {
+        align-items: stretch;
+      }
+      nav a.udt {
+        padding: 8px 10px;
+      }
+      nav a.udt.active {
+        box-shadow: inset 3px 0 0 var(--udt);
+      }
+      .udt-label {
+        display: inline;
+        color: var(--udt);
+        font-weight: 600;
+      }
+      .udt-sep {
+        display: none;
       }
       .nav-foot {
         display: flex;

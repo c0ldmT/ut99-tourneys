@@ -58,7 +58,14 @@ type Mode = 'dm' | 'mh';
                 </label>
                 <label
                   >{{ 'udt.found.tag' | t }}
-                  <input name="ttag" [(ngModel)]="teamTag" maxlength="5" class="narrow" required />
+                  <input
+                    name="ttag"
+                    [(ngModel)]="teamTag"
+                    maxlength="8"
+                    placeholder="[TD]"
+                    class="narrow"
+                    required
+                  />
                 </label>
               </div>
               <label
@@ -106,7 +113,7 @@ type Mode = 'dm' | 'mh';
           <div>
             <div class="kpi" style="color: var(--udt)">{{ 'udt.season' | t: { n: v.season } }}</div>
             <h1 class="disp">
-              <span style="color: var(--hot-text)">[{{ v.team.tag }}]</span> {{ v.team.name }}
+              <span style="color: var(--hot-text)">{{ v.team.tag }}</span> {{ v.team.name }}
             </h1>
           </div>
           <div class="udt-kpis">

@@ -157,10 +157,10 @@ export class UdtAiService implements OnModuleInit {
       `A${n}`,
     ];
     for (const c of cands) {
-      const t = c.toUpperCase();
-      if (t.length >= 2 && !taken.has(t.toLowerCase())) return t;
+      const t = `[${c.toUpperCase()}]`;
+      if (c.length >= 2 && !taken.has(t.toLowerCase())) return t;
     }
-    return `AI${n}`;
+    return `[AI${n}]`;
   }
 
   /** After a market day (and in the test mode on "managers act"): every AI manager acts once. */

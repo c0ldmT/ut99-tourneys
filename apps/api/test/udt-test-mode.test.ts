@@ -131,7 +131,7 @@ describe('Dream Team AI managers', () => {
     await startSeason(admin);
     await mario.post('/udt/team', {
       name: 'Nexus',
-      tag: 'NX',
+      tag: '[NX]',
       starter: { name: 'Mira', skill: 3 },
     });
     await admin.post('/udt/test/market-day');
@@ -187,10 +187,10 @@ describe('Dream Team season finale', () => {
     await startSeason(admin);
     await mario.post('/udt/team', {
       name: 'Nexus',
-      tag: 'NX',
+      tag: '[NX]',
       starter: { name: 'Mira', skill: 3 },
     });
-    await tim.post('/udt/team', { name: 'Iron', tag: 'IG', starter: { name: 'Tox', skill: 3 } });
+    await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: { name: 'Tox', skill: 3 } });
     const cup = async (udt: Record<string, unknown>, name: string) =>
       (
         await admin.post(

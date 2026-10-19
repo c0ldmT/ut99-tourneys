@@ -17,7 +17,11 @@ async function setup() {
   const mario = await Client.login(api, 'Mario');
   await admin.req('PUT', '/settings/udt', { enabled: true });
   await startSeason(admin);
-  await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: { name: 'Mira', skill: 3 } });
+  await mario.post('/udt/team', {
+    name: 'Nexus',
+    tag: '[NX]',
+    starter: { name: 'Mira', skill: 3 },
+  });
   const marioId = (await mario.get('/me')).body.id as string;
   api.app
     .get(LedgerService)
