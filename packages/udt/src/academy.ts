@@ -3,7 +3,7 @@
  * apprentices, developing a manager's own bots with points from their levels up to their
  * potential. Pure rules; the API stores the results.
  */
-import { DEFAULT_ECONOMY, roundNeuro } from './economy.js';
+import { baseValue, DEFAULT_ECONOMY, roundNeuro, valueScore, type Rarity } from './economy.js';
 
 /** Play-style values of a talent (-1..1; camping 0..1). */
 export interface TalentValues {
@@ -218,3 +218,52 @@ export function cannotDevelop(
 
 /** The value after a development step (+5 on the 0..100 scale). */
 export const developValue = (v: number | undefined): number => r3(clamp((v ?? 0) + 0.1, -1, 1));
+
+// ---------- blueprints (from packs) ----------
+
+export interface BlueprintRule {
+  /** Points for skill and values at index 1.0, as the starter budget (base value). */
+  budget: number;
+  /** Highest skill the bot can be built with. */
+  skillCap: number;
+  /** Potential = skill + this (at most Godlike). */
+  potentialUp: number;
+  /** The bot class (model) can be chosen. */
+  models: boolean;
+  /** Signature blueprints: the bot starts with a trait of this rarity. */
+  startTrait: 'rare' | 'epic' | null;
+}
+
+/** Common blank, uncommon blank+, rare blueprint, epic and legendary signature blueprints. */
+export const BLUEPRINTS: Readonly<Record<Rarity, BlueprintRule>> = {
+  common: { budget: 1500, skillCap: 3, potentialUp: 2, models: false, startTrait: null },
+  uncommon: { budget: 2500, skillCap: 4, potentialUp: 2, models: false, startTrait: null },
+  rare: { budget: 4000, skillCap: 4, potentialUp: 3, models: true, startTrait: null },
+  epic: { budget: 7500, skillCap: 5, potentialUp: 3, models: true, startTrait: 'rare' },
+  legendary: { budget: 9000, skillCap: 5, potentialUp: 4, models: true, startTrait: 'epic' },
+};
+
+/** Share of pack draws that bring a blueprint of the rolled rarity instead of a trait. */
+export const BLUEPRINT_CHANCE = 0.12;
+/** Unused blueprints a manager can keep per season; more turn into scrap. */
+export const BLUEPRINTS_MAX = 3;
+
+/** Points a build costs: the base value of skill and values (like the starter bot). */
+export function buildCost(
+  skill: number,
+  values: { accuracy?: number; alertness?: number; strafing?: number },
+): number {
+  return Math.round(baseValue(skill, valueScore(values)));
+}
+
+/** Why a build from a blueprint is not possible (null: it is). */
+export function cannotBuild(
+  rarity: Rarity,
+  skill: number,
+  values: { accuracy?: number; alertness?: number; strafing?: number },
+): 'skill' | 'budget' | null {
+  const r = BLUEPRINTS[rarity];
+  if (Math.round(skill) > r.skillCap) return 'skill';
+  if (buildCost(skill, values) > r.budget) return 'budget';
+  return null;
+}

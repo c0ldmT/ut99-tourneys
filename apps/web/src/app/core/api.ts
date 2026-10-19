@@ -200,6 +200,13 @@ export class Api {
     this.call<UdtAcademy>('POST', '/udt/academy/sign', { pick, name });
   udtApprentice = (mentorId: string, name: string) =>
     this.call<UdtAcademy>('POST', '/udt/academy/mentor', { mentorId, name });
+  udtBuild = (body: {
+    blueprintId: string;
+    name: string;
+    skill: number;
+    traits: { accuracy: number; alertness: number; strafing: number };
+    botClass?: string;
+  }) => this.call<UdtAcademy>('POST', '/udt/academy/build', body);
   udtDevelop = (botId: string, stat: 'accuracy' | 'alertness' | 'strafing' | 'skill') =>
     this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/develop`, { stat });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');

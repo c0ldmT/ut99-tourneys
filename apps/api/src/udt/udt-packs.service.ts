@@ -8,6 +8,8 @@ import {
   isTraitCode,
   levelOf,
   packPrice,
+  BLUEPRINT_CHANCE,
+  BLUEPRINTS_MAX,
   rollBox,
   rollTen,
   SCRAP,
@@ -26,7 +28,7 @@ import { badRequest, conflict, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { udtPity, udtRoster, udtTeams, udtTraits } from '../db/schema.js';
+import { udtBlueprints, udtPity, udtRoster, udtTeams, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { UdtService } from './udt.service.js';
 
@@ -49,7 +51,8 @@ export const CraftBody = z.object({ code: z.string().min(1).max(40) });
 
 export interface PullCard {
   id: string | null;
-  code: TraitCode;
+  /** A trait, or "blueprint" (build an own bot from it in the academy). */
+  code: TraitCode | 'blueprint';
   rarity: Rarity;
   /** Already in the inventory: turned into scrap. */
   duplicate: boolean;
@@ -108,6 +111,21 @@ export class UdtPacksService {
       .all();
   }
 
+  /** Unused blueprints of the manager this season. */
+  blueprints(season: number, userId: string) {
+    return this.db
+      .select()
+      .from(udtBlueprints)
+      .where(
+        and(
+          eq(udtBlueprints.season, season),
+          eq(udtBlueprints.userId, userId),
+          isNull(udtBlueprints.usedAt),
+        ),
+      )
+      .all();
+  }
+
   /** The packs page: boxes (prices at the index, rates, pity), scrap, inventory, crafting. */
   view(user: User) {
     this.udt.assertOn();
@@ -142,6 +160,7 @@ export class UdtPacksService {
         category: traitDef(t.code)?.category ?? 'values',
         needsWeapon: !!traitDef(t.code)?.needsWeapon,
       })),
+      blueprints: this.blueprints(season, user.id).map((b) => ({ id: b.id, rarity: b.rarity })),
       /** For the gun nut: the weapons of the game. */
       weapons: this.bots.assets().weapons,
       catalog: TRAITS.map((t) => ({
@@ -197,7 +216,30 @@ export class UdtPacksService {
     const held = new Set(this.inventory(season, user.id).map((t) => t.code));
     const cards: PullCard[] = [];
     let scrap = 0;
+    let blueprints = this.blueprints(season, user.id).length;
     for (const rarity of drawn.rarities) {
+      // Now and then a blueprint of the rarity instead of a trait.
+      if (rng() < BLUEPRINT_CHANCE) {
+        if (blueprints >= BLUEPRINTS_MAX) {
+          scrap += SCRAP[rarity];
+          cards.push({
+            id: null,
+            code: 'blueprint',
+            rarity,
+            duplicate: true,
+            scrap: SCRAP[rarity],
+          });
+          continue;
+        }
+        const bpId = `p${randomId(12)}`;
+        this.db
+          .insert(udtBlueprints)
+          .values({ id: bpId, season, userId: user.id, rarity, createdAt: this.now() })
+          .run();
+        blueprints++;
+        cards.push({ id: bpId, code: 'blueprint', rarity, duplicate: false, scrap: 0 });
+        continue;
+      }
       const t = traitOfRarity(rarity, rng);
       if (held.has(t.code)) {
         scrap += SCRAP[t.rarity];

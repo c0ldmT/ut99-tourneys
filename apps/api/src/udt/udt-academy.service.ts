@@ -1,8 +1,11 @@
 import { randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import {
   apprentice,
+  BLUEPRINTS,
+  buildCost,
+  cannotBuild,
   cannotDevelop,
   DEVELOP_COST,
   developPoints,
@@ -12,7 +15,9 @@ import {
   scoutPrice,
   scoutTalents,
   talentReport,
+  traitOfRarity,
   type DevelopStat,
+  type Rarity,
   type Talent,
   type TalentReport,
 } from '@tourney/udt';
@@ -23,7 +28,7 @@ import { badRequest, conflict, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, udtBots, udtRoster, udtScouts, udtTraits } from '../db/schema.js';
+import { bots, udtBlueprints, udtBots, udtRoster, udtScouts, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { ROSTER_MAX } from './udt-market.service.js';
 import { gameName, UdtService } from './udt.service.js';
@@ -37,6 +42,16 @@ const BotName = z
 
 export const SignBody = z.object({ pick: z.number().int().min(0).max(2), name: BotName });
 export const MentorBody = z.object({ mentorId: z.string().min(1).max(40), name: BotName });
+const Value = z.number().min(-1).max(1);
+export const BuildBody = z.object({
+  blueprintId: z.string().min(1).max(40),
+  name: BotName,
+  skill: z.number().int().min(0).max(7),
+  traits: z.object({ accuracy: Value, alertness: Value, strafing: Value }),
+  botClass: z.string().max(128).optional(),
+});
+export type BuildInput = z.infer<typeof BuildBody>;
+
 export const DevelopBody = z.object({
   stat: z.enum(['accuracy', 'alertness', 'strafing', 'skill']),
 });
@@ -113,6 +128,13 @@ export class UdtAcademyService {
           used: used.has(r.botId),
         })),
       own: roster.filter((r) => r.own),
+      blueprints: this.blueprintsOf(season, user.id).map((b) => ({
+        id: b.id,
+        rarity: b.rarity,
+        rule: BLUEPRINTS[b.rarity as Rarity],
+      })),
+      /** Models for blueprints of rare and better. */
+      botClasses: this.bots.assets().botClasses,
       developCost: DEVELOP_COST,
       mentorLevel: MENTOR_LEVEL,
     };
@@ -181,12 +203,14 @@ export class UdtAcademyService {
     season: number,
     t: Talent,
     name: string,
-    origin: 'academy' | 'apprentice',
+    origin: 'academy' | 'apprentice' | 'blueprint',
     mentorId: string | null,
+    botClass?: string,
   ): string {
     const bot = this.bots.create({
       name,
       skill: t.skill,
+      ...(botClass ? { botClass } : {}),
       traits: {
         accuracy: t.values.accuracy,
         alertness: t.values.alertness,
@@ -279,6 +303,83 @@ export class UdtAcademyService {
         })
         .run();
     return { ...this.view(user), apprentice: { botId: id, inherited: t.inherited } };
+  }
+
+  private blueprintsOf(season: number, userId: string) {
+    return this.db
+      .select()
+      .from(udtBlueprints)
+      .where(
+        and(
+          eq(udtBlueprints.season, season),
+          eq(udtBlueprints.userId, userId),
+          isNull(udtBlueprints.usedAt),
+        ),
+      )
+      .all();
+  }
+
+  /**
+   * Builds an own bot from a blueprint (needs a licence): skill and values within the
+   * blueprint's points, the model from rare on, a start trait from signature blueprints.
+   */
+  build(user: User, body: BuildInput) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const bp = this.blueprintsOf(season, user.id).find((b) => b.id === body.blueprintId);
+    if (!bp) throw notFound('blueprint');
+    const rarity = bp.rarity as Rarity;
+    const rule = BLUEPRINTS[rarity];
+    const why = cannotBuild(rarity, body.skill, body.traits);
+    if (why === 'skill') throw badRequest(`this blueprint builds up to skill ${rule.skillCap}`);
+    if (why === 'budget')
+      throw badRequest(
+        `the build costs ${buildCost(body.skill, body.traits)} of ${rule.budget} points: lower skill or values`,
+      );
+    if (body.botClass && !rule.models)
+      throw badRequest('the model can be chosen from rare blueprints');
+    if (body.botClass && !this.bots.assets().botClasses.some((c) => c.name === body.botClass))
+      throw badRequest('unknown bot class');
+    if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
+      throw conflict(`a bot is called ${body.name} already`);
+    this.licence(user, season, body.name);
+    const id = this.create(
+      user,
+      season,
+      {
+        name: body.name,
+        skill: body.skill,
+        values: { ...body.traits, combatStyle: 0, camping: 0 },
+        potential: Math.min(7, body.skill + rule.potentialUp),
+      },
+      body.name,
+      'blueprint',
+      null,
+      body.botClass,
+    );
+    let startTrait: string | null = null;
+    if (rule.startTrait) {
+      startTrait = traitOfRarity(rule.startTrait, rng).code;
+      this.db
+        .insert(udtTraits)
+        .values({
+          id: `t${randomId(12)}`,
+          season,
+          userId: user.id,
+          code: startTrait,
+          botId: id,
+          source: 'blueprint',
+          createdAt: this.now(),
+          assignedAt: this.now(),
+        })
+        .run();
+    }
+    this.db
+      .update(udtBlueprints)
+      .set({ usedAt: this.now(), botId: id })
+      .where(eq(udtBlueprints.id, bp.id))
+      .run();
+    return { ...this.view(user), built: { botId: id, startTrait } };
   }
 
   /** Spends development points of an own bot: +5 on a value, or a skill step up to the potential. */

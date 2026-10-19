@@ -467,3 +467,14 @@ export const udtScouts = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.season, t.userId] })],
 );
+
+/** Blueprints from packs (blanks, signature blueprints); used when a bot is built from one. */
+export const udtBlueprints = sqliteTable('udt_blueprints', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  userId: text('user_id').notNull(),
+  rarity: text('rarity').notNull(),
+  createdAt: text('created_at').notNull(),
+  usedAt: text('used_at'),
+  botId: text('bot_id'),
+});

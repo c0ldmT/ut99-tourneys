@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { udtRoster } from '../src/db/schema.js';
+import { udtBlueprints, udtRoster } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
 
@@ -113,5 +113,55 @@ describe('Unreal Dream Team: academy', () => {
     expect((await mario.get('/udt/breeders')).body).toMatchObject([
       { name: 'Mario', graduates: 1, honours: 1 },
     ]);
+  });
+
+  it('builds an own bot from a blueprint: points, skill cap, model, start trait', async () => {
+    const { mario, marioId, db } = await setup();
+    for (const [id, rarity] of [
+      ['pC', 'common'],
+      ['pE', 'epic'],
+    ] as const)
+      db.insert(udtBlueprints)
+        .values({ id, season: 1, userId: marioId, rarity, createdAt: 'x' })
+        .run();
+    const v = (await mario.get('/udt/academy')).body;
+    expect(v.blueprints.map((b: { rarity: string }) => b.rarity).sort()).toEqual([
+      'common',
+      'epic',
+    ]);
+    const avg = { accuracy: 0, alertness: 0, strafing: 0 };
+    expect(
+      (
+        await mario.post('/udt/academy/build', {
+          blueprintId: 'pC',
+          name: 'Blank',
+          skill: 4,
+          traits: avg,
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await mario.post('/udt/academy/build', {
+          blueprintId: 'pC',
+          name: 'Blank',
+          skill: 3,
+          traits: avg,
+          botClass: 'BotPack.TFemale1Bot',
+        })
+      ).status,
+    ).toBe(400); // no model from common blueprints
+    const ok = await mario.post('/udt/academy/build', {
+      blueprintId: 'pE',
+      name: 'Signa',
+      skill: 5,
+      traits: { accuracy: -0.2, alertness: 0, strafing: 0 },
+    });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body.built.startTrait).toBeTruthy();
+    const b = ok.body.own.find((x: { name: string }) => x.name === 'Signa');
+    expect(b).toMatchObject({ skill: 5, own: { origin: 'blueprint' } });
+    expect(b.udtTraits[0].code).toBe(ok.body.built.startTrait);
+    expect(ok.body.blueprints).toHaveLength(1);
   });
 });

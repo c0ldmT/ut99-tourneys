@@ -67,3 +67,15 @@ describe('academy', () => {
     expect(cannotDevelop('strafing', bot, 1)).toBeNull();
   });
 });
+
+describe('blueprints', () => {
+  it('limits skill and points by rarity', async () => {
+    const { cannotBuild, buildCost, BLUEPRINTS } = await import('../src/index.js');
+    expect(cannotBuild('common', 3, {})).toBeNull();
+    expect(cannotBuild('common', 4, {})).toBe('skill');
+    expect(cannotBuild('common', 3, { accuracy: 1, alertness: 1, strafing: 1 })).toBe('budget');
+    expect(cannotBuild('epic', 5, {})).toBeNull();
+    expect(buildCost(5, {})).toBeLessThanOrEqual(BLUEPRINTS.epic.budget);
+    expect(BLUEPRINTS.legendary.startTrait).toBe('epic');
+  });
+});

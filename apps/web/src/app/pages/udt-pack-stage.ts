@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18n, TPipe } from '../core/i18n';
-import type { UdtBox, UdtCatalogTrait, UdtPull, UdtRarity } from '../core/types';
+import type { UdtBox, UdtCatalogTrait, UdtPull, UdtPullCard, UdtRarity } from '../core/types';
 import { RARITIES } from '../core/udt';
 
 type Phase = 'idle' | 'charge' | 'burst' | 'reveal';
@@ -34,8 +34,9 @@ export const BOX_STROKE: Record<UdtBox, string> = {
   premium: '#b26bff',
   elite: '#ecdcff',
 };
-/** Icons per trait category (values, body, behaviour, manager). */
+/** Icons per trait category (values, body, behaviour, manager) and for blueprints. */
 const ICON = {
+  blueprint: 'M4 4h16v16H4zM4 9h16M9 4v16',
   behaviour: 'M5 19c3-1 3-5 6-6s4 2 8-3M15 10h4v4',
   values: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0',
   body: 'M12 3 20 6v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
@@ -188,7 +189,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
                   [style.--sc]="spark(c.rarity)"
                   [attr.aria-label]="
                     isUp(i)
-                      ? ('udt.rarity.' + c.rarity | t) + ': ' + ('udt.trait.' + c.code | t)
+                      ? ('udt.rarity.' + c.rarity | t) + ': ' + (nameKey(c) | t)
                       : ('udt.packs.hidden' | t: { n: i + 1 })
                   "
                   (click)="flip([i], 0)"
@@ -227,13 +228,13 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
                             <path [attr.d]="icon(c.code)" />
                           </svg>
                         </span>
-                        <span class="disp tn">{{ 'udt.trait.' + c.code | t }}</span>
+                        <span class="disp tn">{{ nameKey(c) | t }}</span>
                         <span class="muted te">
                           @if (c.duplicate) {
                             {{ 'udt.packs.dup' | t: { n: c.scrap } }}
                           } @else {
                             {{ 'udt.cat.' + category(c.code) | t }} ·
-                            {{ 'udt.traitE.' + c.code | t }}
+                            {{ effectKey(c) | t }}
                           }
                         </span>
                       </span>
@@ -705,7 +706,16 @@ export class UdtPackStage implements OnDestroy {
     return SPARK[r];
   }
 
+  protected nameKey(c: UdtPullCard) {
+    return c.code === 'blueprint' ? `udt.bp.${c.rarity}` : `udt.trait.${c.code}`;
+  }
+
+  protected effectKey(c: UdtPullCard) {
+    return c.code === 'blueprint' ? `udt.bpE.${c.rarity}` : `udt.traitE.${c.code}`;
+  }
+
   protected category(code: string) {
+    if (code === 'blueprint') return 'blueprint';
     return this.catalog().find((c) => c.code === code)?.category ?? 'values';
   }
 

@@ -469,4 +469,18 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_bots ADD COLUMN graduated_at TEXT;
   ALTER TABLE udt_bots ADD COLUMN honours INTEGER NOT NULL DEFAULT 0;
   `,
+  // 22: Dream Team blueprints from packs: blanks and signature blueprints a manager builds an
+  // own bot from (with a creation licence).
+  `
+  CREATE TABLE udt_blueprints (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    rarity TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    used_at TEXT,
+    bot_id TEXT
+  );
+  CREATE INDEX udt_blueprints_user ON udt_blueprints(season, user_id);
+  `,
 ];

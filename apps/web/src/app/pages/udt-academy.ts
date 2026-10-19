@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
@@ -12,7 +12,7 @@ import type {
   UdtRosterBot,
   UdtTalentReport,
 } from '../core/types';
-import { botRarity, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from '../core/udt';
+import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from '../core/udt';
 
 type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
 
@@ -114,6 +114,107 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
             <p class="muted small">{{ 'udt.academy.full' | t }}</p>
           }
         </section>
+
+        @if (v.blueprints.length) {
+          <section class="card">
+            <h2>{{ 'udt.academy.blueprints' | t }}</h2>
+            <p class="muted small">{{ 'udt.academy.blueprintText' | t }}</p>
+            <div class="build">
+              <div class="bfields">
+                <label
+                  >{{ 'udt.academy.blueprint' | t }}
+                  <select
+                    name="bp"
+                    [ngModel]="blueprint()?.id"
+                    (ngModelChange)="pickBlueprint($event)"
+                  >
+                    @for (b of v.blueprints; track b.id) {
+                      <option [ngValue]="b.id">
+                        {{ 'udt.bp.' + b.rarity | t }} ({{ 'udt.rarity.' + b.rarity | t }})
+                      </option>
+                    }
+                  </select>
+                </label>
+                @if (blueprint(); as bp) {
+                  <p class="muted small">
+                    {{
+                      'udt.academy.bpRule'
+                        | t: { pts: bp.rule.budget, cap: bp.rule.skillCap, up: bp.rule.potentialUp }
+                    }}
+                    @if (bp.rule.startTrait) {
+                      {{
+                        'udt.academy.bpTrait' | t: { r: ('udt.rarity.' + bp.rule.startTrait | t) }
+                      }}
+                    }
+                  </p>
+                  <label
+                    >{{ 'udt.academy.name' | t }}
+                    <input type="text" maxlength="20" name="bpName" [(ngModel)]="bpName" />
+                  </label>
+                  <label
+                    >Skill
+                    <select
+                      name="bpSkill"
+                      [ngModel]="bpSkill()"
+                      (ngModelChange)="bpSkill.set(+$event)"
+                    >
+                      @for (s of skillsUpTo(bp.rule.skillCap); track s) {
+                        <option [ngValue]="s">{{ s }} {{ skillName(s) }}</option>
+                      }
+                    </select>
+                  </label>
+                  @for (k of keys; track k) {
+                    <label
+                      >{{ 'udt.academy.stat.' + k | t }} <span class="mono">{{ bpVal()[k] }}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        step="5"
+                        [name]="'bp' + k"
+                        [ngModel]="bpVal()[k]"
+                        (ngModelChange)="setBpVal(k, $event)"
+                      />
+                    </label>
+                  }
+                  @if (bp.rule.models) {
+                    <label
+                      >{{ 'udt.academy.model' | t }}
+                      <select name="bpClass" [(ngModel)]="bpClass">
+                        <option [ngValue]="''">{{ 'bots.default' | t }}</option>
+                        @for (c of v.botClasses; track c.name) {
+                          <option [ngValue]="c.name">{{ c.label }}</option>
+                        }
+                      </select>
+                    </label>
+                  }
+                  <div class="rg" [class.over]="bpCost() > bp.rule.budget">
+                    <span>{{ 'udt.academy.points2' | t }}</span
+                    ><span class="mono">{{ bpCost() }} / {{ bp.rule.budget }}</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="primary"
+                    [disabled]="
+                      busy() ||
+                      v.rosterFull ||
+                      v.licence.nextPrice === null ||
+                      bpCost() > bp.rule.budget ||
+                      bpName.trim().length < 2
+                    "
+                    (click)="build(bp.id)"
+                  >
+                    {{ 'udt.academy.build' | t }}
+                    @if (v.licence.nextPrice) {
+                      · {{ v.licence.nextPrice | neuro }}
+                    }
+                  </button>
+                }
+              </div>
+              <udt-card [bot]="bpCard(v.tag)" />
+            </div>
+          </section>
+        }
 
         <section class="card">
           <h2>{{ 'udt.academy.mentors' | t }}</h2>
@@ -288,6 +389,21 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
       align-items: center;
       flex-wrap: wrap;
     }
+    .build {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      align-items: flex-start;
+    }
+    .bfields {
+      flex: 1 1 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .over {
+      color: var(--danger);
+    }
     .dev {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -310,6 +426,21 @@ export class UdtAcademyPage {
   protected readonly mentorNames = signal<Partial<Record<string, string>>>({});
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
   protected readonly stats: Stat[] = ['accuracy', 'alertness', 'strafing', 'skill'];
+  protected readonly bpId = signal<string | null>(null);
+  protected readonly bpSkill = signal(3);
+  protected readonly bpVal = signal({ accuracy: 50, alertness: 50, strafing: 50 });
+  protected bpName = '';
+  protected bpClass = '';
+  protected readonly blueprint = computed(
+    () => this.a()?.blueprints.find((b) => b.id === this.bpId()) ?? this.a()?.blueprints[0] ?? null,
+  );
+  /** 0..100 on the page, -1..1 for the rules. */
+  private readonly bpTraits = computed(() => {
+    const v = this.bpVal();
+    const f = (x: number) => x / 50 - 1;
+    return { accuracy: f(v.accuracy), alertness: f(v.alertness), strafing: f(v.strafing) };
+  });
+  protected readonly bpCost = computed(() => buildCost(this.bpSkill(), this.bpTraits()));
 
   constructor() {
     void this.load();
@@ -324,6 +455,56 @@ export class UdtAcademyPage {
     } catch (e) {
       this.error.set(errorText(e));
     }
+  }
+
+  protected skillsUpTo(cap: number) {
+    return Array.from({ length: cap + 1 }, (_, i) => i);
+  }
+
+  protected skillName(s: number) {
+    return SKILL_NAMES[s] ?? '';
+  }
+
+  protected pickBlueprint(id: string) {
+    this.bpId.set(id);
+    const bp = this.blueprint();
+    if (bp && this.bpSkill() > bp.rule.skillCap) this.bpSkill.set(bp.rule.skillCap);
+  }
+
+  protected setBpVal(k: 'accuracy' | 'alertness' | 'strafing', v: number) {
+    this.bpVal.update((x) => ({ ...x, [k]: Number(v) }));
+  }
+
+  protected bpCard(tag: string): CardBot {
+    return {
+      name: this.bpName.trim() || '?',
+      skill: this.bpSkill(),
+      rarity: botRarity(this.bpSkill()),
+      tag,
+      traits: this.bpTraits(),
+    };
+  }
+
+  protected async build(id: string) {
+    await this.act(async () => {
+      const v = await this.api.udtBuild({
+        blueprintId: id,
+        name: this.bpName.trim(),
+        skill: this.bpSkill(),
+        traits: this.bpTraits(),
+        ...(this.bpClass ? { botClass: this.bpClass } : {}),
+      });
+      this.a.set(v);
+      this.bpId.set(null);
+      this.bpName = '';
+      this.grad.set(await this.api.udtGraduation());
+      if (v.built?.startTrait)
+        alert(
+          this.i18n.t('udt.academy.startTrait', {
+            trait: this.i18n.t(`udt.trait.${v.built.startTrait}`),
+          }),
+        );
+    });
   }
 
   protected rarity(skill: number) {

@@ -59,7 +59,9 @@ describe('Unreal Dream Team: packs and traits', () => {
     // Premium 10-pull: an epic or better is certain.
     expect(cards.some((c) => c.rarity === 'epic' || c.rarity === 'legendary')).toBe(true);
     // One of each trait in the inventory, the rest is scrap.
-    const kept = [...one.body.cards, ...cards].filter((c: Card) => !c.duplicate);
+    const kept = [...one.body.cards, ...cards].filter(
+      (c: Card) => !c.duplicate && c.code !== 'blueprint',
+    );
     const codes = new Set(kept.map((c: Card) => c.code));
     expect(codes.size).toBe(kept.length);
     const scrap = cards.reduce((n, c) => n + c.scrap, 0);

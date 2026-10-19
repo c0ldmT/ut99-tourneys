@@ -144,6 +144,16 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
           } @empty {
             <p class="muted small">{{ 'udt.traits.none' | t }}</p>
           }
+          @if (v.blueprints.length) {
+            <h3>{{ 'udt.packs.blueprints' | t }}</h3>
+            @for (b of v.blueprints; track b.id) {
+              <div class="irow">
+                <span class="udt-trait r-{{ b.rarity }}">{{ 'udt.bp.' + b.rarity | t }}</span>
+                <span class="grow muted small">{{ 'udt.bpE.' + b.rarity | t }}</span>
+                <a routerLink="/udt/academy">{{ 'udt.nav.academy' | t }}</a>
+              </div>
+            }
+          }
           <p class="muted small">{{ 'udt.packs.mod' | t }}</p>
         </section>
         <section class="card">

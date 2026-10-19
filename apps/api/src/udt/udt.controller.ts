@@ -16,7 +16,14 @@ import { ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
 import { ApproveBody, UdtCareerService } from './udt-career.service.js';
-import { DevelopBody, MentorBody, SignBody, UdtAcademyService } from './udt-academy.service.js';
+import {
+  BuildBody,
+  DevelopBody,
+  MentorBody,
+  SignBody,
+  UdtAcademyService,
+  type BuildInput,
+} from './udt-academy.service.js';
 import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.service.js';
 import {
   AssignBody,
@@ -241,6 +248,13 @@ export class UdtController {
     @Body(new ZodPipe(MentorBody)) body: { mentorId: string; name: string },
   ) {
     return this.academy.mentor(user, body);
+  }
+
+  /** Builds an own bot from a blueprint of the packs. */
+  @Post('academy/build')
+  @HttpCode(200)
+  build(@CurrentUser() user: User, @Body(new ZodPipe(BuildBody)) body: BuildInput) {
+    return this.academy.build(user, body);
   }
 
   /** Spends development points of an own bot. */

@@ -905,6 +905,7 @@ export interface UdtPacks {
   spendable: number;
   boxes: UdtPackBox[];
   inventory: UdtInventoryCard[];
+  blueprints: { id: string; rarity: UdtRarity }[];
   weapons: AssetItem[];
   catalog: UdtCatalogTrait[];
 }
@@ -1175,6 +1176,9 @@ export interface UdtAcademy {
   developCost: Record<'accuracy' | 'alertness' | 'strafing' | 'skill', number>;
   mentorLevel: number;
   apprentice?: { botId: string; inherited: string | null };
+  blueprints: UdtBlueprint[];
+  botClasses: AssetItem[];
+  built?: { botId: string; startTrait: string | null };
 }
 
 export interface UdtGraduationBot {
@@ -1228,4 +1232,16 @@ export interface UdtBreeder {
   graduates: number;
   honours: number;
   bonus: number;
+}
+
+export interface UdtBlueprint {
+  id: string;
+  rarity: UdtRarity;
+  rule: {
+    budget: number;
+    skillCap: number;
+    potentialUp: number;
+    models: boolean;
+    startTrait: 'rare' | 'epic' | null;
+  };
 }

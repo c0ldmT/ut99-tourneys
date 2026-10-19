@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team blueprints: packs now and then bring a blank or a blueprint (signature blueprints with a start
+  trait); the academy builds an own bot from it (points, skill cap, model from rare on) with a creation licence.
 - Unreal Dream Team academy: creation licences, scouting (three talents with value and potential ranges), apprentices of
   mentors (with the new mentor trait), development points per level up to the potential; own bots stay with their
   team and draw no salary. Graduation (15 games, level 5, approved by an admin) turns them into library bots with
