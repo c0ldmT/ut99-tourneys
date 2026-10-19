@@ -34,8 +34,9 @@ export const BOX_STROKE: Record<UdtBox, string> = {
   premium: '#b26bff',
   elite: '#ecdcff',
 };
-/** Icons per trait category (values, body, manager). */
+/** Icons per trait category (values, body, behaviour, manager). */
 const ICON = {
+  behaviour: 'M5 19c3-1 3-5 6-6s4 2 8-3M15 10h4v4',
   values: 'M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0',
   body: 'M12 3 20 6v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
   manager: 'M3 7h18v13H3zM9 7V5h6v2M3 12h18',

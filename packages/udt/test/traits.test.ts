@@ -103,7 +103,7 @@ describe('manager traits', () => {
 describe('packs', () => {
   it('draws a trait of the rarity', () => {
     expect(traitOfRarity('epic', () => 0).code).toBe('all-rounder');
-    expect(traitOfRarity('epic', () => 0.99).code).toBe('vampire');
+    expect(traitOfRarity('epic', () => 0.99).code).toBe('bounty-hunter');
     expect(traitOfRarity('legendary', () => 0).rarity).toBe('legendary');
     for (const r of ['common', 'uncommon', 'rare'] as const)
       expect(traitOfRarity(r, () => 0.99).rarity).toBe(r);
@@ -112,11 +112,14 @@ describe('packs', () => {
   it('crafting costs four times the scrap', () => {
     expect(craftCost('midas')).toBe(600);
     expect(craftCost('steady-hand')).toBe(20);
-    expect(TRAITS.length).toBe(23);
+    expect(TRAITS.length).toBe(28);
   });
 
   it('gives the mod the body trait codes and values them', () => {
-    expect(modCodes([{ code: 'phoenix' }, { code: 'watchdog' }])).toEqual(['px']);
+    expect(modCodes([{ code: 'phoenix' }, { code: 'watchdog' }, { code: 'revenant' }])).toEqual([
+      'px',
+      'rg',
+    ]);
     expect(traitValueFactor(4, {}, [{ code: 'phoenix' }])).toBeCloseTo(1.2);
   });
 });

@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team behaviour traits (mod 0.10.0): vulture, kamikaze, berserker, revenant and bounty hunter steer the
+  bot's AI in the game (in the packs). Needs mod 0.10.0 on the game server.
 - Unreal Dream Team body traits (mod 0.9.0): starter armour, thick skin, adrenaline, glass cannon, vampire and phoenix
   are played by the game server (one per bot, in the packs). Needs mod 0.9.0 on the game server.
 - Unreal Dream Team high stakes: Dream Team tournaments with an entry ticket (fixed or at the economy index) and a

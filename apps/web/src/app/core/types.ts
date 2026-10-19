@@ -881,14 +881,14 @@ export interface UdtInventoryCard {
   id: string;
   code: string;
   rarity: UdtRarity;
-  category: 'values' | 'body' | 'manager';
+  category: 'values' | 'body' | 'behaviour' | 'manager';
   needsWeapon: boolean;
 }
 
 export interface UdtCatalogTrait {
   code: string;
   rarity: UdtRarity;
-  category: 'values' | 'body' | 'manager';
+  category: 'values' | 'body' | 'behaviour' | 'manager';
   needsWeapon?: boolean;
   scrap: number;
   craft: number;

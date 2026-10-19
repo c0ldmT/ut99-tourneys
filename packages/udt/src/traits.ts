@@ -1,12 +1,12 @@
 /**
  * Unreal Dream Team traits: category A (play-style values, sent to the game as the bot's
  * effective values), B (body: the mod changes damage, health, armour and speed in the game,
- * mod 0.9.0) and D (manager: economy and career on the website). Behaviour traits (C) come with
- * later mod packages. Traits only work in Dream Team games and last one season.
+ * mod 0.9.0), C (behaviour: the mod steers the bot's AI, first group mod 0.10.0) and D (manager:
+ * economy and career on the website). Traits only work in Dream Team games and last one season.
  */
 import { baseValue, DEFAULT_ECONOMY, RARITIES, valueScore, type Rarity } from './economy.js';
 
-export type TraitCategory = 'values' | 'body' | 'manager';
+export type TraitCategory = 'values' | 'body' | 'behaviour' | 'manager';
 
 export type TraitCode =
   | 'steady-hand'
@@ -31,7 +31,12 @@ export type TraitCode =
   | 'adrenaline'
   | 'glass-cannon'
   | 'vampire'
-  | 'phoenix';
+  | 'phoenix'
+  | 'vulture'
+  | 'kamikaze'
+  | 'berserker'
+  | 'revenant'
+  | 'bounty-hunter';
 
 export interface TraitDef {
   code: TraitCode;
@@ -39,7 +44,7 @@ export interface TraitDef {
   category: TraitCategory;
   /** The trait needs a choice when it is put on a bot (gun nut: the weapon). */
   needsWeapon?: boolean;
-  /** Body traits: the code in the mod's `btrt` line. */
+  /** Body and behaviour traits: the code in the mod's `btrt` line. */
   mod?: string;
 }
 
@@ -68,6 +73,11 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'glass-cannon', rarity: 'epic', category: 'body', mod: 'gc' },
   { code: 'vampire', rarity: 'epic', category: 'body', mod: 'vp' },
   { code: 'phoenix', rarity: 'legendary', category: 'body', mod: 'px' },
+  { code: 'vulture', rarity: 'uncommon', category: 'behaviour', mod: 'aa' },
+  { code: 'kamikaze', rarity: 'uncommon', category: 'behaviour', mod: 'kz' },
+  { code: 'berserker', rarity: 'rare', category: 'behaviour', mod: 'bs' },
+  { code: 'revenant', rarity: 'rare', category: 'behaviour', mod: 'rg' },
+  { code: 'bounty-hunter', rarity: 'epic', category: 'behaviour', mod: 'bh' },
 ];
 
 const BY_CODE = new Map(TRAITS.map((t) => [t.code, t]));
@@ -236,7 +246,7 @@ export function managerEffects(traits: readonly TraitOnBot[]): ManagerEffects {
   };
 }
 
-/** Body traits raise the market value by rarity (they act in the game, not on the values). */
+/** Body and behaviour traits raise the market value by rarity (they act in the game). */
 export const BODY_VALUE: Readonly<Record<Rarity, number>> = {
   common: 0.03,
   uncommon: 0.05,
@@ -245,7 +255,7 @@ export const BODY_VALUE: Readonly<Record<Rarity, number>> = {
   legendary: 0.2,
 };
 
-/** Codes of the body traits for the mod's `btrt` line. */
+/** Codes of the body and behaviour traits for the mod's `btrt` line. */
 export function modCodes(traits: readonly TraitOnBot[]): string[] {
   return traits.flatMap((t) => {
     const m = traitDef(t.code)?.mod;
@@ -269,7 +279,7 @@ export function traitValueFactor(
   const eff = baseValue(e.skill, valueScore(e.values), cfg) * (e.overflow ? 1.1 : 1);
   const body = traits.reduce((n, t) => {
     const d = traitDef(t.code);
-    return n + (d?.category === 'body' ? BODY_VALUE[d.rarity] : 0);
+    return n + (d?.category === 'body' || d?.category === 'behaviour' ? BODY_VALUE[d.rarity] : 0);
   }, 0);
   return (plain > 0 ? eff / plain : 1) * (1 + body) * managerEffects(traits).marketValue;
 }
