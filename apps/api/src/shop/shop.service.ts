@@ -86,6 +86,14 @@ export class ShopService {
    * Season awards (ended seasons): the champion frame for the most tournament titles, the
    * "Top Bettor" title for the most Neuro at the end. Cached for a minute.
    */
+  /** Add-ons (the Dream Team) give awards of an ended season: user id -> items. */
+  private readonly awardProviders: ((season: number) => { userId: string; item: ShopItem }[])[] =
+    [];
+  registerAwardProvider(fn: (season: number) => { userId: string; item: ShopItem }[]): void {
+    this.awardProviders.push(fn);
+    this.awardCache = undefined;
+  }
+
   awards(): Map<string, ShopItem[]> {
     const now = this.clock.now();
     if (this.awardCache && now - this.awardCache.at < 60_000) return this.awardCache.map;
@@ -104,6 +112,12 @@ export class ShopService {
       if (best > 0)
         for (const r of rows.filter((x) => x.titles === best))
           add(r.key.slice(2), AWARDS.champion(s.number));
+      for (const fn of this.awardProviders)
+        try {
+          for (const a of fn(s.number)) add(a.userId, a.item);
+        } catch {
+          // an add-on that cannot tell gives nothing
+        }
     }
     this.awardCache = { at: now, map };
     return map;

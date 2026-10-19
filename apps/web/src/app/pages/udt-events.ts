@@ -43,6 +43,9 @@ import { UdtNav } from '../core/udt';
                 'udt.events.stars' | t: { n: e.rules.starLimit }
               }}</span>
             }
+            @if (e.rules.finale) {
+              <span class="udt-mark hs">{{ 'udt.events.finale' | t }}</span>
+            }
             @if (e.ticketNow) {
               <span class="udt-mark hs"
                 >{{ 'udt.events.highStakes' | t }} · {{ 'udt.events.ticket' | t }}
@@ -57,6 +60,14 @@ import { UdtNav } from '../core/udt';
               <span class="udt-mark own">{{ 'udt.events.entered' | t }}</span>
             }
           </div>
+          @if (e.qualified; as q) {
+            <p class="small muted">
+              {{ 'udt.events.qualified' | t: { n: q.length } }}
+              @if (q.includes(myId())) {
+                <b class="up">{{ 'udt.events.youQualified' | t }}</b>
+              }
+            </p>
+          }
           @if (e.lineup; as l) {
             @if (l.problems.length) {
               <p class="small" style="color: var(--danger)">{{ l.problems.join(' · ') }}</p>
@@ -120,6 +131,9 @@ import { UdtNav } from '../core/udt';
       font-size: 1.3rem;
       font-weight: 700;
     }
+    .up {
+      color: var(--live);
+    }
     .hs {
       color: #f5c75e;
       border-color: rgba(245, 199, 94, 0.45);
@@ -138,6 +152,7 @@ export class UdtEventsPage {
   protected readonly events = signal<UdtEvent[]>([]);
   protected readonly error = signal('');
   protected readonly busy = signal(false);
+  protected readonly myId = computed(() => this.auth.me()?.id ?? '');
   protected readonly testMode = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );

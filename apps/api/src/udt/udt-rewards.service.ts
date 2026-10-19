@@ -16,7 +16,10 @@ import { tournaments, udtRoster } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { dayStartMs } from '../seasons/season-time.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
+import { AWARDS } from '../shop/catalog.js';
+import { ShopService } from '../shop/shop.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
+import { UdtEventRulesSchema } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtService } from './udt.service.js';
 
@@ -53,10 +56,22 @@ export class UdtRewardsService implements OnModuleInit {
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtEventsService) private readonly udtEvents: UdtEventsService,
+    @Inject(ShopService) private readonly shop: ShopService,
   ) {}
 
   onModuleInit(): void {
     this.events.onAppend((id, stored, after) => this.onAppended(id, stored, after));
+    this.udtEvents.tableOf = (season) => this.table(season);
+    // The season's Dream Team champion gets a frame and a title (shop awards).
+    this.shop.registerAwardProvider((season) => {
+      const userId = this.champion(season);
+      return userId
+        ? [
+            { userId, item: AWARDS.dreamTeam(season) },
+            { userId, item: AWARDS.dreamTeamTitle(season) },
+          ]
+        : [];
+    });
   }
 
   private onAppended(
@@ -227,6 +242,42 @@ export class UdtRewardsService implements OnModuleInit {
         meta: { tournamentId, place: i + 1, pot },
       }),
     );
+  }
+
+  /**
+   * The Dream Team champion of a season: the winner of its finale, else the top of the table
+   * (human managers only; AI managers get no awards).
+   */
+  champion(season: number): string | null {
+    const s = this.seasons.list().find((x) => x.number === season);
+    if (!s) return null;
+    const ai = this.udt.aiIds();
+    const from = new Date(dayStartMs(s.startDate, this.seasons.timeZone)).toISOString();
+    const finales = this.db
+      .select()
+      .from(tournaments)
+      .where(and(eq(tournaments.kind, 'udt'), eq(tournaments.phase, 'finished')))
+      .all()
+      .filter((t) => t.createdAt >= from && this.seasonOf(t.createdAt) === season)
+      .filter((t) => {
+        try {
+          return UdtEventRulesSchema.parse(t.udtJson ? JSON.parse(t.udtJson) : {}).finale;
+        } catch {
+          return false;
+        }
+      })
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    for (const f of finales) {
+      const champ = this.events.projection(f.id)?.championId;
+      const userId = champ ? udtManagerOf(champ) : undefined;
+      if (userId && !ai.has(userId)) return userId;
+    }
+    const top = this.table(season).find((r) => !r.ai && r.points > 0);
+    return top?.userId ?? null;
+  }
+
+  private seasonOf(iso: string): number | undefined {
+    return this.seasons.at(Date.parse(iso))?.number;
   }
 
   /** Season table: points from the places of finished Dream Team tournaments of the season. */

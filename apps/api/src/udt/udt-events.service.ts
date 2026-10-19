@@ -90,8 +90,26 @@ export class UdtEventsService implements OnModuleInit {
         ticket: null,
         ticketIndexed: true,
         minTeams: 4,
+        finale: false,
       }
     );
+  }
+
+  /**
+   * The season table (set by the rewards service, which owns it): the finale takes its top.
+   * AI managers count when they play along.
+   */
+  tableOf: (season: number) => { userId: string; points: number; ai: boolean }[] = () => [];
+
+  /** Finale: the top `size` teams of the season table that can play. */
+  qualified(t: TournamentRow, settings: TournamentSettings): string[] {
+    const season = this.udt.season().number;
+    const aiOn = this.udt.aiOn();
+    return this.tableOf(season)
+      .filter((r) => r.points > 0 && (aiOn || !r.ai))
+      .map((r) => r.userId)
+      .filter((u) => !this.lineup(u, settings, this.rules(t)).problems.length)
+      .slice(0, settings.size);
   }
 
   /** The entry ticket now (high stakes), 0 without one. */
@@ -242,7 +260,8 @@ export class UdtEventsService implements OnModuleInit {
     const careers = this.career.careers();
     const main: Entrant[] = [];
     const skills: number[] = [];
-    const entered = this.entries(t.id);
+    // The finale: no sign-up, the top of the season table plays.
+    const entered = rules.finale ? this.qualified(t, settings) : this.entries(t.id);
     const ai = this.udt.aiIds();
     const aiOn = this.udt.aiOn();
     let humans = 0;
@@ -362,7 +381,9 @@ export class UdtEventsService implements OnModuleInit {
             : Math.round(rules.valueCap * this.udt.index(this.udt.season().number)),
         entries: who.length,
         entered: who.includes(user.id),
-        open: t.phase === 'draft' && t.registrationOpen,
+        open: t.phase === 'draft' && t.registrationOpen && !rules.finale,
+        /** Finale: the teams that would play now (top of the table). */
+        qualified: rules.finale && t.phase === 'draft' ? this.qualified(t, s) : null,
         lineup: mine
           ? { bots: mine.bots.map((b) => b.name), value: mine.value, problems: mine.problems }
           : null,
@@ -395,6 +416,8 @@ export class UdtEventsService implements OnModuleInit {
     this.udt.assertOn();
     const t = this.row(id);
     if (t.phase !== 'draft' || !t.registrationOpen) throw conflict('the sign-up is closed');
+    if (this.rules(t).finale)
+      throw conflict('the finale has no sign-up: the top of the season table plays');
     const season = this.udt.season().number;
     if (!this.udt.team(user.id, season)) throw conflict('found your team first');
     const s = this.settingsOf(t);

@@ -114,6 +114,7 @@ interface Model {
   udtTicket: number;
   udtTicketIndexed: boolean;
   udtMinTeams: number;
+  udtFinale: boolean;
 }
 
 /** What a stored tournament or series template contributes to the model. */
@@ -514,6 +515,16 @@ function toLocalInput(iso: string | null): string {
                   }
                 </div>
                 <p class="muted small">{{ 'form.udtTicketHint' | t }}</p>
+                <label class="switch"
+                  ><input
+                    type="checkbox"
+                    name="udtFinale"
+                    [(ngModel)]="f.udtFinale"
+                    (ngModelChange)="touch()"
+                    [disabled]="locked()"
+                  /><span class="tr"></span>{{ 'form.udtFinale' | t }}</label
+                >
+                <p class="muted small">{{ 'form.udtFinaleHint' | t }}</p>
               }
             }
             <p class="muted small">
@@ -1949,6 +1960,7 @@ export class TournamentFormPage {
       udtTicket: 0,
       udtTicketIndexed: true,
       udtMinTeams: 4,
+      udtFinale: false,
     };
   }
 
@@ -2005,6 +2017,7 @@ export class TournamentFormPage {
       udtTicket: p.udt?.ticket ?? 0,
       udtTicketIndexed: p.udt?.ticketIndexed ?? true,
       udtMinTeams: p.udt?.minTeams ?? 4,
+      udtFinale: p.udt?.finale ?? false,
     };
   }
 
@@ -2224,6 +2237,7 @@ export class TournamentFormPage {
               ticket: Number(f.udtTicket) > 0 ? Math.round(Number(f.udtTicket)) : null,
               ticketIndexed: !!f.udtTicketIndexed,
               minTeams: Math.min(16, Math.max(2, Math.round(Number(f.udtMinTeams) || 4))),
+              finale: !!f.udtFinale,
             },
           }
         : {}),

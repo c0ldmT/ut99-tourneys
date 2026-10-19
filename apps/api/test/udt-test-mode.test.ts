@@ -174,3 +174,54 @@ describe('Dream Team AI managers', () => {
     expect(ev2.entries).toBe(0);
   });
 });
+
+describe('Dream Team season finale', () => {
+  it('plays the top of the table and crowns the season champion (shop awards)', async () => {
+    ({ api } = await startApi({ TEST_MODE: 'true' }));
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    const tim = await Client.login(api, 'Tim');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    for (let i = 0; i < 8; i++) await admin.post('/bots', { name: `Lib${i}`, skill: 2 + (i % 2) });
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    await mario.post('/udt/team', {
+      name: 'Nexus',
+      tag: 'NX',
+      starter: { name: 'Mira', skill: 3 },
+    });
+    await tim.post('/udt/team', { name: 'Iron', tag: 'IG', starter: { name: 'Tox', skill: 3 } });
+    const cup = async (udt: Record<string, unknown>, name: string) =>
+      (
+        await admin.post(
+          '/tournaments',
+          tournamentBody({ name, botPool: [], kind: 'udt', udt }, { size: 4, format: 'single' }),
+        )
+      ).body.id as string;
+    // A normal cup for the table.
+    const a = await cup({}, 'Cup');
+    await mario.post(`/udt/events/${a}/enter`);
+    await tim.post(`/udt/events/${a}/enter`);
+    expect((await admin.post(`/udt/test/simulate/${a}`)).status).toBe(200);
+    // The finale: no sign-up, the top of the table plays.
+    const f = await cup({ finale: true }, 'Finale');
+    const ev = (await mario.get('/udt/events')).body.find((e: { id: string }) => e.id === f);
+    expect(ev).toMatchObject({ open: false });
+    expect(ev.qualified).toHaveLength(2);
+    expect((await mario.post(`/udt/events/${f}/enter`)).status).toBe(409);
+    const sim = await admin.post(`/udt/test/simulate/${f}`);
+    expect(sim.status, JSON.stringify(sim.body)).toBe(200);
+    const seeded = (await admin.get(`/tournaments/${f}`)).body;
+    expect(JSON.stringify(seeded)).toMatch(/Nexus/);
+    expect(JSON.stringify(seeded)).toMatch(/Iron/);
+    // Season over: the champion owns the frame and the title.
+    expect((await admin.post('/udt/test/season-end')).status).toBe(200);
+    const champs = [];
+    for (const c of [mario, tim]) {
+      const shop = (await c.get('/shop')).body;
+      if ((shop.awards as { id: string }[]).some((x) => x.id === 'award.dreamteam.1'))
+        champs.push(c);
+    }
+    expect(champs).toHaveLength(1);
+  });
+});

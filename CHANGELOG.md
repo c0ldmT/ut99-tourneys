@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team season finale: a Dream Team tournament can be the finale (no sign-up, the top of the season table
+  plays); the season's Dream Team champion gets the frame "Dream Team" and the title "Dream Team Champion" in the shop.
 - Unreal Dream Team AI managers (off by default; settings "Dream Team"): up to eight AI teams with a personality
   play the Dream Team like managers - market, packs, traits, academy, lineups, sign-ups, trades. They do not bet, get a
   small sponsor, and count neither for the betting rankings nor for the economy index, high stakes or place rewards.

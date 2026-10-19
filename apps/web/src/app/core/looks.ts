@@ -193,6 +193,12 @@ export class NameTag {
         0 0 0 6px #fbbf24,
         0 0 18px rgba(251, 191, 36, 0.5);
     }
+    .fr-dreamteam {
+      box-shadow:
+        0 0 0 3px #b26bff,
+        0 0 0 6px #22d3ee,
+        0 0 18px rgba(178, 107, 255, 0.6);
+    }
     .fr-throne {
       box-shadow:
         0 0 0 3px #fbbf24,

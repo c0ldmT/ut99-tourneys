@@ -93,6 +93,8 @@ export const UdtEventRulesSchema = z.object({
   ticketIndexed: z.boolean().default(true),
   /** High stakes: fewer human teams at the seeding and the tickets go back. */
   minTeams: z.number().int().min(2).max(16).default(4),
+  /** Season finale: the top of the season table plays (no sign-up). */
+  finale: z.boolean().default(false),
 });
 export type UdtEventRules = z.infer<typeof UdtEventRulesSchema>;
 

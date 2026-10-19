@@ -990,6 +990,8 @@ export interface UdtEventRules {
   ticket?: number | null;
   ticketIndexed?: boolean;
   minTeams?: number;
+  /** Season finale: the top of the season table plays. */
+  finale?: boolean;
 }
 
 export interface UdtEvent {
@@ -1005,6 +1007,8 @@ export interface UdtEvent {
   /** High stakes: the ticket now and the tickets paid in. */
   ticketNow: number;
   pot: number;
+  /** Finale: the teams that would play now (user ids). */
+  qualified?: string[] | null;
   entries: number;
   entered: boolean;
   open: boolean;
