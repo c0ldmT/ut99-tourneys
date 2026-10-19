@@ -112,7 +112,7 @@ describe('packs', () => {
   it('crafting costs four times the scrap', () => {
     expect(craftCost('midas')).toBe(600);
     expect(craftCost('steady-hand')).toBe(20);
-    expect(TRAITS.length).toBe(28);
+    expect(TRAITS.length).toBe(29);
   });
 
   it('gives the mod the body trait codes and values them', () => {

@@ -7,8 +7,10 @@ import {
   economyIndex,
   effectiveValues,
   levelOf,
+  developPoints,
   marketValue,
   SCRAP,
+  starterPotential,
   traitDef,
   traitSlots,
   traitValueFactor,
@@ -21,7 +23,7 @@ import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, udtDays, udtRoster, udtTeams, udtTraits, udtValues } from '../db/schema.js';
+import { bots, udtBots, udtDays, udtRoster, udtTeams, udtTraits, udtValues } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { today } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
@@ -91,6 +93,15 @@ export interface RosterBot {
   /** Skill and play-style values with the traits (what the game gets). */
   effective: { skill: number; traits: LibraryBot['traits']; overflow: boolean };
   striking: boolean;
+  /** Dream Team games this season. */
+  games: number;
+  /** A bot the manager made: origin, potential (exact from level 5, else a range), points. */
+  own: {
+    origin: string;
+    potential: [number, number];
+    points: number;
+    spent: number;
+  } | null;
 }
 
 export interface UdtTeam {
@@ -189,6 +200,31 @@ export class UdtService {
     return this.traitsOnBots(season).get(botId) ?? [];
   }
 
+  /** The bots a manager made this season (starter, talents, apprentices). */
+  ownBots(season: number, userId?: string): Map<string, typeof udtBots.$inferSelect> {
+    return new Map(
+      this.db
+        .select()
+        .from(udtBots)
+        .where(
+          userId
+            ? and(eq(udtBots.season, season), eq(udtBots.userId, userId))
+            : eq(udtBots.season, season),
+        )
+        .all()
+        .map((b) => [b.botId, b]),
+    );
+  }
+
+  /** A bot the manager made stays with the team: not sold, not traded, no salary. */
+  isOwnBot(season: number, botId: string): boolean {
+    return !!this.db
+      .select({ id: udtBots.botId })
+      .from(udtBots)
+      .where(and(eq(udtBots.season, season), eq(udtBots.botId, botId)))
+      .get();
+  }
+
   /** Adds (or with a negative amount spends) scrap; false when there is not enough. */
   addScrap(season: number, userId: string, amount: number): boolean {
     const t = this.db
@@ -256,6 +292,7 @@ export class UdtService {
     const team = this.team(userId, season);
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const onBots = this.traitsOnBots(season);
+    const own = this.ownBots(season, userId);
     return this.db
       .select()
       .from(udtRoster)
@@ -292,6 +329,8 @@ export class UdtService {
             udtTraits: cards.map((c) => ({ ...c, rarity: traitDef(c.code)?.rarity ?? 'common' })),
             effective: { skill: eff.skill, traits: eff.values, overflow: eff.overflow },
             striking: r.striking,
+            games: r.games,
+            own: ownView(own.get(b.id), level),
           },
         ];
       })
@@ -382,6 +421,17 @@ export class UdtService {
         mhSlot: 1,
       })
       .run();
+    this.db
+      .insert(udtBots)
+      .values({
+        botId: bot.id,
+        season: season.number,
+        userId: user.id,
+        origin: 'starter',
+        potential: starterPotential(body.starter.skill),
+        createdAt: now,
+      })
+      .run();
     return this.team(user.id, season.number)!;
   }
 
@@ -433,4 +483,16 @@ export function withTraits(
 ): number {
   if (!traits.length) return plain;
   return Math.round((plain * traitValueFactor(bot.skill, bot.traits ?? {}, traits)) / 10) * 10;
+}
+
+/** What the roster shows of an own bot: the potential is a range until level 5. */
+function ownView(b: typeof udtBots.$inferSelect | undefined, level: number) {
+  if (!b) return null;
+  const p = b.potential;
+  return {
+    origin: b.origin,
+    potential: (level >= 5 ? [p, p] : [Math.max(0, p - 1), Math.min(7, p + 1)]) as [number, number],
+    points: developPoints(level, b.pointsSpent),
+    spent: b.pointsSpent,
+  };
 }

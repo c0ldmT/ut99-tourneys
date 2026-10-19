@@ -45,6 +45,8 @@ import { UdtTestService } from './udt/udt-test.service.js';
 import { UdtRewardsService } from './udt/udt-rewards.service.js';
 import { UdtPacksService } from './udt/udt-packs.service.js';
 import { UdtTradesService } from './udt/udt-trades.service.js';
+import { UdtAcademyService } from './udt/udt-academy.service.js';
+import { UdtCareerService } from './udt/udt-career.service.js';
 import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
 import { UdtService } from './udt/udt.service.js';
@@ -136,6 +138,8 @@ class AppModule {
         UdtRewardsService,
         UdtPacksService,
         UdtTradesService,
+        UdtAcademyService,
+        UdtCareerService,
         UdtTestService,
         AgentGateway,
       ],

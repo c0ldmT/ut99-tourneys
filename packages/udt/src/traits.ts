@@ -36,7 +36,8 @@ export type TraitCode =
   | 'kamikaze'
   | 'berserker'
   | 'revenant'
-  | 'bounty-hunter';
+  | 'bounty-hunter'
+  | 'mentor';
 
 export interface TraitDef {
   code: TraitCode;
@@ -67,6 +68,7 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'market-darling', rarity: 'rare', category: 'manager' },
   { code: 'training-champion', rarity: 'rare', category: 'manager' },
   { code: 'midas', rarity: 'legendary', category: 'manager' },
+  { code: 'mentor', rarity: 'epic', category: 'manager' },
   { code: 'starter-armour', rarity: 'uncommon', category: 'body', mod: 'sa' },
   { code: 'thick-skin', rarity: 'rare', category: 'body', mod: 'tf' },
   { code: 'adrenaline', rarity: 'rare', category: 'body', mod: 'ad' },

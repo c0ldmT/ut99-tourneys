@@ -28,6 +28,7 @@ import { nextDay, zonedMs } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { StatsService } from '../stats/stats.service.js';
+import { UdtCareerService } from './udt-career.service.js';
 import { UdtService, withTraits } from './udt.service.js';
 
 /** At most this many bots per manager (5 + 2 on the bench). */
@@ -61,6 +62,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     @Inject(StatsService) private readonly stats: StatsService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(UdtService) private readonly udt: UdtService,
+    @Inject(UdtCareerService) private readonly career: UdtCareerService,
   ) {}
 
   onModuleInit(): void {
@@ -209,6 +211,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
         won.add(b.botId);
         size.set(b.userId, (size.get(b.userId) ?? 0) + 1);
         this.db.update(udtBids).set({ status: 'won' }).where(eq(udtBids.id, b.id)).run();
+        this.career.saleBonus(season, b.botId, b.amount, b.id);
         this.db
           .insert(udtRoster)
           .values({
@@ -242,8 +245,10 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     byId: Map<string, LibraryBot>,
     onBots: ReturnType<UdtService['traitsOnBots']>,
   ) {
+    const own = this.udt.ownBots(season);
     for (const r of roster) {
-      if (r.starter) continue;
+      // Bots the managers made (starter, talents, apprentices) play for free.
+      if (r.starter || own.has(r.botId)) continue;
       const b = byId.get(r.botId);
       const traits = onBots.get(r.botId) ?? [];
       const value = values.get(r.botId);
@@ -319,6 +324,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const owners = this.udt.owners(season.number);
     const offers = this.db.select().from(udtOffers).where(eq(udtOffers.day, last.day)).all();
+    const homegrown = this.career.homegrown();
     const history = this.history(
       offers.map((o) => o.botId),
       14,
@@ -350,6 +356,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             value: h.at(-1)?.value ?? o.minPrice,
             history: h,
             sold: owners.has(b.id),
+            homegrown: homegrown.get(b.id) ?? null,
             myBid: myBids.find((x) => x.botId === b.id)?.amount ?? null,
           },
         ];
@@ -496,6 +503,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .get();
     if (!r) throw notFound('bot in your roster');
     if (r.starter) throw conflict('the starter bot stays with your team');
+    if (this.udt.isOwnBot(season.number, botId))
+      throw conflict('a bot you made stays with your team this season');
     const bot = this.bots.list().find((b) => b.id === botId);
     const price = sellPrice(bot ? this.udt.value(bot, season.number) : r.price);
     this.db

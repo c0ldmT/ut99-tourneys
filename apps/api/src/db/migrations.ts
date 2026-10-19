@@ -434,4 +434,39 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_entries ADD COLUMN ticket INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE udt_entries ADD COLUMN ticket_ref TEXT;
   `,
+  // 20: Dream Team academy: the managers' own bots (starter, scouted talents, apprentices) with
+  // their potential and development, the current scout report, games per roster bot.
+  `
+  CREATE TABLE udt_bots (
+    bot_id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    potential INTEGER NOT NULL,
+    points_spent INTEGER NOT NULL DEFAULT 0,
+    mentor_id TEXT,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX udt_bots_user ON udt_bots(season, user_id);
+  INSERT INTO udt_bots (bot_id, season, user_id, origin, potential, created_at)
+    SELECT r.bot_id, r.season, r.user_id, 'starter', MIN(7, CAST(ROUND(b.skill) AS INTEGER) + 2), r.acquired_at
+    FROM udt_roster r JOIN bots b ON b.id = r.bot_id WHERE r.starter = 1;
+  CREATE TABLE udt_scouts (
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    talents_json TEXT NOT NULL,
+    report_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (season, user_id)
+  );
+  ALTER TABLE udt_roster ADD COLUMN games INTEGER NOT NULL DEFAULT 0;
+  `,
+  // 21: Dream Team graduation: an own bot nominated by its manager, graduated (approved by an
+  // admin) into the library or rejected; with honours from level 10.
+  `
+  ALTER TABLE udt_bots ADD COLUMN status TEXT NOT NULL DEFAULT 'own';
+  ALTER TABLE udt_bots ADD COLUMN nominated_at TEXT;
+  ALTER TABLE udt_bots ADD COLUMN graduated_at TEXT;
+  ALTER TABLE udt_bots ADD COLUMN honours INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

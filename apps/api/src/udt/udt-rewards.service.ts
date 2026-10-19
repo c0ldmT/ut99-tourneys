@@ -153,6 +153,7 @@ export class UdtRewardsService implements OnModuleInit {
           .update(udtRoster)
           .set({
             stamina: Math.max(0, r.stamina - lost),
+            games: r.games + games,
             xp: r.xp + Math.round((games * XP_GAME + (won ? XP_WIN : 0)) * fx.xp),
           })
           .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))

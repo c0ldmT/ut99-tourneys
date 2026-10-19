@@ -1,9 +1,22 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post, Put } from '@nestjs/common';
-import { CurrentUser } from '../auth/guard.js';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
+import { AdminOnly, CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
+import { ApproveBody, UdtCareerService } from './udt-career.service.js';
+import { DevelopBody, MentorBody, SignBody, UdtAcademyService } from './udt-academy.service.js';
 import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.service.js';
 import {
   AssignBody,
@@ -32,6 +45,8 @@ export class UdtController {
     @Inject(UdtRewardsService) private readonly rewards: UdtRewardsService,
     @Inject(UdtPacksService) private readonly packs: UdtPacksService,
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
+    @Inject(UdtAcademyService) private readonly academy: UdtAcademyService,
+    @Inject(UdtCareerService) private readonly career: UdtCareerService,
   ) {}
 
   @Get()
@@ -196,5 +211,97 @@ export class UdtController {
   @Delete('trades/:id')
   withdrawTrade(@CurrentUser() user: User, @Param('id') id: string) {
     return this.trades.withdraw(user, id);
+  }
+
+  /** Academy: licences, the scout report, mentors, the manager's own bots. */
+  @Get('academy')
+  academyView(@CurrentUser() user: User) {
+    return this.academy.view(user);
+  }
+
+  @Post('academy/scout')
+  @HttpCode(200)
+  scout(@CurrentUser() user: User) {
+    return this.academy.scoutNow(user);
+  }
+
+  @Post('academy/sign')
+  @HttpCode(200)
+  sign(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(SignBody)) body: { pick: number; name: string },
+  ) {
+    return this.academy.sign(user, body);
+  }
+
+  @Post('academy/mentor')
+  @HttpCode(200)
+  takeApprentice(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(MentorBody)) body: { mentorId: string; name: string },
+  ) {
+    return this.academy.mentor(user, body);
+  }
+
+  /** Spends development points of an own bot. */
+  @Post('roster/:botId/develop')
+  @HttpCode(200)
+  develop(
+    @CurrentUser() user: User,
+    @Param('botId') botId: string,
+    @Body(new ZodPipe(DevelopBody)) body: { stat: 'accuracy' | 'alertness' | 'strafing' | 'skill' },
+  ) {
+    return this.academy.develop(user, botId, body.stat);
+  }
+
+  /** The manager's own bots of the season and what their graduation needs. */
+  @Get('graduation')
+  graduation(@CurrentUser() user: User) {
+    return this.career.graduation(user);
+  }
+
+  @Post('graduation/:botId')
+  @HttpCode(200)
+  nominate(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.career.nominate(user, botId);
+  }
+
+  @Delete('graduation/:botId')
+  unnominate(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.career.withdraw(user, botId);
+  }
+
+  /** Graduations waiting for an admin. */
+  @AdminOnly()
+  @Get('nominations')
+  nominations() {
+    this.udt.assertOn();
+    return this.career.nominations();
+  }
+
+  @AdminOnly()
+  @Post('nominations/:botId/approve')
+  @HttpCode(200)
+  approve(@Param('botId') botId: string, @Body(new ZodPipe(ApproveBody)) body: { name?: string }) {
+    return this.career.approve(botId, body);
+  }
+
+  @AdminOnly()
+  @Post('nominations/:botId/reject')
+  @HttpCode(200)
+  reject(@Param('botId') botId: string) {
+    return this.career.reject(botId);
+  }
+
+  /** The bots the managers made in a season (latest season by default). */
+  @Get('yearbook')
+  yearbook(@Query('season') season?: string) {
+    return this.career.yearbook(season ? Number(season) || undefined : undefined);
+  }
+
+  /** Best breeders of all seasons. */
+  @Get('breeders')
+  breeders() {
+    return this.career.breeders();
   }
 }

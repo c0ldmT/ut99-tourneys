@@ -94,7 +94,7 @@ export class UdtTradesService {
 
   /** Why a roster bot cannot be traded now (null: it can). */
   private blocked(r: RosterBot, acquiredAt: string, playing: Set<string>): string | null {
-    if (r.starter) return 'starter';
+    if (r.starter || r.own) return 'starter';
     if (playing.has(r.botId)) return 'playing';
     const lock = this.cfg().tradeLockDays * DAY;
     if (lock && Date.parse(acquiredAt) + lock > this.clock.now()) return 'locked';
@@ -172,7 +172,8 @@ export class UdtTradesService {
       const r = roster.get(id);
       if (!r) throw conflict(`bot ${id} is not in that roster (any more)`);
       const why = this.blocked(r, at.get(id) ?? this.nowIso(), playing);
-      if (why === 'starter') throw conflict(`${r.name} is a starter bot: it stays with its team`);
+      if (why === 'starter')
+        throw conflict(`${r.name} was made by its team (starter, talent, apprentice): it stays`);
       if (why === 'playing') throw conflict(`${r.name} plays in a running Dream Team tournament`);
       if (why === 'locked')
         throw conflict(

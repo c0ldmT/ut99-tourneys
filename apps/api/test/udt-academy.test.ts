@@ -1,0 +1,117 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import type { RunningApi } from '../src/app.js';
+import { DB, type Db } from '../src/db/database.js';
+import { udtRoster } from '../src/db/schema.js';
+import { LedgerService } from '../src/ledger/ledger.service.js';
+import { Client, startApi, startSeason } from './helpers.js';
+
+let api: RunningApi | undefined;
+afterEach(async () => {
+  await api?.close();
+  api = undefined;
+});
+
+async function setup() {
+  ({ api } = await startApi());
+  const admin = await Client.login(api, 'Boss', true);
+  const mario = await Client.login(api, 'Mario');
+  await admin.req('PUT', '/settings/udt', { enabled: true });
+  await startSeason(admin);
+  await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: { name: 'Mira', skill: 3 } });
+  const marioId = (await mario.get('/me')).body.id as string;
+  api.app
+    .get(LedgerService)
+    .book({ season: 1, userId: marioId, kind: 'udt_reward', amount: 50_000, ref: 'gift' });
+  return { admin, mario, marioId, db: api.app.get<Db>(DB), ledger: api.app.get(LedgerService) };
+}
+
+describe('Unreal Dream Team: academy', () => {
+  it('scouts, signs a talent with a licence, develops it up to its potential', async () => {
+    const { mario, marioId, db, ledger } = await setup();
+    let v = (await mario.get('/udt/academy')).body;
+    // The starter was the first (free) licence; the second costs 2000 × index 0.3.
+    expect(v).toMatchObject({
+      scoutPrice: 360,
+      licence: { made: 1, nextPrice: 600 },
+      report: null,
+    });
+    expect((await mario.post('/udt/academy/sign', { pick: 0, name: 'Kid' })).status).toBe(409);
+    const before = ledger.spendable(marioId).balance;
+    v = (await mario.post('/udt/academy/scout')).body;
+    expect(v.report).toHaveLength(3);
+    expect(ledger.spendable(marioId).balance).toBe(before - 360);
+    const r = v.report[1];
+    expect(r.potential[1] - r.potential[0]).toBe(1);
+    const signed = await mario.post('/udt/academy/sign', { pick: 1, name: 'Kid' });
+    expect(signed.status, JSON.stringify(signed.body)).toBe(200);
+    expect(signed.body).toMatchObject({ report: null, licence: { made: 2, nextPrice: 1200 } });
+    expect(ledger.spendable(marioId).balance).toBe(before - 360 - 600);
+    const kid = signed.body.own.find((b: { name: string }) => b.name === 'Kid');
+    expect(kid).toMatchObject({ skill: r.skill, own: { origin: 'academy', points: 0 } });
+    // Own bots stay: not for sale.
+    expect((await mario.post(`/udt/roster/${kid.botId}/sell`)).status).toBe(409);
+    // Level 4 (120 XP): three points.
+    db.update(udtRoster).set({ xp: 120 }).run();
+    const dev = await mario.post(`/udt/roster/${kid.botId}/develop`, { stat: 'accuracy' });
+    expect(dev.status, JSON.stringify(dev.body)).toBe(200);
+    const k2 = dev.body.roster.find((b: { botId: string }) => b.botId === kid.botId);
+    expect(k2.own).toMatchObject({ points: 2, spent: 1 });
+    expect(k2.traits.accuracy).toBeCloseTo((kid.traits.accuracy ?? 0) + 0.1);
+    expect((await mario.post(`/udt/roster/${kid.botId}/develop`, { stat: 'skill' })).status).toBe(
+      409,
+    ); // 3 points needed
+  });
+
+  it('a mentor of level 3 takes one apprentice per season', async () => {
+    const { admin, mario, marioId, db } = await setup();
+    const lib = (await admin.post('/bots', { name: 'Sensei', skill: 6, traits: { accuracy: 0.8 } }))
+      .body.id as string;
+    db.insert(udtRoster)
+      .values({ season: 1, botId: lib, userId: marioId, price: 9000, acquiredAt: 'x', xp: 0 })
+      .run();
+    let v = (await mario.get('/udt/academy')).body;
+    expect(v.mentors).toMatchObject([{ name: 'Sensei', ready: false }]);
+    expect((await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil' })).status).toBe(
+      409,
+    );
+    db.update(udtRoster).set({ xp: 70 }).run(); // level 3
+    const ok = await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    const pupil = ok.body.own.find((b: { name: string }) => b.name === 'Pupil');
+    expect(pupil).toMatchObject({ skill: 3, own: { origin: 'apprentice' } });
+    expect(pupil.traits.accuracy).toBeGreaterThan(0.3);
+    v = ok.body;
+    expect(v.mentors[0]).toMatchObject({ used: true, ready: false });
+    expect(
+      (await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil2' })).status,
+    ).toBe(409);
+  });
+
+  it('graduates an own bot with 15 games and level 5 after an admin approved', async () => {
+    const { admin, mario, db } = await setup();
+    let g = (await mario.get('/udt/graduation')).body;
+    expect(g).toMatchObject({ games: 15, level: 5, left: 2 });
+    const mira = g.bots[0].botId as string;
+    expect(g.bots[0]).toMatchObject({ name: 'Mira', status: 'own', ready: false });
+    expect((await mario.post(`/udt/graduation/${mira}`)).status).toBe(409);
+    db.update(udtRoster).set({ xp: 640, games: 20 }).run(); // level 10: with honours
+    g = (await mario.post(`/udt/graduation/${mira}`)).body;
+    expect(g.bots[0]).toMatchObject({ status: 'nominated', honours: true });
+    expect(g.left).toBe(1);
+    expect((await mario.get('/udt/nominations')).status).toBe(403);
+    const n = (await admin.get('/udt/nominations')).body;
+    expect(n).toMatchObject([{ name: 'Mira', team: 'Nexus', breeder: 'Mario', level: 10 }]);
+    const ok = await admin.post(`/udt/nominations/${mira}/approve`, { name: 'Mirabelle' });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ok.body).toEqual([]);
+    // A library bot now: in the control center (inactive), in the yearbook with honours.
+    const cc = (await admin.get('/bots')).body.bots as { name: string; active: boolean }[];
+    expect(cc.find((b) => b.name === 'Mirabelle')).toMatchObject({ active: false });
+    const y = (await mario.get('/udt/yearbook')).body;
+    expect(y).toMatchObject({ season: 1, seasons: [1] });
+    expect(y.bots[0]).toMatchObject({ name: 'Mirabelle', status: 'graduated', honours: true });
+    expect((await mario.get('/udt/breeders')).body).toMatchObject([
+      { name: 'Mario', graduates: 1, honours: 1 },
+    ]);
+  });
+});

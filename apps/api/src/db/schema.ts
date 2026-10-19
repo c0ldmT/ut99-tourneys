@@ -310,6 +310,8 @@ export const udtRoster = sqliteTable(
     bench: integer('bench'),
     stamina: integer('stamina').notNull().default(100),
     xp: integer('xp').notNull().default(0),
+    /** Dream Team games played this season (for the graduation). */
+    games: integer('games').notNull().default(0),
     /** Salary not paid: cannot play until the next market day pays it. */
     striking: integer('striking', { mode: 'boolean' }).notNull().default(false),
   },
@@ -430,3 +432,38 @@ export const udtTrades = sqliteTable('udt_trades', {
   expiresAt: text('expires_at').notNull(),
   decidedAt: text('decided_at'),
 });
+
+/**
+ * Bots a manager made (starter, scouted talent, apprentice of a mentor): potential (highest
+ * skill), development points spent, the mentor.
+ */
+export const udtBots = sqliteTable('udt_bots', {
+  botId: text('bot_id').primaryKey(),
+  season: integer('season').notNull(),
+  userId: text('user_id').notNull(),
+  /** "starter", "academy" or "apprentice". */
+  origin: text('origin').notNull(),
+  potential: integer('potential').notNull(),
+  pointsSpent: integer('points_spent').notNull().default(0),
+  mentorId: text('mentor_id'),
+  createdAt: text('created_at').notNull(),
+  /** "own", "nominated" (by the manager), "graduated" (into the library) or "rejected". */
+  status: text('status').notNull().default('own'),
+  nominatedAt: text('nominated_at'),
+  graduatedAt: text('graduated_at'),
+  /** Graduated with honours (level 10). */
+  honours: integer('honours', { mode: 'boolean' }).notNull().default(false),
+});
+
+/** The manager's latest scout report (three talents) of a season. */
+export const udtScouts = sqliteTable(
+  'udt_scouts',
+  {
+    season: integer('season').notNull(),
+    userId: text('user_id').notNull(),
+    talentsJson: text('talents_json').notNull(),
+    reportJson: text('report_json').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.userId] })],
+);
