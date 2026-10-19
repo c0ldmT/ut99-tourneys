@@ -317,6 +317,11 @@ export const TournamentSync = envelope(
      * countdown waits); 0 or missing = the tournament takes no bets now.
      */
     betWindowSec: z.number().int().min(0).max(600).optional(),
+    /**
+     * Bot AI help in deathmatch games (website setting): 0 off, 1 failsafe against bots that stand
+     * still, 2 also the duel mode (one on one: a bot without an enemy hunts its opponent).
+     */
+    antiIdle: z.number().int().min(0).max(2).optional(),
   }),
 );
 

@@ -63,6 +63,8 @@ export class WebsiteAgent {
   private botPersonas = new Map<string, BotPersonality[] | undefined>();
   private dedications = new Map<string, Dedication[] | undefined>();
   private betWindows = new Map<string, number>();
+  /** Bot AI help per tournament (tournament.sync `antiIdle`). */
+  private antiIdle = new Map<string, number>();
   private runtime?: Runtime;
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
@@ -151,6 +153,8 @@ export class WebsiteAgent {
         this.dedications.set(p.tournamentId, p.dedications);
         const betBefore = this.betWindows.get(p.tournamentId) ?? 0;
         this.betWindows.set(p.tournamentId, p.betWindowSec ?? 0);
+        const aiBefore = this.antiIdle.get(p.tournamentId) ?? 0;
+        this.antiIdle.set(p.tournamentId, p.antiIdle ?? 0);
         const rt = this.runtime;
         if (rt && rt.tournamentId === p.tournamentId) {
           if (JSON.stringify(p.access) !== before) await rt.director.setAccess(p.access);
@@ -160,6 +164,7 @@ export class WebsiteAgent {
           if (JSON.stringify(p.dedications) !== dedBefore)
             await rt.director.setDedications(p.dedications);
           if ((p.betWindowSec ?? 0) !== betBefore) await rt.director.setBetWindow(p.betWindowSec);
+          if ((p.antiIdle ?? 0) !== aiBefore) await rt.director.setAntiIdle(p.antiIdle);
           if (changed) await rt.director.refresh();
         }
         return;
@@ -327,6 +332,7 @@ export class WebsiteAgent {
         : {}),
       dedications: this.dedications.get(tournamentId) ?? [],
       betWindowSec: this.betWindows.get(tournamentId) ?? 0,
+      antiIdle: this.antiIdle.get(tournamentId) ?? 0,
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });
     director.on('live', (info: LiveInfo) => {

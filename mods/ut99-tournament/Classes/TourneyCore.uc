@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.7.4";
+const MOD_VERSION = "0.8.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -148,6 +148,14 @@ var int DedCount;
 var float NextBotSay;              // no bot line before this time (all bots)
 var int StartTalkLeft;             // seconds after the start in which bots may greet
 var int HuntTicks;
+// Bot AI help (match line "ai"): 0 off, 1 failsafe, 2 also the duel mode (one on one).
+var int AiLevel;
+var Bot IdleBot[32];               // bots watched for standing still
+var vector IdleLoc[32];            // where the bot stood when the watch (re)started
+var float IdleSince[32];           // since then it did not move away
+var float FreeSince[32];           // since then it had no enemy
+var byte IdleStage[32];            // 0 nothing done, 1 sent after an opponent, 2 sent wandering
+var int IdleCount;
 
 //=============================================================================
 // Startup (from the game type)
@@ -316,6 +324,8 @@ function HandleBridgeMessage(TourneyMsg M)
 			MatchTimeLimit = M.GetInt("tl");
 			TeamSize = Max(1, M.GetInt("ts"));
 			MatchFF = M.GetInt("ff");
+			AiLevel = Clamp(M.GetInt("ai"), 0, 2);
+			IdleCount = 0;
 			// The bot lines follow; bots already in the level are taken over (see AddBotSpec).
 			KeepOldBots();
 			ClearBotConfigs();
@@ -1221,7 +1231,10 @@ function int TimerStep()
 	if (Phase == "ready" || bGameLive)
 		EnsureBots();
 	if (bGameLive && !bTourneyPaused && !Game.bGameEnded)
+	{
 		BotTick();
+		AntiIdle();
+	}
 	if (!bGameLive)
 	{
 		PreMatchTick();
@@ -1871,6 +1884,8 @@ function SetTourneyPause(bool bOn, string Why)
 
 	if (bOn == bTourneyPaused)
 		return;
+	// Bot AI help: the clock ran on during the pause, start watching anew.
+	IdleCount = 0;
 	if (!bOn && bGameLive && !Game.bGameEnded && TeamSize <= 1)
 	{
 		// 1v1: do not resume while a human side is still missing; tell the bridge again.
@@ -2776,8 +2791,8 @@ function HuntNemeses()
 			continue;
 		if (B.Enemy == None)
 		{
-			if (B.IsInState('Roaming') || B.IsInState('Wandering'))
-				B.SetEnemy(N);
+			if ((B.IsInState('Roaming') || B.IsInState('Wandering')) && B.SetEnemy(N))
+				KeepHunting(B, N);
 		}
 		else if (B.IsInState('Hunting') && !B.LineOfSightTo(B.Enemy))
 		{
@@ -2828,6 +2843,158 @@ function BotTick()
 		HuntTicks = 0;
 		if (RivCount > 0)
 			HuntNemeses();
+	}
+}
+
+// Bot AI help only in the deathmatch games of this package. The classes are compared exactly:
+// game types derived from them later (CTF, Domination, ...) keep the game's own AI, and Monster
+// Hunt has its own help (TourneyMHBotExtension).
+function bool AntiIdleAllowed()
+{
+	if (Game == None)
+		return false;
+	return Game.Class == class'TournamentDM' || Game.Class == class'TournamentTDM';
+}
+
+// The watch slot of a bot (a new one when it has none). -1 = all slots taken.
+function int IdleSlot(Bot B)
+{
+	local int i, Free;
+	Free = -1;
+	for (i = 0; i < IdleCount; i++)
+	{
+		if (IdleBot[i] == B)
+			return i;
+		if (Free < 0 && (IdleBot[i] == None || IdleBot[i].bDeleteMe))
+			Free = i;
+	}
+	if (Free < 0)
+	{
+		if (IdleCount >= 32)
+			return -1;
+		Free = IdleCount;
+		IdleCount++;
+	}
+	IdleBot[Free] = B;
+	IdleLoc[Free] = B.Location;
+	IdleSince[Free] = Level.TimeSeconds;
+	FreeSince[Free] = Level.TimeSeconds;
+	IdleStage[Free] = 0;
+	return Free;
+}
+
+// The nearest living opponent of B: players and bots, not of its team in team games.
+function Pawn NearestOpponent(Bot B)
+{
+	local Pawn P, Best;
+	local float D, BestD;
+	Best = None;
+	BestD = 0;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		if (P == B || !P.bIsPlayer || P.bDeleteMe || P.Health <= 0 || P.PlayerReplicationInfo == None)
+			continue;
+		if (P.PlayerReplicationInfo.bIsSpectator)
+			continue;
+		if ((TeamSize > 1 || Game.bTeamGame) && P.PlayerReplicationInfo.Team == B.PlayerReplicationInfo.Team)
+			continue;
+		D = VSize(P.Location - B.Location);
+		if (Best == None || D < BestD)
+		{
+			Best = P;
+			BestD = D;
+		}
+	}
+	return Best;
+}
+
+// After SetEnemy on an opponent the bot may not see: novice bots (skill 0-3) would only turn
+// towards it and give up (Acquisition -> WhatToDoNext restores OldEnemy); this makes them hunt.
+function KeepHunting(Bot B, Pawn Target)
+{
+	if (B.bNovice)
+	{
+		B.OldEnemy = Target;
+		B.bMustHunt = true;
+	}
+}
+
+// Once a second while the game runs (match line "ai" > 0, deathmatch games only).
+// Failsafe: a bot that has not moved away for 8 s and has no enemy is sent after the nearest
+// opponent, after 16 s it wanders off; without an enemy for 15 s it hunts the nearest opponent.
+// Duel mode (one on one): without an enemy for 4 s the bot hunts its opponent, like a nemesis.
+// Only bots that roam or wander and play freelance or attack: hold, defend and follow orders and
+// fights are left to the game. A camping bot (its camping value) is left alone, in the duel mode
+// for 10 s at most. Dead bots start their watch anew when they are back.
+function AntiIdle()
+{
+	local Pawn P, Opp;
+	local Bot B;
+	local int s;
+	local float Now, Limit;
+	local bool bStuck;
+
+	if (AiLevel <= 0 || !AntiIdleAllowed())
+		return;
+	Now = Level.TimeSeconds;
+	Limit = 15;
+	if (AiLevel >= 2 && TeamSize <= 1)
+		Limit = 4;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		B = Bot(P);
+		if (B == None || B.bDeleteMe || B.PlayerReplicationInfo == None)
+			continue;
+		s = IdleSlot(B);
+		if (s < 0)
+			continue;
+		if (B.Health <= 0)
+		{
+			IdleLoc[s] = B.Location;
+			IdleSince[s] = Now;
+			FreeSince[s] = Now;
+			IdleStage[s] = 0;
+			continue;
+		}
+		if (B.bCamping && B.IsInState('Roaming'))
+		{
+			IdleSince[s] = Now;
+			if (Limit > 4 || Now - FreeSince[s] < 10)
+				continue;
+		}
+		if (VSize(B.Location - IdleLoc[s]) > 64)
+		{
+			IdleLoc[s] = B.Location;
+			IdleSince[s] = Now;
+			IdleStage[s] = 0;
+		}
+		if (B.Enemy != None)
+		{
+			FreeSince[s] = Now;
+			continue;
+		}
+		if (B.Orders != '' && B.Orders != 'FreeLance' && B.Orders != 'Attack')
+			continue;
+		if (!B.IsInState('Roaming') && !B.IsInState('Wandering'))
+			continue;
+		bStuck = IdleStage[s] == 0 && Now - IdleSince[s] >= 8;
+		if (bStuck || Now - FreeSince[s] >= Limit)
+		{
+			Opp = NearestOpponent(B);
+			if (Opp != None && B.SetEnemy(Opp))
+			{
+				KeepHunting(B, Opp);
+				FreeSince[s] = Now;
+				if (bStuck)
+					IdleStage[s] = 1;
+				continue;
+			}
+		}
+		if (IdleStage[s] <= 1 && Now - IdleSince[s] >= 16)
+		{
+			IdleStage[s] = 2;
+			B.GotoState('Wandering');
+		}
 	}
 }
 

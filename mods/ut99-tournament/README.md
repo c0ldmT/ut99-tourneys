@@ -44,6 +44,12 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > headshot, first blood, suicide, team kill, spree, multi kill); the website shows it live on the match page.
 > Mod 0.7.4: dedications (Neuro shop) - a player's approved line that website bots say when they frag the player
 > or are fragged by them (`ded` after the bot lines of a match, 60% chance, the bot's chat cooldown applies).
+> Mod 0.8.0: bot AI help in deathmatch and team deathmatch (`ai` in the `match` line, website setting "Bot AI help") -
+> failsafe: a bot that stands still for 8 s without an enemy is sent after the nearest opponent, after 16 s it
+> wanders off, without an enemy for 15 s it hunts the nearest opponent; duel mode (one on one): without an enemy for
+> 4 s it hunts its opponent. Only roaming or wandering bots with freelance or attack orders; camping bots are left
+> alone (duel mode: 10 s at most); the game classes are compared exactly, so later modes (CTF, ...) and Monster Hunt
+> keep their own AI. Novice bots (skill 0-3) now really hunt a target set from outside (also the nemesis hunt).
 
 ## Classes
 
@@ -226,6 +232,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 51 | Caged targets and ammo (mod 0.7.2) | Bot-only Monster Hunt run on MH-NaliVillage][ or MH-Forbidden, then `grep "UTTourney: bot" Tourney.log`: `target X takes no damage (in the way: ...), bots leave it for now` and, with a mover in the way, `target X behind MoverN (tag) ..., opened by: ...`; later `target X is free (MoverN moves)`/`takes damage`/`is tried again`. The bots no longer shoot at the cage for minutes. A bot with an empty weapon: `no ammo for ..., switches to ...`, with no ammo at all `no weapon with ammo left, fetches ...` and `has ammo again` |
 | 52 | **Kill feed** (mod 0.7.3) | During a game the match page on the website shows every kill within a second or two: killer and victim in their side's colour, weapon, "HS" for a headshot, "First Blood", sprees ("Killing Spree" at 5) and multi kills ("Double Kill"), suicides and team kills; the live score above it and in the banner of the tournament list. Monster Hunt: kills of monsters and deaths by monsters. Bridge log without `kf` parse errors |
 | 53 | **Dedication** (mod 0.7.4) | Buy the dedication in the Neuro shop with both lines, approve it (Shop → Manage), start a tournament with you and website bots that talk. When a bot frags you it says your kill line now and then (`{victim}` = you), when you frag one it says your death line; other kills keep the bots' own lines. Bridge log without `ded` parse errors |
+| 54 | **Bot AI help** (mod 0.8.0) | Settings → "Bot AI help" on "Failsafe and duel mode". 1v1 bot-only tournament on maps where bots used to stand still (and a small one like DM-Tempest): the bots look for each other, a game with 10 frags ends in about 4-6 minutes, no bot stands in one place for long. 2on2 bot-only: normal play, a bot that stops moving gets going within ~10 s. Monster Hunt run: bots behave as before. Setting "Off": behaviour as in 0.7.4. Server log without `Accessed None` from `AntiIdle` |
 
 ## SmartStockBots (optional)
 

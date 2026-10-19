@@ -230,6 +230,8 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     tl: int.nonnegative(), // time limit minutes, 0 = none
     ts: int.min(1).max(5), // players per side: 1 = one on one, else team deathmatch
     ff: int.min(0).max(100), // team games: friendly fire in percent
+    /** Bot AI help (deathmatch only): 0 off, 1 failsafe against idle bots, 2 also duel mode. */
+    ai: int.min(0).max(2).optional(),
   }),
   /**
    * A bot playing for a side. 1v1: the side is a bot (sent with the match). Team games: the bots

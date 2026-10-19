@@ -131,6 +131,8 @@ export interface DirectorOptions {
    * when everybody is ready earlier, the countdown of its first game waits. 0 = no betting.
    */
   betWindowSec?: number;
+  /** Bot AI help in deathmatch (0 off, 1 failsafe, 2 also duel mode), sent with each match. */
+  antiIdle?: number;
   timing?: Partial<DirectorTiming>;
 }
 
@@ -260,6 +262,7 @@ export class MatchDirector extends EventEmitter {
   private mapRecords?: MapRecords;
   /** Betting window in ms (0: none) and when each match was called. */
   private betWindowMs = 0;
+  private antiIdle = 0;
   private calledAt = new Map<string, number>();
   /** Website bots' personalities by lower-case name in the game. */
   private personas = new Map<string, BotPersonality>();
@@ -303,6 +306,7 @@ export class MatchDirector extends EventEmitter {
     this.setPersonas(o.botPersonalities);
     this.dedications = [...(o.dedications ?? [])];
     this.betWindowMs = Math.max(0, (o.betWindowSec ?? 0) * 1000);
+    this.antiIdle = clampAi(o.antiIdle);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -497,6 +501,13 @@ export class MatchDirector extends EventEmitter {
   setBetWindow(sec: number | undefined): Promise<void> {
     return this.enqueue(() => {
       this.betWindowMs = Math.max(0, (sec ?? 0) * 1000);
+    });
+  }
+
+  /** New bot AI help from the website: used from the next match line on. */
+  setAntiIdle(level: number | undefined): Promise<void> {
+    return this.enqueue(() => {
+      this.antiIdle = clampAi(level);
     });
   }
 
@@ -886,6 +897,9 @@ export class MatchDirector extends EventEmitter {
       this.personas,
       this.dedications,
     );
+    const head = lines[0];
+    // Monster Hunt has its own bot help; the mod applies this to deathmatch games only.
+    if (head?.t === 'match' && this.antiIdle > 0 && !this.raceMode) head.ai = this.antiIdle;
     const cm = this.proj.currentMatch;
     const runner = this.raceMode ? this.runner() : undefined;
     if (cm?.matchId === matchId && cm.game === game && runner) {
@@ -2529,4 +2543,8 @@ export class MatchDirector extends EventEmitter {
     this.say(`${this.name(winnerId)} wins game ${s.game} (${how})`);
     await this.afterGame(s.matchId, s.game, winnerId);
   }
+}
+
+function clampAi(level: number | undefined): number {
+  return Math.max(0, Math.min(2, Math.round(level ?? 0)));
 }

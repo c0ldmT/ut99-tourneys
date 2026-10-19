@@ -113,6 +113,30 @@ describe('end to end against the simulated UT server', () => {
     expect(env.log.lines.some((l) => l.includes('close in'))).toBe(true);
   });
 
+  it('sends the bot AI help level with each match line (deathmatch)', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'single', rules: { mapMode: 'random' } },
+    );
+    env = await setup({ file, antiIdle: 2 });
+    await env.run(finished(env));
+    const matches = env.sim.received.filter((l) => l.t === 'match');
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.every((l) => l.t === 'match' && l.ai === 2)).toBe(true);
+  });
+
+  it('leaves the bot AI help out when it is off', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'single', rules: { mapMode: 'random' } },
+    );
+    env = await setup({ file, antiIdle: 0 });
+    await env.run(finished(env));
+    const matches = env.sim.received.filter((l) => l.t === 'match');
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.some((l) => l.t === 'match' && l.ai !== undefined)).toBe(false);
+  });
+
   it('random map mode needs no vote', async () => {
     const file = tournamentFile(
       { players: players.slice(0, 3) },
