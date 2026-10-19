@@ -10,6 +10,9 @@ import type {
   UdtPacks,
   UdtPull,
   UdtTableRow,
+  UdtCareer,
+  UdtHall,
+  UdtHallEntry,
   UdtAcademy,
   UdtBreeder,
   UdtGraduation,
@@ -226,6 +229,11 @@ export class Api {
   udtYearbook = (season?: number) =>
     this.call<UdtYearbook>('GET', `/udt/yearbook${season ? `?season=${season}` : ''}`);
   udtBreeders = () => this.call<UdtBreeder[]>('GET', '/udt/breeders');
+  udtCareer = (botId: string) =>
+    this.call<UdtCareer | null>('GET', `/udt/career/${encodeURIComponent(botId)}`);
+  udtHall = () => this.call<UdtHall>('GET', '/udt/hall');
+  udtRetire = (botId: string) =>
+    this.call<UdtHallEntry[]>('POST', `/udt/career/${encodeURIComponent(botId)}/retire`);
   udtTable = () => this.call<UdtTableRow[]>('GET', '/udt/table');
   udtLedger = () => this.call<UdtLedgerEntry[]>('GET', '/udt/ledger');
   udtTest = () => this.call<UdtTestState>('GET', '/udt/test');

@@ -859,6 +859,7 @@ export interface UdtRosterBot {
   games: number;
   /** A bot the manager made: potential (a range until level 5), development points. */
   own: { origin: string; potential: [number, number]; points: number; spent: number } | null;
+  career?: UdtCareer | null;
 }
 
 export interface UdtTraitOnBot {
@@ -969,6 +970,7 @@ export interface UdtOffer {
   sold: boolean;
   /** A graduate of a manager's academy. */
   homegrown?: { breeder: string; honours: boolean } | null;
+  career?: UdtCareer | null;
   myBid: number | null;
 }
 
@@ -1244,4 +1246,34 @@ export interface UdtBlueprint {
     models: boolean;
     startTrait: 'rare' | 'epic' | null;
   };
+}
+
+export type UdtCareerPhase = 'rookie' | 'rising' | 'peak' | 'veteran' | 'decline';
+
+export interface UdtCareer {
+  age: number;
+  phase: UdtCareerPhase;
+  level: number;
+  games: number;
+  wins: number;
+  form: 'hot' | 'normal' | 'cold';
+  from: number | null;
+  to: number | null;
+  retire: boolean;
+}
+
+export interface UdtHallEntry {
+  botId: string;
+  name: string;
+  skill: number;
+  traits: BotTraitsView;
+  season: number | null;
+  retiredAt: string;
+  career: UdtCareer | null;
+  homegrown: { breeder: string; honours: boolean } | null;
+}
+
+export interface UdtHall {
+  retired: UdtHallEntry[];
+  candidates: { botId: string; name: string; career: UdtCareer }[];
 }

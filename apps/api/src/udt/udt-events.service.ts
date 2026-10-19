@@ -9,7 +9,15 @@ import {
   type Entrant,
   type TournamentSettings,
 } from '@tourney/protocol';
-import { bracketOf, effectiveValues, modCodes, roundNeuro, tiredPenalty } from '@tourney/udt';
+import {
+  bracketOf,
+  effectiveValues,
+  modCodes,
+  PHASE_EFFECT,
+  roundNeuro,
+  tiredPenalty,
+  type Career,
+} from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { conflict, notFound } from '../common/http.js';
@@ -24,6 +32,7 @@ import {
   type TournamentRow,
   type UdtEventRules,
 } from '../tournaments/tournaments.service.js';
+import { UdtCareerService } from './udt-career.service.js';
 import { gameName, UdtService, type RosterBot } from './udt.service.js';
 
 /** Bots below this stamina are tired: they play worse and the bench comes first. */
@@ -53,6 +62,7 @@ export class UdtEventsService implements OnModuleInit {
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
+    @Inject(UdtCareerService) private readonly career: UdtCareerService,
   ) {}
 
   onModuleInit(): void {
@@ -198,7 +208,12 @@ export class UdtEventsService implements OnModuleInit {
     return { bots: picked, value, problems };
   }
 
-  private spec(r: RosterBot, tag: string, lib: Map<string, LibraryBot>): BotSpec {
+  private spec(
+    r: RosterBot,
+    tag: string,
+    lib: Map<string, LibraryBot>,
+    careers: Map<string, Career>,
+  ): BotSpec {
     const b = lib.get(r.botId);
     const base = this.bots.resolveSpec({ id: r.botId, name: r.name, skill: r.skill });
     const tired = tiredPenalty(r.stamina);
@@ -206,6 +221,7 @@ export class UdtEventsService implements OnModuleInit {
     const eff = effectiveValues(base.skill, { ...(base.traits ?? b?.traits ?? {}) }, r.udtTraits);
     const traits = eff.values;
     if (tired) traits.accuracy = Math.max(-1, (traits.accuracy ?? 0) - 0.2);
+    withCareer(traits, careers.get(r.botId));
     // Body traits (category B) are played by the mod.
     const codes = modCodes(r.udtTraits);
     return {
@@ -222,6 +238,8 @@ export class UdtEventsService implements OnModuleInit {
     const rules = this.rules(t);
     const season = this.udt.season().number;
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
+    // Career phases change the accuracy of every bot in Dream Team games.
+    const careers = this.career.careers();
     const main: Entrant[] = [];
     const skills: number[] = [];
     const entered = this.entries(t.id);
@@ -233,7 +251,7 @@ export class UdtEventsService implements OnModuleInit {
         this.dropEntry(t.id, userId);
         continue;
       }
-      const specs = l.bots.map((r) => this.spec(r, team.tag, lib));
+      const specs = l.bots.map((r) => this.spec(r, team.tag, lib, careers));
       skills.push(...l.bots.map((r) => r.effective.skill));
       main.push(
         settings.teamSize > 1
@@ -267,8 +285,12 @@ export class UdtEventsService implements OnModuleInit {
     const need = Math.max(0, settings.size - main.length);
     const fill: Entrant[] = [];
     const names = this.settings.get().teamNames;
-    const spec = (b: LibraryBot): BotSpec =>
-      this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill });
+    const spec = (b: LibraryBot): BotSpec => {
+      const s = this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill });
+      const traits = { ...(s.traits ?? b.traits ?? {}) };
+      withCareer(traits, careers.get(b.id));
+      return { ...s, traits };
+    };
     for (let n = 0; n < need; n++) {
       if (settings.teamSize > 1) {
         const group = free.splice(0, settings.teamSize);
@@ -405,4 +427,15 @@ export class UdtEventsService implements OnModuleInit {
     this.dropEntry(id, user.id);
     return this.events(user);
   }
+}
+
+/** The career phase's accuracy change (0..100 scale) on the values sent to the game. */
+function withCareer(traits: { accuracy?: number }, c: Career | undefined): void {
+  if (!c) return;
+  const d = PHASE_EFFECT[c.phase].accuracy / 50;
+  if (d)
+    traits.accuracy = Math.max(
+      -1,
+      Math.min(1, Math.round(((traits.accuracy ?? 0) + d) * 1000) / 1000),
+    );
 }

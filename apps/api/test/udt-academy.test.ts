@@ -164,4 +164,39 @@ describe('Unreal Dream Team: academy', () => {
     expect(b.udtTraits[0].code).toBe(ok.body.built.startTrait);
     expect(ok.body.blueprints).toHaveLength(1);
   });
+
+  it('careers: every bot has one; admins retire bots into the hall of fame', async () => {
+    const { admin, mario, db, marioId } = await setup();
+    const old = (await admin.post('/bots', { name: 'Oldtimer', skill: 5 })).body.id as string;
+    // Twelve seasons of Dream Team games: in decline, retirement suggested.
+    for (let s = 1; s <= 12; s++)
+      db.insert(udtRoster)
+        .values({
+          season: 100 + s,
+          botId: old,
+          userId: marioId,
+          price: 0,
+          acquiredAt: 'x',
+          games: 6,
+        })
+        .run();
+    const c = (await mario.get(`/udt/career/${old}`)).body;
+    expect(c).toMatchObject({ age: 12, phase: 'decline', retire: true, games: 72 });
+    let h = (await admin.get('/udt/hall')).body;
+    expect(h.candidates.map((x: { name: string }) => x.name)).toContain('Oldtimer');
+    expect((await mario.get('/udt/hall')).body.candidates).toEqual([]);
+    expect((await mario.post(`/udt/career/${old}/retire`)).status).toBe(403);
+    const r = await admin.post(`/udt/career/${old}/retire`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body[0]).toMatchObject({ name: 'Oldtimer', career: { age: 12 } });
+    h = (await admin.get('/udt/hall')).body;
+    expect(h.retired).toHaveLength(1);
+    expect(h.candidates).toEqual([]);
+    expect(
+      (await admin.get('/bots')).body.bots.find((b: { name: string }) => b.name === 'Oldtimer'),
+    ).toMatchObject({ active: false });
+    // The roster shows the career of its bots.
+    const v = (await mario.get('/udt')).body;
+    expect(v.roster[0].career).toMatchObject({ phase: 'rookie' });
+  });
 });

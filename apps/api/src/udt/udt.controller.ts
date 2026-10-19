@@ -61,7 +61,12 @@ export class UdtController {
     const v = this.udt.view(user);
     // Offers waiting for the manager (badge on "Trades").
     const tradesIn = v.team && v.season !== null ? this.trades.incoming(user.id) : 0;
-    return { ...v, tradesIn };
+    const careers = v.roster.length ? this.career.careers() : new Map();
+    return {
+      ...v,
+      roster: v.roster.map((r) => ({ ...r, career: careers.get(r.botId) ?? null })),
+      tradesIn,
+    };
   }
 
   /** All teams of the running season. */
@@ -317,5 +322,30 @@ export class UdtController {
   @Get('breeders')
   breeders() {
     return this.career.breeders();
+  }
+
+  /** A bot's career (all bots: age, phase, level, form). */
+  @Get('career/:botId')
+  careerOf(@Param('botId') botId: string) {
+    this.udt.assertOn();
+    return this.career.careerOf(botId);
+  }
+
+  /** The hall of fame; admins also get the bots whose career suggests retirement. */
+  @Get('hall')
+  hall(@CurrentUser() user: User) {
+    this.udt.assertOn();
+    return {
+      retired: this.career.hall(),
+      candidates: user.isAdmin ? this.career.retireCandidates() : [],
+    };
+  }
+
+  @AdminOnly()
+  @Post('career/:botId/retire')
+  @HttpCode(200)
+  retire(@Param('botId') botId: string) {
+    this.udt.assertOn();
+    return this.career.retire(botId);
   }
 }

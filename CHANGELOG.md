@@ -7,6 +7,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Careers of all bots: age in seasons, career level, phase (rookie, rising, peak, veteran, decline) and form on the bot
+  profile and on the Dream Team cards; the phase changes accuracy and market value in Dream Team games. Admins retire
+  old bots into the hall of fame (yearbook page), which suggests candidates.
 - Unreal Dream Team blueprints: packs now and then bring a blank or a blueprint (signature blueprints with a start
   trait); the academy builds an own bot from it (points, skill cap, model from rare on) with a creation licence.
 - Unreal Dream Team academy: creation licences, scouting (three talents with value and potential ranges), apprentices of

@@ -2,9 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
-import { TPipe } from '../core/i18n';
+import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
-import type { UdtBreeder, UdtYearbook, UdtYearbookEntry } from '../core/types';
+import type {
+  UdtBreeder,
+  UdtHall,
+  UdtHallEntry,
+  UdtYearbook,
+  UdtYearbookEntry,
+} from '../core/types';
 import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
 
 /**
@@ -96,6 +102,53 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
         }
       </div>
     }
+    @if (hall(); as h) {
+      <section class="card">
+        <h2>{{ 'udt.hall.title' | t }}</h2>
+        <p class="muted small">{{ 'udt.hall.intro' | t }}</p>
+        <div class="class">
+          @for (r of h.retired; track r.botId) {
+            <figure class="entry grad">
+              <udt-card [bot]="hallCard(r)" [small]="true" />
+              <figcaption>
+                @if (r.homegrown) {
+                  <span class="udt-mark star">{{ 'udt.market.homegrown' | t }}</span>
+                }
+                @if (r.career; as c) {
+                  <div class="muted small">
+                    {{ 'udt.career.seasons' | t: { n: c.age } }} · {{ 'udt.career.level' | t }}
+                    {{ c.level }}
+                  </div>
+                  <div class="muted small">
+                    {{ c.games }} {{ 'udt.career.games' | t }} · {{ c.wins }}
+                    {{ 'udt.career.wins' | t }}
+                  </div>
+                }
+              </figcaption>
+            </figure>
+          } @empty {
+            <p class="muted small">{{ 'udt.hall.empty' | t }}</p>
+          }
+        </div>
+        @if (h.candidates.length) {
+          <h3>{{ 'udt.hall.candidates' | t }}</h3>
+          @for (c of h.candidates; track c.botId) {
+            <div class="nrow">
+              <span class="grow"
+                ><b>{{ c.name }}</b>
+                <span class="muted small"
+                  >{{ 'udt.career.seasons' | t: { n: c.career.age } }} · {{ c.career.games }}
+                  {{ 'udt.career.games' | t }}</span
+                ></span
+              >
+              <button type="button" [disabled]="busy()" (click)="retire(c.botId)">
+                {{ 'udt.hall.retire' | t }}
+              </button>
+            </div>
+          }
+        }
+      </section>
+    }
     <section class="card">
       <h2>{{ 'udt.yearbook.breeders' | t }}</h2>
       <div class="tablepanel">
@@ -163,9 +216,11 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
 export class UdtYearbookPage {
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
+  private readonly i18n = inject(I18n);
   protected readonly book = signal<UdtYearbook | null>(null);
   protected readonly breeders = signal<UdtBreeder[]>([]);
   protected readonly nominations = signal<UdtYearbookEntry[]>([]);
+  protected readonly hall = signal<UdtHall | null>(null);
   protected readonly renames = signal<Partial<Record<string, string>>>({});
   protected readonly error = signal('');
   protected readonly busy = signal(false);
@@ -177,9 +232,14 @@ export class UdtYearbookPage {
 
   async load(season?: number) {
     try {
-      const [y, b] = await Promise.all([this.api.udtYearbook(season), this.api.udtBreeders()]);
+      const [y, b, h] = await Promise.all([
+        this.api.udtYearbook(season),
+        this.api.udtBreeders(),
+        this.api.udtHall(),
+      ]);
       this.book.set(y);
       this.breeders.set(b);
+      this.hall.set(h);
       if (this.isAdmin()) this.nominations.set(await this.api.udtNominations());
       this.error.set('');
     } catch (e) {
@@ -199,6 +259,24 @@ export class UdtYearbookPage {
       traits: b.traits,
       tag: b.tag,
     };
+  }
+
+  protected hallCard(r: UdtHallEntry): CardBot {
+    return {
+      name: r.name,
+      skill: r.skill,
+      rarity: botRarity(r.skill),
+      traits: r.traits,
+      career: r.career,
+    };
+  }
+
+  protected async retire(id: string) {
+    if (!confirm(this.i18n.t('udt.hall.retireConfirm'))) return;
+    await this.act(async () => {
+      await this.api.udtRetire(id);
+      this.hall.set(await this.api.udtHall());
+    });
   }
 
   protected setRename(id: string, v: string) {

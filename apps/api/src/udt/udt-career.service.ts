@@ -1,7 +1,7 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, eq, inArray } from 'drizzle-orm';
 import { udtManagerOf } from '@tourney/protocol';
-import { levelOf, roundNeuro } from '@tourney/udt';
+import { career, levelOf, roundNeuro, type Career } from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
@@ -10,8 +10,10 @@ import { conflict, notFound } from '../common/http.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, neuroLedger, udtBots, udtRoster, udtTeams } from '../db/schema.js';
+import { bots, neuroLedger, udtBots, udtHall, udtRoster, udtTeams } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { SeasonsService } from '../seasons/seasons.service.js';
+import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { UdtService } from './udt.service.js';
 
@@ -54,6 +56,8 @@ export class UdtCareerService implements OnModuleInit {
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(EventLogService) private readonly events: EventLogService,
     @Inject(UdtService) private readonly udt: UdtService,
+    @Inject(StatsService) private readonly stats: StatsService,
+    @Inject(SeasonsService) private readonly seasons: SeasonsService,
   ) {}
 
   onModuleInit(): void {
@@ -322,5 +326,103 @@ export class UdtCareerService implements OnModuleInit {
           { breeder: this.users.byId(g.userId)?.displayName ?? '?', honours: g.honours },
         ]),
     );
+  }
+
+  // ---------- careers of all bots ----------
+
+  /**
+   * Careers of all library bots: games and wins per season from the statistics (normal
+   * tournaments) plus their Dream Team games, age in seasons, phase, level, form.
+   */
+  careers(): Map<string, Career> {
+    const per = new Map<string, { season: number; games: number; wins: number }[]>();
+    const add = (id: string, season: number, games: number, wins: number) => {
+      const l = per.get(id) ?? [];
+      const e = l.find((x) => x.season === season);
+      if (e) {
+        e.games += games;
+        e.wins += wins;
+      } else l.push({ season, games, wins });
+      per.set(id, l);
+    };
+    for (const s of this.seasons.list())
+      for (const p of this.stats.players(s.number, undefined, true))
+        if (p.key.startsWith('b:')) add(p.key.slice(2), s.number, p.games, p.gamesWon);
+    for (const r of this.db.select().from(udtRoster).all())
+      if (r.games) add(r.botId, r.season, r.games, 0);
+    const current = this.seasons.current()?.number;
+    const out = new Map<string, Career>();
+    for (const b of this.bots.list())
+      out.set(b.id, career({ seasons: per.get(b.id) ?? [], ...(current ? { current } : {}) }));
+    return out;
+  }
+
+  careerOf(botId: string): Career | null {
+    return this.careers().get(botId) ?? null;
+  }
+
+  /** An admin retires a bot: inactive, in the hall of fame with its career. */
+  retire(botId: string) {
+    const b = this.bots.list().find((x) => x.id === botId);
+    if (!b) throw notFound('bot');
+    if (b.udtOwner) throw conflict('a bot a manager owns cannot retire');
+    const season = this.seasons.current()?.number;
+    if (season && this.udt.owners(season).has(botId))
+      throw conflict('the bot plays in a Dream Team roster this season');
+    if (this.db.select().from(udtHall).where(eq(udtHall.botId, botId)).get())
+      throw conflict('retired already');
+    const c = this.careerOf(botId);
+    this.db.update(bots).set({ active: false }).where(eq(bots.id, botId)).run();
+    this.db
+      .insert(udtHall)
+      .values({
+        botId,
+        name: b.name,
+        season: season ?? null,
+        retiredAt: new Date(this.clock.now()).toISOString(),
+        careerJson: JSON.stringify(c),
+      })
+      .run();
+    this.log.info(`bot ${b.name} retired (hall of fame)`);
+    return this.hall();
+  }
+
+  /** The hall of fame: retired bots, newest first. */
+  hall() {
+    const grads = this.homegrown();
+    return this.db
+      .select()
+      .from(udtHall)
+      .all()
+      .sort((a, b) => b.retiredAt.localeCompare(a.retiredAt))
+      .map((h) => {
+        const lib = this.bots.list().find((x) => x.id === h.botId);
+        return {
+          botId: h.botId,
+          name: lib?.name ?? h.name,
+          skill: lib?.skill ?? 0,
+          traits: lib?.traits ?? {},
+          season: h.season,
+          retiredAt: h.retiredAt,
+          career: JSON.parse(h.careerJson) as Career | null,
+          homegrown: grads.get(h.botId) ?? null,
+        };
+      });
+  }
+
+  /** Bots whose career suggests retirement (admins see them in the hall of fame). */
+  retireCandidates() {
+    const retired = new Set(
+      this.db
+        .select({ id: udtHall.botId })
+        .from(udtHall)
+        .all()
+        .map((h) => h.id),
+    );
+    const careers = this.careers();
+    return this.bots
+      .list()
+      .filter((b) => !b.udtOwner && !retired.has(b.id) && careers.get(b.id)?.retire)
+      .map((b) => ({ botId: b.id, name: b.name, career: careers.get(b.id)! }));
   }
 }

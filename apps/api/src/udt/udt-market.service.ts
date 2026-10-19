@@ -7,6 +7,7 @@ import {
   economyIndex,
   formFactor,
   managerEffects,
+  PHASE_EFFECT,
   marketValue,
   sellPrice,
   staminaRecovered,
@@ -143,11 +144,13 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const unsoldDays = this.unsoldDays(last?.day);
     const owned = new Map(roster.map((r) => [r.botId, r]));
     const values = new Map<string, number>();
+    const careers = this.career.careers();
     for (const b of library) {
       if (b.udtOwner && !owned.has(b.id)) continue;
       const p = players.get(`b:${b.id}`);
+      const phase = careers.get(b.id)?.phase;
       const v = marketValue(
-        baseValue(b.skill, valueScore(b.traits)),
+        baseValue(b.skill, valueScore(b.traits)) * (phase ? PHASE_EFFECT[phase].value : 1),
         formFactor({ games: p?.games ?? 0, wins: p?.gamesWon ?? 0 }),
         demandFactor(bidCounts.get(b.id) ?? 0, unsoldDays.get(b.id) ?? 0),
         index,
@@ -325,6 +328,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const owners = this.udt.owners(season.number);
     const offers = this.db.select().from(udtOffers).where(eq(udtOffers.day, last.day)).all();
     const homegrown = this.career.homegrown();
+    const careers = this.career.careers();
     const history = this.history(
       offers.map((o) => o.botId),
       14,
@@ -357,6 +361,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             history: h,
             sold: owners.has(b.id),
             homegrown: homegrown.get(b.id) ?? null,
+            career: careers.get(b.id) ?? null,
             myBid: myBids.find((x) => x.botId === b.id)?.amount ?? null,
           },
         ];

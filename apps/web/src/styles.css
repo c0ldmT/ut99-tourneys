@@ -1407,3 +1407,17 @@ udt-pack-stage .stage.lg .rays {
   font-weight: 800;
   vertical-align: 1px;
 }
+
+.udt-card .car {
+  letter-spacing: 0.08em;
+  color: var(--muted);
+}
+.udt-card .car.ph-peak {
+  color: #f5c75e;
+}
+.udt-card .car.ph-rising {
+  color: #86e8b4;
+}
+.udt-card .car.ph-decline {
+  color: #ff9aa4;
+}

@@ -483,4 +483,14 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX udt_blueprints_user ON udt_blueprints(season, user_id);
   `,
+  // 23: careers: retired bots in the hall of fame with their career at the time.
+  `
+  CREATE TABLE udt_hall (
+    bot_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    season INTEGER,
+    retired_at TEXT NOT NULL,
+    career_json TEXT NOT NULL
+  );
+  `,
 ];

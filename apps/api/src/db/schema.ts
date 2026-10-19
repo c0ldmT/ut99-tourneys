@@ -478,3 +478,12 @@ export const udtBlueprints = sqliteTable('udt_blueprints', {
   usedAt: text('used_at'),
   botId: text('bot_id'),
 });
+
+/** Retired bots (hall of fame) with their career when they retired. */
+export const udtHall = sqliteTable('udt_hall', {
+  botId: text('bot_id').primaryKey(),
+  name: text('name').notNull(),
+  season: integer('season'),
+  retiredAt: text('retired_at').notNull(),
+  careerJson: text('career_json').notNull(),
+});

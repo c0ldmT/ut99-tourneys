@@ -24,7 +24,7 @@ import { Auth } from './auth';
 import { Coin } from './brand';
 import { I18n, TPipe } from './i18n';
 import { NeuroPipe } from './neuro';
-import type { BotTraitsView, UdtRarity, UdtTestState, UdtTraitOnBot } from './types';
+import type { BotTraitsView, UdtCareer, UdtRarity, UdtTestState, UdtTraitOnBot } from './types';
 
 export {
   baseValue,
@@ -72,6 +72,7 @@ export interface CardBot {
   slots?: number;
   level?: number;
   effective?: { skill: number; traits: BotTraitsView; overflow: boolean };
+  career?: UdtCareer | null;
 }
 
 /** A bot as a Dream Team card (rarity from the skill): skill, values, value, stamina. */
@@ -94,6 +95,19 @@ export interface CardBot {
             >{{ rarityLabel() }}
             @if (b.level) {
               <br /><span class="lvl">{{ 'udt.level' | t }} {{ b.level }}</span>
+            }
+            @if (b.career) {
+              <br /><span
+                class="car"
+                [class]="'car ph-' + b.career.phase"
+                [title]="'udt.career.age' | t: { n: b.career.age }"
+                >{{ 'udt.career.' + b.career.phase | t }}
+                @if (b.career.form === 'hot') {
+                  ▲
+                } @else if (b.career.form === 'cold') {
+                  ▼
+                }
+              </span>
             }
           </span>
         </div>

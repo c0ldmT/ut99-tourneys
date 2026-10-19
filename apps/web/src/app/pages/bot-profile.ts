@@ -16,7 +16,7 @@ import { assetLabel, combatStyleKey, traitPercent } from '../core/bots';
 import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import { Coin } from '../core/brand';
-import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
+import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '../core/types';
 
 /** Bot profile (everybody logged in): look, play style, personality, rivals with the record. */
 @Component({
@@ -62,6 +62,25 @@ import { BOT_LINE_KINDS, type BotProfile, type UserBets } from '../core/types';
       }
       @if (b.clan?.description) {
         <p class="muted small">{{ b.clan!.description }}</p>
+      }
+
+      @if (career(); as c) {
+        <section class="card">
+          <h2>{{ 'udt.career.title' | t }}</h2>
+          <dl class="career">
+            <dt>{{ 'udt.career.phase' | t }}</dt>
+            <dd>{{ 'udt.career.' + c.phase | t }}</dd>
+            <dt>{{ 'udt.career.ageLabel' | t }}</dt>
+            <dd>{{ 'udt.career.seasons' | t: { n: c.age } }}</dd>
+            <dt>{{ 'udt.career.level' | t }}</dt>
+            <dd>{{ c.level }}</dd>
+            <dt>{{ 'udt.career.gamesLabel' | t }}</dt>
+            <dd>{{ c.games }} ({{ c.wins }} {{ 'udt.career.wins' | t }})</dd>
+            <dt>{{ 'udt.career.form' | t }}</dt>
+            <dd>{{ 'udt.career.form.' + c.form | t }}</dd>
+          </dl>
+          <p class="muted small">{{ 'udt.career.effect.' + c.phase | t }}</p>
+        </section>
       }
 
       <div class="grid two">
@@ -311,6 +330,8 @@ export class BotProfilePage {
   protected readonly auth = inject(Auth);
   readonly id = input.required<string>();
   protected readonly b = signal<BotProfile | null>(null);
+  /** Dream Team career (only while the add-on is on). */
+  protected readonly career = signal<UdtCareer | null>(null);
   protected readonly error = signal('');
   protected readonly styleKey = combatStyleKey;
   protected readonly bars: {
@@ -347,6 +368,11 @@ export class BotProfilePage {
     this.error.set('');
     try {
       this.b.set(await this.api.botProfile(id));
+      if (this.auth.config().udt)
+        this.api.udtCareer(id).then(
+          (c) => this.career.set(c),
+          () => this.career.set(null),
+        );
       this.api.botBets(id).then(
         (n) => this.neuro.set(n),
         () => this.neuro.set(null),
