@@ -110,6 +110,8 @@ export interface LibraryBot {
   active: boolean;
   createdAt: string;
   updatedAt: string;
+  /** Unreal Dream Team: made by this manager (hidden in the control center). */
+  udtOwner: string | null;
 }
 
 const key = (s: string) => s.trim().toLowerCase();
@@ -235,6 +237,7 @@ export class BotsService {
           active: r.active,
           createdAt: r.createdAt,
           updatedAt: r.updatedAt,
+          udtOwner: r.udtOwner ?? null,
         };
       });
   }

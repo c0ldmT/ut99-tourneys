@@ -40,7 +40,8 @@ export class BotsController {
   @AdminOnly()
   @Get('bots')
   list() {
-    return { bots: this.bots.list(), clans: this.bots.clans() };
+    // Bots made by Dream Team managers are theirs, not part of the control center.
+    return { bots: this.bots.list().filter((b) => !b.udtOwner), clans: this.bots.clans() };
   }
 
   @AdminOnly()

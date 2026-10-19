@@ -39,6 +39,8 @@ import { BotsService } from './bots/bots.service.js';
 import { SeriesController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
+import { UdtController } from './udt/udt.controller.js';
+import { UdtService } from './udt/udt.service.js';
 import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
 import { AutoStartService } from './tournaments/auto-start.service.js';
@@ -79,6 +81,7 @@ class AppModule {
         BetsController,
         SeriesController,
         ShopController,
+        UdtController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -116,6 +119,7 @@ class AppModule {
         AutoStartService,
         ShopService,
         LedgerService,
+        UdtService,
         AgentGateway,
       ],
     };

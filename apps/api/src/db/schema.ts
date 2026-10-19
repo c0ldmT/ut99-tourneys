@@ -99,6 +99,8 @@ export const tournaments = sqliteTable('tournaments', {
   createdAt: text('created_at').notNull(),
   /** Cached projection phase ("draft" while there are no events). */
   phase: text('phase').notNull().default('draft'),
+  /** "standard", or "udt" (Unreal Dream Team: managers' lineups, not in the statistics). */
+  kind: text('kind').notNull().default('standard'),
   headSeq: integer('head_seq').notNull().default(0),
   /** Discord channel: "default" (DISCORD_WEBHOOK_URL), "custom" (webhookUrl) or "off". */
   notifyMode: text('notify_mode').notNull().default('default'),
@@ -173,6 +175,10 @@ export const bots = sqliteTable('bots', {
   active: integer('active', { mode: 'boolean' }).notNull().default(true),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
+  /** Unreal Dream Team: the manager who made the bot (not in the control center, inactive). */
+  udtOwner: text('udt_owner'),
+  /** How it was made: "starter" (later: scouting, blueprint, ...). */
+  udtOrigin: text('udt_origin'),
 });
 
 /** Seasons, numbered from 1; dates are days (YYYY-MM-DD) in the season time zone, inclusive. */
@@ -267,3 +273,93 @@ export const betBailouts = sqliteTable('bet_bailouts', {
   amount: integer('amount').notNull(),
   at: text('at').notNull(),
 });
+
+// --- Unreal Dream Team ------------------------------------------------------------------------
+
+/** A manager's team of a season (name and tag in front of the bots' names in the game). */
+export const udtTeams = sqliteTable(
+  'udt_teams',
+  {
+    season: integer('season').notNull(),
+    userId: text('user_id').notNull(),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    tag: text('tag').notNull(),
+    tagKey: text('tag_key').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.userId] })],
+);
+
+/** Bots of the managers: one owner per bot and season. Slots 1..5 (lineups), bench 1..2. */
+export const udtRoster = sqliteTable(
+  'udt_roster',
+  {
+    season: integer('season').notNull(),
+    botId: text('bot_id').notNull(),
+    userId: text('user_id').notNull(),
+    price: integer('price').notNull(),
+    acquiredAt: text('acquired_at').notNull(),
+    starter: integer('starter', { mode: 'boolean' }).notNull().default(false),
+    dmSlot: integer('dm_slot'),
+    mhSlot: integer('mh_slot'),
+    bench: integer('bench'),
+    stamina: integer('stamina').notNull().default(100),
+    xp: integer('xp').notNull().default(0),
+    /** Salary not paid: cannot play until the next market day pays it. */
+    striking: integer('striking', { mode: 'boolean' }).notNull().default(false),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.botId] })],
+);
+
+/** Market days done (one per day in SEASON_TZ) with the economy index of the day. */
+export const udtDays = sqliteTable('udt_days', {
+  day: text('day').primaryKey(),
+  season: integer('season').notNull(),
+  economyIndex: real('economy_index').notNull(),
+  doneAt: text('done_at').notNull(),
+});
+
+/** Market value of every bot per market day (history for the charts). */
+export const udtValues = sqliteTable(
+  'udt_values',
+  {
+    botId: text('bot_id').notNull(),
+    day: text('day').notNull(),
+    value: integer('value').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.botId, t.day] })],
+);
+
+/** Bots on offer from a market day until the next one. */
+export const udtOffers = sqliteTable(
+  'udt_offers',
+  {
+    day: text('day').notNull(),
+    botId: text('bot_id').notNull(),
+    minPrice: integer('min_price').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.botId] })],
+);
+
+/** Hidden bids for an offer; resolved on the next market day (won, lost, refunded). */
+export const udtBids = sqliteTable('udt_bids', {
+  id: text('id').primaryKey(),
+  day: text('day').notNull(),
+  botId: text('bot_id').notNull(),
+  userId: text('user_id').notNull(),
+  amount: integer('amount').notNull(),
+  status: text('status').notNull().default('open'),
+  createdAt: text('created_at').notNull(),
+});
+
+/** Managers signed up for a Dream Team tournament. */
+export const udtEntries = sqliteTable(
+  'udt_entries',
+  {
+    tournamentId: text('tournament_id').notNull(),
+    userId: text('user_id').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tournamentId, t.userId] })],
+);

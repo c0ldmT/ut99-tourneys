@@ -73,12 +73,29 @@ export const BotAiSettingsSchema = z.object({
 });
 export type BotAiSettings = z.infer<typeof BotAiSettingsSchema>;
 
+/**
+ * Unreal Dream Team (add-on): off by default. The market day runs once a day at `marketTime`
+ * (SEASON_TZ); `offersPerDay` bots are on offer; the starter bot may cost up to `starterBudget`
+ * (reference value at index 1.0, about skill 3 with average values).
+ */
+export const UdtSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  marketTime: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/)
+    .default('04:00'),
+  offersPerDay: z.number().int().min(1).max(40).default(8),
+  starterBudget: z.number().int().min(100).max(100_000).default(1500),
+});
+export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
+
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
   teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
   betting: BettingSettingsSchema.default(DEFAULT_BETTING),
   shop: ShopSettingsSchema.default(ShopSettingsSchema.parse({})),
   botAi: BotAiSettingsSchema.default(BotAiSettingsSchema.parse({})),
+  udt: UdtSettingsSchema.default(UdtSettingsSchema.parse({})),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -107,7 +124,9 @@ export class SettingsService {
     const betting = BettingSettingsSchema.safeParse(raw['betting'] ?? {});
     const shop = ShopSettingsSchema.safeParse(raw['shop'] ?? {});
     const botAi = BotAiSettingsSchema.safeParse(raw['botAi'] ?? {});
+    const udt = UdtSettingsSchema.safeParse(raw['udt'] ?? {});
     return {
+      udt: udt.success ? udt.data : UdtSettingsSchema.parse({}),
       botAi: botAi.success ? botAi.data : BotAiSettingsSchema.parse({}),
       shop: shop.success ? shop.data : ShopSettingsSchema.parse({}),
       betting: betting.success ? betting.data : { ...DEFAULT_BETTING },
@@ -139,6 +158,13 @@ export class SettingsService {
     const next = BotAiSettingsSchema.safeParse({ ...this.get().botAi, ...value });
     if (!next.success) throw badRequest(z.prettifyError(next.error));
     this.put('botAi', next.data);
+    return this.get();
+  }
+
+  setUdt(value: Partial<UdtSettings>): WebsiteSettings {
+    const next = UdtSettingsSchema.safeParse({ ...this.get().udt, ...value });
+    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    this.put('udt', next.data);
     return this.get();
   }
 

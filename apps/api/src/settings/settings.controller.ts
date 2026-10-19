@@ -8,6 +8,8 @@ import {
   BettingFieldsSchema,
   BotAiSettingsSchema,
   type BotAiSettings,
+  UdtSettingsSchema,
+  type UdtSettings,
   RatingSettingsSchema,
   SettingsService,
   ShopSettingsSchema,
@@ -71,6 +73,12 @@ export class SettingsController {
   @Put('bot-ai')
   botAi(@Body(new ZodPipe(BotAiSettingsSchema.partial())) body: Partial<BotAiSettings>) {
     return this.settings.setBotAi(body);
+  }
+
+  /** Unreal Dream Team: on/off, market time, offers per day, starter budget. */
+  @Put('udt')
+  udt(@Body(new ZodPipe(UdtSettingsSchema.partial())) body: Partial<UdtSettings>) {
+    return this.settings.setUdt(body);
   }
 
   /** Names for teams made of bots only. */

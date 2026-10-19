@@ -303,4 +303,74 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX neuro_ledger_season ON neuro_ledger(season, user_id);
   `,
+  // 15: Unreal Dream Team. Tournaments get a kind ("udt" ones stay out of the statistics); bots
+  // made by managers live in the library (inactive) with their owner; teams, rosters (a bot
+  // belongs to one manager per season), market days, values, offers, bids, event entries.
+  `
+  ALTER TABLE tournaments ADD COLUMN kind TEXT NOT NULL DEFAULT 'standard';
+  ALTER TABLE bots ADD COLUMN udt_owner TEXT;
+  ALTER TABLE bots ADD COLUMN udt_origin TEXT;
+  CREATE TABLE udt_teams (
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    tag_key TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (season, user_id),
+    UNIQUE (season, name_key),
+    UNIQUE (season, tag_key)
+  );
+  CREATE TABLE udt_roster (
+    season INTEGER NOT NULL,
+    bot_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    acquired_at TEXT NOT NULL,
+    starter INTEGER NOT NULL DEFAULT 0,
+    dm_slot INTEGER,
+    mh_slot INTEGER,
+    bench INTEGER,
+    stamina INTEGER NOT NULL DEFAULT 100,
+    xp INTEGER NOT NULL DEFAULT 0,
+    striking INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (season, bot_id)
+  );
+  CREATE INDEX udt_roster_user ON udt_roster(season, user_id);
+  CREATE TABLE udt_days (
+    day TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    economy_index REAL NOT NULL,
+    done_at TEXT NOT NULL
+  );
+  CREATE TABLE udt_values (
+    bot_id TEXT NOT NULL,
+    day TEXT NOT NULL,
+    value INTEGER NOT NULL,
+    PRIMARY KEY (bot_id, day)
+  );
+  CREATE TABLE udt_offers (
+    day TEXT NOT NULL,
+    bot_id TEXT NOT NULL,
+    min_price INTEGER NOT NULL,
+    PRIMARY KEY (day, bot_id)
+  );
+  CREATE TABLE udt_bids (
+    id TEXT PRIMARY KEY,
+    day TEXT NOT NULL,
+    bot_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL,
+    UNIQUE (day, bot_id, user_id)
+  );
+  CREATE TABLE udt_entries (
+    tournament_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (tournament_id, user_id)
+  );
+  `,
 ];

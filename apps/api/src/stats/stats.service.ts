@@ -96,10 +96,12 @@ export class StatsService {
         headSeq: tournaments.headSeq,
         createdAt: tournaments.createdAt,
         seasonal: tournaments.seasonal,
+        kind: tournaments.kind,
       })
       .from(tournaments)
       .all()
-      .filter((r) => r.headSeq > 0)
+      // Dream Team tournaments (managers' bots with traits) have their own table.
+      .filter((r) => r.headSeq > 0 && r.kind !== 'udt')
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const seasons = this.seasons.list();
     const out: Loaded[] = [];
