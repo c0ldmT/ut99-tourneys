@@ -856,6 +856,9 @@ export interface UdtRosterBot {
   udtTraits: UdtTraitOnBot[];
   effective: { skill: number; traits: BotTraitsView; overflow: boolean };
   striking: boolean;
+  games: number;
+  /** A bot the manager made: potential (a range until level 5), development points. */
+  own: { origin: string; potential: [number, number]; points: number; spent: number } | null;
 }
 
 export interface UdtTraitOnBot {
@@ -963,6 +966,8 @@ export interface UdtOffer {
   value: number;
   history: { day: string; value: number }[];
   sold: boolean;
+  /** A graduate of a manager's academy. */
+  homegrown?: { breeder: string; honours: boolean } | null;
   myBid: number | null;
 }
 
@@ -1138,4 +1143,89 @@ export interface UdtTradePreview {
   feeTo: number;
   balancePct: number;
   feePct: number;
+}
+
+export interface UdtTalentReport {
+  name: string;
+  skill: number;
+  ranges: Record<'accuracy' | 'alertness' | 'strafing', [number, number]>;
+  potential: [number, number];
+}
+
+export interface UdtMentor {
+  botId: string;
+  name: string;
+  skill: number;
+  level: number;
+  mentorTrait: boolean;
+  ready: boolean;
+  used: boolean;
+}
+
+export interface UdtAcademy {
+  hasTeam: boolean;
+  tag: string;
+  index: number;
+  scoutPrice: number;
+  licence: { made: number; nextPrice: number | null };
+  rosterFull: boolean;
+  report: UdtTalentReport[] | null;
+  mentors: UdtMentor[];
+  own: UdtRosterBot[];
+  developCost: Record<'accuracy' | 'alertness' | 'strafing' | 'skill', number>;
+  mentorLevel: number;
+  apprentice?: { botId: string; inherited: string | null };
+}
+
+export interface UdtGraduationBot {
+  botId: string;
+  name: string;
+  origin: string;
+  status: 'own' | 'nominated' | 'graduated' | 'rejected';
+  games: number;
+  level: number;
+  ready: boolean;
+  honours: boolean;
+}
+
+export interface UdtGraduation {
+  games: number;
+  level: number;
+  honours: number;
+  perSeason: number;
+  left: number;
+  bots: UdtGraduationBot[];
+}
+
+export interface UdtYearbookEntry {
+  botId: string;
+  season: number;
+  name: string;
+  skill: number;
+  traits: BotTraitsView;
+  origin: string;
+  status: 'own' | 'nominated' | 'graduated' | 'rejected';
+  honours: boolean;
+  potential: number;
+  games: number;
+  xp: number;
+  level: number;
+  breeder: string;
+  team: string;
+  tag: string;
+  active: boolean;
+}
+
+export interface UdtYearbook {
+  season: number;
+  seasons: number[];
+  bots: UdtYearbookEntry[];
+}
+
+export interface UdtBreeder {
+  userId: string;
+  name: string;
+  graduates: number;
+  honours: number;
+  bonus: number;
 }

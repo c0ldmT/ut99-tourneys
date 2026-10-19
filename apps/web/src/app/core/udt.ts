@@ -185,8 +185,10 @@ export function staminaColor(s: number): string {
           }}</span>
         }
       </a>
+      <a routerLink="/udt/academy" routerLinkActive="active">{{ 'udt.nav.academy' | t }}</a>
       <a routerLink="/udt/events" routerLinkActive="active">{{ 'udt.nav.events' | t }}</a>
       <a routerLink="/udt/table" routerLinkActive="active">{{ 'udt.nav.table' | t }}</a>
+      <a routerLink="/udt/yearbook" routerLinkActive="active">{{ 'udt.nav.yearbook' | t }}</a>
     </nav>
     @if (testBar()) {
       <div class="udt-test" role="region" [attr.aria-label]="'udt.test.title' | t">

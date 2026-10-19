@@ -10,6 +10,11 @@ import type {
   UdtPacks,
   UdtPull,
   UdtTableRow,
+  UdtAcademy,
+  UdtBreeder,
+  UdtGraduation,
+  UdtYearbook,
+  UdtYearbookEntry,
   UdtPartner,
   UdtTradeOffer,
   UdtTradePreview,
@@ -189,6 +194,31 @@ export class Api {
     this.call<UdtTrades>('POST', `/udt/trades/${encodeURIComponent(id)}/decline`);
   udtWithdrawTrade = (id: string) =>
     this.call<UdtTrades>('DELETE', `/udt/trades/${encodeURIComponent(id)}`);
+  udtAcademy = () => this.call<UdtAcademy>('GET', '/udt/academy');
+  udtScout = () => this.call<UdtAcademy>('POST', '/udt/academy/scout');
+  udtSign = (pick: number, name: string) =>
+    this.call<UdtAcademy>('POST', '/udt/academy/sign', { pick, name });
+  udtApprentice = (mentorId: string, name: string) =>
+    this.call<UdtAcademy>('POST', '/udt/academy/mentor', { mentorId, name });
+  udtDevelop = (botId: string, stat: 'accuracy' | 'alertness' | 'strafing' | 'skill') =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/develop`, { stat });
+  udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');
+  udtNominate = (botId: string) =>
+    this.call<UdtGraduation>('POST', `/udt/graduation/${encodeURIComponent(botId)}`);
+  udtUnnominate = (botId: string) =>
+    this.call<UdtGraduation>('DELETE', `/udt/graduation/${encodeURIComponent(botId)}`);
+  udtNominations = () => this.call<UdtYearbookEntry[]>('GET', '/udt/nominations');
+  udtApprove = (botId: string, name?: string) =>
+    this.call<UdtYearbookEntry[]>(
+      'POST',
+      `/udt/nominations/${encodeURIComponent(botId)}/approve`,
+      name ? { name } : {},
+    );
+  udtReject = (botId: string) =>
+    this.call<UdtYearbookEntry[]>('POST', `/udt/nominations/${encodeURIComponent(botId)}/reject`);
+  udtYearbook = (season?: number) =>
+    this.call<UdtYearbook>('GET', `/udt/yearbook${season ? `?season=${season}` : ''}`);
+  udtBreeders = () => this.call<UdtBreeder[]>('GET', '/udt/breeders');
   udtTable = () => this.call<UdtTableRow[]>('GET', '/udt/table');
   udtLedger = () => this.call<UdtLedgerEntry[]>('GET', '/udt/ledger');
   udtTest = () => this.call<UdtTestState>('GET', '/udt/test');

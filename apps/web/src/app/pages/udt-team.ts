@@ -212,6 +212,13 @@ type Mode = 'dm' | 'mh';
                   <b>{{ b.gameName }}</b>
                   @if (b.starter) {
                     <span class="udt-mark own">{{ 'udt.starter' | t }}</span>
+                  } @else if (b.own) {
+                    <span class="udt-mark own">{{ 'udt.academy.origin.' + b.own.origin | t }}</span>
+                  }
+                  @if (b.own && b.own.points > 0) {
+                    <a routerLink="/udt/academy" class="udt-mark star">{{
+                      'udt.academy.pointsFree' | t: { n: b.own.points }
+                    }}</a>
                   }
                   @if (b.striking) {
                     <span class="udt-mark strike">{{ 'udt.strike' | t }}</span>
@@ -303,7 +310,7 @@ type Mode = 'dm' | 'mh';
                   ><span class="mono small">{{ b.stamina }}</span></span
                 >
                 <span class="neuro mono">{{ b.value | neuro }}</span>
-                @if (!b.starter) {
+                @if (!b.starter && !b.own) {
                   <button type="button" (click)="sell(b)" [disabled]="busy()">
                     {{ 'udt.sell' | t }}
                   </button>

@@ -7,6 +7,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Unreal Dream Team academy: creation licences, scouting (three talents with value and potential ranges), apprentices of
+  mentors (with the new mentor trait), development points per level up to the potential; own bots stay with their
+  team and draw no salary. Graduation (15 games, level 5, approved by an admin) turns them into library bots with
+  their breeder ("homegrown" on the market, breeder bonuses); a yearbook per season and the best breeders.
 - Unreal Dream Team behaviour traits (mod 0.10.0): vulture, kamikaze, berserker, revenant and bounty hunter steer the
   bot's AI in the game (in the packs). Needs mod 0.10.0 on the game server.
 - Unreal Dream Team body traits (mod 0.9.0): starter armour, thick skin, adrenaline, glass cannon, vampire and phoenix

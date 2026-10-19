@@ -66,6 +66,13 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                 >
                 <span class="grow"
                   ><b class="disp">{{ o.name }}</b>
+                  @if (o.homegrown) {
+                    <span
+                      class="udt-mark star"
+                      [title]="'udt.market.breeder' | t: { n: o.homegrown.breeder }"
+                      >{{ 'udt.market.homegrown' | t }}</span
+                    >
+                  }
                   @if (o.sold) {
                     <span class="udt-mark">{{ 'udt.market.sold' | t }}</span>
                   }
