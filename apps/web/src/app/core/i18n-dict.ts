@@ -967,6 +967,15 @@ const en = {
   'bets.versus': 'Man vs. machine',
   'bets.botRecords': 'Bot records',
   'bets.botsBetLabel': 'The bots of the control center bet too',
+  'botAi.title': 'Bot AI help',
+  'botAi.hint':
+    'Deathmatch and team deathmatch only (Monster Hunt has its own help, other game modes are left alone). Applies from the next match.',
+  'botAi.level': 'Help',
+  'botAi.level2': 'Failsafe and duel mode',
+  'botAi.level1': 'Failsafe only',
+  'botAi.level0': 'Off',
+  'botAi.modHint':
+    'Failsafe: bots that stand still or find no enemy for long get moving again. Duel mode (one on one): a bot without an enemy hunts its opponent. Needs mod 0.8.0.',
   'bets.discordLabel':
     "Post bets in the tournament's Discord channel (open, closed with pools, payout, summary)",
   'bets.botsPerMatch': 'Bots per match (at most)',
@@ -2013,6 +2022,15 @@ const de: Record<TKey, string> = {
   'bets.versus': 'Mensch gegen Maschine',
   'bets.botRecords': 'Bot-Rekorde',
   'bets.botsBetLabel': 'Die Bots des Kontrollzentrums wetten mit',
+  'botAi.title': 'Hilfe für die Bot-KI',
+  'botAi.hint':
+    'Nur Deathmatch und Team-Deathmatch (Monster Hunt hat eine eigene Hilfe, andere Spielmodi bleiben unberührt). Gilt ab dem nächsten Match.',
+  'botAi.level': 'Hilfe',
+  'botAi.level2': 'Failsafe und Duell-Modus',
+  'botAi.level1': 'Nur Failsafe',
+  'botAi.level0': 'Aus',
+  'botAi.modHint':
+    'Failsafe: Bots, die stehen bleiben oder lange keinen Gegner finden, laufen wieder los. Duell-Modus (1 gegen 1): Ein Bot ohne Gegner jagt seinen Kontrahenten. Braucht Mod 0.8.0.',
   'bets.discordLabel':
     'Wetten im Discord-Channel des Turniers posten (offen, geschlossen mit Pools, Auszahlung, Bilanz)',
   'bets.botsPerMatch': 'Bots pro Match (höchstens)',

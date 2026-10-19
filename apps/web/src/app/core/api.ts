@@ -128,6 +128,8 @@ export class Api {
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/rating', body);
+  setBotAiSettings = (body: Partial<WebsiteSettings['botAi']>) =>
+    this.call<WebsiteSettings>('PUT', '/settings/bot-ai', body);
   setBettingSettings = (body: Partial<WebsiteSettings['betting']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/betting', body);
 

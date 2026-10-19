@@ -1213,6 +1213,7 @@ export class TournamentsService {
         bots: this.botPersonalities(t),
         dedications: this.dedications(t),
         betWindowSec: this.betWindowSec(t),
+        antiIdle: this.settingsSvc.get().botAi.level,
       },
     });
   }

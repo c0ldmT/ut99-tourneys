@@ -235,6 +235,26 @@ import type { Season, SeasonsOverview } from '../core/types';
       </div>
     </form>
 
+    <form class="card" (ngSubmit)="saveBotAi()">
+      <h2>{{ 'botAi.title' | t }}</h2>
+      <p class="muted small">{{ 'botAi.hint' | t }}</p>
+      <label
+        >{{ 'botAi.level' | t }}
+        <select name="botAiLevel" [(ngModel)]="botAiLevel">
+          <option [ngValue]="2">{{ 'botAi.level2' | t }}</option>
+          <option [ngValue]="1">{{ 'botAi.level1' | t }}</option>
+          <option [ngValue]="0">{{ 'botAi.level0' | t }}</option>
+        </select>
+      </label>
+      <p class="muted small">{{ 'botAi.modHint' | t }}</p>
+      <div class="row">
+        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
+        @if (savedBotAi()) {
+          <span class="muted small">{{ 'settings.saved' | t }}</span>
+        }
+      </div>
+    </form>
+
     <app-shop-settings />
 
     <section class="card danger-zone">
@@ -391,6 +411,8 @@ export class SettingsPage {
   protected betsDiscord = true;
   protected botsPerMatch = 6;
   protected readonly savedBetting = signal(false);
+  protected botAiLevel = 2;
+  protected readonly savedBotAi = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
   protected readonly resetWord = 'RESET';
   protected readonly resetOpen = signal(false);
@@ -435,6 +457,7 @@ export class SettingsPage {
       this.botsPerMatch = s.betting.botsPerMatch;
       this.windowSec = s.betting.windowSec;
       this.betsDiscord = s.betting.discord;
+      this.botAiLevel = s.botAi?.level ?? 2;
       this.o.set(o);
       this.saved.set(false);
     } catch (e) {
@@ -504,6 +527,21 @@ export class SettingsPage {
       this.startBalance = s.betting.startBalance;
       this.floor = s.betting.floor;
       this.savedBetting.set(true);
+    } catch (e) {
+      this.error.set(errorText(e));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async saveBotAi() {
+    this.busy.set(true);
+    this.error.set('');
+    this.savedBotAi.set(false);
+    try {
+      const s = await this.api.setBotAiSettings({ level: Number(this.botAiLevel) });
+      this.botAiLevel = s.botAi.level;
+      this.savedBotAi.set(true);
     } catch (e) {
       this.error.set(errorText(e));
     } finally {

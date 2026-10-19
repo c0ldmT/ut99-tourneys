@@ -6,6 +6,8 @@ import { SeasonsService } from '../seasons/seasons.service.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
 import {
   BettingFieldsSchema,
+  BotAiSettingsSchema,
+  type BotAiSettings,
   RatingSettingsSchema,
   SettingsService,
   ShopSettingsSchema,
@@ -63,6 +65,12 @@ export class SettingsController {
   @Put('shop')
   shop(@Body(new ZodPipe(ShopSettingsSchema.partial())) body: Partial<ShopSettings>) {
     return this.settings.setShop(body);
+  }
+
+  /** Help for the bot AI in deathmatch games (sent to the bridge with the next sync). */
+  @Put('bot-ai')
+  botAi(@Body(new ZodPipe(BotAiSettingsSchema.partial())) body: Partial<BotAiSettings>) {
+    return this.settings.setBotAi(body);
   }
 
   /** Names for teams made of bots only. */

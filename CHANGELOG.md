@@ -7,6 +7,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Bot AI help in deathmatch and team deathmatch (mod 0.8.0, settings page "Bot AI help", on by default): bots
+  that stand still or find no enemy for long get moving again, and in one-on-one games a bot without an enemy hunts
+  its opponent, so bot duels no longer stall. Monster Hunt and other game modes are not touched.
 - Series schedules: weekly on several weekdays (every n weeks) or daily; at fixed times (up to 24 a day) or every n
   hours within a window ("daily, every 4 hours"); lead time in minutes, hours or days (whole days in local time);
   {time} in the name; the form shows the next three tournaments. "Start by itself" (series and single tournaments):

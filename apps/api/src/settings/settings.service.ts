@@ -63,11 +63,22 @@ export const ShopSettingsSchema = z.object({
 });
 export type ShopSettings = z.infer<typeof ShopSettingsSchema>;
 
+/**
+ * Help for the game's bot AI in deathmatch games (mod 0.8.0): 0 off, 1 failsafe (bots that stand
+ * still or find no enemy for long get moving), 2 also the duel mode (one on one: a bot without an
+ * enemy hunts its opponent). Monster Hunt keeps its own bot help.
+ */
+export const BotAiSettingsSchema = z.object({
+  level: z.number().int().min(0).max(2).default(2),
+});
+export type BotAiSettings = z.infer<typeof BotAiSettingsSchema>;
+
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
   teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
   betting: BettingSettingsSchema.default(DEFAULT_BETTING),
   shop: ShopSettingsSchema.default(ShopSettingsSchema.parse({})),
+  botAi: BotAiSettingsSchema.default(BotAiSettingsSchema.parse({})),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -95,7 +106,9 @@ export class SettingsService {
     const teamNames = TeamNamesSchema.safeParse(raw['teamNames']);
     const betting = BettingSettingsSchema.safeParse(raw['betting'] ?? {});
     const shop = ShopSettingsSchema.safeParse(raw['shop'] ?? {});
+    const botAi = BotAiSettingsSchema.safeParse(raw['botAi'] ?? {});
     return {
+      botAi: botAi.success ? botAi.data : BotAiSettingsSchema.parse({}),
       shop: shop.success ? shop.data : ShopSettingsSchema.parse({}),
       betting: betting.success ? betting.data : { ...DEFAULT_BETTING },
       rating: rating.success ? rating.data : RatingSettingsSchema.parse({}),
@@ -119,6 +132,13 @@ export class SettingsService {
     const next = ShopSettingsSchema.safeParse({ ...this.get().shop, ...value });
     if (!next.success) throw badRequest(z.prettifyError(next.error));
     this.put('shop', next.data);
+    return this.get();
+  }
+
+  setBotAi(value: Partial<BotAiSettings>): WebsiteSettings {
+    const next = BotAiSettingsSchema.safeParse({ ...this.get().botAi, ...value });
+    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    this.put('botAi', next.data);
     return this.get();
   }
 

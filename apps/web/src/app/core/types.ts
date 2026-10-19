@@ -402,6 +402,8 @@ export interface WebsiteSettings {
     discord: boolean;
   };
   shop: ShopSettings;
+  /** Bot AI help in deathmatch: 0 off, 1 failsafe, 2 failsafe and duel mode. */
+  botAi: { level: number };
 }
 
 // --- Bot control center ---------------------------------------------------------------------
