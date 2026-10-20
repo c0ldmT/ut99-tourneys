@@ -70,6 +70,11 @@ export type ShopSettings = z.infer<typeof ShopSettingsSchema>;
  */
 export const BotAiSettingsSchema = z.object({
   level: z.number().int().min(0).max(2).default(2),
+  /**
+   * Skill curve (mod 0.13.0, all game types): bots of all levels use the full AI, the level sets
+   * speed, view, dodging and aim; off = UT's own levels (novice switch below Adept).
+   */
+  skillCurve: z.boolean().default(true),
 });
 export type BotAiSettings = z.infer<typeof BotAiSettingsSchema>;
 

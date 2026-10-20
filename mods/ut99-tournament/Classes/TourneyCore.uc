@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.12.1";
+const MOD_VERSION = "0.13.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -178,6 +178,8 @@ var int StartTalkLeft;             // seconds after the start in which bots may 
 var int HuntTicks;
 // Bot AI help (match line "ai"): 0 off, 1 failsafe, 2 also the duel mode (one on one).
 var int AiLevel;
+var bool bSkillCurve;              // mod 0.13.0: bots on the tournament's skill curve (match "sc")
+var TourneySkillCurve Curve;
 var Bot IdleBot[32];               // bots watched for standing still
 var vector IdleLoc[32];            // where the bot stood when the watch (re)started
 var float IdleSince[32];           // since then it did not move away
@@ -238,6 +240,12 @@ function OnPostBeginPlay()
 	Game.RegisterMessageMutator(TMut);
 	Game.RegisterDamageMutator(TMut);
 	// Chat commands come from the listener (it also hears spectators); the mutator only handles "mutate".
+	Curve = Spawn(class'TourneySkillCurve');
+	if (Curve != None)
+	{
+		Curve.bOn = bSkillCurve;
+		Curve.Init(self);
+	}
 	ChatListener = Spawn(class'TourneyChatListener');
 	if (ChatListener != None)
 	{
@@ -369,6 +377,10 @@ function HandleBridgeMessage(TourneyMsg M)
 			TeamSize = Max(1, M.GetInt("ts"));
 			MatchFF = M.GetInt("ff");
 			AiLevel = Clamp(M.GetInt("ai"), 0, 2);
+			// Skill curve: on unless the bridge sends sc=0 (bridges before 0.13.0 send nothing).
+			bSkillCurve = M.Get("sc") != "0";
+			if (Curve != None)
+				Curve.SetOn(bSkillCurve);
 			IdleCount = 0;
 			// The bot lines follow; bots already in the level are taken over (see AddBotSpec).
 			KeepOldBots();
@@ -1227,6 +1239,9 @@ function Bot SpawnSideBot(string BName, int BSkill, string BClass, int Side)
 		BC = Game.BotConfig.CHGetBotClass(N);
 	if (BC == None)
 		BC = class'Botpack.TMale1Bot';
+	// Skill curve: the stock classes as the tournament's own (same bot, drifting aim).
+	if (Curve != None)
+		BC = Curve.BotClassFor(BC);
 
 	StartSpot = Game.FindPlayerStart(None, 255);
 	if (StartSpot == None)
@@ -2759,6 +2774,9 @@ function ApplyBotConfig(Bot B, string BName)
 
 	if (B == None || B.bDeleteMe || B.PlayerReplicationInfo == None)
 		return;
+	// The traits' accuracy, alertness and jumpy back on the bot (the curve adds to them).
+	if (Curve != None)
+		Curve.TraitValues(B);
 	c = FindCfg(BName, false);
 	if (c >= 0)
 	{
@@ -2795,6 +2813,18 @@ function ApplyBotConfig(Bot B, string BName)
 	// Without a voice the bot stays silent in voice messages: the class's own, as UT does.
 	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
 		B.PlayerReplicationInfo.VoiceType = class<VoicePack>(DynamicLoadObject(B.VoiceType, class'Class'));
+	if (Curve != None)
+		Curve.Setup(B, BotLevel(BName));
+}
+
+// The tournament skill (0..7) of a bot of the match, -1 = not in the list.
+function int BotLevel(string BName)
+{
+	local int i;
+	for (i = 0; i < BotCount; i++)
+		if (SameBotName(BotName[i], BName))
+			return Clamp(BotSkill[i], 0, 7);
+	return -1;
 }
 
 // 0 = no rival, 1 = rival, 2 = nemesis of the configured bot c.
@@ -4320,6 +4350,9 @@ function SaveCache()
 	class'TournamentConfig'.default.CachedTimeLimit = MatchTimeLimit;
 	class'TournamentConfig'.default.CachedTeamSize = TeamSize;
 	class'TournamentConfig'.default.CachedFF = MatchFF;
+	class'TournamentConfig'.default.CachedSkillCurve = 0;
+	if (bSkillCurve)
+		class'TournamentConfig'.default.CachedSkillCurve = 1;
 	class'TournamentConfig'.default.CachedBotCount = BotCount;
 	for (i = 0; i < MAXBOTS; i++)
 	{
@@ -4350,6 +4383,7 @@ function LoadCache()
 	MatchTimeLimit = class'TournamentConfig'.default.CachedTimeLimit;
 	TeamSize = Max(1, class'TournamentConfig'.default.CachedTeamSize);
 	MatchFF = class'TournamentConfig'.default.CachedFF;
+	bSkillCurve = class'TournamentConfig'.default.CachedSkillCurve != 0;
 	BotCount = Clamp(class'TournamentConfig'.default.CachedBotCount, 0, MAXBOTS);
 	for (i = 0; i < BotCount; i++)
 	{
@@ -4438,6 +4472,8 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 	local int cv, ci, Heal;
 	if (ActualDamage <= 0 || Victim == None)
 		return;
+	if (Curve != None)
+		Curve.OnHit(Victim, InstigatedBy, ActualDamage);
 	cv = GameTraitCfg(Victim);
 	ci = -1;
 	if (InstigatedBy != Victim)

@@ -64,6 +64,7 @@ export async function setup(opts: {
   mapRecords?: MapRecords;
   betWindowSec?: number;
   antiIdle?: number;
+  skillCurve?: boolean;
 }) {
   const clock = new FakeClock();
   const log = memoryLogger();
@@ -91,6 +92,7 @@ export async function setup(opts: {
       ...(opts.mapRecords ? { mapRecords: opts.mapRecords } : {}),
       ...(opts.betWindowSec ? { betWindowSec: opts.betWindowSec } : {}),
       ...(opts.antiIdle !== undefined ? { antiIdle: opts.antiIdle } : {}),
+      ...(opts.skillCurve !== undefined ? { skillCurve: opts.skillCurve } : {}),
       timing: {
         postGameDelayMs: 2_000,
         simulateDelayMs: 1_000,

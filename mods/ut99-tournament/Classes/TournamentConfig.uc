@@ -29,6 +29,7 @@ var config int CachedFragLimit;
 var config int CachedTimeLimit;
 var config int CachedTeamSize;
 var config int CachedFF;
+var config byte CachedSkillCurve;                 // 1 = bots on the skill curve (mod 0.13.0)
 // Bots of the match (1v1: the bot side; team games: the bots of both teams).
 var config int CachedBotCount;
 var config string CachedBotName[10];
@@ -55,6 +56,7 @@ defaultproperties
 	CachedBestOf=1
 	CachedGameNo=1
 	CachedTeamSize=1
+	CachedSkillCurve=1
 	CachedLives=-1
 	CachedMonsterSkill=-1
 	CachedWeaponStay=1

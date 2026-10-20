@@ -424,7 +424,7 @@ export interface WebsiteSettings {
   };
   shop: ShopSettings;
   /** Bot AI help in deathmatch: 0 off, 1 failsafe, 2 failsafe and duel mode. */
-  botAi: { level: number };
+  botAi: { level: number; skillCurve: boolean };
   udt: UdtSettings;
 }
 

@@ -65,6 +65,8 @@ export class WebsiteAgent {
   private betWindows = new Map<string, number>();
   /** Bot AI help per tournament (tournament.sync `antiIdle`). */
   private antiIdle = new Map<string, number>();
+  /** Bot skill curve per tournament (tournament.sync `skillCurve`, missing = on). */
+  private skillCurve = new Map<string, boolean>();
   private runtime?: Runtime;
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
@@ -155,6 +157,8 @@ export class WebsiteAgent {
         this.betWindows.set(p.tournamentId, p.betWindowSec ?? 0);
         const aiBefore = this.antiIdle.get(p.tournamentId) ?? 0;
         this.antiIdle.set(p.tournamentId, p.antiIdle ?? 0);
+        const curveBefore = this.skillCurve.get(p.tournamentId) ?? true;
+        this.skillCurve.set(p.tournamentId, p.skillCurve ?? true);
         const rt = this.runtime;
         if (rt && rt.tournamentId === p.tournamentId) {
           if (JSON.stringify(p.access) !== before) await rt.director.setAccess(p.access);
@@ -165,6 +169,8 @@ export class WebsiteAgent {
             await rt.director.setDedications(p.dedications);
           if ((p.betWindowSec ?? 0) !== betBefore) await rt.director.setBetWindow(p.betWindowSec);
           if ((p.antiIdle ?? 0) !== aiBefore) await rt.director.setAntiIdle(p.antiIdle);
+          if ((p.skillCurve ?? true) !== curveBefore)
+            await rt.director.setSkillCurve(p.skillCurve ?? true);
           if (changed) await rt.director.refresh();
         }
         return;
@@ -334,6 +340,7 @@ export class WebsiteAgent {
       dedications: this.dedications.get(tournamentId) ?? [],
       betWindowSec: this.betWindows.get(tournamentId) ?? 0,
       antiIdle: this.antiIdle.get(tournamentId) ?? 0,
+      skillCurve: this.skillCurve.get(tournamentId) ?? true,
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });
     director.on('live', (info: LiveInfo) => {

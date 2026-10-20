@@ -244,6 +244,11 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     ff: int.min(0).max(100), // team games: friendly fire in percent
     /** Bot AI help (deathmatch only): 0 off, 1 failsafe against idle bots, 2 also duel mode. */
     ai: int.min(0).max(2).optional(),
+    /**
+     * Mod 0.13.0, skill curve (all game types): 1 = bots on the tournament's curve instead of
+     * UT's novice switch, 0 = UT's own levels. Missing = on.
+     */
+    sc: int.min(0).max(1).optional(),
   }),
   /**
    * A bot playing for a side. 1v1: the side is a bot (sent with the match). Team games: the bots

@@ -1011,6 +1011,9 @@ const en = {
   'botAi.level0': 'Off',
   'botAi.modHint':
     'Failsafe: bots that stand still or find no enemy for long get moving again. Duel mode (one on one): a bot without an enemy hunts its opponent. Needs mod 0.8.0.',
+  'botAi.skillCurve': 'Skill curve instead of the novice switch (all game types)',
+  'botAi.skillCurveHint':
+    'All levels use the full bot AI: the level sets speed (Novice 70 % … Skilled 90 %), view, hearing, how often bots dodge and how well they aim; the aim error drifts instead of jumping with every shot, bots stop firing at walls after about a second. Off: UT’s own levels. Needs mod 0.13.0.',
   'bets.discordLabel':
     "Post bets in the tournament's Discord channel (open, closed with pools, payout, summary)",
   'bets.botsPerMatch': 'Bots per match (at most)',
@@ -2575,6 +2578,9 @@ const de: Record<TKey, string> = {
   'botAi.level0': 'Aus',
   'botAi.modHint':
     'Failsafe: Bots, die stehen bleiben oder lange keinen Gegner finden, laufen wieder los. Duell-Modus (1 gegen 1): Ein Bot ohne Gegner jagt seinen Kontrahenten. Braucht Mod 0.8.0.',
+  'botAi.skillCurve': 'Skill-Kurve statt Novice-Schalter (alle Spielmodi)',
+  'botAi.skillCurveHint':
+    'Alle Stufen nutzen die volle Bot-KI: Die Stufe bestimmt Tempo (Novice 70 % … Skilled 90 %), Sicht, Gehör, wie oft Bots ausweichen und wie gut sie zielen; der Zielfehler driftet statt mit jedem Schuss zu springen, auf Wände feuern sie nur noch etwa eine Sekunde. Aus: die Stufen von UT. Braucht Mod 0.13.0.',
   'bets.discordLabel':
     'Wetten im Discord-Channel des Turniers posten (offen, geschlossen mit Pools, Auszahlung, Bilanz)',
   'bets.botsPerMatch': 'Bots pro Match (höchstens)',

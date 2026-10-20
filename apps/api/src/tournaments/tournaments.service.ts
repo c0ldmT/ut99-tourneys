@@ -1442,6 +1442,7 @@ export class TournamentsService {
         dedications: this.dedications(t),
         betWindowSec: this.betWindowSec(t),
         antiIdle: this.settingsSvc.get().botAi.level,
+        skillCurve: this.settingsSvc.get().botAi.skillCurve,
       },
     });
   }

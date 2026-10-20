@@ -248,6 +248,11 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
         </select>
       </label>
       <p class="muted small">{{ 'botAi.modHint' | t }}</p>
+      <label class="row"
+        ><input type="checkbox" name="botSkillCurve" [(ngModel)]="botSkillCurve" />
+        {{ 'botAi.skillCurve' | t }}</label
+      >
+      <p class="muted small">{{ 'botAi.skillCurveHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
         @if (savedBotAi()) {
@@ -560,6 +565,7 @@ export class SettingsPage {
   protected botsPerMatch = 6;
   protected readonly savedBetting = signal(false);
   protected botAiLevel = 2;
+  protected botSkillCurve = true;
   protected udtOn = false;
   protected ai = pickAi({});
   protected readonly aiStrengths = ['calm', 'normal', 'ambitious'] as const;
@@ -622,6 +628,7 @@ export class SettingsPage {
       this.windowSec = s.betting.windowSec;
       this.betsDiscord = s.betting.discord;
       this.botAiLevel = s.botAi?.level ?? 2;
+      this.botSkillCurve = s.botAi?.skillCurve ?? true;
       if (s.udt) {
         this.udtOn = s.udt.enabled;
         this.udtTime = s.udt.marketTime;
@@ -746,8 +753,12 @@ export class SettingsPage {
     this.error.set('');
     this.savedBotAi.set(false);
     try {
-      const s = await this.api.setBotAiSettings({ level: Number(this.botAiLevel) });
+      const s = await this.api.setBotAiSettings({
+        level: Number(this.botAiLevel),
+        skillCurve: !!this.botSkillCurve,
+      });
       this.botAiLevel = s.botAi.level;
+      this.botSkillCurve = s.botAi.skillCurve;
       this.savedBotAi.set(true);
     } catch (e) {
       this.error.set(errorText(e));

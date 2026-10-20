@@ -79,6 +79,15 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > on a kicker no longer leaves its area); no far detour → a near one, none → start spot 12 s later. Stuck heading for
 > the same point again and again: a detour, the fourth time a start spot. A cleared enemy no longer causes
 > `Accessed None` in StakeOut.
+> Mod 0.13.0: skill curve instead of UT's novice switch (all game types, website setting "Skill curve", match `sc`).
+> Every bot runs the full AI; its level sets speed (Novice 70 %, Average 77 %, Experienced 83 %, Skilled 90 %, from
+> Adept 100 %), turn rate, field of view (100°-200°), hearing, dodging (projectiles 10 %-95 %, fighting moves 5 %-30 %,
+> while running at least every 6 s-0.4 s), flinches and aim (below Adept a negative accuracy; the aim error drifts
+> instead of jumping with every shot, a slight lag behind moving targets). A bot that has not seen its target for
+> 0.6-1.5 s stops firing (splash weapons a little longer near the last seen spot; StakeOut -> hunting); a hit from out
+> of view turns it after 0.12-0.7 s (low levels sometimes the wrong way first). No damage malus against players. The
+> stock bot classes are spawned as `TourneyMale1Bot` etc. (same bot, drifting aim); other classes get everything but
+> the aim. SmartStockBots: `MoveWithDodge` and `FixMinigun` are switched off at run time (log line, ini untouched).
 
 ## Classes
 
@@ -268,6 +277,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 58 | **Dream Team behaviour traits, group 2** (mod 0.11.0) | Dream Team games with a real server, roster bots with the new traits. Sniper's nest (DM-Deck16][, DM-Morpheus or another map with heights): the bot picks up the sniper rifle, goes up and camps there for a while (server log `sniper nests on this map: N`, `heads for the sniper's nest PathNodeN`, `... reached, camps`). Team player (2on2 or larger): two bots of a side attack the same opponent, `team player joins X's fight against Y`. Shuffle dancer: dodges left and right in fights (spectate it). Item controller (DM-Deck16][ or a map with shield belt/UDamage): `power items on this map: N`, it heads for the item before it is back (`item controller heads for ..., back in N s`) and waits next to it (`waits N s at ...`). Bots without these traits as in 0.10.1; server log without `Accessed None` |
 | 59 | **Bot chat in the kill feed** (mod 0.12.0) | A game with talking website bots (Bots → personality with lines, talkativeness high; Dream Team bots: My team → Look & lines). On the match page the bots' lines appear in the kill feed between the kills (name in its side's colour, the line in quotes). Bridge log without `bad line` for `bs` |
 | 60 | **Cut-off bots** (mod 0.12.1) | Bot AI help on. Bot-only 1v1 on DM-SpaceNoxx (upper ring, kickers), a few games. No bot stays on the ring or on a kicker for more than ~40 s without a fight. `grep "UTTourney: bot" Tourney.log`: `no path to X (N in a row)`, then `no path to any opponent (3 hunts in a row) at ..., moved to PlayerStartN (no death counted)` (or `..., stays` once); bouncing bots get `has not left ... for 12 s`. Other maps (DM-Curse][, DM-Deck16][) as in test 57. Server log without `Accessed None` (no more `StakeOut.ContinueStakeOut` / `RelativeStrength`) |
+| 61 | **Skill curve** (mod 0.13.0) | Settings → Bot AI help → "Skill curve" on. Bot-only 1v1s at Novice, Skilled, Adept and Godlike (DM-Deck16][, DM-Curse][), one Monster Hunt run. Server log: `skill curve True`, with SmartStockBots `SmartStockBots: MoveWithDodge False (was True), FixMinigun False (was True)`; `spawned bot ... class TourneyMale1Bot` (stock classes). Spectate in first person: Novice clearly slower than before (70 %), Skilled almost full speed; low levels dodge now and then (also forward while running), high levels often. Minigun and pulse gun swing smoothly past the target instead of jittering. A bot that loses sight stops firing after about a second (`has not seen X for N s, stops firing at ..., hunts`); shot from behind it turns round (`hit from out of view by X, turns to it`). Setting off: `skill curve False`, bots as in 0.12.1 (stock classes, SmartStockBots values back). Server log without `Accessed None` |
 
 ## SmartStockBots (optional)
 

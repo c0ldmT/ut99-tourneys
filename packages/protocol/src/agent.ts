@@ -327,6 +327,8 @@ export const TournamentSync = envelope(
      * still, 2 also the duel mode (one on one: a bot without an enemy hunts its opponent).
      */
     antiIdle: z.number().int().min(0).max(2).optional(),
+    /** Bot skill curve (website setting, all game types); missing = on. */
+    skillCurve: z.boolean().optional(),
   }),
 );
 

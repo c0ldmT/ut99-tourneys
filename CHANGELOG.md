@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.13.0: skill curve instead of UT's novice switch (all game types, setting under Bot AI help): every bot uses the full AI, the level sets speed, view, hearing, dodging and aim; aim error drifts instead of jittering, no long fire at walls, bots turn to hits from behind; works with SmartStockBots (two of its options are switched off at run time).
 - Dream Team: rest bots with Neuro (2 per stamina point); "Enter automatically when possible" on the Events page.
 - Servers: sync models and skins from the game server (texture packages, custom model packs), import bots on the Servers page; custom bot packages go into ServerPackages.
 - Dream Team: look and chat lines of own bots (founding, academy, later), squads of all teams, a Dream Team draw on the tournament page; AI managers enter as soon as the sign-up opens.

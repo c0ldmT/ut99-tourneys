@@ -137,6 +137,30 @@ describe('end to end against the simulated UT server', () => {
     expect(matches.some((l) => l.t === 'match' && l.ai !== undefined)).toBe(false);
   });
 
+  it('sends the skill curve with each match line, on by default', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'single', rules: { mapMode: 'random' } },
+    );
+    env = await setup({ file });
+    await env.run(finished(env));
+    const matches = env.sim.received.filter((l) => l.t === 'match');
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.every((l) => l.t === 'match' && l.sc === 1)).toBe(true);
+  });
+
+  it('sends sc=0 when the skill curve is off', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'single', rules: { mapMode: 'random' } },
+    );
+    env = await setup({ file, skillCurve: false });
+    await env.run(finished(env));
+    const matches = env.sim.received.filter((l) => l.t === 'match');
+    expect(matches.length).toBeGreaterThan(0);
+    expect(matches.every((l) => l.t === 'match' && l.sc === 0)).toBe(true);
+  });
+
   it('random map mode needs no vote', async () => {
     const file = tournamentFile(
       { players: players.slice(0, 3) },

@@ -133,6 +133,8 @@ export interface DirectorOptions {
   betWindowSec?: number;
   /** Bot AI help in deathmatch (0 off, 1 failsafe, 2 also duel mode), sent with each match. */
   antiIdle?: number;
+  /** Bot skill curve (mod 0.13.0, all game types), sent with each match; default on. */
+  skillCurve?: boolean;
   timing?: Partial<DirectorTiming>;
 }
 
@@ -263,6 +265,7 @@ export class MatchDirector extends EventEmitter {
   /** Betting window in ms (0: none) and when each match was called. */
   private betWindowMs = 0;
   private antiIdle = 0;
+  private skillCurve = true;
   private calledAt = new Map<string, number>();
   /** Website bots' personalities by lower-case name in the game. */
   private personas = new Map<string, BotPersonality>();
@@ -307,6 +310,7 @@ export class MatchDirector extends EventEmitter {
     this.dedications = [...(o.dedications ?? [])];
     this.betWindowMs = Math.max(0, (o.betWindowSec ?? 0) * 1000);
     this.antiIdle = clampAi(o.antiIdle);
+    this.skillCurve = o.skillCurve ?? true;
   }
 
   // -------------------------------------------------------------------------------------------
@@ -508,6 +512,13 @@ export class MatchDirector extends EventEmitter {
   setAntiIdle(level: number | undefined): Promise<void> {
     return this.enqueue(() => {
       this.antiIdle = clampAi(level);
+    });
+  }
+
+  /** New bot skill curve setting from the website: used from the next match line on. */
+  setSkillCurve(on: boolean): Promise<void> {
+    return this.enqueue(() => {
+      this.skillCurve = on;
     });
   }
 
@@ -900,6 +911,8 @@ export class MatchDirector extends EventEmitter {
     const head = lines[0];
     // Monster Hunt has its own bot help; the mod applies this to deathmatch games only.
     if (head?.t === 'match' && this.antiIdle > 0 && !this.raceMode) head.ai = this.antiIdle;
+    // The skill curve applies to all game types (Monster Hunt too).
+    if (head?.t === 'match') head.sc = this.skillCurve ? 1 : 0;
     const cm = this.proj.currentMatch;
     const runner = this.raceMode ? this.runner() : undefined;
     if (cm?.matchId === matchId && cm.game === game && runner) {
