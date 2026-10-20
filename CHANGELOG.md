@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Bot duel simulator (`pnpm --filter @tourney/api bot:sim`, HTML report): skill levels against accuracy and Dream Team traits in 1v1 meetings, guard rails, what each part of a level adds, reaction from an ambush, A/B against a curve file (proposal v1 included).
 - Messages as toasts in the page's language: every error of the website is translated (German for every server message) and every action of users and admins confirms itself; the red error lines on the pages are gone.
 - One Neuro state for the whole website: navbar, bets panel, shop and Dream Team pages show the same balance, pushed by the server when it changes (results, rewards, purchases).
 - Dream Team help: "How it works" button in the Dream Team navigation (opens by itself the first time) with the ways to new bots.
