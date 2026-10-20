@@ -19,7 +19,7 @@ import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
 import { TeamRoster } from '../components/team-roster';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
 import { isLocalAddress, joinUrl, linuxStartCommand } from '../core/connect';
 import { Auth } from '../core/auth';
@@ -49,9 +49,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (t(); as t) {
       <div class="head">
         <div class="head-l">
@@ -824,14 +821,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
               </table>
             </div>
           }
-          @if (actionError()) {
-            <p class="error">{{ actionError() }}</p>
-          }
         </div>
-      } @else if (actionError()) {
-        <p class="error">{{ actionError() }}</p>
       }
-    } @else if (!error()) {
+    } @else if (!failed()) {
       <p class="muted">{{ 'common.loading' | t }}</p>
     }
   `,
@@ -1063,8 +1055,8 @@ export class TournamentPage {
   protected readonly router = inject(Router);
 
   protected readonly t = signal<TournamentDetail | null>(null);
-  protected readonly error = signal('');
-  protected readonly actionError = signal('');
+  /** Loading the tournament failed (the toast says why): no "loading" placeholder. */
+  protected readonly failed = signal(false);
   protected readonly busy = signal(false);
   protected readonly copied = signal<{ which: string; state: '' | 'ok' | 'manual' }>({
     which: '',
@@ -1231,15 +1223,16 @@ export class TournamentPage {
         this.again = false;
         const t = await this.api.tournament(id);
         this.t.set(t);
-        this.error.set('');
+        this.failed.set(false);
         if (t.seasonal && t.headSeq !== this.ratingsHead) {
           this.ratingsHead = t.headSeq;
           this.ratings.set(await this.api.tournamentRatings(id));
         }
         if (this.tab() === 'events') this.events.set(await this.api.events(id));
       } while (this.again);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
+      this.failed.set(true);
     } finally {
       this.loading = false;
     }
@@ -1410,12 +1403,11 @@ export class TournamentPage {
 
   protected async act(p: Promise<unknown>) {
     this.busy.set(true);
-    this.actionError.set('');
     try {
       await p;
       await this.load(this.id());
-    } catch (e) {
-      this.actionError.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     } finally {
       this.busy.set(false);
     }
@@ -1481,8 +1473,8 @@ export class TournamentPage {
     try {
       await this.api.deleteTournament(this.id());
       await this.router.navigateByUrl('/');
-    } catch (e) {
-      this.actionError.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 
@@ -1490,8 +1482,8 @@ export class TournamentPage {
     this.tab.set('events');
     try {
       this.events.set(await this.api.events(this.id()));
-    } catch (e) {
-      this.actionError.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 

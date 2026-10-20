@@ -840,6 +840,32 @@ label.switch input:disabled + .tr {
   color: var(--text);
   border-bottom-color: var(--accent);
 }
+.udt-nav .udt-help-btn {
+  margin: 4px 0 6px auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--udt);
+  background: rgba(178, 107, 255, 0.12);
+  color: var(--text);
+  font-weight: 700;
+  box-shadow: 0 0 0 3px rgba(178, 107, 255, 0.12);
+}
+.udt-nav .udt-help-btn:hover {
+  background: rgba(178, 107, 255, 0.22);
+}
+.udt-help-btn .q {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--udt);
+  color: var(--bg);
+  font-weight: 800;
+}
 .udt-test {
   display: flex;
   flex-wrap: wrap;

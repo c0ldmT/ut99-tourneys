@@ -1,24 +1,20 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Coin } from '../core/brand';
-import { TPipe } from '../core/i18n';
-import { NeuroPipe } from '../core/neuro';
-import type { UdtMarket, UdtOffer, UdtView } from '../core/types';
+import { I18n, TPipe } from '../core/i18n';
+import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
+import type { UdtMarket, UdtOffer } from '../core/types';
 import { bracketOf, UdtCard, UdtNav, weeklySalary } from '../core/udt';
 
 type Filter = 'all' | 'weak' | 'mid' | 'strong';
 
-/** Dream Team transfer market: today's offers, hidden bids, the next market day. */
+/** Dream Team transfer market: today's offers at fixed prices (buy at once), the next market day. */
 @Component({
   selector: 'app-udt-market',
-  imports: [FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
+  imports: [TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (market(); as m) {
       <div class="udt-head">
         <div>
@@ -36,7 +32,11 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
           </div>
           <div>
             <div class="kpi">{{ 'udt.spendable' | t }}</div>
-            <div class="v neuro"><na-coin [size]="16" /> {{ spendable() | neuro: false }}</div>
+            <div class="v neuro"><na-coin [size]="16" /> {{ spendable() ?? 0 | neuro: false }}</div>
+          </div>
+          <div>
+            <div class="kpi">{{ 'udt.market.roster' | t }}</div>
+            <div class="v">{{ m.rosterSize }} / {{ m.rosterMax }}</div>
           </div>
         </div>
       </div>
@@ -73,13 +73,14 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                       >{{ 'udt.market.homegrown' | t }}</span
                     >
                   }
-                  @if (o.sold) {
-                    <span class="udt-mark">{{ 'udt.market.sold' | t }}</span>
-                  }
-                  @if (o.myBid !== null) {
-                    <span class="udt-mark own"
-                      >{{ 'udt.market.myBid' | t }} {{ o.myBid | neuro }}</span
-                    >
+                  @if (o.mine) {
+                    <span class="udt-mark own">{{ 'udt.market.yours' | t }}</span>
+                  } @else if (o.sold) {
+                    <span class="udt-mark">{{
+                      o.buyer
+                        ? ('udt.market.soldTo' | t: { tag: o.buyer })
+                        : ('udt.market.sold' | t)
+                    }}</span>
                   }
                 </span>
                 <svg width="96" height="30" viewBox="0 0 96 30" aria-hidden="true">
@@ -91,7 +92,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                   />
                 </svg>
                 <span class="price"
-                  ><span class="neuro mono">{{ o.minPrice | neuro }}</span
+                  ><span class="neuro mono">{{ o.price | neuro }}</span
                   ><span class="mono small" [class.up]="trend(o) >= 0" [class.down]="trend(o) < 0"
                     >{{ trend(o) >= 0 ? '▲' : '▼' }} {{ abs(trend(o)) }} %</span
                   ></span
@@ -104,42 +105,39 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
           <aside>
             @if (sel(); as o) {
               <udt-card [bot]="o" />
-              <form class="card bid" (ngSubmit)="bid(o)">
-                <h2>{{ 'udt.market.bid' | t }}</h2>
+              <div class="card bid">
+                <h2>{{ 'udt.market.buyTitle' | t }}</h2>
                 <div class="line">
-                  <span>{{ 'udt.market.min' | t }}</span
-                  ><b class="neuro">{{ o.minPrice | neuro }}</b>
+                  <span>{{ 'udt.market.price' | t }}</span
+                  ><b class="neuro">{{ o.price | neuro }}</b>
                 </div>
-                <label
-                  >{{ 'udt.market.amount' | t }}
-                  <input
-                    type="number"
-                    name="amount"
-                    [min]="o.minPrice"
-                    step="10"
-                    [(ngModel)]="amount"
-                    class="mono"
-                  />
-                </label>
-                <div class="row">
-                  <button type="button" (click)="raise(o, 5)">+5 %</button>
-                  <button type="button" (click)="raise(o, 10)">+10 %</button>
-                  <button type="button" (click)="raise(o, 25)">+25 %</button>
+                <div class="line">
+                  <span>{{ 'udt.market.value' | t }}</span
+                  ><span class="mono">{{ o.value | neuro }}</span>
                 </div>
                 <div class="line">
                   <span>{{ 'udt.market.salary' | t }}</span
                   ><span class="mono">{{ salaryOf(o) | neuro }}</span>
                 </div>
-                <button type="submit" class="primary" [disabled]="busy() || o.sold">
-                  {{ 'udt.market.place' | t }}
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="busy() || o.sold || full() || tooDear(o)"
+                  (click)="buy(o)"
+                >
+                  {{ 'udt.market.buy' | t: { price: neuro(o.price) } }}
                 </button>
-                @if (o.myBid !== null) {
-                  <button type="button" (click)="withdraw(o)" [disabled]="busy()">
-                    {{ 'udt.market.withdraw' | t }}
-                  </button>
+                @if (!o.sold) {
+                  @if (full()) {
+                    <p class="muted small">
+                      {{ 'udt.market.full' | t: { max: market()!.rosterMax } }}
+                    </p>
+                  } @else if (tooDear(o)) {
+                    <p class="muted small">{{ 'udt.market.cannotAfford' | t }}</p>
+                  }
                 }
-                <p class="muted small">{{ 'udt.market.hidden' | t }}</p>
-              </form>
+                <p class="muted small">{{ 'udt.market.surcharge' | t }}</p>
+              </div>
             }
           </aside>
         </div>
@@ -213,14 +211,13 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
 })
 export class UdtMarketPage {
   private readonly api = inject(Api);
+  private readonly i18n = inject(I18n);
+  private readonly store = inject(NeuroStore);
   protected readonly market = signal<UdtMarket | null>(null);
-  protected readonly view = signal<UdtView | null>(null);
-  protected readonly error = signal('');
   protected readonly busy = signal(false);
   protected readonly filter = signal<Filter>('all');
   protected readonly filters: Filter[] = ['all', 'weak', 'mid', 'strong'];
   protected readonly selId = signal<string | null>(null);
-  protected amount = 0;
   protected readonly abs = Math.abs;
 
   protected readonly shown = computed(() =>
@@ -231,7 +228,12 @@ export class UdtMarketPage {
   protected readonly sel = computed(
     () => this.market()?.offers.find((o) => o.botId === this.selId()) ?? this.shown()[0] ?? null,
   );
-  protected readonly spendable = computed(() => this.view()?.wallet?.spendable ?? 0);
+  /** The shared Neuro state (the same as in the navbar). */
+  protected readonly spendable = this.store.spendable;
+  protected readonly full = computed(() => {
+    const m = this.market();
+    return !!m && m.rosterSize >= m.rosterMax;
+  });
 
   constructor() {
     void this.load();
@@ -239,31 +241,30 @@ export class UdtMarketPage {
 
   async load() {
     try {
-      const [m, v] = await Promise.all([this.api.udtMarket(), this.api.udt()]);
-      this.market.set(m);
-      this.view.set(v);
-      const s = this.sel();
-      if (s && !this.amount) this.amount = s.myBid ?? s.minPrice;
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+      this.market.set(await this.api.udtMarket());
+    } catch {
+      // the toast shows the error
     }
   }
 
   protected next(): string {
     const at = this.market()?.nextAt;
     if (!at) return '–';
-    const d = new Date(at);
-    return `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    return this.i18n.date(new Date(at).toISOString());
   }
 
   protected pick(o: UdtOffer) {
     this.selId.set(o.botId);
-    this.amount = o.myBid ?? o.minPrice;
   }
 
-  protected raise(o: UdtOffer, p: number) {
-    this.amount = Math.ceil((o.minPrice * (1 + p / 100)) / 10) * 10;
+  /** More than can be spent (unknown yet: the server decides). */
+  protected tooDear(o: UdtOffer): boolean {
+    const s = this.spendable();
+    return s !== null && o.price > s;
+  }
+
+  protected neuro(n: number): string {
+    return formatNeuro(n, this.i18n.lang());
   }
 
   protected trend(o: UdtOffer): number {
@@ -291,27 +292,15 @@ export class UdtMarketPage {
     return weeklySalary(o.value, o.skill);
   }
 
-  protected async bid(o: UdtOffer) {
-    await this.act(async () => {
-      this.market.set(await this.api.udtBid(o.botId, Math.round(Number(this.amount))));
-      this.view.set(await this.api.udt());
-    });
-  }
-
-  protected async withdraw(o: UdtOffer) {
-    await this.act(async () => {
-      this.market.set(await this.api.udtWithdraw(o.botId));
-      this.view.set(await this.api.udt());
-    });
-  }
-
-  private async act(fn: () => Promise<void>) {
+  protected async buy(o: UdtOffer) {
+    const msg = this.i18n.t('udt.market.buyConfirm', { name: o.name, price: this.neuro(o.price) });
+    if (!confirm(msg)) return;
     this.busy.set(true);
-    this.error.set('');
     try {
-      await fn();
-    } catch (e) {
-      this.error.set(errorText(e));
+      this.market.set(await this.api.udtBuy(o.botId));
+    } catch {
+      // the toast shows the error; the offer may be sold meanwhile
+      void this.load();
     } finally {
       this.busy.set(false);
     }

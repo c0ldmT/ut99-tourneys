@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { TPipe } from '../core/i18n';
 import type { ShopItem } from '../core/types';
 
@@ -27,12 +27,6 @@ import type { ShopItem } from '../core/types';
         {{ 'shop.settingsHint' | t }}
         <a routerLink="/shop" [queryParams]="{ tab: 'admin' }">{{ 'shop.toAdmin' | t }}</a>
       </p>
-      @if (error()) {
-        <p class="error">{{ error() }}</p>
-      }
-      @if (saved()) {
-        <p class="muted small hint">{{ 'settings.saved' | t }}</p>
-      }
       <div class="scroll">
         <table>
           <thead>
@@ -113,8 +107,6 @@ export class ShopSettings {
   private readonly api = inject(Api);
   protected readonly catalog = signal<ShopItem[]>([]);
   protected readonly busy = signal(false);
-  protected readonly saved = signal(false);
-  protected readonly error = signal('');
   protected enabled = true;
 
   constructor() {
@@ -126,8 +118,8 @@ export class ShopSettings {
       const [s, a] = await Promise.all([this.api.settings(), this.api.shopAdmin()]);
       this.enabled = s.shop?.enabled ?? true;
       this.catalog.set(a.catalog.map((i) => ({ ...i })));
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -143,14 +135,11 @@ export class ShopSettings {
       .filter((i) => i.hidden)
       .map((i) => i.id);
     this.busy.set(true);
-    this.error.set('');
-    this.saved.set(false);
     try {
       await this.api.setShopSettings({ enabled: this.enabled, prices, hidden });
       await this.load();
-      this.saved.set(true);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

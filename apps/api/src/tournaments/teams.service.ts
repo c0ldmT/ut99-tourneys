@@ -78,7 +78,7 @@ export class TeamsService {
 
   get(tournamentId: string, teamId: string): TeamView {
     const team = this.list(tournamentId).find((t) => t.id === teamId);
-    if (!team) throw notFound(`team ${teamId}`);
+    if (!team) throw notFound('team {teamId}', { teamId });
     return team;
   }
 
@@ -124,7 +124,7 @@ export class TeamsService {
   ): TeamRow {
     let name = cleanTeamName(fields.name);
     if (this.nameTaken(tournamentId, nameKey(name))) {
-      if (!opts.uniqueSuffix) throw conflict(`a team called ${name} already exists`);
+      if (!opts.uniqueSuffix) throw conflict('a team called {name} already exists', { name });
       name = uniqueName(name, (k) => this.nameTaken(tournamentId, k));
     }
     const row: TeamRow = {
@@ -152,7 +152,7 @@ export class TeamsService {
     if (fields.name !== undefined) {
       const name = cleanTeamName(fields.name);
       if (this.nameTaken(tournamentId, nameKey(name), teamId))
-        throw conflict(`a team called ${name} already exists`);
+        throw conflict('a team called {name} already exists', { name });
       set.name = name;
       set.nameKey = nameKey(name);
     }

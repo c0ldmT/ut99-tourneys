@@ -22,21 +22,18 @@ import { UdtService, type RosterBot } from './udt.service.js';
 export type AiPersonality = 'saver' | 'gambler' | 'tactician' | 'breeder';
 const PERSONALITIES: AiPersonality[] = ['tactician', 'gambler', 'saver', 'breeder'];
 
-/** How a personality plays: share of the free Neuro it spends on the market, bid surcharge. */
+/** How a personality plays: share of the free Neuro it spends on the market, packs, trades. */
 const STYLE: Readonly<
-  Record<
-    AiPersonality,
-    { spend: number; markup: [number, number]; packs: number; tradeMin: number; scout: boolean }
-  >
+  Record<AiPersonality, { spend: number; packs: number; tradeMin: number; scout: boolean }>
 > = {
-  saver: { spend: 0.25, markup: [0, 0.05], packs: 0.05, tradeMin: 1.1, scout: false },
-  gambler: { spend: 0.6, markup: [0.05, 0.25], packs: 0.5, tradeMin: 0.9, scout: false },
-  tactician: { spend: 0.4, markup: [0, 0.1], packs: 0.15, tradeMin: 1, scout: false },
-  breeder: { spend: 0.3, markup: [0, 0.08], packs: 0.1, tradeMin: 1, scout: true },
+  saver: { spend: 0.25, packs: 0.05, tradeMin: 1.1, scout: false },
+  gambler: { spend: 0.6, packs: 0.5, tradeMin: 0.9, scout: false },
+  tactician: { spend: 0.4, packs: 0.15, tradeMin: 1, scout: false },
+  breeder: { spend: 0.3, packs: 0.1, tradeMin: 1, scout: true },
 };
 const STRENGTH = { calm: 0.6, normal: 1, ambitious: 1.4 } as const;
-/** Bids per AI manager and market day (humans have room). */
-const MAX_BIDS = 2;
+/** Bots an AI manager buys per market day at most (humans have room). */
+const MAX_BUYS = 2;
 /**
  * AI managers do not bet: a sponsor pays them this much per market day (× index × style) so
  * that they can keep up with managers who win bets.
@@ -45,8 +42,9 @@ const SPONSOR = 150;
 
 /**
  * Dream Team AI managers (setting "AI managers", off by default): website users ("ai:<n>")
- * with a team from the bot team names and a personality. After every market day they line up,
- * bid on the market (at most two bots, a human wins on the same amount), open packs, put traits
+ * with a team from the bot team names and a personality. At the market's closing time they buy
+ * what the humans left of the day's offers (at most two bots); after every market day they line
+ * up, open packs, put traits
  * on their bots, scout and develop own bots, enter open Dream Team tournaments without a
  * ticket and answer or make trade offers. They do not bet: they earn Neuro from Dream Team match
  * rewards and a daily sponsor; they are not in the betting rankings, the economy index, high
@@ -74,6 +72,7 @@ export class UdtAiService implements OnModuleInit {
     // After a market day (rested bots, new buys) the humans' automatic sign-ups come first.
     this.market.afterDay(() => void this.events.autoFill());
     this.market.afterDay((season, day) => this.daily(season, day));
+    this.market.atClosing((season, day) => this.closing(season, day));
     this.events.aiFill = (id) => this.fill(id);
   }
 
@@ -198,7 +197,7 @@ export class UdtAiService implements OnModuleInit {
   /** After a market day (and in the test mode on "managers act"): every AI manager acts once. */
   daily(season: Season, day: string) {
     const cfg = this.cfg();
-    const out = { managers: 0, bids: 0, entries: 0, packs: 0, trades: 0, made: [] as string[] };
+    const out = { managers: 0, entries: 0, packs: 0, trades: 0, made: [] as string[] };
     if (!cfg.enabled || !cfg.aiEnabled) {
       this.leaveAll();
       return out;
@@ -229,7 +228,6 @@ export class UdtAiService implements OnModuleInit {
       if (style.scout || rng() < 0.05) act('academy', () => this.scoutAndSign(m.user, rng));
       if (rng() < style.packs * strength) act('packs', () => (out.packs += this.openPack(m.user)));
       act('traits', () => this.assignTraits(m.user, season.number, rng));
-      act('market', () => (out.bids += this.bid(m.user, season.number, style, strength, rng)));
       act('lineup', () => this.lineup(m.user, season.number, m.personality === 'tactician'));
       act(
         'events',
@@ -238,7 +236,7 @@ export class UdtAiService implements OnModuleInit {
       if (rng() < 0.15) act('offer', () => (out.trades += this.offerTrade(m.user, rng)));
     }
     this.log.info(
-      `udt AI managers ${day}: ${out.managers} acted, ${out.bids} bids, ${out.entries} sign-ups, ${out.packs} packs, ${out.trades} trades`,
+      `udt AI managers ${day}: ${out.managers} acted, ${out.entries} sign-ups, ${out.packs} packs, ${out.trades} trades`,
     );
     return out;
   }
@@ -258,29 +256,45 @@ export class UdtAiService implements OnModuleInit {
     return this.ledger.spendable(user.id).spendable;
   }
 
-  private bid(
+  /**
+   * Closing time of a market day's offers (before the next market day): every AI manager buys
+   * up to two of the bots the humans left, the strongest it can afford. Returns the purchases.
+   */
+  closing(season: Season, day: string): number {
+    const cfg = this.cfg();
+    if (!cfg.enabled || !cfg.aiEnabled) return 0;
+    const strength = STRENGTH[cfg.aiStrength];
+    let n = 0;
+    for (const m of this.managers().slice(0, cfg.aiCount)) {
+      if (!this.udt.team(m.user.id, season.number)) continue;
+      try {
+        n += this.buy(m.user, season.number, STYLE[m.personality], strength);
+      } catch (e) {
+        this.log.debug(`AI ${m.n} market: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+    if (n) this.log.info(`udt AI managers bought ${n} bots at the closing of ${day}`);
+    return n;
+  }
+
+  private buy(
     user: User,
     season: number,
     style: (typeof STYLE)[AiPersonality],
     strength: number,
-    rng: () => number,
   ): number {
     const m = this.market.view(user);
-    const size = this.udt.roster(user.id, season).length;
-    const open = m.offers.filter((o) => o.myBid !== null).length;
-    let room = Math.min(MAX_BIDS - open, ROSTER_MAX - size - open);
+    let room = Math.min(MAX_BUYS, ROSTER_MAX - this.udt.roster(user.id, season).length);
     let budget = this.spendable(user) * style.spend * strength;
     let n = 0;
     const offers = m.offers
-      .filter((o) => !o.sold && o.myBid === null)
-      .sort((a, b) => b.skill - a.skill || a.minPrice - b.minPrice);
+      .filter((o) => !o.sold)
+      .sort((a, b) => b.skill - a.skill || a.price - b.price);
     for (const o of offers) {
       if (room <= 0) break;
-      const markup = style.markup[0] + rng() * (style.markup[1] - style.markup[0]);
-      const amount = Math.ceil((o.minPrice * (1 + markup)) / 10) * 10;
-      if (amount > budget) continue;
-      this.market.bid(user, { botId: o.botId, amount });
-      budget -= amount;
+      if (o.price > budget) continue;
+      this.market.buy(user, { botId: o.botId });
+      budget -= o.price;
       room--;
       n++;
     }

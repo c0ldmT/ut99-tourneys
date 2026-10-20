@@ -32,7 +32,7 @@ describe('Dream Team test mode', () => {
     const before = (await admin.get('/udt/test')).body;
     const moved = await admin.post('/udt/test/advance', { hours: 48 });
     expect(moved.body.offsetHours).toBe(before.offsetHours + 48);
-    // Test managers act: bids and sign-ups.
+    // Test managers act: purchases and sign-ups.
     const cup = await admin.post(
       '/tournaments',
       tournamentBody({ name: 'Test Cup', botPool: [], kind: 'udt' }, { size: 4, format: 'single' }),
@@ -121,7 +121,7 @@ describe('Dream Team high stakes', () => {
 });
 
 describe('Dream Team AI managers', () => {
-  it('are off by default; on, they found teams, bid, line up and sign up after market days', async () => {
+  it('are off by default; on, they found teams, buy at closing, line up and sign up', async () => {
     ({ api } = await startApi({ TEST_MODE: 'true' }));
     const admin = await Client.login(api, 'Boss', true);
     const mario = await Client.login(api, 'Mario');
@@ -155,6 +155,10 @@ describe('Dream Team AI managers', () => {
       tournamentBody({ name: 'AI Cup', botPool: [], kind: 'udt' }, { size: 4, format: 'single' }),
     );
     await admin.post('/udt/test/market-day'); // the next one (time of day independent)
+    // They buy only at the closing of a market day: the new offers are all for sale.
+    const fresh = (await mario.get('/udt/market')).body.offers as { sold: boolean }[];
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.every((o) => !o.sold)).toBe(true);
     const ev = (await mario.get('/udt/events')).body.find(
       (e: { id: string }) => e.id === cup.body.id,
     );

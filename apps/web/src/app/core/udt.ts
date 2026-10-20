@@ -1,4 +1,5 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -6,6 +7,7 @@ import {
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
@@ -19,11 +21,13 @@ import {
   valueScore,
   weeklySalary,
 } from '@tourney/udt';
-import { Api, errorText } from './api';
+import { UdtHelp } from '../components/udt-help';
+import { Api } from './api';
 import { Auth } from './auth';
 import { Coin } from './brand';
 import { I18n, TPipe } from './i18n';
 import { NeuroPipe } from './neuro';
+import { Toasts } from './toast';
 import type { BotTraitsView, UdtCareer, UdtRarity, UdtTestState, UdtTraitOnBot } from './types';
 
 export {
@@ -200,7 +204,7 @@ export function staminaColor(s: number): string {
 /** Sub navigation of the Dream Team pages, with the test mode bar for admins. */
 @Component({
   selector: 'udt-nav',
-  imports: [RouterLink, RouterLinkActive, TPipe],
+  imports: [RouterLink, RouterLinkActive, TPipe, UdtHelp],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <nav class="udt-nav" [attr.aria-label]="'udt.title' | t">
@@ -222,7 +226,11 @@ export function staminaColor(s: number): string {
       <a routerLink="/udt/table" routerLinkActive="active">{{ 'udt.nav.table' | t }}</a>
       <a routerLink="/udt/squads" routerLinkActive="active">{{ 'udt.nav.squads' | t }}</a>
       <a routerLink="/udt/yearbook" routerLinkActive="active">{{ 'udt.nav.yearbook' | t }}</a>
+      <button type="button" class="udt-help-btn" (click)="help().open()">
+        <span class="q" aria-hidden="true">?</span>{{ 'udt.help.button' | t }}
+      </button>
     </nav>
+    <udt-help />
     @if (testBar()) {
       <div class="udt-test" role="region" [attr.aria-label]="'udt.test.title' | t">
         <b>{{ 'udt.test.title' | t }}</b>
@@ -246,9 +254,6 @@ export function staminaColor(s: number): string {
         <button type="button" class="danger" (click)="endSeason()">
           {{ 'udt.test.seasonEnd' | t }}
         </button>
-        @if (msg()) {
-          <span class="muted small">{{ msg() }}</span>
-        }
       </div>
     }
   `,
@@ -257,24 +262,28 @@ export class UdtNav {
   private readonly auth = inject(Auth);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
+  private readonly toasts = inject(Toasts);
   /** Something changed (time, market, managers): the page reloads. */
   readonly changed = output<void>();
   protected readonly state = signal<UdtTestState | null>(null);
-  protected readonly msg = signal('');
   /** Trade offers waiting for the manager. */
   protected readonly tradesIn = signal(0);
   protected readonly testBar = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );
 
+  protected readonly help = viewChild.required(UdtHelp);
+
   constructor() {
     if (this.testBar()) void this.load();
     void this.loadTrades();
+    // New managers see the help once by itself.
+    afterNextRender(() => this.help().openFirstTime());
   }
 
   private async loadTrades() {
     try {
-      const t = await this.api.udtTrades();
+      const t = await this.api.udtTrades(true);
       this.tradesIn.set(t.open.filter((x) => x.incoming).length);
     } catch {
       this.tradesIn.set(0);
@@ -283,25 +292,27 @@ export class UdtNav {
 
   private async load() {
     try {
-      this.state.set(await this.api.udtTest());
+      this.state.set(await this.api.udtTest(true));
     } catch {
       this.state.set(null);
     }
   }
 
   protected async run(what: string, body?: unknown) {
-    this.msg.set('');
     try {
       const r = await this.api.udtTestDo(what, body);
-      if (r && typeof r === 'object' && 'now' in r) this.state.set(r as UdtTestState);
-      else {
-        this.msg.set(JSON.stringify(r));
+      if (r && typeof r === 'object' && 'now' in r) {
+        this.state.set(r as UdtTestState);
+        this.toasts.success(this.i18n.t('ok.done'));
+      } else {
+        // The result says what happened (e.g. managers made, season results): keep it readable.
+        this.toasts.info(JSON.stringify(r));
         await this.load();
       }
       this.changed.emit();
       void this.loadTrades();
-    } catch (e) {
-      this.msg.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 

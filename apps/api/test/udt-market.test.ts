@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeClock } from '@tourney/bridge';
 import type { RunningApi } from '../src/app.js';
+import { buyPrice } from '@tourney/udt';
+import { DB, type Db } from '../src/db/database.js';
+import { udtBids } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtMarketService } from '../src/udt/udt-market.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -32,8 +35,19 @@ async function setup() {
   return { clock, admin, mario, tim, market, ledger };
 }
 
+interface Offer {
+  botId: string;
+  name: string;
+  skill: number;
+  price: number;
+  value: number;
+  sold: boolean;
+  buyer: string | null;
+  mine: boolean;
+}
+
 describe('Unreal Dream Team: transfer market', () => {
-  it('opens on the first tick, settles hidden bids on the next market day, refunds the loser', async () => {
+  it('sells at once at a fixed price, first come first served; the next market day has new offers', async () => {
     const { clock, mario, tim, market, ledger } = await setup();
     expect(market.tick()).toBe(true); // first market day of the season: right away
     expect(market.tick()).toBe(false);
@@ -41,78 +55,77 @@ describe('Unreal Dream Team: transfer market', () => {
     expect(m.day).toBe('2026-10-19');
     expect(m.index).toBe(0.3);
     expect(m.offers).toHaveLength(6);
-    const cheap = [...m.offers].sort(
-      (a: { minPrice: number }, b: { minPrice: number }) => a.minPrice - b.minPrice,
-    )[0];
-    expect(cheap.minPrice).toBeGreaterThan(0);
-    expect((await mario.post('/udt/market/bid', { botId: cheap.botId, amount: 5 })).status).toBe(
-      400,
-    );
-    const low = cheap.minPrice;
-    expect((await mario.post('/udt/market/bid', { botId: cheap.botId, amount: low })).status).toBe(
-      200,
-    );
-    expect(
-      (await tim.post('/udt/market/bid', { botId: cheap.botId, amount: low + 50 })).status,
-    ).toBe(200);
+    expect(m).toMatchObject({ rosterSize: 1, rosterMax: 7 });
+    const offers = m.offers as Offer[];
+    // The price is the market value plus the bracket's surcharge.
+    for (const o of offers) {
+      expect(o.price).toBe(buyPrice(o.value, o.skill));
+      expect(o.price).toBeGreaterThan(o.value);
+    }
+    const cheap = [...offers].sort((a, b) => a.price - b.price)[0]!;
     const marioId = (await mario.get('/me')).body.id as string;
     const timId = (await tim.get('/me')).body.id as string;
-    // Paid while open.
-    expect(ledger.spendable(marioId).balance).toBe(1000 - low);
-    // A higher bid replaces the own one.
-    expect(
-      (await mario.post('/udt/market/bid', { botId: cheap.botId, amount: low + 60 })).status,
-    ).toBe(200);
-    expect(ledger.spendable(marioId).balance).toBe(1000 - low - 60);
+    const bought = await mario.post('/udt/market/buy', { botId: cheap.botId });
+    expect(bought.status, JSON.stringify(bought.body)).toBe(200);
+    // In the roster at once, paid at once.
+    const roster = (await mario.get('/udt')).body.roster as { botId: string; price: number }[];
+    expect(roster.find((r) => r.botId === cheap.botId)?.price).toBe(cheap.price);
+    expect(ledger.spendable(marioId).balance).toBe(1000 - cheap.price);
+    const mine = (bought.body.offers as Offer[]).find((o) => o.botId === cheap.botId)!;
+    expect(mine).toMatchObject({ sold: true, mine: true, buyer: '[NX]' });
+    // Tim comes too late; the error carries its template for the website.
+    const late = await tim.post('/udt/market/buy', { botId: cheap.botId });
+    expect(late.status).toBe(409);
+    expect(late.body).toMatchObject({ key: 'the bot is sold', message: 'the bot is sold' });
+    const forTim = (await tim.get('/udt/market')).body.offers as Offer[];
+    expect(forTim.find((o) => o.botId === cheap.botId)).toMatchObject({
+      sold: true,
+      mine: false,
+      buyer: '[NX]',
+    });
+    expect(ledger.spendable(timId).balance).toBe(1000);
+    // Too expensive: nothing changes.
+    const dear = [...offers].sort((a, b) => b.price - a.price)[0]!;
+    if (dear.price > 1000 - 100) {
+      const no = await tim.post('/udt/market/buy', { botId: dear.botId });
+      expect(no.status).toBe(409);
+      expect(no.body.key).toBe('not enough Neuro: {spendable} can be spent (rescue floor {floor})');
+      expect(no.body.params).toMatchObject({ floor: 100 });
+    }
+    // Selling pays 85 % of the value; bought again the same day, it is paid again.
+    const sold = await mario.post(`/udt/roster/${cheap.botId}/sell`);
+    expect(sold.status).toBe(200);
+    const afterSale = ledger.spendable(marioId).balance;
+    expect(afterSale).toBeGreaterThan(1000 - cheap.price);
+    expect((await mario.post('/udt/market/buy', { botId: cheap.botId })).status).toBe(200);
+    expect(ledger.spendable(marioId).balance).toBe(afterSale - cheap.price);
+    // The starter stays.
+    const starter = (await mario.get('/udt')).body.roster.find(
+      (r: { starter: boolean }) => r.starter,
+    );
+    expect((await mario.post(`/udt/roster/${starter.botId}/sell`)).status).toBe(409);
     // Before the market time of the next day nothing happens.
     clock.advance(DAY - 8 * 3_600_000); // Tuesday 02:00 UTC = 04:00 in Berlin (summer time)
     clock.advance(-60_000);
     expect(market.tick()).toBe(false);
     clock.advance(2 * 60_000);
     expect(market.tick()).toBe(true);
-    const roster = (await mario.get('/udt')).body.roster as { botId: string; price: number }[];
-    expect(roster.find((r) => r.botId === cheap.botId)?.price).toBe(low + 60);
-    expect(ledger.spendable(timId).balance).toBe(1000); // refunded
     const m2 = (await mario.get('/udt/market')).body;
     expect(m2.day).toBe('2026-10-20');
-    expect(m2.offers.some((o: { botId: string }) => o.botId === cheap.botId)).toBe(false);
-    // Selling pays 85 % of the value; the starter stays.
-    const starter = (await mario.get('/udt')).body.roster.find(
-      (r: { starter: boolean }) => r.starter,
-    );
-    expect((await mario.post(`/udt/roster/${starter.botId}/sell`)).status).toBe(409);
-    const sold = await mario.post(`/udt/roster/${cheap.botId}/sell`);
-    expect(sold.status).toBe(200);
-    expect(ledger.spendable(marioId).balance).toBeGreaterThan(1000 - low - 60);
+    expect((m2.offers as Offer[]).some((o) => o.botId === cheap.botId)).toBe(false);
   });
 
-  it('withdraws bids and pays salaries on Mondays (strike when it cannot be paid)', async () => {
+  it('pays salaries on Mondays (strike when it cannot be paid)', async () => {
     const { clock, mario, market, ledger } = await setup();
     market.tick();
     const m = (await mario.get('/udt/market')).body;
-    const best = [...m.offers]
-      .filter((o: { minPrice: number }) => o.minPrice <= 900)
-      .sort((a: { minPrice: number }, b: { minPrice: number }) => b.minPrice - a.minPrice)[0];
+    const best = [...(m.offers as Offer[])]
+      .filter((o) => o.price <= 900)
+      .sort((a, b) => b.price - a.price)[0]!;
     const marioId = (await mario.get('/me')).body.id as string;
-    expect(
-      (await mario.post('/udt/market/bid', { botId: best.botId, amount: best.minPrice })).status,
-    ).toBe(200);
-    expect(
-      (
-        await mario.post('/udt/market/bid', {
-          botId: m.offers.find((o: { minPrice: number }) => o.minPrice > 900)?.botId ?? best.botId,
-          amount: 100_000,
-        })
-      ).status,
-    ).toBe(409);
-    const wd = await mario.req('DELETE', `/udt/market/bid/${best.botId}`);
-    expect(wd.status, JSON.stringify(wd.body)).toBe(200);
-    expect(ledger.spendable(marioId).balance).toBe(1000);
-    await mario.post('/udt/market/bid', { botId: best.botId, amount: best.minPrice });
-    // Tuesday's market day: Mario owns it. Then on to the next Monday.
-    clock.advance(DAY);
-    market.tick();
-    for (let d = 0; d < 6; d++) {
+    expect((await mario.post('/udt/market/buy', { botId: best.botId })).status).toBe(200);
+    // On to the next Monday.
+    for (let d = 0; d < 7; d++) {
       clock.advance(DAY);
       market.tick();
     }
@@ -125,5 +138,28 @@ describe('Unreal Dream Team: transfer market', () => {
       expect(salary.amount).toBeLessThan(0);
       expect(r.striking).toBe(false);
     } else expect(r.striking).toBe(true);
+  });
+
+  it('refunds the open bids of the old market once', async () => {
+    const { mario, market, ledger } = await setup();
+    market.tick();
+    const m = (await mario.get('/udt/market')).body;
+    const marioId = (await mario.get('/me')).body.id as string;
+    const db = api!.app.get(DB) as Db;
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_purchase', amount: -300, ref: 'bid:old' });
+    db.insert(udtBids)
+      .values({
+        id: 'old',
+        day: m.day,
+        botId: (m.offers as Offer[])[0]!.botId,
+        userId: marioId,
+        amount: 300,
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+    expect(ledger.spendable(marioId).balance).toBe(700);
+    expect(market.refundOpenBids()).toBe(1);
+    expect(market.refundOpenBids()).toBe(0);
+    expect(ledger.spendable(marioId).balance).toBe(1000);
   });
 });

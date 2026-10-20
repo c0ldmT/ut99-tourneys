@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { assetLabel, COMBAT_STYLES, combatStyleKey, skinPackage } from '../core/bots';
 import { I18n, TPipe } from '../core/i18n';
 import {
@@ -79,9 +79,6 @@ const emptyLines = () =>
         {{ 'bots.tab.teams' | t }}
       </button>
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (notice()) {
       <p class="notice">{{ notice() }}</p>
     }
@@ -656,9 +653,6 @@ const emptyLines = () =>
             <button type="submit" class="primary" [disabled]="busy()">
               {{ 'common.save' | t }}
             </button>
-            @if (savedTeams()) {
-              <span class="muted small">{{ 'settings.saved' | t }}</span>
-            }
           </div>
         </form>
       }
@@ -833,9 +827,8 @@ export class BotsPage {
   protected readonly draft = signal<Draft | null>(null);
   protected readonly panel = signal<'random' | 'import' | null>(null);
   protected readonly busy = signal(false);
-  protected readonly error = signal('');
+  /** Import result (the toast only says how many were imported, not how many were skipped). */
   protected readonly notice = signal('');
-  protected readonly savedTeams = signal(false);
   protected readonly query = signal('');
   protected readonly status = signal<'all' | 'active' | 'retired'>('all');
   protected readonly clanFilter = signal('');
@@ -901,8 +894,8 @@ export class BotsPage {
       this.agents.set(agents);
       const first = agents.find((a) => a.profiles.length);
       if (first && !this.importFrom) this.importFrom = `${first.id}/${first.profiles[0]!.id}`;
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -914,14 +907,13 @@ export class BotsPage {
 
   private async run(fn: () => Promise<unknown>) {
     this.busy.set(true);
-    this.error.set('');
     this.notice.set('');
     try {
       await fn();
       await this.reload();
       return true;
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
       return false;
     } finally {
       this.busy.set(false);
@@ -951,12 +943,11 @@ export class BotsPage {
 
   protected random() {
     void this.run(async () => {
-      const made = await this.api.randomBots({
+      await this.api.randomBots({
         count: Math.max(1, Math.min(50, Math.round(Number(this.randomCount) || 1))),
         skill: this.randomSkill,
         ...(this.randomClan ? { clanId: this.randomClan } : {}),
       });
-      this.notice.set(this.i18n.t('bots.randomDone', { n: made.length }));
       this.panel.set(null);
     });
   }
@@ -1182,12 +1173,10 @@ export class BotsPage {
       .split('\n')
       .map((n) => n.trim())
       .filter(Boolean);
-    this.savedTeams.set(false);
-    const ok = await this.run(async () => {
+    await this.run(async () => {
       const s = await this.api.setTeamNames(names);
       this.teamNames = s.teamNames.join('\n');
     });
-    this.savedTeams.set(ok);
   }
 }
 

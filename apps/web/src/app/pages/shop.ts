@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { Coin, Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { Avatar, Looks, nameStyle } from '../core/looks';
-import { NeuroPipe } from '../core/neuro';
+import { NeuroPipe, NeuroStore } from '../core/neuro';
 import type { ShopItem, ShopPurchaseView, ShopSlot, ShopView } from '../core/types';
 
 type Tab = 'shop' | 'wardrobe' | 'admin';
@@ -30,10 +30,11 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
     <div class="pagehead">
       <h1>{{ 'shop.title' | t }}</h1>
       @if (view(); as v) {
+        @let w = wallet() ?? v.wallet;
         <div class="wallet">
-          <b class="neuro"><na-coin [size]="20" /> {{ v.wallet.balance | neuro: false }}</b>
+          <b class="neuro"><na-coin [size]="20" /> {{ w.balance | neuro: false }}</b>
           <span class="muted small">{{
-            'shop.spendable' | t: { n: neuro(v.wallet.spendable), floor: neuro(v.wallet.floor) }
+            'shop.spendable' | t: { n: neuro(w.spendable), floor: neuro(w.floor) }
           }}</span>
         </div>
       }
@@ -55,9 +56,6 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
         </button>
       }
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
 
     @if (view(); as v) {
       @if (!v.enabled && tab() !== 'admin') {
@@ -504,7 +502,12 @@ export class ShopPage {
   protected readonly view = signal<ShopView | null>(null);
   protected readonly admin = signal<{ catalog: ShopItem[]; log: ShopPurchaseView[] } | null>(null);
   protected readonly busy = signal(false);
-  protected readonly error = signal('');
+  private readonly store = inject(NeuroStore);
+  /** The shared Neuro state while a season runs (the same as in the navbar). */
+  protected readonly wallet = computed(() => {
+    const w = this.store.wallet();
+    return w?.running ? w : null;
+  });
   protected readonly dedOpen = signal(false);
   protected dedKill = '';
   protected dedDeath = '';
@@ -541,8 +544,8 @@ export class ShopPage {
         this.dedKill = v.dedication.kill;
         this.dedDeath = v.dedication.death;
       }
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -561,13 +564,12 @@ export class ShopPage {
 
   private async run(fn: () => Promise<ShopView | unknown>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       const r = await fn();
       if (r && typeof r === 'object' && 'items' in r) this.view.set(r as ShopView);
       void this.looks.reload();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }
@@ -575,7 +577,8 @@ export class ShopPage {
 
   protected canBuy(i: ShopItem): boolean {
     const v = this.view();
-    return !!v && v.enabled && v.wallet.season !== null && i.price <= v.wallet.spendable;
+    const spendable = this.wallet()?.spendable ?? v?.wallet.spendable ?? 0;
+    return !!v && v.enabled && v.wallet.season !== null && i.price <= spendable;
   }
 
   protected worn(i: ShopItem): boolean {

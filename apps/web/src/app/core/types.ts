@@ -875,7 +875,14 @@ export interface UdtRosterBot {
   striking: boolean;
   games: number;
   /** A bot the manager made: potential (a range until level 5), development points. */
-  own: { origin: string; potential: [number, number]; points: number; spent: number } | null;
+  own: {
+    origin: string;
+    potential: [number, number];
+    points: number;
+    spent: number;
+    /** The one free renaming is still open. */
+    canRename: boolean;
+  } | null;
   career?: UdtCareer | null;
 }
 
@@ -985,14 +992,18 @@ export interface UdtOffer {
   skin: string | null;
   face: string | null;
   traits: BotTraitsView;
-  minPrice: number;
+  /** What buying costs (fixed for the market day). */
+  price: number;
   value: number;
   history: { day: string; value: number }[];
   sold: boolean;
+  /** Tag of the team that bought it (sold). */
+  buyer: string | null;
+  /** Bought by the own team. */
+  mine: boolean;
   /** A graduate of a manager's academy. */
   homegrown?: { breeder: string; honours: boolean } | null;
   career?: UdtCareer | null;
-  myBid: number | null;
 }
 
 export interface UdtMarket {
@@ -1001,7 +1012,9 @@ export interface UdtMarket {
   /** Next market day (epoch ms). */
   nextAt: number;
   offers: UdtOffer[];
-  bids: { botId: string; amount: number; status: string }[];
+  /** Bots in the own roster and the most a roster holds. */
+  rosterSize: number;
+  rosterMax: number;
 }
 
 export interface UdtEventRules {

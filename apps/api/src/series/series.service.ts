@@ -113,7 +113,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
 
   private row(id: string): SeriesRow {
     const r = this.db.select().from(series).where(eq(series.id, id)).get();
-    if (!r) throw notFound(`series ${id}`);
+    if (!r) throw notFound('series {id}', { id });
     return r;
   }
 
@@ -140,7 +140,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     const s: Schedule = { days: [...new Set(days)].sort(), times: times ?? [], every };
     const n = dayTimes(s).length;
     if (!n) throw badRequest('a series needs a start time or an hour interval');
-    if (n > MAX_TIMES) throw badRequest(`at most ${MAX_TIMES} tournaments a day`);
+    if (n > MAX_TIMES) throw badRequest('at most {max} tournaments a day', { max: MAX_TIMES });
     return s;
   }
 
@@ -223,7 +223,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
   /** A copy of a tournament's server, settings, bots and channel. */
   private templateOf(id: string): Template {
     const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
-    if (!t) throw notFound(`tournament ${id}`);
+    if (!t) throw notFound('tournament {id}', { id });
     return {
       agentId: t.agentId,
       profileId: t.profileId,

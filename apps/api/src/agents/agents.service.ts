@@ -41,7 +41,7 @@ export class AgentsService {
 
   require(id: string): AgentRow {
     const a = this.get(id);
-    if (!a) throw notFound(`agent ${id}`);
+    if (!a) throw notFound('agent {id}', { id });
     return a;
   }
 
@@ -56,7 +56,7 @@ export class AgentsService {
   /** Returns the plain token once; only its hash is stored. */
   create(id: string, name: string): { agent: AgentRow; token: string } {
     if (!TOURNAMENT_ID.test(id)) throw badRequest('agent id: letters, digits, - and _ only');
-    if (this.get(id)) throw conflict(`agent ${id} exists`);
+    if (this.get(id)) throw conflict('agent {id} exists', { id });
     const token = newAgentToken();
     this.db
       .insert(agents)

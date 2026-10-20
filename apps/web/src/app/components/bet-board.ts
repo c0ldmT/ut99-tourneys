@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe } from '../core/neuro';
 import type { BetBoard, BetRecordView } from '../core/types';
@@ -23,9 +23,6 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
   imports: [TPipe, RouterLink, NeuroPipe, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (board()?.versus; as v) {
       @if (v.humans || v.bots) {
         <div class="card versus">
@@ -210,7 +207,6 @@ export class BetBoardView {
   readonly meId = input<string | null>(null);
   protected readonly board = signal<BetBoard | null>(null);
   protected readonly recs = signal<BetRecordView[]>([]);
-  protected readonly error = signal('');
   protected readonly botRecs = signal<BetRecordView[]>([]);
   protected readonly records = computed(() => this.recs());
   protected readonly botRecords = computed(() => this.botRecs());
@@ -234,14 +230,13 @@ export class BetBoardView {
   }
 
   private async load(season: number | undefined) {
-    this.error.set('');
     try {
       const [b, r] = await Promise.all([this.api.betBoard(season), this.api.betRecords(season)]);
       this.board.set(b);
       this.recs.set(r.records);
       this.botRecs.set(r.botRecords ?? []);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 

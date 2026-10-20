@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { leadText, scheduleText } from '../core/series-text';
@@ -19,9 +19,6 @@ import type { SeriesView } from '../core/types';
       </a>
     </div>
     <p class="muted small intro">{{ 'series.intro' | t }}</p>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
 
     <div class="card tablepanel">
       @if (!list().length) {
@@ -158,7 +155,6 @@ export class SeriesPage {
   private readonly i18n = inject(I18n);
   protected readonly list = signal<SeriesView[]>([]);
   protected readonly busy = signal(false);
-  protected readonly error = signal('');
 
   constructor() {
     void this.load();
@@ -167,19 +163,18 @@ export class SeriesPage {
   private async load() {
     try {
       this.list.set(await this.api.series());
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
   private async run(fn: () => Promise<unknown>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
       await this.load();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

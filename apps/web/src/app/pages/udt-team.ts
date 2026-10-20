@@ -9,10 +9,11 @@ import {
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { UdtRename } from '../components/udt-rename';
+import { Api } from '../core/api';
 import { Coin } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
-import { NeuroPipe } from '../core/neuro';
+import { NeuroPipe, NeuroStore } from '../core/neuro';
 import type { UdtLedgerEntry, UdtPacks, UdtRosterBot, UdtTraitOnBot, UdtView } from '../core/types';
 import {
   baseValue,
@@ -33,13 +34,20 @@ type Mode = 'dm' | 'mh';
 /** Dream Team: founding the team (starter bot), the lineups, the roster and the ledger. */
 @Component({
   selector: 'app-udt-team',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtBotLook],
+  imports: [
+    FormsModule,
+    RouterLink,
+    TPipe,
+    NeuroPipe,
+    Coin,
+    UdtCard,
+    UdtNav,
+    UdtBotLook,
+    UdtRename,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (view(); as v) {
       @if (!v.enabled) {
         <div class="card">
@@ -138,7 +146,7 @@ type Mode = 'dm' | 'mh';
             <div>
               <div class="kpi">{{ 'udt.spendable' | t }}</div>
               <div class="v neuro">
-                <na-coin [size]="16" /> {{ v.wallet?.spendable ?? 0 | neuro: false }}
+                <na-coin [size]="16" /> {{ spendable() ?? v.wallet?.spendable ?? 0 | neuro: false }}
               </div>
             </div>
             <div>
@@ -391,7 +399,10 @@ type Mode = 'dm' | 'mh';
                     <button
                       type="button"
                       class="primary"
-                      [disabled]="busy() || restPoints() * restPrice > (v.wallet?.spendable ?? 0)"
+                      [disabled]="
+                        busy() ||
+                        restPoints() * restPrice > (spendable() ?? v.wallet?.spendable ?? 0)
+                      "
                       (click)="rest(b)"
                     >
                       {{ 'udt.rest.buy' | t }} · {{ restPoints() * restPrice | neuro }}
@@ -405,6 +416,9 @@ type Mode = 'dm' | 'mh';
               @if (lookFor() === b.botId) {
                 @if (lookDraft(); as ld) {
                   <div class="lookedit">
+                    @if (b.own?.canRename) {
+                      <udt-rename [botId]="b.botId" [name]="b.name" (renamed)="renamed()" />
+                    }
                     <app-udt-bot-look [draft]="ld" [looks]="looks()" />
                     <span class="row">
                       <button
@@ -549,7 +563,8 @@ export class UdtTeamPage {
   private readonly i18n = inject(I18n);
   protected readonly view = signal<UdtView | null>(null);
   protected readonly ledger = signal<UdtLedgerEntry[]>([]);
-  protected readonly error = signal('');
+  /** The shared Neuro state (the same as in the navbar). */
+  protected readonly spendable = inject(NeuroStore).spendable;
   protected readonly busy = signal(false);
   protected readonly mode = signal<Mode>('dm');
   protected readonly slots = [1, 2, 3, 4, 5];
@@ -633,9 +648,8 @@ export class UdtTeamPage {
       if (v.enabled && v.season !== null && !this.looks())
         this.looks.set(await this.api.udtLooks().catch(() => null));
       if (v.team) this.ledger.set(await this.api.udtLedger());
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -800,6 +814,11 @@ export class UdtTeamPage {
     });
   }
 
+  /** After the one renaming: the roster shows the new name, the look editor stays open. */
+  protected async renamed() {
+    await this.load();
+  }
+
   protected async saveLook(b: UdtRosterBot) {
     const d = this.lookDraft();
     if (!d) return;
@@ -820,11 +839,10 @@ export class UdtTeamPage {
 
   private async act(fn: () => Promise<void>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

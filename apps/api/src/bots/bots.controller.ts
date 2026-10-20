@@ -54,7 +54,7 @@ export class BotsController {
   @Get('bots/:id')
   profile(@Param('id') id: string) {
     const b = this.bots.get(id);
-    if (!b) throw notFound(`bot ${id}`);
+    if (!b) throw notFound('bot {id}', { id });
     const users = new Map(this.users.list().map((u) => [u.id, u.displayName]));
     const all = this.bots.list();
     const rivalKey = (r: { kind: 'user' | 'bot'; id: string }) =>

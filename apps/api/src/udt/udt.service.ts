@@ -144,6 +144,8 @@ export interface RosterBot {
     potential: [number, number];
     points: number;
     spent: number;
+    /** The one free renaming is still open. */
+    canRename: boolean;
   } | null;
 }
 
@@ -546,6 +548,34 @@ export class UdtService {
     return this.bots.update(b.id, { ...lookFields(body), ...traits });
   }
 
+  /**
+   * Renames an own bot of the season once, free (the look and lines can change any time, the
+   * name only this once). Its game name keeps the team's tag in front.
+   */
+  rename(user: User, botId: string, name: string): LibraryBot {
+    this.assertOn();
+    const season = this.season().number;
+    const own = this.db
+      .select()
+      .from(udtBots)
+      .where(and(eq(udtBots.botId, botId), eq(udtBots.season, season)))
+      .get();
+    const b = this.bots.get(botId);
+    if (!own || !b || own.userId !== user.id || b.udtOwner !== user.id)
+      throw forbidden('only your own bots (starter, academy, blueprint) can be changed');
+    if (own.renamed) throw conflict('the bot was renamed already (once per bot)');
+    if (own.status !== 'own') throw conflict('the bot is {status}', { status: own.status });
+    if (b.name === name) throw badRequest('that is its name already');
+    if (this.bots.list().some((x) => x.id !== botId && x.name.toLowerCase() === name.toLowerCase()))
+      throw conflict('a bot is called {name} already', { name });
+    const tag = this.team(user.id, season)?.tag ?? '';
+    if (gameName(tag, name).length < `${tag}${name}`.length)
+      throw badRequest('{tag}{name} is too long for the game', { tag, name });
+    const updated = this.bots.update(botId, { name });
+    this.db.update(udtBots).set({ renamed: true }).where(eq(udtBots.botId, botId)).run();
+    return updated;
+  }
+
   view(user: User) {
     const enabled = this.enabled();
     const season = this.seasons.current();
@@ -579,18 +609,22 @@ export class UdtService {
     const tagKey = body.tag.toLowerCase();
     const others = this.teams(season.number);
     if (others.some((t) => t.name.toLowerCase() === nameKey))
-      throw conflict(`the team name ${body.name} is taken`);
+      throw conflict('the team name {name} is taken', { name: body.name });
     if (others.some((t) => t.tag.toLowerCase() === tagKey))
-      throw conflict(`the tag ${body.tag} is taken`);
+      throw conflict('the tag {tag} is taken', { tag: body.tag });
     if (gameName(body.tag, body.starter.name).length < `${body.tag}${body.starter.name}`.length)
       throw badRequest(
-        `tag and bot name are too long for the game: ${body.tag}${body.starter.name} (at most ${GAME_NAME_CHARS})`,
+        'tag and bot name are too long for the game: {tag}{name} (at most {chars})',
+        { tag: body.tag, name: body.starter.name, chars: GAME_NAME_CHARS },
       );
     const cfg = this.settings.get().udt;
     const budget = cfg.starterBudget + cfg.starterExtra;
     const cost = Math.round(baseValue(body.starter.skill, valueScore(body.starter.traits)));
     if (cost > budget)
-      throw badRequest(`the starter bot costs ${cost} of ${budget} points: lower skill or values`);
+      throw badRequest('the starter bot costs {cost} of {budget} points: lower skill or values', {
+        cost,
+        budget,
+      });
     const bot = this.bots.create({
       name: body.starter.name,
       skill: body.starter.skill,
@@ -652,15 +686,15 @@ export class UdtService {
     const season = this.season();
     if (!this.team(user.id, season.number)) throw notFound('team');
     const owned = new Set(this.roster(user.id, season.number).map((r) => r.botId));
-    const check = (list: (string | null)[] | undefined, what: string) => {
+    const check = (list: (string | null)[] | undefined, twice: Error) => {
       if (!list) return;
       const ids = list.filter((x): x is string => x !== null);
-      if (new Set(ids).size !== ids.length) throw badRequest(`a bot twice in the ${what}`);
-      for (const id of ids) if (!owned.has(id)) throw badRequest(`bot ${id} is not yours`);
+      if (new Set(ids).size !== ids.length) throw twice;
+      for (const id of ids) if (!owned.has(id)) throw badRequest('bot {id} is not yours', { id });
     };
-    check(body.dm, 'deathmatch lineup');
-    check(body.mh, 'Monster Hunt lineup');
-    check(body.bench, 'bench');
+    check(body.dm, badRequest('a bot twice in the deathmatch lineup'));
+    check(body.mh, badRequest('a bot twice in the Monster Hunt lineup'));
+    check(body.bench, badRequest('a bot twice on the bench'));
     const where = (botId: string) =>
       and(eq(udtRoster.season, season.number), eq(udtRoster.botId, botId));
     this.db.transaction((tx) => {
@@ -705,5 +739,6 @@ function ownView(b: typeof udtBots.$inferSelect | undefined, level: number) {
     potential: (level >= 5 ? [p, p] : [Math.max(0, p - 1), Math.min(7, p + 1)]) as [number, number],
     points: developPoints(level, b.pointsSpent),
     spent: b.pointsSpent,
+    canRename: !b.renamed && b.status === 'own',
   };
 }

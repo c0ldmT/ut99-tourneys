@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { DatePipe } from '@angular/common';
 import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { BetBoardView } from '../components/bet-board';
 import { TPipe } from '../core/i18n';
@@ -74,9 +74,6 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
       }
     </div>
 
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (!seasons().length) {
       <p class="muted small">{{ 'season.noneYet' | t }}</p>
     }
@@ -636,7 +633,6 @@ export class StatsPage {
   protected readonly ratingRows = signal<RatingRow[]>([]);
   protected readonly records = signal<StatsRecord[]>([]);
   protected readonly maps = signal<MapRecord[]>([]);
-  protected readonly error = signal('');
   protected readonly sortKey = signal<SortKey>('titles');
   protected readonly sortDesc = signal(true);
 
@@ -767,8 +763,8 @@ export class StatsPage {
       this.scope.set(known && pref ? parseScope(pref) : defaultScope(o));
       this.fixTab();
       await this.load();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -814,7 +810,6 @@ export class StatsPage {
   }
 
   private async load() {
-    this.error.set('');
     const scope = this.scope();
     try {
       const season = scope === 'lifetime' ? null : scope;
@@ -829,8 +824,8 @@ export class StatsPage {
       this.maps.set(rec.maps);
       const skills = [...new Set(rec.maps.map((m) => m.monsterSkill))];
       if (skills.length && !skills.includes(this.mapSkill())) this.mapSkill.set(skills[0]!);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 }

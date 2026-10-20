@@ -12,6 +12,10 @@ import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { events, tournaments } from '../db/schema.js';
 import { LiveHub } from './hub.js';
+import { NeuroHub } from '../ledger/neuro-hub.js';
+
+/** Events after which bets are settled or refunded. */
+const SETTLES = new Set(['match.result', 'tournament.finished', 'tournament.aborted']);
 
 /** Called after every accepted append (notifications). `before` folds the log as it was. */
 export type AppendListener = (
@@ -39,6 +43,7 @@ export class EventLogService {
     @Inject(DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(LiveHub) private readonly hub: LiveHub,
+    @Inject(NeuroHub) private readonly neuro: NeuroHub,
   ) {}
 
   load(tournamentId: string): TournamentEvent[] {
@@ -105,6 +110,8 @@ export class EventLogService {
       headSeq: projection.headSeq,
       phase: projection.phase,
     });
+    // Results settle bets: everybody's Neuro may have changed.
+    if (stored.some((e) => SETTLES.has(e.type))) this.neuro.changedAll();
     const before = () => (log.length ? projectTournament(log) : undefined);
     for (const l of this.listeners) {
       try {
@@ -127,6 +134,7 @@ export class EventLogService {
     });
     this.cache.delete(tournamentId);
     this.hub.publish(tournamentId, { type: 'change', headSeq: 0, phase: 'draft' });
+    this.neuro.changedAll();
   }
 
   forget(tournamentId: string): void {

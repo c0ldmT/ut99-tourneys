@@ -9,6 +9,7 @@ import { randomId } from '../common/ids.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { betBailouts, bets, neuroLedger, shopPurchases, tournaments } from '../db/schema.js';
+import { NeuroHub } from '../ledger/neuro-hub.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { headToHead } from '../stats/aggregate.js';
 import { botKey, userKey } from '../stats/facts.js';
@@ -85,6 +86,7 @@ export class BetsService {
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(BotsService) private readonly bots: BotsService,
     @Inject(StatsService) private readonly stats: StatsService,
+    @Inject(NeuroHub) private readonly neuro: NeuroHub,
   ) {
     // A match opens for bets when its entrants are known: the bots bet right away.
     this.log.onAppend((tournamentId) => this.botsBet(tournamentId));
@@ -226,7 +228,7 @@ export class BetsService {
 
   private tournament(id: string) {
     const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
-    if (!t) throw notFound(`tournament ${id}`);
+    if (!t) throw notFound('tournament {id}', { id });
     return t;
   }
 
@@ -349,10 +351,10 @@ export class BetsService {
     const kind = body.kind ?? 'winner';
     const t = this.tournament(tournamentId);
     const reason = this.closedReason(t);
-    if (reason) throw conflict(`no bets in this tournament now (${reason})`);
+    if (reason) throw conflict('no bets in this tournament now ({reason})', { reason });
     const season = this.seasons.current()!;
     const m = this.book(tournamentId)?.books.get(matchId);
-    if (!m) throw notFound(`match ${matchId}`);
+    if (!m) throw notFound('match {matchId}', { matchId });
     if (m.state !== 'open') throw conflict('bets on this match are closed');
     if (m.participants.includes(userId)) throw forbidden('you play in this match');
     if (!m.entrants!.includes(body.pick)) throw badRequest('pick one of the two entrants');
@@ -371,7 +373,7 @@ export class BetsService {
     const w = this.rescue(userId, season);
     // The old stake of this bet is free again when it changes.
     const free = w.free + (existing && existing.season === season.number ? existing.amount : 0);
-    if (body.amount > free) throw badRequest(`only ${free} Neuro free`);
+    if (body.amount > free) throw badRequest('only {free} Neuro free', { free });
     const row = {
       season: season.number,
       pick: body.pick,
@@ -385,13 +387,14 @@ export class BetsService {
         .insert(bets)
         .values({ id: `w${randomId(12)}`, tournamentId, matchId, kind, userId, ...row })
         .run();
+    this.neuro.changed(userId);
     return this.tournamentView(tournamentId, userId);
   }
 
   /** Withdraws a bet while the match takes bets. */
   withdraw(tournamentId: string, matchId: string, userId: string, kind: BetKind = 'winner') {
     const m = this.book(tournamentId)?.books.get(matchId);
-    if (!m) throw notFound(`match ${matchId}`);
+    if (!m) throw notFound('match {matchId}', { matchId });
     if (m.state !== 'open') throw conflict('bets on this match are closed');
     this.db
       .delete(bets)
@@ -404,6 +407,7 @@ export class BetsService {
         ),
       )
       .run();
+    this.neuro.changed(userId);
     return this.tournamentView(tournamentId, userId);
   }
 
@@ -703,7 +707,7 @@ export class BetsService {
   /** A bot's Neuro in a season and its betting type (bot profile). */
   botView(botId: string, seasonNo?: number) {
     const bot = this.bots.get(botId);
-    if (!bot) throw notFound(`bot ${botId}`);
+    if (!bot) throw notFound('bot {botId}', { botId });
     return {
       name: bot.gameName,
       type: bettingType(toBettingBot(bot)),

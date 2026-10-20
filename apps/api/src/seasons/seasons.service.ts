@@ -133,7 +133,7 @@ export class SeasonsService {
 
   get(number: number): Season {
     const s = this.list().find((x) => x.number === number);
-    if (!s) throw notFound(`season ${number}`);
+    if (!s) throw notFound('season {number}', { number });
     return s;
   }
 
@@ -144,7 +144,10 @@ export class SeasonsService {
     this.checkDates(body.startDate, body.endDate);
     if (body.startDate < day) throw badRequest('a season cannot start in the past');
     if (last && body.startDate <= this.lastDay(last))
-      throw conflict(`season ${last.number} runs until ${this.lastDay(last)}`);
+      throw conflict('season {number} runs until {day}', {
+        number: last.number,
+        day: this.lastDay(last),
+      });
     const number = (last?.number ?? 0) + 1;
     this.db
       .insert(seasons)
@@ -165,7 +168,7 @@ export class SeasonsService {
   update(number: number, body: { startDate?: string; endDate?: string }): Season {
     const s = this.get(number);
     const status = seasonStatus(s, this.clock.now(), this.timeZone);
-    if (status === 'ended') throw conflict(`season ${number} has ended`);
+    if (status === 'ended') throw conflict('season {number} has ended', { number });
     const day = today(this.clock.now(), this.timeZone);
     const startDate = body.startDate ?? s.startDate;
     const endDate = body.endDate ?? s.endDate;
@@ -179,10 +182,16 @@ export class SeasonsService {
       .filter((x) => x.number < number)
       .at(-1);
     if (before && startDate <= this.lastDay(before))
-      throw conflict(`season ${before.number} runs until ${this.lastDay(before)}`);
+      throw conflict('season {number} runs until {day}', {
+        number: before.number,
+        day: this.lastDay(before),
+      });
     const after = this.list().find((x) => x.number > number);
     if (after && endDate >= after.startDate)
-      throw conflict(`season ${after.number} starts on ${after.startDate}`);
+      throw conflict('season {number} starts on {startDate}', {
+        number: after.number,
+        startDate: after.startDate,
+      });
     this.db.update(seasons).set({ startDate, endDate }).where(eq(seasons.number, number)).run();
     this.version++;
     return this.get(number);
@@ -192,7 +201,7 @@ export class SeasonsService {
   endNow(number: number): Season {
     const s = this.get(number);
     if (seasonStatus(s, this.clock.now(), this.timeZone) !== 'running')
-      throw conflict(`season ${number} is not running`);
+      throw conflict('season {number} is not running', { number });
     this.db
       .update(seasons)
       .set({

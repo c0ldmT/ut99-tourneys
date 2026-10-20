@@ -12,12 +12,24 @@ type Outgoing = WebsiteToBridge extends infer M
   : never;
 
 export class AgentOfflineError extends Error {
+  readonly key = 'agent {id} is not connected';
+  readonly params: Record<string, string>;
   constructor(agentId: string) {
     super(`agent ${agentId} is not connected`);
+    this.params = { id: agentId };
   }
 }
 
-export class CommandFailedError extends Error {}
+/** `key`/`params`: the template of the message for the website (none: the agent's own text). */
+export class CommandFailedError extends Error {
+  constructor(
+    message: string,
+    readonly key?: string,
+    readonly params?: Record<string, string>,
+  ) {
+    super(message);
+  }
+}
 
 interface Pending {
   resolve: () => void;
@@ -79,7 +91,13 @@ export class AgentConnections {
     return new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(commandId);
-        reject(new CommandFailedError(`agent ${agentId} did not answer ${command.kind}`));
+        reject(
+          new CommandFailedError(
+            `agent ${agentId} did not answer ${command.kind}`,
+            'agent {id} did not answer {command}',
+            { id: agentId, command: command.kind },
+          ),
+        );
       }, timeoutMs);
       this.pending.set(commandId, { resolve, reject, timer });
       try {
@@ -115,7 +133,7 @@ export class AgentConnections {
     this.sockets.clear();
     for (const p of this.pending.values()) {
       clearTimeout(p.timer);
-      p.reject(new CommandFailedError('server shutting down'));
+      p.reject(new CommandFailedError('server shutting down', 'server shutting down'));
     }
     this.pending.clear();
   }

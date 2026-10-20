@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { finalMs, raceTime } from '../core/race';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
@@ -28,9 +28,6 @@ import type { TournamentSummary } from '../core/types';
         </div>
       }
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (items(); as list) {
       @for (t of live(); track t.id) {
         <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
@@ -361,7 +358,6 @@ export class TournamentListPage {
   protected readonly i18n = inject(I18n);
   private readonly api = inject(Api);
   protected readonly items = signal<TournamentSummary[] | null>(null);
-  protected readonly error = signal('');
 
   /** Monster Hunt: a side's finished run (final time), the running clock, or a dash. */
   protected runText(n: NonNullable<TournamentSummary['now']>, i: 0 | 1): string {
@@ -429,8 +425,8 @@ export class TournamentListPage {
   private async load() {
     try {
       this.items.set(await this.api.tournaments());
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 }

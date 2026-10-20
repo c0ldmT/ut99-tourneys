@@ -16,6 +16,7 @@ import { I18n, TPipe } from '../core/i18n';
 import { isLocalAddress } from '../core/connect';
 import { scheduleText, weekdayNames } from '../core/series-text';
 import { MH_ADAPTER } from '../core/race';
+import { Toasts } from '../core/toast';
 import type {
   AgentView,
   LibraryBot,
@@ -162,9 +163,6 @@ function toLocalInput(iso: string | null): string {
     </div>
     @if (locked()) {
       <p class="notice">{{ 'form.locked' | t }}</p>
-    }
-    @if (loadError()) {
-      <p class="error">{{ loadError() }}</p>
     }
     @if (m(); as f) {
       <form class="layout" (ngSubmit)="save()">
@@ -1156,9 +1154,6 @@ function toLocalInput(iso: string | null): string {
               <dt>Discord</dt>
               <dd>{{ notifyLabel(f.notifyMode) | t }}</dd>
             </dl>
-            @if (error()) {
-              <p class="error small">{{ error() }}</p>
-            }
             <button class="primary go" type="submit" [disabled]="busy() || !f.name.trim()">
               {{ submitLabel() | t }}
             </button>
@@ -1603,6 +1598,7 @@ export class TournamentFormPage {
   private readonly router = inject(Router);
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
+  private readonly toasts = inject(Toasts);
 
   protected readonly agents = signal<AgentView[]>([]);
   /** The running season (null: out of season, season tournaments cannot be created). */
@@ -1610,8 +1606,6 @@ export class TournamentFormPage {
   protected readonly m = signal<Model | null>(null);
   protected readonly detail = signal<TournamentDetail | null>(null);
   protected readonly seriesView = signal<SeriesView | null>(null);
-  protected readonly error = signal('');
-  protected readonly loadError = signal('');
   protected readonly busy = signal(false);
   protected readonly bestOf = [1, 3, 5, 7];
   protected readonly skills = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -1886,7 +1880,10 @@ export class TournamentFormPage {
         this.m.set(this.fromDetail(d));
       } else if (sid) {
         const s = (await this.api.series()).find((x) => x.id === sid);
-        if (!s) throw new Error(this.i18n.t('form.seriesMissing'));
+        if (!s) {
+          this.toasts.error(this.i18n.t('form.seriesMissing'));
+          return;
+        }
         this.seriesView.set(s);
         this.m.set(this.fromSeries(s));
       } else {
@@ -1897,8 +1894,8 @@ export class TournamentFormPage {
         if (this.mode() === 'series') this.toSeries(f);
         this.m.set(f);
       }
-    } catch (e) {
-      this.loadError.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 
@@ -2250,7 +2247,6 @@ export class TournamentFormPage {
     const f = this.m();
     if (!f) return;
     this.busy.set(true);
-    this.error.set('');
     try {
       const id = this.id();
       const sid = this.sid();
@@ -2297,8 +2293,8 @@ export class TournamentFormPage {
           await this.router.navigate(['/t', d.id]);
         }
       }
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     } finally {
       this.busy.set(false);
     }

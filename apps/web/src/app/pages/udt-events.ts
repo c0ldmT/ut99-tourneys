@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
@@ -19,9 +19,6 @@ import { UdtNav } from '../core/udt';
         <h1 class="disp">{{ 'udt.events.title' | t }}</h1>
       </div>
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (hasTeam()) {
       <section class="card auto" [class.on]="autoEnter()">
         <label class="switch big"
@@ -34,9 +31,6 @@ import { UdtNav } from '../core/udt';
           /><span class="tr"></span><b>{{ 'udt.events.auto' | t }}</b></label
         >
         <p class="small muted">{{ 'udt.events.autoHint' | t }}</p>
-        @if (autoNote()) {
-          <p class="small ok">{{ autoNote() }}</p>
-        }
       </section>
     }
     <div class="evs">
@@ -145,9 +139,6 @@ import { UdtNav } from '../core/udt';
     .auto p {
       margin: 8px 0 0;
     }
-    .ok {
-      color: var(--live);
-    }
     .evs {
       display: grid;
       gap: 14px;
@@ -189,12 +180,10 @@ export class UdtEventsPage {
   private readonly auth = inject(Auth);
   private readonly i18n = inject(I18n);
   protected readonly events = signal<UdtEvent[]>([]);
-  protected readonly error = signal('');
   protected readonly busy = signal(false);
   protected readonly myId = computed(() => this.auth.me()?.id ?? '');
   protected readonly hasTeam = signal(false);
   protected readonly autoEnter = signal(false);
-  protected readonly autoNote = signal('');
   protected readonly testMode = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );
@@ -209,9 +198,8 @@ export class UdtEventsPage {
       this.events.set(events);
       this.hasTeam.set(!!view.team);
       this.autoEnter.set(!!view.team?.autoEnter);
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 
@@ -221,7 +209,6 @@ export class UdtEventsPage {
       const r = await this.api.udtAutoEnter(on);
       this.autoEnter.set(!!r.team.autoEnter);
       this.events.set(r.events);
-      this.autoNote.set(on ? this.i18n.t('udt.events.autoEntered', { n: r.entered }) : '');
     });
   }
 
@@ -246,11 +233,10 @@ export class UdtEventsPage {
 
   private async act(fn: () => Promise<void>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
-    } catch (err) {
-      this.error.set(errorText(err));
+    } catch {
+      // the Api shows the error as a toast
     } finally {
       this.busy.set(false);
     }
@@ -269,9 +255,6 @@ export class UdtEventsPage {
         <h1 class="disp">{{ 'udt.table.title' | t }}</h1>
       </div>
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     <div class="tablepanel">
       <table>
         <thead>
@@ -312,7 +295,6 @@ export class UdtEventsPage {
 export class UdtTablePage {
   private readonly api = inject(Api);
   protected readonly rows = signal<UdtTableRow[]>([]);
-  protected readonly error = signal('');
 
   constructor() {
     void this.load();
@@ -321,9 +303,8 @@ export class UdtTablePage {
   async load() {
     try {
       this.rows.set(await this.api.udtTable());
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 }

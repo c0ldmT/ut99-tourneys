@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { assetLabel, combatStyleKey, traitPercent } from '../core/bots';
 import { TPipe } from '../core/i18n';
@@ -32,9 +32,6 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
         }}</a>
       }
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (b(); as b) {
       <h1>
         @if (b.color) {
@@ -332,7 +329,6 @@ export class BotProfilePage {
   protected readonly b = signal<BotProfile | null>(null);
   /** Dream Team career (only while the add-on is on). */
   protected readonly career = signal<UdtCareer | null>(null);
-  protected readonly error = signal('');
   protected readonly styleKey = combatStyleKey;
   protected readonly bars: {
     key: 'accuracy' | 'alertness' | 'strafing' | 'camping';
@@ -365,21 +361,20 @@ export class BotProfilePage {
   }
 
   private async load(id: string) {
-    this.error.set('');
     try {
       this.b.set(await this.api.botProfile(id));
       if (this.auth.config().udt)
-        this.api.udtCareer(id).then(
+        this.api.udtCareer(id, true).then(
           (c) => this.career.set(c),
           () => this.career.set(null),
         );
-      this.api.botBets(id).then(
+      this.api.botBets(id, undefined, true).then(
         (n) => this.neuro.set(n),
         () => this.neuro.set(null),
       );
-    } catch (e) {
+    } catch {
+      // the toast shows the error
       this.b.set(null);
-      this.error.set(errorText(e));
     }
   }
 

@@ -12,7 +12,7 @@ import {
 import { Avatar, NameTag, Looks } from '../core/looks';
 import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import { RatingChart } from '../components/rating-chart';
@@ -52,9 +52,6 @@ import type {
         </select>
       </label>
     </div>
-    @if (error() && !neuro()?.name) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (d(); as d) {
       <div class="hero" [class]="banner() ? 'hero bn-' + banner() : 'hero'">
         @if (userId(); as uid) {
@@ -548,7 +545,6 @@ export class StatsPlayerPage {
   protected readonly scope = signal<StatScope>('lifetime');
   protected readonly seasons = computed(() => startedSeasons(this.overview()));
   protected readonly d = signal<StatsPlayerDetail | null>(null);
-  protected readonly error = signal('');
   protected readonly ratings = signal<PlayerRatings | null>(null);
   /** A bot of the control center: link to its profile. */
   protected readonly botId = signal<string | null>(null);
@@ -618,7 +614,7 @@ export class StatsPlayerPage {
       this.botId.set(null);
       // Bots of the server's ini have no profile: the request just fails.
       if (key.startsWith('b:'))
-        this.api.botProfile(key.slice(2)).then(
+        this.api.botProfile(key.slice(2), true).then(
           (b) => this.botId.set(b.id),
           () => undefined,
         );
@@ -631,8 +627,8 @@ export class StatsPlayerPage {
       this.overview.set(o);
       this.scope.set(season ? parseScope(season) : defaultScope(o));
       await this.load(key);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -648,25 +644,24 @@ export class StatsPlayerPage {
   protected race = (ms: number) => raceTime(ms);
 
   private async load(key: string) {
-    this.error.set('');
     const scope = this.scope();
     if (scope === 'lifetime') this.ratings.set(null);
     else
-      this.api.playerRatings(key, scope).then(
+      this.api.playerRatings(key, scope, true).then(
         (r) => this.ratings.set(r),
         () => this.ratings.set(null),
       );
     this.neuro.set(null);
     if (key.startsWith('u:'))
-      this.api.userBets(key.slice(2), scope === 'lifetime' ? undefined : scope).then(
+      this.api.userBets(key.slice(2), scope === 'lifetime' ? undefined : scope, true).then(
         (n) => this.neuro.set(n),
         () => undefined,
       );
     try {
       this.d.set(await this.api.statsPlayer(key, scope));
-    } catch (e) {
+    } catch {
+      // the toast shows the error
       this.d.set(null);
-      this.error.set(errorText(e));
     }
   }
 }

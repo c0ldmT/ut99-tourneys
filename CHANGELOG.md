@@ -7,6 +7,10 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Messages as toasts in the page's language: every error of the website is translated (German for every server message) and every action of users and admins confirms itself; the red error lines on the pages are gone.
+- One Neuro state for the whole website: navbar, bets panel, shop and Dream Team pages show the same balance, pushed by the server when it changes (results, rewards, purchases).
+- Dream Team help: "How it works" button in the Dream Team navigation (opens by itself the first time) with the ways to new bots.
+- Dream Team: rename an own bot once for free (academy and My team).
 - Mod 0.13.0: skill curve instead of UT's novice switch (all game types, setting under Bot AI help): every bot uses the full AI, the level sets speed, view, hearing, dodging and aim; aim error drifts instead of jittering, no long fire at walls, bots turn to hits from behind; works with SmartStockBots (two of its options are switched off at run time).
 - Dream Team: rest bots with Neuro (2 per stamina point); "Enter automatically when possible" on the Events page.
 - Servers: sync models and skins from the game server (texture packages, custom model packs), import bots on the Servers page; custom bot packages go into ServerPackages.
@@ -158,6 +162,9 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team market: buy at once at a fixed price instead of hidden bids (market value plus 10/20/30 % for weak/middle/strong bots, calibrated with the season simulator); demand follows the purchases of the bracket; AI managers buy what is left at the market's closing; open bids are refunded.
+- Dream Team trades: every roster keeps at least one bot; the rules say which bots can be traded and why.
+- Dream Team academy: no more "look and lines for the next bot" (change them on My team).
 - Dream Team: tournament win reward 3,000 (index 1), high stakes place rewards ×1.5; 100 extra points for the starter (setting).
 - Dream Team: "Dream Team" next to the nav mark; trait titles in English; trade inputs and the 10-pull price aligned.
 - Dream Team: rewards doubled, stamina 6 per game (was 15) with an explanation on the team page; the model is free for own bots.

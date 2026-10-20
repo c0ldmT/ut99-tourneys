@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
@@ -23,9 +23,6 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
     @if (isAdmin() && nominations().length) {
       <section class="card">
         <h2>{{ 'udt.yearbook.nominations' | t }} ({{ nominations().length }})</h2>
@@ -222,7 +219,6 @@ export class UdtYearbookPage {
   protected readonly nominations = signal<UdtYearbookEntry[]>([]);
   protected readonly hall = signal<UdtHall | null>(null);
   protected readonly renames = signal<Partial<Record<string, string>>>({});
-  protected readonly error = signal('');
   protected readonly busy = signal(false);
   protected readonly isAdmin = computed(() => !!this.auth.me()?.isAdmin);
 
@@ -241,9 +237,8 @@ export class UdtYearbookPage {
       this.breeders.set(b);
       this.hall.set(h);
       if (this.isAdmin()) this.nominations.set(await this.api.udtNominations());
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 
@@ -297,11 +292,10 @@ export class UdtYearbookPage {
 
   private async act(fn: () => Promise<void>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     } finally {
       this.busy.set(false);
     }

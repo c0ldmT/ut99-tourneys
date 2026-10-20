@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { TPipe } from '../core/i18n';
 import type { PublicUser } from '../core/types';
@@ -11,9 +11,6 @@ import type { PublicUser } from '../core/types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'users.title' | t }}</h1>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     <div class="card">
       <table>
         <thead>
@@ -52,7 +49,6 @@ export class UsersPage {
   protected readonly auth = inject(Auth);
   private readonly api = inject(Api);
   protected readonly users = signal<PublicUser[]>([]);
-  protected readonly error = signal('');
 
   constructor() {
     void this.load();
@@ -61,8 +57,8 @@ export class UsersPage {
   private async load() {
     try {
       this.users.set(await this.api.users());
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 
@@ -71,8 +67,8 @@ export class UsersPage {
     try {
       await this.api.setAdmin(u.id, on);
       await this.load();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 }

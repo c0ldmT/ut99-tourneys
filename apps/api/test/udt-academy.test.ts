@@ -54,6 +54,29 @@ describe('Unreal Dream Team: academy', () => {
     expect(kid).toMatchObject({ skill: r.skill, own: { origin: 'academy', points: 0 } });
     // Own bots stay: not for sale.
     expect((await mario.post(`/udt/roster/${kid.botId}/sell`)).status).toBe(409);
+    // One free renaming: the game name keeps the tag; a second one is refused.
+    expect(kid.own.canRename).toBe(true);
+    const renamed = await mario.post(`/udt/bots/${kid.botId}/rename`, { name: 'Kiddo' });
+    expect(renamed.status, JSON.stringify(renamed.body)).toBe(200);
+    expect(renamed.body).toMatchObject({ name: 'Kiddo' });
+    const again = await mario.post(`/udt/bots/${kid.botId}/rename`, { name: 'Kidd' });
+    expect(again.status).toBe(409);
+    expect(again.body.key).toBe('the bot was renamed already (once per bot)');
+    const kiddo = (await mario.get('/udt')).body.roster.find(
+      (b: { botId: string }) => b.botId === kid.botId,
+    );
+    expect(kiddo).toMatchObject({
+      name: 'Kiddo',
+      gameName: '[NX]Kiddo',
+      own: { canRename: false },
+    });
+    // Not someone else's bot, not a taken name.
+    const starter = (await mario.get('/udt')).body.roster.find(
+      (b: { starter: boolean }) => b.starter,
+    );
+    expect((await mario.post(`/udt/bots/${starter.botId}/rename`, { name: 'Kiddo' })).status).toBe(
+      409,
+    );
     // Level 4 (120 XP): three points.
     db.update(udtRoster).set({ xp: 120 }).run();
     const dev = await mario.post(`/udt/roster/${kid.botId}/develop`, { stat: 'accuracy' });

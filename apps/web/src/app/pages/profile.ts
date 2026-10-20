@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { TPipe } from '../core/i18n';
 
@@ -21,12 +21,6 @@ import { TPipe } from '../core/i18n';
           <button class="primary" type="submit" [disabled]="busy() || name === me.displayName">
             {{ 'common.save' | t }}
           </button>
-          @if (msg()) {
-            <p class="notice">{{ msg() | t }}</p>
-          }
-          @if (err()) {
-            <p class="error">{{ err() }}</p>
-          }
         </form>
         <div class="card">
           <h2>{{ 'profile.token' | t }}</h2>
@@ -72,22 +66,18 @@ export class ProfilePage {
   protected name = this.auth.me()?.displayName ?? '';
   protected readonly busy = signal(false);
   protected readonly shown = signal(false);
-  protected readonly msg = signal('');
-  protected readonly err = signal('');
 
   protected async save() {
     await this.act(async () => {
       const me = await this.api.updateMe(this.name);
       this.auth.me.set(me);
       this.name = me.displayName;
-      return 'profile.saved';
     });
   }
 
   protected async setDm(on: boolean) {
     await this.act(async () => {
       this.auth.me.set(await this.api.setNotifyDm(on));
-      return 'profile.saved';
     });
   }
 
@@ -95,19 +85,15 @@ export class ProfilePage {
     await this.act(async () => {
       this.auth.me.set(await this.api.rotateToken());
       this.shown.set(true);
-      return 'profile.rotated';
     });
   }
 
-  private async act(fn: () => Promise<string>) {
+  private async act(fn: () => Promise<void>) {
     this.busy.set(true);
-    this.msg.set('');
-    this.err.set('');
     try {
-      const key = await fn();
-      this.msg.set(key);
-    } catch (e) {
-      this.err.set(errorText(e));
+      await fn();
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

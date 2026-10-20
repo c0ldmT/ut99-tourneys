@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { Icon } from '../core/brand';
 import { ShopSettings } from '../components/shop-settings';
 import { FormsModule } from '@angular/forms';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
@@ -14,9 +14,6 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
 
     <section class="card">
       <h2>{{ 'season.title' | t }}</h2>
@@ -165,9 +162,6 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
       <p class="muted small">{{ 'settings.levelPointsHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-        @if (saved()) {
-          <span class="muted small">{{ 'settings.saved' | t }}</span>
-        }
       </div>
     </form>
 
@@ -230,9 +224,6 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
       </div>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-        @if (savedBetting()) {
-          <span class="muted small">{{ 'settings.saved' | t }}</span>
-        }
       </div>
     </form>
 
@@ -255,9 +246,6 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
       <p class="muted small">{{ 'botAi.skillCurveHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-        @if (savedBotAi()) {
-          <span class="muted small">{{ 'settings.saved' | t }}</span>
-        }
       </div>
     </form>
 
@@ -401,9 +389,6 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
       <p class="muted small">{{ 'udt.settings.aiHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-        @if (savedUdt()) {
-          <span class="muted small">{{ 'settings.saved' | t }}</span>
-        }
       </div>
     </form>
 
@@ -550,8 +535,6 @@ export class SettingsPage {
   protected readonly botGames = signal(true);
   protected readonly levelPoints = signal(100);
   protected readonly busy = signal(false);
-  protected readonly saved = signal(false);
-  protected readonly error = signal('');
   protected readonly o = signal<SeasonsOverview | null>(null);
   protected readonly editing = signal<number | null>(null);
   protected editFrom = '';
@@ -563,7 +546,6 @@ export class SettingsPage {
   protected windowSec = 20;
   protected betsDiscord = true;
   protected botsPerMatch = 6;
-  protected readonly savedBetting = signal(false);
   protected botAiLevel = 2;
   protected botSkillCurve = true;
   protected udtOn = false;
@@ -581,8 +563,6 @@ export class SettingsPage {
   protected udtOffers = 8;
   protected udtBudget = 1500;
   protected udtExtra = 100;
-  protected readonly savedUdt = signal(false);
-  protected readonly savedBotAi = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
   protected readonly resetWord = 'RESET';
   protected readonly resetOpen = signal(false);
@@ -639,21 +619,19 @@ export class SettingsPage {
         this.ai = pickAi(s.udt);
       }
       this.o.set(o);
-      this.saved.set(false);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
   private async run(fn: () => Promise<unknown>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
       this.editing.set(null);
       this.o.set(await this.api.seasons());
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }
@@ -693,8 +671,6 @@ export class SettingsPage {
 
   protected async saveBetting() {
     this.busy.set(true);
-    this.error.set('');
-    this.savedBetting.set(false);
     try {
       const s = await this.api.setBettingSettings({
         startBalance: Math.round(Number(this.startBalance)),
@@ -706,9 +682,8 @@ export class SettingsPage {
       });
       this.startBalance = s.betting.startBalance;
       this.floor = s.betting.floor;
-      this.savedBetting.set(true);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }
@@ -716,8 +691,6 @@ export class SettingsPage {
 
   protected async saveUdt() {
     this.busy.set(true);
-    this.error.set('');
-    this.savedUdt.set(false);
     try {
       const s = await this.api.setUdtSettings({
         enabled: this.udtOn,
@@ -740,9 +713,8 @@ export class SettingsPage {
       this.udtOn = s.udt.enabled;
       // The menu shows the Dream Team at once.
       this.auth.config.update((c) => ({ ...c, udt: s.udt.enabled }));
-      this.savedUdt.set(true);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }
@@ -750,8 +722,6 @@ export class SettingsPage {
 
   protected async saveBotAi() {
     this.busy.set(true);
-    this.error.set('');
-    this.savedBotAi.set(false);
     try {
       const s = await this.api.setBotAiSettings({
         level: Number(this.botAiLevel),
@@ -759,9 +729,8 @@ export class SettingsPage {
       });
       this.botAiLevel = s.botAi.level;
       this.botSkillCurve = s.botAi.skillCurve;
-      this.savedBotAi.set(true);
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }
@@ -778,13 +747,12 @@ export class SettingsPage {
     if (!this.resetUnderstood || this.resetTyped !== this.resetWord) return;
     if (!confirm(this.i18n.t('reset.lastChance'))) return;
     this.busy.set(true);
-    this.error.set('');
     try {
       this.resetDone.set(await this.api.resetAll(this.resetTyped));
       this.resetOpen.set(false);
       this.o.set(await this.api.seasons());
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }
@@ -792,7 +760,6 @@ export class SettingsPage {
 
   protected async save() {
     this.busy.set(true);
-    this.error.set('');
     try {
       const s = await this.api.setRatingSettings({
         botGames: this.botGames(),
@@ -800,10 +767,9 @@ export class SettingsPage {
       });
       this.botGames.set(s.rating.botGames);
       this.levelPoints.set(s.rating.levelPoints);
-      this.saved.set(true);
       this.o.set(await this.api.seasons());
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

@@ -25,6 +25,7 @@ import {
   SignBody,
   UdtAcademyService,
   type BuildInput,
+  BotName,
 } from './udt-academy.service.js';
 import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.service.js';
 import {
@@ -35,7 +36,7 @@ import {
   type AssignInput,
   type OpenInput,
 } from './udt-packs.service.js';
-import { BidBody, UdtMarketService, type BidInput } from './udt-market.service.js';
+import { BuyBody, UdtMarketService, type BuyInput } from './udt-market.service.js';
 import {
   BotLookBody,
   LineupBody,
@@ -140,6 +141,17 @@ export class UdtController {
     return this.udt.editBot(user, id, body);
   }
 
+  /** Renames an own bot once (free). */
+  @Post('bots/:id/rename')
+  @HttpCode(200)
+  renameBot(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(z.object({ name: BotName }))) body: { name: string },
+  ) {
+    return this.udt.rename(user, id, body.name);
+  }
+
   @Post('team')
   createTeam(@CurrentUser() user: User, @Body(new ZodPipe(TeamBody)) body: TeamInput) {
     this.udt.createTeam(user, body);
@@ -175,21 +187,17 @@ export class UdtController {
     return this.udt.rest(user, botId, body.points);
   }
 
-  /** Today's offers (values, last 14 days), the manager's hidden bids, the next market day. */
+  /** Today's offers (price, values of the last 14 days, sold to whom), the next market day. */
   @Get('market')
   marketView(@CurrentUser() user: User) {
     return this.market.view(user);
   }
 
-  @Post('market/bid')
+  /** Buys an offer at once (first come, first served). */
+  @Post('market/buy')
   @HttpCode(200)
-  bid(@CurrentUser() user: User, @Body(new ZodPipe(BidBody)) body: BidInput) {
-    return this.market.bid(user, body);
-  }
-
-  @Delete('market/bid/:botId')
-  withdraw(@CurrentUser() user: User, @Param('botId') botId: string) {
-    return this.market.withdraw(user, botId);
+  buy(@CurrentUser() user: User, @Body(new ZodPipe(BuyBody)) body: BuyInput) {
+    return this.market.buy(user, body);
   }
 
   /** Sells a roster bot to the market (85 % of its value). */

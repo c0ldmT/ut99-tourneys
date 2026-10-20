@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
 import { isLocalAddress } from '../core/connect';
 import { I18n, TPipe } from '../core/i18n';
@@ -17,9 +17,6 @@ import type { AgentView, Inventory } from '../core/types';
       <button (click)="load()">{{ 'common.refresh' | t }}</button>
     </div>
     <p class="muted">{{ 'agents.intro' | t }}</p>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (imported()) {
       <p class="notice">{{ imported() }}</p>
     }
@@ -192,7 +189,6 @@ export class AgentsPage {
   protected readonly i18n = inject(I18n);
   private readonly api = inject(Api);
   protected readonly agents = signal<AgentView[]>([]);
-  protected readonly error = signal('');
   protected readonly busy = signal(false);
   protected readonly imported = signal('');
   protected readonly newToken = signal<{ id: string; token: string } | null>(null);
@@ -206,9 +202,8 @@ export class AgentsPage {
   protected async load() {
     try {
       this.agents.set(await this.api.agents());
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -239,9 +234,8 @@ export class AgentsPage {
     this.busy.set(true);
     try {
       await fn();
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
       await this.load();

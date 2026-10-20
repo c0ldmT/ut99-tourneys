@@ -7,6 +7,7 @@ import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { neuroLedger } from '../db/schema.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
+import { NeuroHub } from './neuro-hub.js';
 
 /** What a booking is for. */
 export type LedgerKind =
@@ -59,6 +60,7 @@ export class LedgerService {
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(BetsService) private readonly bets: BetsService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
+    @Inject(NeuroHub) private readonly neuro: NeuroHub,
   ) {}
 
   /** Books an amount; false when the ref was booked before. */
@@ -79,6 +81,7 @@ export class LedgerService {
         metaJson: b.meta ? JSON.stringify(b.meta) : null,
       })
       .run();
+    this.neuro.changed(b.userId);
     return true;
   }
 
@@ -88,7 +91,10 @@ export class LedgerService {
     if (s.season === null) throw conflict('no season is running');
     const amount = Math.abs(b.amount);
     if (amount > s.spendable)
-      throw conflict(`not enough Neuro: ${s.spendable} can be spent (rescue floor ${s.floor})`);
+      throw conflict('not enough Neuro: {spendable} can be spent (rescue floor {floor})', {
+        spendable: s.spendable,
+        floor: s.floor,
+      });
     this.book({ ...b, season: s.season, amount: -amount });
     return s.season;
   }

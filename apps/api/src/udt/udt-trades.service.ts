@@ -173,15 +173,19 @@ export class UdtTradesService {
     let value = 0;
     for (const id of botIds) {
       const r = roster.get(id);
-      if (!r) throw conflict(`bot ${id} is not in that roster (any more)`);
+      if (!r) throw conflict('bot {id} is not in that roster (any more)', { id });
       const why = this.blocked(r, at.get(id) ?? this.nowIso(), playing);
       if (why === 'starter')
-        throw conflict(`${r.name} was made by its team (starter, talent, apprentice): it stays`);
-      if (why === 'playing') throw conflict(`${r.name} plays in a running Dream Team tournament`);
+        throw conflict('{name} was made by its team (starter, talent, apprentice): it stays', {
+          name: r.name,
+        });
+      if (why === 'playing')
+        throw conflict('{name} plays in a running Dream Team tournament', { name: r.name });
       if (why === 'locked')
-        throw conflict(
-          `${r.name} was bought or traded less than ${this.cfg().tradeLockDays} days ago`,
-        );
+        throw conflict('{name} was bought or traded less than {tradeLockDays} days ago', {
+          name: r.name,
+          tradeLockDays: this.cfg().tradeLockDays,
+        });
       value += r.value;
     }
     return value;
@@ -236,16 +240,22 @@ export class UdtTradesService {
     const lo = Math.min(giveValue, takeValue);
     if (hi > 0 && lo * 100 < hi * cfg.tradeBalancePct)
       throw conflict(
-        `unbalanced: one side is worth ${giveValue}, the other ${takeValue} Neuro (the smaller must be at least ${cfg.tradeBalancePct} %)`,
+        'unbalanced: one side is worth {giveValue}, the other {takeValue} Neuro (the smaller must be at least {tradeBalancePct} %)',
+        { giveValue, takeValue, tradeBalancePct: cfg.tradeBalancePct },
       );
     const [fromSize, toSize] = this.sizes(season, from, to);
     if (
       fromSize - give.length + take.length > ROSTER_MAX ||
       toSize - take.length + give.length > ROSTER_MAX
     )
-      throw conflict(`at most ${ROSTER_MAX} bots per roster`);
+      throw conflict('at most {max} bots per roster', { max: ROSTER_MAX });
+    // Every manager keeps at least one bot (the starter cannot go, but the rule is explicit).
+    if (fromSize - give.length + take.length < 1 || toSize - take.length + give.length < 1)
+      throw conflict('every manager keeps at least one bot');
     if (cfg.tradePairPerWeek && this.pairCount(season, from, to) >= cfg.tradePairPerWeek)
-      throw conflict(`at most ${cfg.tradePairPerWeek} trades between two managers per week`);
+      throw conflict('at most {tradePairPerWeek} trades between two managers per week', {
+        tradePairPerWeek: cfg.tradePairPerWeek,
+      });
     return {
       giveValue,
       takeValue,
@@ -409,7 +419,7 @@ export class UdtTradesService {
     this.sweep(season);
     const t = this.get(id, season);
     if (t.toUser !== user.id) throw forbidden('only the partner can accept');
-    if (t.status !== 'open') throw conflict(`the offer is ${t.status}`);
+    if (t.status !== 'open') throw conflict('the offer is {status}', { status: t.status });
     const give = JSON.parse(t.giveJson) as string[];
     const take = JSON.parse(t.takeJson) as string[];
     // Values may have changed since the offer (market days): the balance must still hold. The
@@ -495,7 +505,7 @@ export class UdtTradesService {
     const season = this.udt.season().number;
     const t = this.get(id, season);
     if (t.toUser !== user.id) throw forbidden('only the partner can decline');
-    if (t.status !== 'open') throw conflict(`the offer is ${t.status}`);
+    if (t.status !== 'open') throw conflict('the offer is {status}', { status: t.status });
     this.close(t, 'declined');
     return this.list(user);
   }
@@ -505,7 +515,7 @@ export class UdtTradesService {
     const season = this.udt.season().number;
     const t = this.get(id, season);
     if (t.fromUser !== user.id) throw forbidden('only the proposer can withdraw');
-    if (t.status !== 'open') throw conflict(`the offer is ${t.status}`);
+    if (t.status !== 'open') throw conflict('the offer is {status}', { status: t.status });
     this.close(t, 'withdrawn');
     return this.list(user);
   }

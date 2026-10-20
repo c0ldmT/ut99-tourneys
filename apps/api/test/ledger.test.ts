@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
+import { NeuroHub } from '../src/ledger/neuro-hub.js';
 import { Client, startApi, startSeason } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -44,5 +45,36 @@ describe('Neuro ledger', () => {
     expect(lb.rows.find((r: { userId: string }) => r.userId === id)?.balance).toBe(100);
     expect((await admin.post('/settings/reset', { confirm: 'RESET' })).status).toBe(200);
     expect(ledger.has('r1')).toBe(false);
+  });
+
+  it('one wallet snapshot for every display, a push when it changes', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    const id = (await mario.get('/me')).body.id as string;
+    expect((await mario.get('/me/neuro')).body).toMatchObject({ season: null, spendable: 0 });
+    await startSeason(admin);
+    const hub = api.app.get(NeuroHub);
+    let pushes = 0;
+    const off = hub.subscribe(id, () => pushes++);
+    api.app
+      .get(LedgerService)
+      .book({ season: 1, userId: id, kind: 'udt_reward', amount: 300, ref: 'r1' });
+    expect(pushes).toBe(1);
+    // Booked once: no second push.
+    api.app
+      .get(LedgerService)
+      .book({ season: 1, userId: id, kind: 'udt_reward', amount: 300, ref: 'r1' });
+    expect(pushes).toBe(1);
+    off();
+    expect((await mario.get('/me/neuro')).body).toEqual({
+      season: 1,
+      running: true,
+      balance: 1300,
+      staked: 0,
+      free: 1300,
+      floor: 100,
+      spendable: 1200,
+    });
   });
 });

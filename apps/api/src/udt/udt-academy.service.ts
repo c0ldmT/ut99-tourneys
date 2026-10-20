@@ -33,7 +33,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { ROSTER_MAX } from './udt-market.service.js';
 import { BotLookBody, gameName, lookFields, UdtService, type BotLook } from './udt.service.js';
 
-const BotName = z
+export const BotName = z
   .string()
   .trim()
   .min(2)
@@ -190,12 +190,12 @@ export class UdtAcademyService {
     const team = this.udt.team(user.id, season);
     if (!team) throw conflict('found your team first');
     if (this.udt.roster(user.id, season).length >= ROSTER_MAX)
-      throw conflict(`at most ${ROSTER_MAX} bots: make room first`);
+      throw conflict('at most {max} bots: make room first', { max: ROSTER_MAX });
     if (gameName(team.tag, name).length < `${team.tag}${name}`.length)
-      throw badRequest(`${team.tag}${name} is too long for the game`);
+      throw badRequest('{tag}{name} is too long for the game', { tag: team.tag, name });
     const made = this.made(season, user.id);
     const price = licencePrice(made, this.udt.index(season));
-    if (price === null) throw conflict(`at most ${made} own bots per season`);
+    if (price === null) throw conflict('at most {made} own bots per season', { made });
     if (price > 0)
       this.ledger.charge({
         userId: user.id,
@@ -266,7 +266,7 @@ export class UdtAcademyService {
     const talent = (JSON.parse(s.talentsJson) as Talent[])[body.pick];
     if (!talent) throw notFound('talent');
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
-      throw conflict(`a bot is called ${body.name} already`);
+      throw conflict('a bot is called {name} already', { name: body.name });
     this.licence(user, season, body.name);
     this.create(user, season, talent, body.name, 'academy', null, undefined, body.look);
     this.db
@@ -283,11 +283,12 @@ export class UdtAcademyService {
     const m = this.udt.roster(user.id, season).find((r) => r.botId === body.mentorId);
     if (!m) throw notFound('mentor in your roster');
     if (m.own || m.starter) throw conflict('a mentor is a bought bot, not one you made');
-    if (m.level < MENTOR_LEVEL) throw conflict(`a mentor needs level ${MENTOR_LEVEL}`);
+    if (m.level < MENTOR_LEVEL)
+      throw conflict('a mentor needs level {level}', { level: MENTOR_LEVEL });
     if (this.mentorsUsed(season).has(m.botId))
-      throw conflict(`${m.name} has an apprentice this season`);
+      throw conflict('{name} has an apprentice this season', { name: m.name });
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
-      throw conflict(`a bot is called ${body.name} already`);
+      throw conflict('a bot is called {name} already', { name: body.name });
     this.licence(user, season, body.name);
     const t = apprentice(
       {
@@ -343,13 +344,15 @@ export class UdtAcademyService {
     const rarity = bp.rarity as Rarity;
     const rule = BLUEPRINTS[rarity];
     const why = cannotBuild(rarity, body.skill, body.traits);
-    if (why === 'skill') throw badRequest(`this blueprint builds up to skill ${rule.skillCap}`);
+    if (why === 'skill')
+      throw badRequest('this blueprint builds up to skill {skillCap}', { skillCap: rule.skillCap });
     if (why === 'budget')
-      throw badRequest(
-        `the build costs ${buildCost(body.skill, body.traits)} of ${rule.budget} points: lower skill or values`,
-      );
+      throw badRequest('the build costs {cost} of {budget} points: lower skill or values', {
+        cost: buildCost(body.skill, body.traits),
+        budget: rule.budget,
+      });
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
-      throw conflict(`a bot is called ${body.name} already`);
+      throw conflict('a bot is called {name} already', { name: body.name });
     this.licence(user, season, body.name);
     const id = this.create(
       user,
@@ -406,7 +409,8 @@ export class UdtAcademyService {
       points,
     );
     if (why === 'points') throw conflict('not enough development points (one per level)');
-    if (why === 'potential') throw conflict(`the potential is skill ${own.potential}`);
+    if (why === 'potential')
+      throw conflict('the potential is skill {potential}', { potential: own.potential });
     if (why === 'max') throw conflict('the value is at its maximum');
     if (stat === 'skill') this.bots.update(botId, { skill: Math.round(r.skill) + 1 });
     else this.bots.update(botId, { traits: { ...r.traits, [stat]: developValue(r.traits[stat]) } });

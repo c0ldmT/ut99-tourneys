@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { BOT_TEAM_NAMES } from '@tourney/protocol';
 import { z } from 'zod';
-import { badRequest } from '../common/http.js';
+import { invalidInput } from '../common/http.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { settings } from '../db/schema.js';
@@ -165,28 +165,28 @@ export class SettingsService {
 
   setBetting(value: Partial<BettingSettings>): WebsiteSettings {
     const next = BettingSettingsSchema.safeParse({ ...this.get().betting, ...value });
-    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    if (!next.success) throw invalidInput(next.error);
     this.put('betting', next.data);
     return this.get();
   }
 
   setShop(value: Partial<ShopSettings>): WebsiteSettings {
     const next = ShopSettingsSchema.safeParse({ ...this.get().shop, ...value });
-    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    if (!next.success) throw invalidInput(next.error);
     this.put('shop', next.data);
     return this.get();
   }
 
   setBotAi(value: Partial<BotAiSettings>): WebsiteSettings {
     const next = BotAiSettingsSchema.safeParse({ ...this.get().botAi, ...value });
-    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    if (!next.success) throw invalidInput(next.error);
     this.put('botAi', next.data);
     return this.get();
   }
 
   setUdt(value: Partial<UdtSettings>): WebsiteSettings {
     const next = UdtSettingsSchema.safeParse({ ...this.get().udt, ...value });
-    if (!next.success) throw badRequest(z.prettifyError(next.error));
+    if (!next.success) throw invalidInput(next.error);
     this.put('udt', next.data);
     return this.get();
   }

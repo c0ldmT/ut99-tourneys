@@ -93,7 +93,7 @@ export class UdtEventsService implements OnModuleInit {
 
   private row(id: string): TournamentRow {
     const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
-    if (!t || t.kind !== 'udt') throw notFound(`Dream Team tournament ${id}`);
+    if (!t || t.kind !== 'udt') throw notFound('Dream Team tournament {id}', { id });
     return t;
   }
 
@@ -354,7 +354,8 @@ export class UdtEventsService implements OnModuleInit {
       this.refundTickets(t.id);
       this.db.delete(udtEntries).where(eq(udtEntries.tournamentId, t.id)).run();
       throw conflict(
-        `high stakes needs ${rules.minTeams} human teams, ${humans} can play: the tickets went back`,
+        'high stakes needs {minTeams} human teams, {humans} can play: the tickets went back',
+        { minTeams: rules.minTeams, humans },
       );
     }
     // Free library bots, closest to the managers' average skill first (ties at random).
@@ -481,7 +482,8 @@ export class UdtEventsService implements OnModuleInit {
     if (!this.udt.team(user.id, season)) throw conflict('found your team first');
     const s = this.settingsOf(t);
     const l = this.lineup(user.id, s, this.rules(t));
-    if (l.problems.length) throw conflict(`your team cannot play: ${l.problems.join('; ')}`);
+    if (l.problems.length)
+      throw conflict('your team cannot play: {list}', { list: l.problems.join('; ') });
     const who = this.entries(id);
     if (who.includes(user.id)) return this.events(user);
     const ai = this.udt.aiIds();

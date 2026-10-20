@@ -3,6 +3,8 @@ import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
 import {
   baseValue,
   botRarity,
+  bracketOf,
+  buyPrice,
   demandFactor,
   economyIndex,
   formFactor,
@@ -19,7 +21,7 @@ import type { User } from '../auth/users.service.js';
 import { BetsService } from '../bets/bets.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { randomId } from '../common/ids.js';
-import { badRequest, conflict, notFound } from '../common/http.js';
+import { conflict, notFound } from '../common/http.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
@@ -35,18 +37,17 @@ import { UdtService, withTraits } from './udt.service.js';
 /** At most this many bots per manager (5 + 2 on the bench). */
 export const ROSTER_MAX = 7;
 
-export const BidBody = z.object({
+export const BuyBody = z.object({
   botId: z.string().min(1).max(40),
-  amount: z.number().int().min(10).max(100_000_000),
 });
-export type BidInput = z.infer<typeof BidBody>;
+export type BuyInput = z.infer<typeof BuyBody>;
 
 /**
  * The Dream Team transfer market. Once a day (setting `udt.marketTime`, SEASON_TZ) the market
- * day settles the hidden bids of the day before (highest wins, the others get their Neuro back),
- * pays salaries on Mondays (a bot whose salary cannot be paid goes on strike), lets the bots
- * rest, computes the economy index and every bot's market value, and puts new bots on offer.
- * A bid is paid when it is made and refunded when it loses.
+ * day lets the AI managers buy what is left of the day's offers, pays salaries on Mondays (a bot
+ * whose salary cannot be paid goes on strike), lets the bots rest, computes the economy index
+ * and every bot's market value, and puts new bots on offer at a fixed price (market value plus
+ * the bracket's surcharge). Managers buy an offer at once: first come, first served.
  */
 @Injectable()
 export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
@@ -67,6 +68,11 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
+    try {
+      this.refundOpenBids();
+    } catch (e) {
+      this.log.error(`udt old bids: ${e instanceof Error ? e.message : String(e)}`);
+    }
     this.timer = setInterval(() => this.tick(), 60_000);
     this.timer.unref();
   }
@@ -108,19 +114,34 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   }
 
   private readonly dayHooks: ((season: Season, day: string) => void)[] = [];
+  private readonly closingHooks: ((season: Season, day: string) => void)[] = [];
   /** Called after every market day (the AI managers act then). */
   afterDay(fn: (season: Season, day: string) => void): void {
     this.dayHooks.push(fn);
+  }
+  /**
+   * Called at the start of a market day while the old offers are still on sale (`day`: the day
+   * of those offers): the AI managers buy what the humans left, so they never get there first.
+   */
+  atClosing(fn: (season: Season, day: string) => void): void {
+    this.closingHooks.push(fn);
   }
 
   /** The market day (exposed for the test mode: "market day now"). */
   runDay(season: Season, day: string): void {
     const last = this.lastDay(season.number);
     const s = season.number;
+    // 1. Closing time of the last offers: the AI managers buy; then the demand per bracket.
+    if (last)
+      for (const fn of this.closingHooks)
+        try {
+          fn(season, last.day);
+        } catch (e) {
+          this.log.error(`udt market closing: ${e instanceof Error ? e.message : String(e)}`);
+        }
+    const sales = this.salesByBracket(s, last?.day);
     const library = this.bots.list();
     const byId = new Map(library.map((b) => [b.id, b]));
-    // 1. Bids of the last offers.
-    const bidCounts = this.settleBids(s, last?.day, byId);
     // 2. Rest, 3. salaries (Mondays).
     const rest = last ? daysBetween(last.day, day) : 0;
     const roster = this.db.select().from(udtRoster).where(eq(udtRoster.season, s)).all();
@@ -160,7 +181,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       const v = marketValue(
         baseValue(b.skill, valueScore(b.traits)) * (phase ? PHASE_EFFECT[phase].value : 1),
         formFactor({ games: p?.games ?? 0, wins: p?.gamesWon ?? 0 }),
-        demandFactor(bidCounts.get(b.id) ?? 0, unsoldDays.get(b.id) ?? 0),
+        demandFactor(sales.get(bracketOf(b.skill)) ?? 0, unsoldDays.get(b.id) ?? 0),
         index,
       );
       values.set(b.id, v);
@@ -178,10 +199,11 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     // Not the same bots two days running when there are enough others.
     const fresh = shuffle(free.filter((b) => !yesterday.has(b.id)));
     const again = shuffle(free.filter((b) => yesterday.has(b.id)));
+    // The price stays for the whole market day (`minPrice` holds it).
     for (const b of [...fresh, ...again].slice(0, n))
       this.db
         .insert(udtOffers)
-        .values({ day, botId: b.id, minPrice: values.get(b.id) ?? 10 })
+        .values({ day, botId: b.id, minPrice: buyPrice(values.get(b.id) ?? 10, b.skill) })
         .onConflictDoNothing()
         .run();
     this.db
@@ -202,54 +224,49 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       }
   }
 
-  /** Highest bid wins (earlier one on a tie); the others are refunded. Returns bids per bot. */
-  private settleBids(season: number, day: string | undefined, byId: Map<string, LibraryBot>) {
-    const counts = new Map<string, number>();
-    if (!day) return counts;
-    const open = this.db
-      .select()
-      .from(udtBids)
-      .where(and(eq(udtBids.day, day), eq(udtBids.status, 'open')))
-      .orderBy(desc(udtBids.amount), asc(udtBids.createdAt))
+  /** Bots bought on the market on a market day, per bracket (the demand of the next day). */
+  private salesByBracket(season: number, day: string | undefined): Map<string, number> {
+    const out = new Map<string, number>();
+    const ids = day ? this.offerIds(day) : [];
+    if (!ids.length) return out;
+    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
+    const bought = this.db
+      .select({ botId: udtRoster.botId })
+      .from(udtRoster)
+      .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, ids)))
       .all();
-    // On the same amount a human manager wins over an AI manager.
-    const ai = this.udt.aiIds();
-    if (ai.size)
-      open.sort(
-        (a, b) =>
-          b.amount - a.amount ||
-          Number(ai.has(a.userId)) - Number(ai.has(b.userId)) ||
-          a.createdAt.localeCompare(b.createdAt),
-      );
-    const owners = this.udt.owners(season);
-    const won = new Set<string>();
-    const size = new Map<string, number>();
-    for (const r of this.db.select().from(udtRoster).where(eq(udtRoster.season, season)).all())
-      size.set(r.userId, (size.get(r.userId) ?? 0) + 1);
+    for (const r of bought) {
+      const b = lib.get(r.botId);
+      if (!b) continue;
+      const k = bracketOf(b.skill);
+      out.set(k, (out.get(k) ?? 0) + 1);
+    }
+    return out;
+  }
+
+  /**
+   * Bids from before the instant market (decision 152) that were never settled: their Neuro
+   * goes back once.
+   */
+  refundOpenBids(): number {
+    const open = this.db.select().from(udtBids).where(eq(udtBids.status, 'open')).all();
+    if (!open.length) return 0;
+    const seasonOf = new Map(
+      this.db
+        .select()
+        .from(udtDays)
+        .all()
+        .map((d) => [d.day, d.season]),
+    );
+    let n = 0;
     for (const b of open) {
-      counts.set(b.botId, (counts.get(b.botId) ?? 0) + 1);
-      const ok =
-        !won.has(b.botId) &&
-        !owners.has(b.botId) &&
-        byId.has(b.botId) &&
-        (size.get(b.userId) ?? 0) < ROSTER_MAX;
-      if (ok) {
-        won.add(b.botId);
-        size.set(b.userId, (size.get(b.userId) ?? 0) + 1);
-        this.db.update(udtBids).set({ status: 'won' }).where(eq(udtBids.id, b.id)).run();
-        this.career.saleBonus(season, b.botId, b.amount, b.id);
-        this.db
-          .insert(udtRoster)
-          .values({
-            season,
-            botId: b.botId,
-            userId: b.userId,
-            price: b.amount,
-            acquiredAt: new Date(this.clock.now()).toISOString(),
-          })
-          .run();
-      } else {
-        this.db.update(udtBids).set({ status: 'lost' }).where(eq(udtBids.id, b.id)).run();
+      // The day of the offer gives the season; without it the bid stays open (and is logged).
+      const season = seasonOf.get(b.day);
+      if (season === undefined) {
+        this.log.error(`udt market: old bid ${b.id} has no market day ${b.day}, not refunded`);
+        continue;
+      }
+      this.db.transaction(() => {
         this.ledger.book({
           season,
           userId: b.userId,
@@ -258,9 +275,12 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
           ref: `bid-refund:${b.id}`,
           meta: { botId: b.botId },
         });
-      }
+        this.db.update(udtBids).set({ status: 'lost' }).where(eq(udtBids.id, b.id)).run();
+      });
+      n++;
     }
-    return counts;
+    this.log.info(`udt market: ${n} open bids of the old market refunded`);
+    return n;
   }
 
   private paySalaries(
@@ -336,7 +356,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     return out;
   }
 
-  /** The market page: today's offers with values and history, the manager's bids. */
+  /** The market page: today's offers with price, value and history; who bought what. */
   view(user: User) {
     this.udt.assertOn();
     const season = this.udt.season();
@@ -345,10 +365,21 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const marketTime = this.settings.get().udt.marketTime;
     const today = this.udt.today();
     const nextAt = zonedMs(this.dayDone(today) ? nextDay(today) : today, marketTime, tz);
+    const size = this.udt.team(user.id, season.number)
+      ? this.udt.roster(user.id, season.number).length
+      : 0;
     if (!last)
-      return { day: null, index: this.udt.index(season.number), nextAt, offers: [], bids: [] };
+      return {
+        day: null,
+        index: this.udt.index(season.number),
+        nextAt,
+        offers: [],
+        rosterSize: size,
+        rosterMax: ROSTER_MAX,
+      };
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const owners = this.udt.owners(season.number);
+    const tags = new Map(this.udt.teams(season.number).map((t) => [t.userId, t.tag]));
     const offers = this.db.select().from(udtOffers).where(eq(udtOffers.day, last.day)).all();
     const homegrown = this.career.homegrown();
     const careers = this.career.careers();
@@ -356,19 +387,17 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       offers.map((o) => o.botId),
       14,
     );
-    const myBids = this.db
-      .select()
-      .from(udtBids)
-      .where(and(eq(udtBids.day, last.day), eq(udtBids.userId, user.id)))
-      .all();
     return {
       day: last.day,
       index: last.economyIndex,
       nextAt,
+      rosterSize: size,
+      rosterMax: ROSTER_MAX,
       offers: offers.flatMap((o) => {
         const b = lib.get(o.botId);
         if (!b) return [];
         const h = history.get(b.id) ?? [];
+        const owner = owners.get(b.id);
         return [
           {
             botId: b.id,
@@ -379,17 +408,18 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             skin: b.skin,
             face: b.face,
             traits: b.traits,
-            minPrice: o.minPrice,
+            price: o.minPrice,
             value: h.at(-1)?.value ?? o.minPrice,
             history: h,
-            sold: owners.has(b.id),
+            sold: owner !== undefined,
+            /** The tag of the team that bought it (sold). */
+            buyer: owner !== undefined ? (tags.get(owner) ?? null) : null,
+            mine: owner === user.id,
             homegrown: homegrown.get(b.id) ?? null,
             career: careers.get(b.id) ?? null,
-            myBid: myBids.find((x) => x.botId === b.id)?.amount ?? null,
           },
         ];
       }),
-      bids: myBids.map((b) => ({ botId: b.botId, amount: b.amount, status: b.status })),
     };
   }
 
@@ -409,8 +439,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     return out;
   }
 
-  /** A hidden bid (or a new amount): paid now, refunded if it loses. */
-  bid(user: User, body: BidInput) {
+  /** Buys an offer of the day at its price, at once (first come, first served). */
+  buy(user: User, body: BuyInput) {
     this.udt.assertOn();
     const season = this.udt.season();
     if (!this.udt.team(user.id, season.number)) throw conflict('found your team first');
@@ -424,94 +454,31 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       : undefined;
     if (!last || !offer) throw notFound('offer');
     if (this.udt.owners(season.number).has(body.botId)) throw conflict('the bot is sold');
-    if (body.amount < offer.minPrice) throw badRequest(`the lowest bid is ${offer.minPrice} Neuro`);
-    const mine = this.db
-      .select()
-      .from(udtBids)
-      .where(
-        and(eq(udtBids.day, last.day), eq(udtBids.userId, user.id), eq(udtBids.status, 'open')),
-      )
-      .all();
-    const old = mine.find((b) => b.botId === body.botId);
-    const size = this.udt.roster(user.id, season.number).length;
-    if (!old && size + mine.length >= ROSTER_MAX)
-      throw conflict(`at most ${ROSTER_MAX} bots: your roster and open bids are full`);
-    if (old) this.withdrawBid(old, season.number);
-    const id = `u${randomId(12)}`;
-    try {
-      this.ledger.charge({
-        userId: user.id,
-        kind: 'udt_purchase',
-        amount: body.amount,
-        ref: `bid:${id}`,
-        meta: { botId: body.botId, day: last.day },
-      });
-    } catch (e) {
-      // Not enough Neuro: the old bid stays as it was.
-      if (old) this.rebid(old, season.number);
-      throw e;
-    }
+    if (!this.bots.list().some((b) => b.id === body.botId)) throw notFound('offer');
+    if (this.udt.roster(user.id, season.number).length >= ROSTER_MAX)
+      throw conflict('at most {max} bots: your roster is full', { max: ROSTER_MAX });
+    // Unique per purchase: a bot sold back can be bought again the same day.
+    const ref = `buy:${season.number}:${last.day}:${body.botId}:${randomId(6)}`;
+    // Throws when the Neuro do not reach (nothing changes then).
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_purchase',
+      amount: offer.minPrice,
+      ref,
+      meta: { botId: body.botId, day: last.day },
+    });
     this.db
-      .insert(udtBids)
+      .insert(udtRoster)
       .values({
-        id,
-        day: last.day,
+        season: season.number,
         botId: body.botId,
         userId: user.id,
-        amount: body.amount,
-        createdAt: new Date(this.clock.now()).toISOString(),
+        price: offer.minPrice,
+        acquiredAt: new Date(this.clock.now()).toISOString(),
       })
       .run();
+    this.career.saleBonus(season.number, body.botId, offer.minPrice, ref);
     return this.view(user);
-  }
-
-  /** Takes back an open bid (Neuro back). */
-  withdraw(user: User, botId: string) {
-    this.udt.assertOn();
-    const season = this.udt.season();
-    const last = this.lastDay(season.number);
-    const old = last
-      ? this.db
-          .select()
-          .from(udtBids)
-          .where(
-            and(
-              eq(udtBids.day, last.day),
-              eq(udtBids.userId, user.id),
-              eq(udtBids.botId, botId),
-              eq(udtBids.status, 'open'),
-            ),
-          )
-          .get()
-      : undefined;
-    if (!old) throw notFound('bid');
-    this.withdrawBid(old, season.number);
-    return this.view(user);
-  }
-
-  private withdrawBid(b: typeof udtBids.$inferSelect, season: number) {
-    this.db.delete(udtBids).where(eq(udtBids.id, b.id)).run();
-    this.ledger.book({
-      season,
-      userId: b.userId,
-      kind: 'udt_refund',
-      amount: b.amount,
-      ref: `bid-refund:${b.id}`,
-      meta: { botId: b.botId },
-    });
-  }
-
-  /** Restores a withdrawn bid (its Neuro is taken again under a new ref). */
-  private rebid(b: typeof udtBids.$inferSelect, season: number) {
-    this.ledger.book({
-      season,
-      userId: b.userId,
-      kind: 'udt_purchase',
-      amount: -b.amount,
-      ref: `bid-again:${b.id}`,
-      meta: { botId: b.botId },
-    });
-    this.db.insert(udtBids).values(b).run();
   }
 
   /** Sells a bot back to the market for 85 % of its value (not the starter bot). */

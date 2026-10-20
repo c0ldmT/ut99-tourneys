@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject, input, signal, effect } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import type { UdtRosterBot, UdtSquad, UdtSquadRow } from '../core/types';
@@ -19,9 +19,6 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
         <p class="muted">{{ 'udt.squads.intro' | t }}</p>
       </div>
     </div>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     <div class="tablepanel">
       <table>
         <thead>
@@ -68,7 +65,6 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
 export class UdtSquadsPage {
   private readonly api = inject(Api);
   protected readonly rows = signal<UdtSquadRow[]>([]);
-  protected readonly error = signal('');
 
   constructor() {
     void this.load();
@@ -77,9 +73,8 @@ export class UdtSquadsPage {
   async load() {
     try {
       this.rows.set(await this.api.udtSquads());
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 }
@@ -94,9 +89,6 @@ export class UdtSquadsPage {
     <p>
       <a routerLink="/udt/squads">← {{ 'udt.squads.title' | t }}</a>
     </p>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
     @if (squad(); as s) {
       <div class="udt-head">
         <div>
@@ -167,7 +159,6 @@ export class UdtSquadPage {
   private readonly api = inject(Api);
   readonly userId = input.required<string>();
   protected readonly squad = signal<UdtSquad | null>(null);
-  protected readonly error = signal('');
 
   constructor() {
     effect(() => {
@@ -179,9 +170,8 @@ export class UdtSquadPage {
   async load() {
     try {
       this.squad.set(await this.api.udtSquad(this.userId()));
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     }
   }
 

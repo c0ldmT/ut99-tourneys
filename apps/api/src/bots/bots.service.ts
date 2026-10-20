@@ -152,7 +152,7 @@ export class BotsService {
 
   createClan(body: ClanInput): Clan {
     if (this.clans().some((c) => key(c.name) === key(body.name)))
-      throw conflict(`clan ${body.name} exists`);
+      throw conflict('clan {name} exists', { name: body.name });
     const id = `c${randomId(10)}`;
     this.db
       .insert(botClans)
@@ -172,7 +172,7 @@ export class BotsService {
   updateClan(id: string, body: Partial<ClanInput>): Clan {
     const c = this.clan(id);
     if (body.name && this.clans().some((x) => x.id !== id && key(x.name) === key(body.name!)))
-      throw conflict(`clan ${body.name} exists`);
+      throw conflict('clan {name} exists', { name: body.name });
     const tag = body.tag ?? c.tag;
     if (tag !== c.tag)
       for (const b of this.list().filter((x) => x.clanId === id))
@@ -199,7 +199,7 @@ export class BotsService {
 
   clan(id: string): Clan {
     const c = this.clans().find((x) => x.id === id);
-    if (!c) throw notFound(`clan ${id}`);
+    if (!c) throw notFound('clan {id}', { id });
     return c;
   }
 
@@ -250,7 +250,7 @@ export class BotsService {
 
   require(id: string): LibraryBot {
     const b = this.get(id);
-    if (!b) throw notFound(`bot ${id}`);
+    if (!b) throw notFound('bot {id}', { id });
     return b;
   }
 
@@ -258,26 +258,27 @@ export class BotsService {
   private checkGameName(id: string | undefined, name: string, tag: string) {
     const gameName = `${tag}${name}`;
     if (gameName.length > GAME_NAME_CHARS)
-      throw badRequest(
-        `"${gameName}" is longer than ${GAME_NAME_CHARS} characters (UT cuts names)`,
-      );
+      throw badRequest('"{gameName}" is longer than {chars} characters (UT cuts names)', {
+        gameName,
+        chars: GAME_NAME_CHARS,
+      });
     const clash = this.list().find((b) => b.id !== id && key(b.gameName) === key(gameName));
-    if (clash) throw conflict(`a bot is already called ${gameName} in the game`);
+    if (clash) throw conflict('a bot is already called {gameName} in the game', { gameName });
   }
 
   private checkPersonality(p: Personality, selfId: string | undefined) {
     for (const r of p.rivals) {
       if (r.kind === 'bot' && (r.id === selfId || !this.get(r.id)))
-        throw badRequest(`unknown rival bot ${r.id}`);
+        throw badRequest('unknown rival bot {id}', { id: r.id });
       if (r.kind === 'user' && !this.users.list().some((u) => u.id === r.id))
-        throw badRequest(`unknown rival player ${r.id}`);
+        throw badRequest('unknown rival player {id}', { id: r.id });
     }
   }
 
   create(body: BotInput): LibraryBot {
     const tag = body.clanId ? this.clan(body.clanId).tag : '';
     if (this.list().some((b) => key(b.name) === key(body.name)))
-      throw conflict(`bot ${body.name} exists`);
+      throw conflict('bot {name} exists', { name: body.name });
     this.checkGameName(undefined, body.name, tag);
     const personality = PersonalitySchema.parse(body.personality ?? {});
     this.checkPersonality(personality, undefined);
@@ -311,7 +312,7 @@ export class BotsService {
     const name = body.name ?? b.name;
     const clanId = body.clanId !== undefined ? body.clanId : b.clanId;
     if (body.name && this.list().some((x) => x.id !== id && key(x.name) === key(name)))
-      throw conflict(`bot ${name} exists`);
+      throw conflict('bot {name} exists', { name });
     this.checkGameName(id, name, clanId ? this.clan(clanId).tag : '');
     const personality = body.personality
       ? PersonalitySchema.parse({ ...b.personality, ...body.personality })

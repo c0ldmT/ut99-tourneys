@@ -39,6 +39,8 @@ import { BotsService } from './bots/bots.service.js';
 import { SeriesController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
+import { NeuroHub } from './ledger/neuro-hub.js';
+import { NeuroController } from './ledger/neuro.controller.js';
 import { UdtController } from './udt/udt.controller.js';
 import { UdtTestController } from './udt/udt-test.controller.js';
 import { UdtTestService } from './udt/udt-test.service.js';
@@ -93,6 +95,7 @@ class AppModule {
         ShopController,
         UdtController,
         UdtTestController,
+        NeuroController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -118,6 +121,7 @@ class AppModule {
         UsersService,
         SessionsService,
         LiveHub,
+        NeuroHub,
         EventLogService,
         AgentConnections,
         AgentsService,

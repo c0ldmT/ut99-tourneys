@@ -46,7 +46,7 @@ export class AgentsController {
   @HttpCode(204)
   async rescan(@Param('id') id: string, @Param('profileId') profileId: string) {
     this.agents.require(id);
-    if (!this.connections.isOnline(id)) throw conflict(`agent ${id} is offline`);
+    if (!this.connections.isOnline(id)) throw conflict('agent {id} is offline', { id });
     await this.connections.command(id, { kind: 'inventory.rescan', profileId }, 120_000);
   }
 }

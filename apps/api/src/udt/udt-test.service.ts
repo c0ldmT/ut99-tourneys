@@ -124,7 +124,7 @@ export class UdtTestService {
   simulate(id: string, by: User) {
     this.assertTestMode();
     const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
-    if (!t || t.kind !== 'udt') throw notFound(`Dream Team tournament ${id}`);
+    if (!t || t.kind !== 'udt') throw notFound('Dream Team tournament {id}', { id });
     if (t.phase === 'draft') this.tournaments.seed(id, { mode: 'auto', humanOrder: 'random' }, by);
     const actor = { kind: 'system' as const };
     const append = (batch: NewTournamentEvent[]) => {
@@ -140,7 +140,8 @@ export class UdtTestService {
         { type: 'tournament.started', actor, data: {} },
       ]);
     else if (p.phase === 'checkIn') p = append([{ type: 'tournament.started', actor, data: {} }]);
-    if (p.phase !== 'running') throw conflict(`cannot simulate in phase ${p.phase}`);
+    if (p.phase !== 'running')
+      throw conflict('cannot simulate in phase {phase}', { phase: p.phase });
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const strength = (e: Entrant | undefined) => {
       const specs = !e ? [] : e.kind === 'bot' ? [e.bot] : e.kind === 'team' ? e.bots : [];
@@ -181,7 +182,7 @@ export class UdtTestService {
 
   /**
    * Test managers: dev users with a team and a starter bot each. `act` lets every test manager
-   * bid on an affordable offer, line up its best bots and enter the open tournaments.
+   * buy an affordable offer, line up its best bots and enter the open tournaments.
    */
   createManagers(count: number) {
     this.assertTestMode();
@@ -210,7 +211,7 @@ export class UdtTestService {
     this.assertTestMode();
     const season = this.udt.season().number;
     const managers = this.users.list().filter((u) => u.discordId.startsWith('dev:test'));
-    let bids = 0;
+    let bought = 0;
     let entries = 0;
     let traded = 0;
     for (const u of managers) {
@@ -234,11 +235,11 @@ export class UdtTestService {
         const m = this.market.view(u);
         const budget = this.udt.view(u).wallet?.spendable ?? 0;
         const pick = m.offers
-          .filter((o) => !o.sold && o.myBid === null && o.minPrice <= budget * 0.6)
-          .sort((x, y) => y.minPrice - x.minPrice)[0];
+          .filter((o) => !o.sold && o.price <= budget * 0.6)
+          .sort((x, y) => y.price - x.price)[0];
         if (pick) {
-          this.market.bid(u, { botId: pick.botId, amount: pick.minPrice });
-          bids++;
+          this.market.buy(u, { botId: pick.botId });
+          bought++;
         }
       } catch {
         // full roster, no market day yet: skip
@@ -257,6 +258,6 @@ export class UdtTestService {
     }
     // The AI managers (when switched on) act as after a market day.
     const ai = this.ai.daily(this.udt.season(), this.udt.today());
-    return { managers: managers.length, bids, entries, trades: traded, ai };
+    return { managers: managers.length, bought, entries, trades: traded, ai };
   }
 }

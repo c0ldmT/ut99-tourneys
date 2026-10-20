@@ -24,9 +24,6 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
     @if (data(); as d) {
       <div class="udt-head">
         <div>
@@ -169,6 +166,11 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
                       </button>
                     }
                   </div>
+                  @if (!tradable(d.mine)) {
+                    <p class="muted small">
+                      {{ 'udt.trades.noneTradable' | t: { lock: d.rules.lockDays } }}
+                    </p>
+                  }
                   <label
                     >{{ 'udt.trades.addNeuro' | t }}
                     <input
@@ -474,7 +476,6 @@ export class UdtTradesPage {
   private readonly i18n = inject(I18n);
   protected readonly data = signal<UdtTrades | null>(null);
   protected readonly partners = signal<UdtPartner[]>([]);
-  protected readonly error = signal('');
   protected readonly busy = signal(false);
   protected readonly partnerId = signal<string | null>(null);
   protected readonly give = signal<string[]>([]);
@@ -515,9 +516,8 @@ export class UdtTradesPage {
       this.data.set(d);
       this.partners.set(p);
       if (!p.some((x) => x.userId === this.partnerId())) this.setPartner(p[0]?.userId ?? null);
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -554,6 +554,11 @@ export class UdtTradesPage {
     // Own bots: the tag is the part of the game name in front of the bot's name.
     const own = b.gameName.endsWith(b.name) ? b.gameName.slice(0, -b.name.length) : '';
     return rosterCard(b, tag ?? own);
+  }
+
+  /** At least one bot of the list can be traded now. */
+  protected tradable(list: readonly UdtPartnerBot[]): boolean {
+    return list.some((b) => !b.blocked);
   }
 
   protected blockedText(b: UdtPartnerBot) {
@@ -651,11 +656,10 @@ export class UdtTradesPage {
 
   private async act(fn: () => Promise<void>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

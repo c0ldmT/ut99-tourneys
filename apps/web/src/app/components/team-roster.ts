@@ -7,7 +7,7 @@ import {
   output,
   signal,
 } from '@angular/core';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { RouterLink } from '@angular/router';
 import { TPipe } from '../core/i18n';
 import type { Entrant, TournamentDetail } from '../core/types';
@@ -96,9 +96,6 @@ type Team = Extract<Entrant, { kind: 'team' }>;
       }
     </div>
     <p class="muted small">{{ 'roster.hint' | t }}</p>
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
   `,
   styles: `
     .teams {
@@ -153,7 +150,6 @@ export class TeamRoster {
   protected readonly editing = signal<string | null>(null);
   protected readonly picked = signal<string[]>([]);
   protected readonly busy = signal(false);
-  protected readonly error = signal('');
 
   protected readonly teams = computed(() => {
     const p = this.tournament().projection;
@@ -185,13 +181,12 @@ export class TeamRoster {
 
   protected async save(team: Team) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await this.api.setLineup(this.tournament().id, team.id, this.picked());
       this.editing.set(null);
       this.changed.emit();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the Api shows the error as a toast
     } finally {
       this.busy.set(false);
     }

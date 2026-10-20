@@ -1,6 +1,6 @@
 /**
  * Season simulator for calibrating the Dream Team economy: managers with different habits bet,
- * buy bots on the nightly market, pay salaries and play the season's events. Betting outcomes
+ * buy bots on the daily market (first come, first served), pay salaries and play the season's events. Betting outcomes
  * are drawn from real settled bets (payout / stake), so the wealth curves follow the website's
  * betting. Deterministic for a seed.
  */
@@ -8,6 +8,7 @@ import {
   DEFAULT_ECONOMY,
   baseValue,
   bracketOf,
+  buyPrice,
   demandFactor,
   economyIndex,
   formFactor,
@@ -171,7 +172,8 @@ export function simulateSeason(o: SimOptions): SimResult {
   const pick = <T>(l: readonly T[]): T => l[Math.floor(rng() * l.length)]!;
   const owner = new Map<string, Manager>();
   const games = new Map<string, { games: number; wins: number }>();
-  const bids = new Map<string, number>();
+  /** Market sales per bracket on the last market day (the demand). */
+  let sales = new Map<string, number>();
   const unsold = new Map<string, number>();
   let index = economyIndex([], undefined, cfg);
   let rescued = 0;
@@ -181,7 +183,7 @@ export function simulateSeason(o: SimOptions): SimResult {
     return marketValue(
       baseValue(b.skill, b.score, cfg),
       formFactor(g, cfg),
-      demandFactor(bids.get(b.id) ?? 0, unsold.get(b.id) ?? 0, cfg),
+      demandFactor(sales.get(bracketOf(b.skill)) ?? 0, unsold.get(b.id) ?? 0, cfg),
       index,
     );
   };
@@ -240,36 +242,10 @@ export function simulateSeason(o: SimOptions): SimResult {
   for (let day = 0; day < days; day++) {
     const weekday = day % 7; // 0 = Monday
 
-    // --- Market day (04:00): index, values, bids of the day before, salaries, new offers.
+    // --- Market day (04:00): index, values, salaries, new offers at fixed prices.
     index = economyIndex(managers.map(bookNet), day === 0 ? undefined : index, cfg);
     if (day > 0) {
-      for (const b of offers) {
-        if (owner.has(b.id)) continue;
-        const v = value(b);
-        let best: { m: Manager; amount: number } | undefined;
-        let count = 0;
-        for (const m of managers) {
-          const want = wants(m, day, b, v);
-          if (!want) continue;
-          count++;
-          if (!best || want > best.amount) best = { m, amount: want };
-        }
-        bids.set(b.id, count);
-        if (best) {
-          best.m.cash -= best.amount;
-          best.m.t.bought += best.amount;
-          best.m.roster.push({
-            bot: b,
-            price: best.amount,
-            stamina: 100,
-            starter: false,
-            striking: false,
-          });
-          owner.set(b.id, best.m);
-          unsold.delete(b.id);
-          upgrade(best.m);
-        } else unsold.set(b.id, (unsold.get(b.id) ?? 0) + 1);
-      }
+      for (const b of offers) if (!owner.has(b.id)) unsold.set(b.id, (unsold.get(b.id) ?? 0) + 1);
       if (weekday === 0) {
         for (const m of managers) {
           for (const x of m.roster) {
@@ -289,6 +265,25 @@ export function simulateSeason(o: SimOptions): SimResult {
     const pool = [...free];
     for (let i = 0; i < (o.offersPerDay ?? 8) && pool.length; i++)
       offers.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]!);
+    const prices = new Map(offers.map((b) => [b.id, buyPrice(value(b), b.skill, cfg)]));
+
+    // --- Buying during the day: the managers come in a random order, the first one gets it.
+    const sold = new Map<string, number>();
+    for (const m of shuffle(managers)) {
+      for (const b of [...offers].sort((x, y) => strengthOf(y) - strengthOf(x))) {
+        if (owner.has(b.id)) continue;
+        const price = prices.get(b.id)!;
+        if (!wants(m, day, b, price)) continue;
+        m.cash -= price;
+        m.t.bought += price;
+        m.roster.push({ bot: b, price, stamina: 100, starter: false, striking: false });
+        owner.set(b.id, m);
+        unsold.delete(b.id);
+        sold.set(bracketOf(b.skill), (sold.get(bracketOf(b.skill)) ?? 0) + 1);
+        upgrade(m);
+      }
+    }
+    sales = sold;
 
     // --- Betting during the day.
     for (const m of managers) {
@@ -338,30 +333,24 @@ export function simulateSeason(o: SimOptions): SimResult {
   out.totals = managers.map((m) => ({ ...m.t, finalNet: net(m) }));
   return out;
 
-  // A manager's bid for an offer (0 = none): fills the roster towards its target size, keeps a
-  // reserve of two weeks of salaries.
-  function wants(m: Manager, day: number, b: SimBot, v: number): number {
+  // Whether a manager buys an offer at its price: fills the roster towards its target size,
+  // keeps a reserve of two weeks of salaries.
+  function wants(m: Manager, day: number, b: SimBot, price: number): boolean {
     const target = day < 3 ? 2 : day < 10 ? 3 : day < 17 ? 5 : 7;
     const salaries = m.roster.reduce(
       (s, x) => s + (x.starter ? 0 : weeklySalary(value(x.bot), x.bot.skill, cfg)),
       0,
     );
-    const reserve = floor + 2 * (salaries + weeklySalary(v, b.skill, cfg));
+    const reserve = floor + 2 * (salaries + weeklySalary(price, b.skill, cfg));
     const budget = (m.cash - reserve) * m.p.spend;
     const weakest = Math.min(...m.roster.map((x) => strength(x)));
     const fits =
       m.roster.length < target || (m.roster.length >= 7 && strengthOf(b) > weakest * 1.3);
-    if (!fits) return 0;
-    const bid = roundUp(v * (1 + rng() * 0.1));
-    return bid <= budget ? bid : 0;
+    return fits && price <= budget;
   }
 
   function strengthOf(b: SimBot) {
     return STRENGTH[Math.round(b.skill)]! * (0.85 + 0.3 * b.score);
-  }
-
-  function roundUp(n: number) {
-    return Math.ceil(n / 10) * 10;
   }
 
   // Roster above 7: the weakest non-starter bot is sold to the market.

@@ -250,7 +250,7 @@ export class TournamentsService {
 
   require(id: string): TournamentRow {
     const t = this.get(id);
-    if (!t) throw notFound(`tournament ${id}`);
+    if (!t) throw notFound('tournament {id}', { id });
     return t;
   }
 
@@ -351,7 +351,8 @@ export class TournamentsService {
       if (f.settings.teamSize > 1 && f.botPool && distinctBots < 2 * f.settings.teamSize) {
         // Two full bot teams must be able to play each other.
         throw badRequest(
-          `team tournaments of ${f.settings.teamSize} need at least ${2 * f.settings.teamSize} different bots in the pool`,
+          'team tournaments of {teamSize} need at least {teamSize2} different bots in the pool',
+          { teamSize: f.settings.teamSize, teamSize2: 2 * f.settings.teamSize },
         );
       }
     }
@@ -359,7 +360,10 @@ export class TournamentsService {
       const agent = this.agents.require(f.agentId);
       const profiles = this.agents.info(agent).profiles;
       if (f.profileId && profiles && !profiles.some((p) => p.id === f.profileId)) {
-        throw badRequest(`agent ${f.agentId} has no server profile ${f.profileId}`);
+        throw badRequest('agent {agentId} has no server profile {profileId}', {
+          agentId: f.agentId,
+          profileId: f.profileId,
+        });
       }
     }
   }
@@ -380,7 +384,7 @@ export class TournamentsService {
     if (body.seasonal && !inSeason && !opts.seriesId) throw conflict('no season is running');
     let id = body.id ?? slugify(body.name);
     if (this.get(id)) {
-      if (body.id) throw conflict(`tournament ${id} exists`);
+      if (body.id) throw conflict('tournament {id} exists', { id });
       id = `${id.slice(0, 50)}-${randomId(6).toLowerCase()}`;
     }
     this.db
@@ -539,9 +543,9 @@ export class TournamentsService {
     const all = this.db.select().from(tournaments).all();
     const active = all.filter((t) => ACTIVE_PHASES.includes(t.phase));
     if (active.length)
-      throw conflict(
-        `abort the running tournaments first: ${active.map((t) => t.name).join(', ')}`,
-      );
+      throw conflict('abort the running tournaments first: {list}', {
+        list: active.map((t) => t.name).join(', '),
+      });
     for (const t of all) this.remove(t.id);
     for (const fn of this.resetHooks) fn();
     // Shop purchases were paid with the seasons' Neuro: they go with them (looks too).
@@ -784,7 +788,8 @@ export class TournamentsService {
     const { settings } = this.requireTeamDraft(id);
     const team = this.teams.get(id, teamId);
     if (userId !== user.id) this.requireManager(team, user);
-    if (!team.members.some((m) => m.user.id === userId)) throw notFound(`member ${userId}`);
+    if (!team.members.some((m) => m.user.id === userId))
+      throw notFound('member {userId}', { userId });
     const teams = this.teams
       .list(id)
       .map((t) =>
@@ -802,7 +807,7 @@ export class TournamentsService {
   moveMember(id: string, userId: string, body: MoveMember) {
     const { settings } = this.requireTeamDraft(id);
     const reg = this.teams.registration(id, userId);
-    if (!reg) throw notFound(`registration of ${userId}`);
+    if (!reg) throw notFound('registration of {userId}', { userId });
     if (body.teamId) {
       const target = this.teams.get(id, body.teamId);
       const others = target.members.filter((m) => m.user.id !== userId);
@@ -825,23 +830,23 @@ export class TournamentsService {
     if (settings.teamSize < 2) throw conflict('this is not a team tournament');
     const unique = [...new Set(starters)];
     if (unique.length > settings.teamSize)
-      throw badRequest(`at most ${settings.teamSize} starters`);
+      throw badRequest('at most {teamSize} starters', { teamSize: settings.teamSize });
     if (t.phase === 'draft') {
       const team = this.teams.get(id, teamId);
       this.requireManager(team, user);
       const unknown = unique.filter((u) => !team.members.some((m) => m.user.id === u));
-      if (unknown.length) throw badRequest(`not in the team: ${unknown.join(', ')}`);
+      if (unknown.length) throw badRequest('not in the team: {list}', { list: unknown.join(', ') });
       this.teams.setStarters(id, teamId, unique);
       this.notifyDraft(id);
       return;
     }
     if (t.phase === 'finished' || t.phase === 'aborted')
-      throw conflict(`the tournament is ${t.phase}`);
+      throw conflict('the tournament is {phase}', { phase: t.phase });
     const entrant = this.log.projection(id)?.entrants[teamId];
-    if (entrant?.kind !== 'team') throw notFound(`team ${teamId}`);
+    if (entrant?.kind !== 'team') throw notFound('team {teamId}', { teamId });
     this.requireManager({ captainId: entrant.captainUserId ?? '' }, user);
     const unknown = unique.filter((u) => !entrant.members.some((m) => m.userId === u));
-    if (unknown.length) throw badRequest(`not in the team: ${unknown.join(', ')}`);
+    if (unknown.length) throw badRequest('not in the team: {list}', { list: unknown.join(', ') });
     const head = t.headSeq;
     const res = this.log.append(id, head, [
       {
@@ -1016,7 +1021,7 @@ export class TournamentsService {
   seed(id: string, body: Seed, by: User): TournamentProjection {
     const t = this.require(id);
     if (t.phase !== 'draft' && t.phase !== 'seeded') {
-      throw conflict(`cannot seed in phase ${t.phase}`);
+      throw conflict('cannot seed in phase {phase}', { phase: t.phase });
     }
     if (t.kind !== 'standard') return this.seedByProvider(t, body, by);
     if (t.botsFromLibrary) {
@@ -1071,8 +1076,10 @@ export class TournamentsService {
     }
     // Nobody registered: a tournament of bots only (everybody can watch).
     if (humans.length > settings.size) {
-      const what = teamMode ? 'teams' : 'players';
-      throw badRequest(`${humans.length} ${what} do not fit into a bracket of ${settings.size}`);
+      const params = { n: humans.length, size: settings.size };
+      throw teamMode
+        ? badRequest('{n} teams do not fit into a bracket of {size}', params)
+        : badRequest('{n} players do not fit into a bracket of {size}', params);
     }
     const humanIds = humans.map((h) => h.id);
     const botIds = bots.map((b) => b.id);
@@ -1161,13 +1168,17 @@ export class TournamentsService {
    */
   private seedByProvider(t: TournamentRow, body: Seed, by: User): TournamentProjection {
     const provider = this.lineupProviders.get(t.kind);
-    if (!provider) throw conflict(`tournaments of kind ${t.kind} cannot be seeded now`);
+    if (!provider)
+      throw conflict('tournaments of kind {kind} cannot be seeded now', { kind: t.kind });
     const settings = this.settings(t);
     const rngSeed = body.rngSeed ?? `${t.id}-${this.clock.now()}`;
     const rng = createRng(rngSeed);
     const { entrants: main, fill } = provider(t, settings, rng);
     if (main.length > settings.size)
-      throw badRequest(`${main.length} teams do not fit into a bracket of ${settings.size}`);
+      throw badRequest('{n} teams do not fit into a bracket of {size}', {
+        n: main.length,
+        size: settings.size,
+      });
     let slots: string[];
     try {
       slots = buildSlots({
@@ -1378,7 +1389,7 @@ export class TournamentsService {
     const t = this.require(id);
     const proj = this.log.projection(t.id);
     const d = proj ? matchDetail(this.log.load(t.id), proj, matchId) : undefined;
-    if (!d) throw notFound(`match ${matchId}`);
+    if (!d) throw notFound('match {matchId}', { matchId });
     const names = this.bots.gameNames();
     const current = this.withCurrentBotNames(proj!);
     for (const s of d.entrants) {
@@ -1416,7 +1427,7 @@ export class TournamentsService {
   /** Throws away the seeding (allowed until check-in opens). */
   resetToDraft(id: string): void {
     const t = this.require(id);
-    if (t.phase !== 'seeded') throw conflict(`cannot reset in phase ${t.phase}`);
+    if (t.phase !== 'seeded') throw conflict('cannot reset in phase {phase}', { phase: t.phase });
     this.log.clear(id);
     this.syncToAgent(this.require(id), 0);
   }
@@ -1528,13 +1539,18 @@ export class TournamentsService {
   async run(id: string): Promise<void> {
     const t = this.require(id);
     if (t.phase !== 'seeded' && !ACTIVE_PHASES.includes(t.phase)) {
-      throw conflict(`cannot run a tournament in phase ${t.phase}`);
+      throw conflict('cannot run a tournament in phase {phase}', { phase: t.phase });
     }
-    if (!this.connections.isOnline(t.agentId)) throw conflict(`agent ${t.agentId} is offline`);
+    if (!this.connections.isOnline(t.agentId))
+      throw conflict('agent {agentId} is offline', { agentId: t.agentId });
     const other = this.byAgent(t.agentId).find(
       (x) => x.id !== id && ACTIVE_PHASES.includes(x.phase),
     );
-    if (other) throw conflict(`agent ${t.agentId} is busy with ${other.name}`);
+    if (other)
+      throw conflict('agent {agentId} is busy with {name}', {
+        agentId: t.agentId,
+        name: other.name,
+      });
     this.syncToAgent(t, 0);
     await this.connections.command(t.agentId, {
       kind: 'tournament.run',
@@ -1547,7 +1563,7 @@ export class TournamentsService {
   /** Calls off a seeded tournament that never ran (autostart: no free server). */
   cancelSeeded(id: string, reason: string, by: User): void {
     const t = this.require(id);
-    if (t.phase !== 'seeded') throw conflict(`cannot cancel in phase ${t.phase}`);
+    if (t.phase !== 'seeded') throw conflict('cannot cancel in phase {phase}', { phase: t.phase });
     const res = this.log.append(id, t.headSeq, [
       { type: 'tournament.aborted', actor: { kind: 'admin', id: by.id }, data: { reason } },
     ]);
@@ -1576,7 +1592,7 @@ export class TournamentsService {
     if (cmd.kind === 'abort' && !online) {
       // The bridge is gone: the website closes the tournament on its own.
       if (t.phase === 'finished' || t.phase === 'aborted' || t.phase === 'draft') {
-        throw conflict(`cannot abort in phase ${t.phase}`);
+        throw conflict('cannot abort in phase {phase}', { phase: t.phase });
       }
       const res = this.log.append(id, t.headSeq, [
         {
@@ -1588,9 +1604,9 @@ export class TournamentsService {
       if (!res.accepted) throw conflict(res.reason);
       return;
     }
-    if (!online) throw conflict(`agent ${t.agentId} is offline`);
+    if (!online) throw conflict('agent {agentId} is offline', { agentId: t.agentId });
     if (!ACTIVE_PHASES.includes(t.phase))
-      throw conflict(`the tournament is not running (${t.phase})`);
+      throw conflict('the tournament is not running ({phase})', { phase: t.phase });
     switch (cmd.kind) {
       case 'forceStart':
         return this.connections.command(t.agentId, {
@@ -1616,7 +1632,7 @@ export class TournamentsService {
       case 'restart': {
         const cm = this.log.projection(id)?.currentMatch;
         if (!cm) throw conflict('no match is being played right now');
-        if (!cm.map) throw conflict(`${cm.matchId} has no map yet (map vote)`);
+        if (!cm.map) throw conflict('{matchId} has no map yet (map vote)', { matchId: cm.matchId });
         return this.connections.command(t.agentId, {
           kind: 'match.restart',
           tournamentId: id,
@@ -1644,15 +1660,22 @@ export class TournamentsService {
   override(id: string, body: Override, by: User): void {
     const t = this.require(id);
     if (t.phase !== 'running' && t.phase !== 'paused')
-      throw conflict(`results can only be set while the tournament runs (${t.phase})`);
+      throw conflict('results can only be set while the tournament runs ({phase})', {
+        phase: t.phase,
+      });
     const p = this.log.projection(id);
     const node = p?.bracket?.byId[body.matchId];
-    if (!p || !node) throw notFound(`match ${body.matchId}`);
+    if (!p || !node) throw notFound('match {matchId}', { matchId: body.matchId });
     const [a, b] = node.entrants;
     if (!a || !b || (node.status !== 'ready' && node.status !== 'completed'))
-      throw conflict(`${body.matchId} cannot be decided yet (entrants not known)`);
+      throw conflict('{matchId} cannot be decided yet (entrants not known)', {
+        matchId: body.matchId,
+      });
     if (body.winnerId !== a && body.winnerId !== b)
-      throw badRequest(`${body.winnerId} does not play in ${body.matchId}`);
+      throw badRequest('{winnerId} does not play in {matchId}', {
+        winnerId: body.winnerId,
+        matchId: body.matchId,
+      });
     const head = t.headSeq;
     const res = this.log.append(id, head, [
       {

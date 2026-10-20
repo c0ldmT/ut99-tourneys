@@ -10,6 +10,7 @@ import { DB, type Db } from '../db/database.js';
 import { shopPurchases, users } from '../db/schema.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { seasonStatus } from '../seasons/season-time.js';
+import { NeuroHub } from '../ledger/neuro-hub.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { StatsService } from '../stats/stats.service.js';
 import {
@@ -60,6 +61,7 @@ export class ShopService {
     @Inject(BetsService) private readonly bets: BetsService,
     @Inject(StatsService) private readonly stats: StatsService,
     @Inject(UsersService) private readonly users: UsersService,
+    @Inject(NeuroHub) private readonly neuro: NeuroHub,
   ) {}
 
   /** The items for sale with the admin's prices; hidden ones left out unless `all`. */
@@ -180,7 +182,7 @@ export class ShopService {
   buy(user: User, body: z.infer<typeof BuyBody>) {
     if (!this.settings.get().shop.enabled) throw forbidden('the shop is closed');
     const item = this.catalog().find((i) => i.id === body.item);
-    if (!item) throw notFound(`item ${body.item}`);
+    if (!item) throw notFound('item {item}', { item: body.item });
     const w = this.spendable(user.id);
     if (w.season === null) throw conflict('no season is running');
     const ded = item.slot === 'dedication';
@@ -191,7 +193,10 @@ export class ShopService {
       if (!d.kill && !d.death) throw badRequest('write at least one line');
     } else if (this.owned(user.id).has(item.id)) throw conflict('you own it already');
     if (item.price > w.spendable)
-      throw conflict(`not enough Neuro: ${w.spendable} can be spent (rescue floor ${w.floor})`);
+      throw conflict('not enough Neuro: {spendable} can be spent (rescue floor {floor})', {
+        spendable: w.spendable,
+        floor: w.floor,
+      });
     if (ded)
       // A refunded dedication makes room for the new one.
       this.db
@@ -211,6 +216,7 @@ export class ShopService {
         dataJson: ded ? JSON.stringify(DedicationSchema.parse(body.dedication ?? {})) : null,
       })
       .run();
+    this.neuro.changed(user.id);
     // Wear it right away.
     if (item.slot !== 'dedication')
       this.setLook(user, { ...this.look(user), [item.slot]: item.id });
@@ -291,12 +297,13 @@ export class ShopService {
   /** Approves or rejects a dedication (rejected: the Neuro come back). */
   review(id: string, approve: boolean) {
     const p = this.db.select().from(shopPurchases).where(eq(shopPurchases.id, id)).get();
-    if (!p || p.itemId !== 'dedication') throw notFound(`dedication ${id}`);
+    if (!p || p.itemId !== 'dedication') throw notFound('dedication {id}', { id });
     this.db
       .update(shopPurchases)
       .set({ status: approve ? 'approved' : 'rejected' })
       .where(eq(shopPurchases.id, id))
       .run();
+    this.neuro.changed(p.userId);
     return this.log();
   }
 

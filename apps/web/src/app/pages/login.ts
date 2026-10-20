@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { TPipe } from '../core/i18n';
 
@@ -36,9 +36,6 @@ import { TPipe } from '../core/i18n';
           <button class="primary" type="submit" [disabled]="busy() || name.trim().length < 2">
             {{ 'login.enter' | t }}
           </button>
-          @if (devError()) {
-            <p class="error">{{ devError() }}</p>
-          }
         </form>
       }
     </div>
@@ -75,7 +72,6 @@ export class LoginPage {
   protected name = '';
   protected admin = false;
   protected readonly busy = signal(false);
-  protected readonly devError = signal('');
 
   protected error = () => {
     const e = this.errorParam();
@@ -97,12 +93,11 @@ export class LoginPage {
 
   protected async devLogin() {
     this.busy.set(true);
-    this.devError.set('');
     try {
       this.auth.me.set(await this.api.devLogin(this.name.trim(), this.admin));
       await this.router.navigateByUrl(this.safeNext());
-    } catch (e) {
-      this.devError.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

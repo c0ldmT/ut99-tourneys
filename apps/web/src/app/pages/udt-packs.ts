@@ -7,10 +7,10 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Coin } from '../core/brand';
 import { TPipe } from '../core/i18n';
-import { NeuroPipe } from '../core/neuro';
+import { NeuroPipe, NeuroStore } from '../core/neuro';
 import type { UdtBox, UdtCatalogTrait, UdtInventoryCard, UdtPacks, UdtRarity } from '../core/types';
 import { RARITIES, SCRAP, UdtNav } from '../core/udt';
 import { BOX_STROKE, UdtPackStage } from './udt-pack-stage';
@@ -30,9 +30,6 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
     @if (view(); as v) {
       <div class="udt-head">
         <div>
@@ -50,7 +47,9 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
           </div>
           <div>
             <div class="kpi">{{ 'udt.spendable' | t }}</div>
-            <div class="v neuro"><na-coin [size]="16" /> {{ v.spendable | neuro: false }}</div>
+            <div class="v neuro">
+              <na-coin [size]="16" /> {{ spendable() ?? v.spendable | neuro: false }}
+            </div>
           </div>
         </div>
       </div>
@@ -319,7 +318,8 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
 export class UdtPacksPage {
   private readonly api = inject(Api);
   protected readonly view = signal<UdtPacks | null>(null);
-  protected readonly error = signal('');
+  /** The shared Neuro state (the same as in the navbar). */
+  protected readonly spendable = inject(NeuroStore).spendable;
   protected readonly busy = signal(false);
   protected readonly rarities = RARITIES;
   protected readonly max = Math.max;
@@ -336,9 +336,8 @@ export class UdtPacksPage {
   async load() {
     try {
       this.view.set(await this.api.udtPacks());
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -356,7 +355,13 @@ export class UdtPacksPage {
 
   protected canBuy(price: number) {
     const v = this.view();
-    return !!v && v.hasTeam && !this.busy() && !this.stage()?.animating() && v.spendable >= price;
+    return (
+      !!v &&
+      v.hasTeam &&
+      !this.busy() &&
+      !this.stage()?.animating() &&
+      (this.spendable() ?? v.spendable) >= price
+    );
   }
 
   protected async open(box: UdtBox, ten: boolean) {
@@ -377,11 +382,10 @@ export class UdtPacksPage {
 
   private async act(fn: () => Promise<void>) {
     this.busy.set(true);
-    this.error.set('');
     try {
       await fn();
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

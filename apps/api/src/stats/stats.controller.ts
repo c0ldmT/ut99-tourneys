@@ -37,7 +37,7 @@ export class StatsController {
   @Get('players/:key')
   player(@Param('key') key: string, @Query(new ZodPipe(Query_)) q: Query_) {
     const d = this.stats.player(key, this.scope(q));
-    if (!d) throw notFound(`player ${key}`);
+    if (!d) throw notFound('player {key}', { key });
     return d;
   }
 

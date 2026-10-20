@@ -355,7 +355,8 @@ export class UdtPacksService {
     if (this.inventory(season, user.id).some((t) => t.code === code))
       throw conflict('you have this trait in your inventory');
     const cost = craftCost(code);
-    if (!this.udt.addScrap(season, user.id, -cost)) throw conflict(`crafting costs ${cost} scrap`);
+    if (!this.udt.addScrap(season, user.id, -cost))
+      throw conflict('crafting costs {cost} scrap', { cost });
     this.db
       .insert(udtTraits)
       .values({

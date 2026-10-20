@@ -12,7 +12,7 @@ import { PageTitle } from '../core/page-title';
 import { TournamentStream } from '../core/stream';
 import { KillFeed } from '../components/kill-feed';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { MH_ADAPTER, raceTime } from '../core/race';
 import { playTime } from '../core/stats-format';
@@ -69,9 +69,6 @@ const SUM_KEYS = [
   template: `
     @if (t(); as t) {
       <a [routerLink]="['/t', t.id]">← {{ t.name }}</a>
-    }
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
     }
     @if (d(); as d) {
       <h1>
@@ -484,7 +481,6 @@ export class MatchPage {
   protected readonly t = signal<TournamentDetail | null>(null);
   protected readonly d = signal<MatchDetailView | null>(null);
   protected readonly bets = signal<BetMatchView | null>(null);
-  protected readonly error = signal('');
   protected readonly tab = signal<string>('');
   protected readonly raceTime = (ms: number) => raceTime(ms);
 
@@ -585,7 +581,7 @@ export class MatchPage {
       const [t, d, b] = await Promise.all([
         first || !this.t() ? this.api.tournament(id) : Promise.resolve(this.t()!),
         this.api.matchDetail(id, matchId),
-        this.api.tournamentBets(id).catch(() => null),
+        this.api.tournamentBets(id, true).catch(() => null),
       ]);
       this.t.set(t);
       this.d.set(d);
@@ -597,9 +593,8 @@ export class MatchPage {
           live ? `g${live.game}` : d.games.length > 1 ? 'total' : `g${d.games.at(-1)?.game ?? 1}`,
         );
       }
-      this.error.set('');
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 

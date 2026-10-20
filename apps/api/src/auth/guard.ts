@@ -1,16 +1,14 @@
 import {
   createParamDecorator,
-  ForbiddenException,
   Inject,
   Injectable,
   SetMetadata,
-  UnauthorizedException,
   type CanActivate,
   type ExecutionContext,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import { parseCookies } from '../common/http.js';
+import { forbidden, parseCookies, unauthorized } from '../common/http.js';
 import { SESSION_COOKIE, SessionsService } from './sessions.service.js';
 import type { User } from './users.service.js';
 
@@ -48,7 +46,7 @@ export class AuthGuard implements CanActivate {
     const req = ctx.switchToHttp().getRequest<AuthedRequest>();
     const targets = [ctx.getHandler(), ctx.getClass()];
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers[CSRF_HEADER] !== '1') {
-      throw new ForbiddenException(`missing ${CSRF_HEADER} header`);
+      throw forbidden('missing {header} header', { header: CSRF_HEADER });
     }
     const sid = parseCookies(req.headers.cookie)[SESSION_COOKIE];
     const user = this.sessions.resolve(sid);
@@ -57,9 +55,9 @@ export class AuthGuard implements CanActivate {
       req.sessionId = sid;
     }
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC, targets)) return true;
-    if (!user) throw new UnauthorizedException('login required');
+    if (!user) throw unauthorized();
     if (this.reflector.getAllAndOverride<boolean>(ADMIN, targets) && !user.isAdmin) {
-      throw new ForbiddenException('admins only');
+      throw forbidden('admins only');
     }
     return true;
   }

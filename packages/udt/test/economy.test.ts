@@ -4,6 +4,7 @@ import {
   baseValue,
   botRarity,
   bracketOf,
+  buyPrice,
   demandFactor,
   economyIndex,
   formFactor,
@@ -68,6 +69,14 @@ describe('market values', () => {
     expect(demandFactor(0, 2)).toBe(0.9);
     expect(marketValue(14_500, 1.1, 1.05, 1.84)).toBe(30_820);
     expect(sellPrice(1000)).toBe(850);
+  });
+
+  it('buying costs the value plus the bracket surcharge', () => {
+    expect(buyPrice(1000, 2)).toBe(1100);
+    expect(buyPrice(1000, 4)).toBe(1200);
+    expect(buyPrice(10_000, 7)).toBe(13_000);
+    // A round trip (buy, sell back) always loses.
+    for (const skill of [0, 4, 7]) expect(sellPrice(1000)).toBeLessThan(buyPrice(1000, skill));
   });
 
   it('salaries rise with the bracket', () => {

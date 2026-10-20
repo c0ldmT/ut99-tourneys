@@ -10,10 +10,10 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
-import { formatNeuro, NeuroPipe } from '../core/neuro';
+import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
 import { Coin } from '../core/brand';
 import type { BetMatchView, Entrant, TournamentBets, TournamentDetail } from '../core/types';
 
@@ -37,20 +37,17 @@ interface Draft {
         <div class="card bets">
           <div class="spread top">
             <h2>{{ 'bets.title' | t }}</h2>
-            @if (v.wallet; as w) {
+            @if (wallet(); as w) {
               <b class="neuro bal" [title]="'bets.balance' | t"
                 ><na-coin [size]="18" /> {{ w.balance | neuro: false }}</b
               >
             }
           </div>
-          @if (v.wallet?.staked) {
+          @if (wallet()?.staked) {
             <p class="muted small">
-              {{ 'bets.staked' | t }} {{ v.wallet!.staked | neuro }} · {{ 'bets.free' | t }}
-              {{ v.wallet!.free | neuro }}
+              {{ 'bets.staked' | t }} {{ wallet()!.staked | neuro }} · {{ 'bets.free' | t }}
+              {{ wallet()!.free | neuro }}
             </p>
-          }
-          @if (error()) {
-            <p class="error">{{ error() }}</p>
           }
           @if (!v.open) {
             <p class="muted small">{{ 'bets.closed.' + (v.reason ?? 'phase') | t }}</p>
@@ -168,7 +165,7 @@ interface Draft {
             <details class="how">
               <summary class="small">{{ 'bets.howTo' | t }}</summary>
               <p class="muted small">
-                {{ 'bets.hint' | t: { floor: neuro(v.wallet?.floor ?? 0) } }}
+                {{ 'bets.hint' | t: { floor: neuro(wallet()?.floor ?? 0) } }}
               </p>
             </details>
           }
@@ -407,7 +404,15 @@ export class BetPanel {
   private readonly chosen = signal<string | null>(null);
   protected readonly view = signal<TournamentBets | null>(null);
   protected readonly busy = signal(false);
-  protected readonly error = signal('');
+  private readonly store = inject(NeuroStore);
+  /**
+   * The own wallet: the shared Neuro state (the same as in the navbar) while a season runs,
+   * else what the bets view brought.
+   */
+  protected readonly wallet = computed(() => {
+    const s = this.store.wallet();
+    return s?.running ? s : (this.view()?.wallet ?? null);
+  });
   private readonly drafts = signal<Record<string, Draft>>({});
 
   protected readonly openMatches = computed(() =>
@@ -501,8 +506,8 @@ export class BetPanel {
       this.openIds.emit(
         v.open ? v.matches.filter((m) => m.state === 'open').map((m) => m.matchId) : [],
       );
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     }
   }
 
@@ -533,7 +538,7 @@ export class BetPanel {
 
   /** The free Neuro plus what this bet already holds. */
   protected maxFor(m: BetMatchView): number {
-    const w = this.view()?.wallet;
+    const w = this.wallet();
     if (!w) return 0;
     // A wallet below the floor is topped up when the bet is placed.
     const free = Math.max(w.free, w.floor - w.staked);
@@ -551,15 +556,14 @@ export class BetPanel {
 
   private async run(fn: () => Promise<TournamentBets>, matchId: string) {
     this.busy.set(true);
-    this.error.set('');
     try {
       this.view.set(await fn());
       this.drafts.update((d) => {
         const { [matchId]: _, ...rest } = d;
         return rest;
       });
-    } catch (e) {
-      this.error.set(errorText(e));
+    } catch {
+      // the toast shows the error
     } finally {
       this.busy.set(false);
     }

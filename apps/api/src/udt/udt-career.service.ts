@@ -105,8 +105,8 @@ export class UdtCareerService implements OnModuleInit {
     }
   }
 
-  /** Called by the market when a bid wins: a graduate pays its breeder a share. */
-  saleBonus(season: number, botId: string, price: number, bidId: string): void {
+  /** Called by the market when a bot is bought: a graduate pays its breeder a share. */
+  saleBonus(season: number, botId: string, price: number, saleRef: string): void {
     const g = this.graduate(botId);
     if (!g || price <= 0) return;
     this.ledger.book({
@@ -114,7 +114,7 @@ export class UdtCareerService implements OnModuleInit {
       userId: g.userId,
       kind: 'udt_breeder',
       amount: roundNeuro(price * BREEDER_SALE),
-      ref: `breeder-sale:${bidId}`,
+      ref: `breeder-sale:${saleRef}`,
       meta: { botId },
     });
   }
@@ -164,12 +164,14 @@ export class UdtCareerService implements OnModuleInit {
     const g = this.graduation(user);
     const b = g.bots.find((x) => x.botId === botId);
     if (!b) throw notFound('own bot of this season');
-    if (b.status !== 'own') throw conflict(`the bot is ${b.status}`);
+    if (b.status !== 'own') throw conflict('the bot is {status}', { status: b.status });
     if (!b.ready)
-      throw conflict(
-        `a graduation needs ${GRADUATE_GAMES} Dream Team games and level ${GRADUATE_LEVEL}`,
-      );
-    if (g.left <= 0) throw conflict(`at most ${GRADUATES_PER_SEASON} graduations per season`);
+      throw conflict('a graduation needs {games} Dream Team games and level {level}', {
+        games: GRADUATE_GAMES,
+        level: GRADUATE_LEVEL,
+      });
+    if (g.left <= 0)
+      throw conflict('at most {n} graduations per season', { n: GRADUATES_PER_SEASON });
     this.db
       .update(udtBots)
       .set({ status: 'nominated', nominatedAt: new Date(this.clock.now()).toISOString() })

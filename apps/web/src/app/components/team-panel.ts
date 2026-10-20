@@ -7,10 +7,11 @@ import {
   input,
   output,
   signal,
+  untracked,
 } from '@angular/core';
 import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
-import { Api, errorText } from '../core/api';
+import { Api } from '../core/api';
 import { copyText } from '../core/clipboard';
 import { I18n, TPipe } from '../core/i18n';
 import type { InvitePreview, TeamView, TournamentDetail } from '../core/types';
@@ -256,10 +257,6 @@ export function inviteCodeFrom(text: string): string {
         </div>
       }
     }
-
-    @if (error()) {
-      <p class="error">{{ error() }}</p>
-    }
   `,
   styles: `
     .invite {
@@ -348,7 +345,6 @@ export class TeamPanel {
   protected readonly inviteCodeFrom = inviteCodeFrom;
 
   protected readonly busy = signal(false);
-  protected readonly error = signal('');
   protected readonly copied = signal<'' | 'ok' | 'manual'>('');
   protected readonly invite = signal<InvitePreview | null>(null);
   protected newName = '';
@@ -366,14 +362,15 @@ export class TeamPanel {
   constructor() {
     effect(() => {
       const code = this.joinCode();
-      const id = this.tournament().id;
+      // Only the code starts a preview, not every update of the tournament.
+      const id = untracked(() => this.tournament().id);
       if (!code) {
         this.invite.set(null);
         return;
       }
       this.api.invitePreview(id, code).then(
         (p) => this.invite.set(p),
-        (e) => this.error.set(errorText(e)),
+        () => this.invite.set(null), // the Api shows the error as a toast
       );
     });
   }
@@ -416,14 +413,15 @@ export class TeamPanel {
     setTimeout(() => this.copied.set(''), ok ? 1500 : 5000);
   }
 
-  protected async act(p: Promise<unknown>) {
+  /** Runs an action; true when it worked (the Api toasts errors and successes). */
+  protected async act(p: Promise<unknown>): Promise<boolean> {
     this.busy.set(true);
-    this.error.set('');
     try {
       await p;
       this.changed.emit();
-    } catch (e) {
-      this.error.set(errorText(e));
+      return true;
+    } catch {
+      return false;
     } finally {
       this.busy.set(false);
     }
@@ -432,14 +430,13 @@ export class TeamPanel {
   protected async create() {
     const name = this.newName.trim();
     if (!name) return;
-    await this.act(this.api.createTeam(this.tournament().id, name, this.newTag.trim() || null));
-    if (!this.error()) this.newName = this.newTag = '';
+    if (await this.act(this.api.createTeam(this.tournament().id, name, this.newTag.trim() || null)))
+      this.newName = this.newTag = '';
   }
 
   protected async join(code: string) {
     if (!code) return;
-    await this.act(this.api.joinTeam(this.tournament().id, code));
-    if (!this.error()) this.code = '';
+    if (await this.act(this.api.joinTeam(this.tournament().id, code))) this.code = '';
   }
 
   protected leave(team: TeamView) {

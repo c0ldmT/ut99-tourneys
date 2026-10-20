@@ -37,6 +37,11 @@ export interface EconomyConfig {
   salaryRate: Readonly<Record<Bracket, number>>;
   /** Selling to the market pays this share of the market value. */
   sellBack: number;
+  /**
+   * Buying on the market (first come, first served) costs the market value plus this share per
+   * bracket: instant buying replaces the bidding, the surcharge replaces what bidding wars added.
+   */
+  buyPremium: Readonly<Record<Bracket, number>>;
   rewards: {
     game: number;
     win: number;
@@ -81,6 +86,10 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   demandMax: 0.15,
   salaryRate: { weak: 3, mid: 5, strong: 8 },
   sellBack: 0.85,
+  // Calibrated on 20.10. with the simulator (40 seeds): bidding ended the season at index 2.4
+  // (max 3.7); instant buying without a surcharge at 2.75 (max 5, the cap), with 10/20/30 % at
+  // 2.5 (max 4.0) and about the same net worth per manager as with bids.
+  buyPremium: { weak: 0.1, mid: 0.2, strong: 0.3 },
   // Doubled on 20.10. (owner: at least +50 %); the simulator keeps the index moderate up to
   // twice the rewards (about 1.7 at the season's end), beyond that it runs away (3.8 at 2.5x).
   rewards: {
@@ -207,13 +216,16 @@ export function formFactor(f: BotForm, cfg: EconomyConfig = DEFAULT_ECONOMY): nu
   return round3(clamp(1 + (raw - 1) * weight, cfg.formMin, cfg.formMax));
 }
 
-/** Demand: +5 % per bid of the last market day (up to 3), −5 % per day unsold on offer (up to 3). */
+/**
+ * Demand: +5 % per bot of the same bracket bought on the market on the last market day (up to
+ * 3), −5 % per day the bot stayed unsold on offer (up to 3).
+ */
 export function demandFactor(
-  bids: number,
+  sales: number,
   daysUnsold: number,
   cfg: EconomyConfig = DEFAULT_ECONOMY,
 ): number {
-  const d = 0.05 * Math.min(Math.max(bids, 0), 3) - 0.05 * Math.min(Math.max(daysUnsold, 0), 3);
+  const d = 0.05 * Math.min(Math.max(sales, 0), 3) - 0.05 * Math.min(Math.max(daysUnsold, 0), 3);
   return round3(1 + clamp(d, -cfg.demandMax, cfg.demandMax));
 }
 
@@ -229,6 +241,15 @@ export function weeklySalary(
   cfg: EconomyConfig = DEFAULT_ECONOMY,
 ): number {
   return roundNeuro((value * cfg.salaryRate[bracketOf(skill)]) / 100);
+}
+
+/** What buying an offer costs: market value plus the bracket's surcharge, in steps of 10. */
+export function buyPrice(
+  value: number,
+  skill: number,
+  cfg: EconomyConfig = DEFAULT_ECONOMY,
+): number {
+  return roundNeuro(value * (1 + cfg.buyPremium[bracketOf(skill)]));
 }
 
 /** What selling a bot to the market pays. */

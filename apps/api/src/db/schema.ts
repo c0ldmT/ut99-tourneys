@@ -443,7 +443,7 @@ export const udtBots = sqliteTable('udt_bots', {
   botId: text('bot_id').primaryKey(),
   season: integer('season').notNull(),
   userId: text('user_id').notNull(),
-  /** "starter", "academy" or "apprentice". */
+  /** "starter", "academy", "apprentice" or "blueprint". */
   origin: text('origin').notNull(),
   potential: integer('potential').notNull(),
   pointsSpent: integer('points_spent').notNull().default(0),
@@ -455,6 +455,8 @@ export const udtBots = sqliteTable('udt_bots', {
   graduatedAt: text('graduated_at'),
   /** Graduated with honours (level 10). */
   honours: integer('honours', { mode: 'boolean' }).notNull().default(false),
+  /** The manager used the one free renaming. */
+  renamed: integer('renamed', { mode: 'boolean' }).notNull().default(false),
 });
 
 /** The manager's latest scout report (three talents) of a season. */

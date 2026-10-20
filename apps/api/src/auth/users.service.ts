@@ -115,7 +115,7 @@ export class UsersService {
       .from(users)
       .where(eq(users.displayKey, key))
       .get();
-    if (owner && owner.id !== userId) throw conflict(`the name ${name} is already taken`);
+    if (owner && owner.id !== userId) throw conflict('the name {name} is already taken', { name });
     this.db
       .update(users)
       .set({ displayName: name, displayKey: key })
