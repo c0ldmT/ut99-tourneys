@@ -949,6 +949,8 @@ export interface UdtTeam {
   name: string;
   tag: string;
   createdAt: string;
+  /** Enters open Dream Team tournaments automatically when possible. */
+  autoEnter?: boolean;
 }
 
 export interface UdtWallet {

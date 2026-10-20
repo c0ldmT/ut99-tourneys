@@ -374,8 +374,10 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
       margin: 0;
     }
     .pick {
+      flex: 1;
       display: flex;
       flex-wrap: wrap;
+      align-content: flex-start;
       align-items: flex-start;
       gap: 10px;
     }

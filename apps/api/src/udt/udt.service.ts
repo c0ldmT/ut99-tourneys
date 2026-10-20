@@ -152,7 +152,12 @@ export interface UdtTeam {
   name: string;
   tag: string;
   createdAt: string;
+  /** Enters open Dream Team tournaments automatically when possible. */
+  autoEnter: boolean;
 }
+
+/** Neuro per stamina point bought (rest with Neuro). */
+export const REST_PRICE = 2;
 
 /**
  * Unreal Dream Team (add-on, settings "udt.enabled"): managers' teams and rosters of a season.
@@ -373,7 +378,72 @@ export class UdtService {
       .from(udtTeams)
       .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, userId)))
       .get();
-    return t ? { userId: t.userId, name: t.name, tag: t.tag, createdAt: t.createdAt } : null;
+    return t
+      ? {
+          userId: t.userId,
+          name: t.name,
+          tag: t.tag,
+          createdAt: t.createdAt,
+          autoEnter: t.autoEnter,
+        }
+      : null;
+  }
+
+  /** The managers (humans) whose switch "enter automatically" is on this season. */
+  autoEntrants(season: number): string[] {
+    const ai = this.aiIds();
+    return this.db
+      .select({ u: udtTeams.userId })
+      .from(udtTeams)
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.autoEnter, true)))
+      .all()
+      .map((r) => r.u)
+      .filter((u) => !ai.has(u));
+  }
+
+  setAutoEnter(user: User, on: boolean): UdtTeam {
+    this.assertOn();
+    const season = this.season().number;
+    if (!this.team(user.id, season)) throw conflict('found your team first');
+    this.db
+      .update(udtTeams)
+      .set({ autoEnter: on })
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, user.id)))
+      .run();
+    return this.team(user.id, season)!;
+  }
+
+  /** Buys stamina for a bot of the roster: REST_PRICE Neuro per point, up to 100. */
+  rest(user: User, botId: string, points: number) {
+    this.assertOn();
+    const season = this.season().number;
+    const r = this.db
+      .select()
+      .from(udtRoster)
+      .where(
+        and(
+          eq(udtRoster.season, season),
+          eq(udtRoster.botId, botId),
+          eq(udtRoster.userId, user.id),
+        ),
+      )
+      .get();
+    if (!r) throw notFound('bot in your roster');
+    const n = Math.min(Math.round(points), 100 - r.stamina);
+    if (n <= 0) throw conflict('the bot is fully rested');
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_rest',
+      amount: n * REST_PRICE,
+      ref: `rest:${season}:${botId}:${this.clock.now()}`,
+      meta: { botId, points: n },
+    });
+    this.db
+      .update(udtRoster)
+      .set({ stamina: r.stamina + n })
+      .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, botId)))
+      .run();
+    return this.view(user);
   }
 
   teams(season: number): UdtTeam[] {
@@ -382,7 +452,13 @@ export class UdtService {
       .from(udtTeams)
       .where(eq(udtTeams.season, season))
       .all()
-      .map((t) => ({ userId: t.userId, name: t.name, tag: t.tag, createdAt: t.createdAt }));
+      .map((t) => ({
+        userId: t.userId,
+        name: t.name,
+        tag: t.tag,
+        createdAt: t.createdAt,
+        autoEnter: t.autoEnter,
+      }));
   }
 
   /** Bots owned this season: bot id -> manager. */

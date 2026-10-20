@@ -1612,3 +1612,23 @@ details.help ul {
   display: grid;
   gap: 4px;
 }
+
+/* Dream Team: rest a bot with Neuro */
+.restbox {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #0c0f16;
+}
+.restslider {
+  display: grid;
+  grid-template-columns: auto 1fr 48px;
+  align-items: center;
+  gap: 10px;
+}
+.restslider input {
+  padding: 0;
+}

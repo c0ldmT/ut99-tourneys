@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import type { UdtLooks } from '../components/udt-bot-look';
 import type {
   UdtBotLookBody,
+  UdtTeam,
   UdtSquad,
   UdtSquadRow,
   UdtEvent,
@@ -216,6 +217,12 @@ export class Api {
     look?: UdtBotLookBody;
   }) => this.call<UdtAcademy>('POST', '/udt/academy/build', body);
   udtLooks = () => this.call<UdtLooks>('GET', '/udt/looks');
+  udtAutoEnter = (on: boolean) =>
+    this.call<{ team: UdtTeam; entered: number; events: UdtEvent[] }>('PUT', '/udt/auto-enter', {
+      on,
+    });
+  udtRest = (botId: string, points: number) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/rest`, { points });
   udtEditBot = (botId: string, body: UdtBotLookBody) =>
     this.call<LibraryBot>('PUT', `/udt/bots/${encodeURIComponent(botId)}`, body);
   udtSquads = () => this.call<UdtSquadRow[]>('GET', '/udt/squads');

@@ -18,7 +18,7 @@ import {
   tiredPenalty,
   type Career,
 } from '@tourney/udt';
-import type { User } from '../auth/users.service.js';
+import { UsersService, type User } from '../auth/users.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
 import { conflict, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
@@ -63,6 +63,7 @@ export class UdtEventsService implements OnModuleInit {
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
+    @Inject(UsersService) private readonly users: UsersService,
   ) {}
 
   onModuleInit(): void {
@@ -73,8 +74,10 @@ export class UdtEventsService implements OnModuleInit {
     this.tournaments.onResetAll(() => this.udt.wipeAll());
     // AI managers enter as soon as a Dream Team tournament opens its sign-up.
     this.tournaments.onSaved((t) => {
-      if (t.kind === 'udt' && t.phase === 'draft' && t.registrationOpen && !this.rules(t).finale)
+      if (t.kind === 'udt' && t.phase === 'draft' && t.registrationOpen && !this.rules(t).finale) {
+        this.autoFill(t.id);
         this.aiFill(t.id);
+      }
     });
     // The tournament page signs up through the Dream Team: the manager enters the team.
     this.tournaments.registerSignupProvider('udt', {
@@ -116,6 +119,34 @@ export class UdtEventsService implements OnModuleInit {
    * AI managers count when they play along.
    */
   tableOf: (season: number) => { userId: string; points: number; ai: boolean }[] = () => [];
+
+  /**
+   * Managers with the switch "enter automatically" enter open Dream Team tournaments where they
+   * can: open sign-up, no high stakes ticket, a lineup that fits the rules (enough bots that
+   * can play, value cap, star limit). A full bracket with AI teams makes room for them.
+   */
+  autoFill(tournamentId?: string, onlyUser?: string): number {
+    const season = this.udt.seasonNumber();
+    if (season === null || !this.udt.enabled()) return 0;
+    let n = 0;
+    for (const id of this.udt.autoEntrants(season)) {
+      if (onlyUser && id !== onlyUser) continue;
+      const user = this.users.byId(id);
+      if (!user) continue;
+      for (const e of this.events(user)) {
+        if (tournamentId && e.id !== tournamentId) continue;
+        if (!e.open || e.entered || e.ticketNow > 0 || !e.lineup || e.lineup.problems.length)
+          continue;
+        try {
+          this.enter(user, e.id);
+          n++;
+        } catch {
+          // full of humans, or changed meanwhile
+        }
+      }
+    }
+    return n;
+  }
 
   /** AI managers enter the tournament where they can (set by the AI service). */
   aiFill: (tournamentId: string) => void = () => {};
@@ -282,7 +313,10 @@ export class UdtEventsService implements OnModuleInit {
     const skills: number[] = [];
     // The finale: no sign-up, the top of the season table plays.
     // Free places: AI managers that can play enter first (humans already have theirs).
-    if (!rules.finale) this.aiFill(t.id);
+    if (!rules.finale) {
+      this.autoFill(t.id);
+      this.aiFill(t.id);
+    }
     const entered = rules.finale ? this.qualified(t, settings) : this.entries(t.id);
     const ai = this.udt.aiIds();
     const aiOn = this.udt.aiOn();

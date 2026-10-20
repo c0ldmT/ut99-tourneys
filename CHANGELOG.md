@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team: rest bots with Neuro (2 per stamina point); "Enter automatically when possible" on the Events page.
 - Servers: sync models and skins from the game server (texture packages, custom model packs), import bots on the Servers page; custom bot packages go into ServerPackages.
 - Dream Team: look and chat lines of own bots (founding, academy, later), squads of all teams, a Dream Team draw on the tournament page; AI managers enter as soon as the sign-up opens.
 - Mod 0.12.0: bot chat lines in the kill feed.
@@ -155,6 +156,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team: "Dream Team" next to the nav mark; trait titles in English; trade inputs and the 10-pull price aligned.
 - Dream Team: rewards doubled, stamina 6 per game (was 15) with an explanation on the team page; the model is free for own bots.
 - Dream Team cards: one shared card, English terms, fits phones; trade window, look editor and spacing reworked.
 - Dream Team tournaments always count for the running season (no season switch in the form).

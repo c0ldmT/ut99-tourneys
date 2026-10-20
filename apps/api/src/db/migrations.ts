@@ -513,4 +513,8 @@ export const MIGRATIONS: string[] = [
   DELETE FROM teams WHERE tournament_id IN (SELECT id FROM tournaments WHERE kind = 'udt');
   UPDATE tournaments SET seasonal = 1 WHERE kind = 'udt';
   `,
+  // 27: Dream Team: a manager's switch "enter automatically when possible".
+  `
+  ALTER TABLE udt_teams ADD COLUMN auto_enter INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

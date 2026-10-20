@@ -218,7 +218,7 @@ type Mode = 'dm' | 'mh';
           <details class="help small">
             <summary>{{ 'udt.staminaHelp.title' | t }}</summary>
             <ul>
-              @for (k of ['loss', 'rest', 'tired', 'bench', 'traits']; track k) {
+              @for (k of ['loss', 'rest', 'tired', 'bench', 'traits', 'buy']; track k) {
                 <li>{{ 'udt.staminaHelp.' + k | t }}</li>
               }
             </ul>
@@ -343,6 +343,16 @@ type Mode = 'dm' | 'mh';
                     {{ 'udt.sell' | t }}
                   </button>
                 }
+                @if (b.stamina < 100) {
+                  <button
+                    type="button"
+                    [disabled]="busy()"
+                    (click)="openRest(b)"
+                    [title]="'udt.rest.hint' | t"
+                  >
+                    {{ 'udt.rest.button' | t }}
+                  </button>
+                }
                 @if (b.own) {
                   <button
                     type="button"
@@ -354,6 +364,39 @@ type Mode = 'dm' | 'mh';
                   </button>
                 }
               </div>
+              @if (restFor() === b.botId) {
+                <div class="restbox">
+                  <label class="restslider"
+                    ><span>{{ 'udt.rest.points' | t }}</span>
+                    <input
+                      type="range"
+                      name="rest"
+                      min="1"
+                      [max]="100 - b.stamina"
+                      step="1"
+                      [ngModel]="restPoints()"
+                      (ngModelChange)="restPoints.set(+$event)"
+                    />
+                    <span class="mono">+{{ restPoints() }}</span>
+                  </label>
+                  <span class="small muted">
+                    {{ 'udt.stamina' | t }} {{ b.stamina }} → {{ b.stamina + restPoints() }}
+                  </span>
+                  <span class="row">
+                    <button
+                      type="button"
+                      class="primary"
+                      [disabled]="busy() || restPoints() * restPrice > (v.wallet?.spendable ?? 0)"
+                      (click)="rest(b)"
+                    >
+                      {{ 'udt.rest.buy' | t }} · {{ restPoints() * restPrice | neuro }}
+                    </button>
+                    <button type="button" (click)="restFor.set(null)">
+                      {{ 'common.cancel' | t }}
+                    </button>
+                  </span>
+                </div>
+              }
               @if (lookFor() === b.botId) {
                 @if (lookDraft(); as ld) {
                   <div class="lookedit">
@@ -519,6 +562,10 @@ export class UdtTeamPage {
   protected readonly looks = signal<UdtLooks | null>(null);
   protected readonly lookFor = signal<string | null>(null);
   protected readonly lookDraft = signal<LookDraft | null>(null);
+  // Rest with Neuro
+  protected readonly restFor = signal<string | null>(null);
+  protected readonly restPoints = signal(1);
+  protected readonly restPrice = 2;
   // Lineup draft (bot ids per slot) and whether it differs from the saved one
   private readonly draft = signal<{
     dm: (string | null)[];
@@ -721,6 +768,25 @@ export class UdtTeamPage {
       const bot = await this.api.botProfile(b.botId);
       this.lookDraft.set(lookFromBot(bot));
       this.lookFor.set(b.botId);
+    });
+  }
+
+  protected openRest(b: UdtRosterBot) {
+    if (this.restFor() === b.botId) {
+      this.restFor.set(null);
+      return;
+    }
+    this.restPoints.set(100 - b.stamina);
+    this.restFor.set(b.botId);
+  }
+
+  protected async rest(b: UdtRosterBot) {
+    await this.act(async () => {
+      const v = await this.api.udtRest(b.botId, this.restPoints());
+      this.view.set(v);
+      this.resetDraft(v);
+      this.restFor.set(null);
+      this.ledger.set(await this.api.udtLedger());
     });
   }
 

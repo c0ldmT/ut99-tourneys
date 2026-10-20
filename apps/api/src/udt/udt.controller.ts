@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   Body,
   Controller,
@@ -147,7 +148,31 @@ export class UdtController {
 
   @Put('lineup')
   lineup(@CurrentUser() user: User, @Body(new ZodPipe(LineupBody)) body: LineupInput) {
-    return this.udt.setLineup(user, body);
+    const out = this.udt.setLineup(user, body);
+    this.events.autoFill(undefined, user.id); // a lineup that can play now enters
+    return out;
+  }
+
+  /** The switch "enter automatically when possible" (enters right away where it can). */
+  @Put('auto-enter')
+  autoEnter(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(z.object({ on: z.boolean() }))) body: { on: boolean },
+  ) {
+    const team = this.udt.setAutoEnter(user, body.on);
+    const entered = body.on ? this.events.autoFill(undefined, user.id) : 0;
+    return { team, entered, events: this.events.events(user) };
+  }
+
+  /** Rest with Neuro: stamina points for a roster bot (2 Neuro each). */
+  @Post('roster/:botId/rest')
+  rest(
+    @CurrentUser() user: User,
+    @Param('botId') botId: string,
+    @Body(new ZodPipe(z.object({ points: z.number().int().min(1).max(100) })))
+    body: { points: number },
+  ) {
+    return this.udt.rest(user, botId, body.points);
   }
 
   /** Today's offers (values, last 14 days), the manager's hidden bids, the next market day. */

@@ -227,8 +227,8 @@ import type { Lang } from './core/i18n-dict';
     nav a.udt {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 4px 6px;
+      gap: 8px;
+      padding: 4px 10px 4px 6px;
     }
     nav a.udt:hover {
       background: color-mix(in srgb, var(--udt) 14%, transparent);
@@ -238,7 +238,8 @@ import type { Lang } from './core/i18n-dict';
       box-shadow: inset 0 -2px 0 var(--udt);
     }
     .udt-label {
-      display: none;
+      color: var(--udt);
+      font-weight: 600;
     }
     .udt-sep {
       width: 1px;
@@ -367,11 +368,6 @@ import type { Lang } from './core/i18n-dict';
       }
       nav a.udt.active {
         box-shadow: inset 3px 0 0 var(--udt);
-      }
-      .udt-label {
-        display: inline;
-        color: var(--udt);
-        font-weight: 600;
       }
       .udt-sep {
         display: none;

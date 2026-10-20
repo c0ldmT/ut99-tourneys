@@ -118,8 +118,9 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
                   [disabled]="!canBuy(b.tenPrice)"
                   (click)="open(b.box, true)"
                 >
-                  {{ 'udt.packs.ten' | t }} ·
-                  <span class="mono small">{{ b.tenPrice | neuro: false }}</span>
+                  <span>{{ 'udt.packs.ten' | t }}</span
+                  ><span aria-hidden="true">·</span
+                  ><span class="mono small price">{{ b.tenPrice | neuro: false }}</span>
                 </button>
               </div>
               <div class="muted small center">{{ 'udt.packs.tenNote.' + b.box | t }}</div>
@@ -177,6 +178,16 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     }
   `,
   styles: `
+    .buy .holo {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      line-height: 1;
+    }
+    .buy .holo .price {
+      line-height: 1;
+    }
     :host {
       display: block;
     }

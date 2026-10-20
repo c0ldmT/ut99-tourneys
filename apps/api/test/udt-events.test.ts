@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { udtTraits } from '../src/db/schema.js';
+import { eq } from 'drizzle-orm';
+import { udtRoster, udtTraits } from '../src/db/schema.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -161,6 +162,36 @@ describe('Unreal Dream Team: events', () => {
     expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
     const ids = Object.keys(seeded.body.projection.entrants);
     expect(ids.filter((k) => k.startsWith('udt-'))).toHaveLength(3); // Mario and two AI teams
+  });
+
+  it('enters automatically where possible; rests bots with Neuro', async () => {
+    const { admin, mario, tim } = await setup();
+    const cup1 = (await admin.post('/tournaments', udtCup(1))).body.id as string;
+    const duo = (await admin.post('/tournaments', udtCup(2))).body.id as string;
+    const on = await mario.req('PUT', '/udt/auto-enter', { on: true });
+    expect(on.status, JSON.stringify(on.body)).toBe(200);
+    expect(on.body).toMatchObject({ team: { autoEnter: true }, entered: 1 });
+    const ev = (await mario.get('/udt/events')).body;
+    expect(ev.find((e: any) => e.id === cup1).entered).toBe(true);
+    // Only one bot: no 2v2.
+    expect(ev.find((e: any) => e.id === duo).entered).toBe(false);
+    // A new cup: in at once, even when Mario is not on the page; Tim (switch off) is not.
+    const cup2 = (await admin.post('/tournaments', { ...udtCup(1), name: 'Cup Two' })).body
+      .id as string;
+    const page = (await admin.get(`/tournaments/${cup2}`)).body;
+    expect(page.registrations.map((r: any) => r.displayName)).toEqual(['Mario']);
+    expect((await tim.get('/udt')).body.team.autoEnter).toBe(false);
+    // Rest with Neuro: 2 per point, not above 100.
+    const db = api!.app.get<Db>(DB);
+    const marioId = (await mario.get('/me')).body.id as string;
+    db.update(udtRoster).set({ stamina: 60 }).where(eq(udtRoster.userId, marioId)).run();
+    const before = (await mario.get('/udt')).body;
+    const bot = before.roster[0].botId as string;
+    const rested = await mario.post(`/udt/roster/${bot}/rest`, { points: 50 });
+    expect(rested.status, JSON.stringify(rested.body)).toBe(201);
+    expect(rested.body.roster[0].stamina).toBe(100);
+    expect(before.wallet.spendable - rested.body.wallet.spendable).toBe(80); // 40 points
+    expect((await mario.post(`/udt/roster/${bot}/rest`, { points: 5 })).status).toBe(409);
   });
 
   it('2v2: a team needs two playable bots; value cap and star limit apply', async () => {

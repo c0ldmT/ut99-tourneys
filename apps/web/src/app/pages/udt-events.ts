@@ -14,9 +14,30 @@ import { UdtNav } from '../core/udt';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    <h1 class="disp">{{ 'udt.events.title' | t }}</h1>
+    <div class="udt-head">
+      <div>
+        <h1 class="disp">{{ 'udt.events.title' | t }}</h1>
+      </div>
+    </div>
     @if (error()) {
       <p class="error">{{ error() }}</p>
+    }
+    @if (hasTeam()) {
+      <section class="card auto" [class.on]="autoEnter()">
+        <label class="switch big"
+          ><input
+            type="checkbox"
+            name="auto"
+            [checked]="autoEnter()"
+            [disabled]="busy()"
+            (change)="setAuto($any($event.target).checked)"
+          /><span class="tr"></span><b>{{ 'udt.events.auto' | t }}</b></label
+        >
+        <p class="small muted">{{ 'udt.events.autoHint' | t }}</p>
+        @if (autoNote()) {
+          <p class="small ok">{{ autoNote() }}</p>
+        }
+      </section>
     }
     <div class="evs">
       @for (e of events(); track e.id) {
@@ -112,6 +133,21 @@ import { UdtNav } from '../core/udt';
     </div>
   `,
   styles: `
+    .auto {
+      border-color: var(--border);
+    }
+    .auto.on {
+      border-color: rgba(178, 107, 255, 0.5);
+      background:
+        radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.12), transparent 55%),
+        var(--panel);
+    }
+    .auto p {
+      margin: 8px 0 0;
+    }
+    .ok {
+      color: var(--live);
+    }
     .evs {
       display: grid;
       gap: 14px;
@@ -156,6 +192,9 @@ export class UdtEventsPage {
   protected readonly error = signal('');
   protected readonly busy = signal(false);
   protected readonly myId = computed(() => this.auth.me()?.id ?? '');
+  protected readonly hasTeam = signal(false);
+  protected readonly autoEnter = signal(false);
+  protected readonly autoNote = signal('');
   protected readonly testMode = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );
@@ -166,11 +205,24 @@ export class UdtEventsPage {
 
   async load() {
     try {
-      this.events.set(await this.api.udtEvents());
+      const [events, view] = await Promise.all([this.api.udtEvents(), this.api.udt()]);
+      this.events.set(events);
+      this.hasTeam.set(!!view.team);
+      this.autoEnter.set(!!view.team?.autoEnter);
       this.error.set('');
     } catch (e) {
       this.error.set(errorText(e));
     }
+  }
+
+  /** The switch "enter automatically": on enters right away where the team can play. */
+  protected setAuto(on: boolean) {
+    void this.act(async () => {
+      const r = await this.api.udtAutoEnter(on);
+      this.autoEnter.set(!!r.team.autoEnter);
+      this.events.set(r.events);
+      this.autoNote.set(on ? this.i18n.t('udt.events.autoEntered', { n: r.entered }) : '');
+    });
   }
 
   protected when(iso: string) {

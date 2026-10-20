@@ -291,6 +291,8 @@ export const udtTeams = sqliteTable(
     createdAt: text('created_at').notNull(),
     /** Scrap from duplicates and removed traits; crafting spends it. */
     scrap: integer('scrap').notNull().default(0),
+    /** The manager's switch: enter open Dream Team tournaments automatically when possible. */
+    autoEnter: integer('auto_enter', { mode: 'boolean' }).notNull().default(false),
   },
   (t) => [primaryKey({ columns: [t.season, t.userId] })],
 );

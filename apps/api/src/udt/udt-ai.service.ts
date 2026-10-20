@@ -71,6 +71,8 @@ export class UdtAiService implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
+    // After a market day (rested bots, new buys) the humans' automatic sign-ups come first.
+    this.market.afterDay(() => void this.events.autoFill());
     this.market.afterDay((season, day) => this.daily(season, day));
     this.events.aiFill = (id) => this.fill(id);
   }
