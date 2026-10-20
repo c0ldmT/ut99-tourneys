@@ -156,6 +156,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team: tournament win reward 3,000 (index 1), high stakes place rewards ×1.5; 100 extra points for the starter (setting).
 - Dream Team: "Dream Team" next to the nav mark; trait titles in English; trade inputs and the 10-pull price aligned.
 - Dream Team: rewards doubled, stamina 6 per game (was 15) with an explanation on the team page; the model is free for own bots.
 - Dream Team cards: one shared card, English terms, fits phones; trade window, look editor and spacing reworked.

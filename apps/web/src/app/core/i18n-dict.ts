@@ -594,7 +594,7 @@ const en = {
   'tp.udtWithdraw': 'Take my team out',
   'tp.udtLineup': 'Team and lineup',
   'tp.udtTicket':
-    'High stakes: entering costs a ticket in Neuro (back when you take the team out).',
+    'High stakes: entering costs a ticket in Neuro (back when you take the team out); place rewards ×1.5 plus the pot.',
   'tp.udtFinale': 'Season finale: no sign-up, the top of the season table plays.',
   'tp.udtFinaleBadge': 'Finale',
   'tp.udtTeams': 'Teams',
@@ -1129,6 +1129,8 @@ const en = {
   'udt.found.bot': 'Name of your starter bot',
   'udt.found.skill': 'Skill',
   'udt.found.cost': 'Costs {cost} of {budget} points',
+  'udt.found.extra':
+    'Extra points: {free} of {extra} left (skill 3 with average values uses the rest)',
   'udt.found.submit': 'Found team',
   'udt.value.accuracy': 'Accuracy',
   'udt.value.alertness': 'Alertness',
@@ -1361,7 +1363,7 @@ const en = {
   'form.udtMinTeams': 'Fewest human teams',
   'form.udtTicketIndexed': 'Ticket at the economy index',
   'form.udtTicketHint':
-    'High stakes: managers pay the ticket when they enter. The best human team gets 60 % of the tickets plus one ticket, the second best 20 %, the rest leaves the economy. Fewer human teams at the seeding: all tickets go back.',
+    'High stakes: managers pay the ticket when they enter. Place rewards are 1.5 times higher; on top, the best human team gets 60 % of the tickets plus one ticket, the second best 20 %, the rest leaves the economy. Fewer human teams at the seeding: all tickets go back.',
   'udt.nav.trades': 'Trades',
   'udt.kind.udt_trade': 'Trade',
   'udt.kind.udt_trade_fee': 'Trade fee',
@@ -1542,6 +1544,7 @@ const en = {
   'udt.settings.marketTime': 'Market day at',
   'udt.settings.offers': 'Offers per day',
   'udt.settings.budget': 'Starter budget (points)',
+  'udt.settings.extra': 'Extra points to allocate',
   'form.udt': 'Dream Team tournament (managers’ lineups)',
   'form.udtCap': 'Team value cap (reference, 0 = none)',
   'form.udtStars': 'Bots of skill 6-7 at most',
@@ -2149,7 +2152,8 @@ const de: Record<TKey, string> = {
   'tp.udtIn': 'Dein Dream Team ist angemeldet.',
   'tp.udtWithdraw': 'Team abmelden',
   'tp.udtLineup': 'Team und Aufstellung',
-  'tp.udtTicket': 'High Stakes: Die Anmeldung kostet ein Ticket in Neuro (zurück beim Abmelden).',
+  'tp.udtTicket':
+    'High Stakes: Die Anmeldung kostet ein Ticket in Neuro (zurück beim Abmelden); Platzprämien ×1,5 plus der Pot.',
   'tp.udtFinale': 'Season-Finale: keine Anmeldung, die Tabellenspitze der Season spielt.',
   'tp.udtFinaleBadge': 'Finale',
   'tp.udtTeams': 'Teams',
@@ -2690,6 +2694,8 @@ const de: Record<TKey, string> = {
   'udt.found.bot': 'Name deines Starter-Bots',
   'udt.found.skill': 'Skill',
   'udt.found.cost': 'Kostet {cost} von {budget} Punkten',
+  'udt.found.extra':
+    'Extrapunkte: {free} von {extra} übrig (Skill 3 mit durchschnittlichen Werten nutzt den Rest)',
   'udt.found.submit': 'Team gründen',
   'udt.value.accuracy': 'Accuracy',
   'udt.value.alertness': 'Alertness',
@@ -2923,7 +2929,7 @@ const de: Record<TKey, string> = {
   'form.udtMinTeams': 'Mindestens menschliche Teams',
   'form.udtTicketIndexed': 'Ticket mit dem Wirtschaftsindex',
   'form.udtTicketHint':
-    'High Stakes: Manager zahlen das Ticket bei der Anmeldung. Das beste menschliche Team bekommt 60 % der Tickets plus ein Ticket, das zweitbeste 20 %, der Rest verlässt die Wirtschaft. Weniger menschliche Teams beim Seeding: alle Tickets gehen zurück.',
+    'High Stakes: Manager zahlen das Ticket bei der Anmeldung. Die Platzprämien sind 1,5-mal so hoch; dazu bekommt das beste menschliche Team 60 % der Tickets plus ein Ticket, das zweitbeste 20 %, der Rest verlässt die Wirtschaft. Weniger menschliche Teams beim Seeding: alle Tickets gehen zurück.',
   'udt.nav.trades': 'Handel',
   'udt.kind.udt_trade': 'Handel',
   'udt.kind.udt_trade_fee': 'Handelsgebühr',
@@ -3104,6 +3110,7 @@ const de: Record<TKey, string> = {
   'udt.settings.marketTime': 'Markttag um',
   'udt.settings.offers': 'Angebote pro Tag',
   'udt.settings.budget': 'Starter-Budget (Punkte)',
+  'udt.settings.extra': 'Extrapunkte zum Verteilen',
   'form.udt': 'Dream-Team-Turnier (Aufstellungen der Manager)',
   'form.udtCap': 'Teamwert-Grenze (Referenz, 0 = keine)',
   'form.udtStars': 'Höchstens Bots mit Skill 6–7',

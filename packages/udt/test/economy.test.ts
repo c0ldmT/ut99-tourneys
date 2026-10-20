@@ -82,11 +82,13 @@ describe('rewards and stamina', () => {
     expect(matchReward({ won: true, mvp: true, teamSize: 1, vsBaseBots: false }, 1)).toBe(380);
     expect(matchReward({ won: true, mvp: false, teamSize: 1, vsBaseBots: true }, 1)).toBe(210);
     expect(matchReward({ won: false, mvp: false, teamSize: 5, vsBaseBots: false }, 2)).toBe(720);
-    expect(placeReward(1, 1, 1, false)).toBe(1200);
+    expect(placeReward(1, 1, 1, false)).toBe(3000);
     expect(placeReward(2, 2, 1, false)).toBe(900);
     expect(placeReward(3, 1, 1, false)).toBe(300);
     expect(placeReward(5, 1, 1, false)).toBe(0);
-    expect(placeReward(1, 1, 1, true)).toBe(360);
+    // High stakes: places x1.5 on top of the pot.
+    expect(placeReward(1, 1, 1, false, undefined, true)).toBe(4500);
+    expect(placeReward(1, 1, 1, true)).toBe(900);
   });
 
   it('tires bots and lets them rest', () => {

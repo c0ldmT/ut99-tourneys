@@ -290,6 +290,17 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
             class="narrow"
           />
         </label>
+        <label
+          >{{ 'udt.settings.extra' | t }}
+          <input
+            type="number"
+            name="udtExtra"
+            min="0"
+            step="50"
+            [(ngModel)]="udtExtra"
+            class="narrow"
+          />
+        </label>
       </div>
       <h3>{{ 'udt.settings.trade' | t }}</h3>
       <label class="switch"
@@ -563,6 +574,7 @@ export class SettingsPage {
   protected udtTime = '04:00';
   protected udtOffers = 8;
   protected udtBudget = 1500;
+  protected udtExtra = 100;
   protected readonly savedUdt = signal(false);
   protected readonly savedBotAi = signal(false);
   /** Website reset: opened, ticked and the word typed before the button works. */
@@ -615,6 +627,7 @@ export class SettingsPage {
         this.udtTime = s.udt.marketTime;
         this.udtOffers = s.udt.offersPerDay;
         this.udtBudget = s.udt.starterBudget;
+        this.udtExtra = s.udt.starterExtra ?? 100;
         this.trade = pickTrade(s.udt);
         this.ai = pickAi(s.udt);
       }
@@ -704,6 +717,7 @@ export class SettingsPage {
         marketTime: this.udtTime,
         offersPerDay: Math.round(Number(this.udtOffers)),
         starterBudget: Math.round(Number(this.udtBudget)),
+        starterExtra: Math.max(0, Math.round(Number(this.udtExtra))),
         ...Object.fromEntries(
           Object.entries(this.trade).map(([k, v]) => [
             k,

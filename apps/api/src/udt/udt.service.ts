@@ -561,6 +561,7 @@ export class UdtService {
       roster: team ? this.roster(user.id, season.number) : [],
       wallet: this.ledger.spendable(user.id),
       starterBudget: this.settings.get().udt.starterBudget,
+      starterExtra: this.settings.get().udt.starterExtra,
     };
   }
 
@@ -585,7 +586,8 @@ export class UdtService {
       throw badRequest(
         `tag and bot name are too long for the game: ${body.tag}${body.starter.name} (at most ${GAME_NAME_CHARS})`,
       );
-    const budget = this.settings.get().udt.starterBudget;
+    const cfg = this.settings.get().udt;
+    const budget = cfg.starterBudget + cfg.starterExtra;
     const cost = Math.round(baseValue(body.starter.skill, valueScore(body.starter.traits)));
     if (cost > budget)
       throw badRequest(`the starter bot costs ${cost} of ${budget} points: lower skill or values`);

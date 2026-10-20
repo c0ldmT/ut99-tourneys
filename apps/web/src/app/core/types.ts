@@ -970,6 +970,8 @@ export interface UdtView {
   roster: UdtRosterBot[];
   wallet?: UdtWallet;
   starterBudget?: number;
+  /** Free points on top of the budget (the default starter costs the budget). */
+  starterExtra?: number;
   /** Trade offers waiting for the manager. */
   tradesIn?: number;
 }
@@ -1070,6 +1072,7 @@ export interface UdtSettings {
   marketTime: string;
   offersPerDay: number;
   starterBudget: number;
+  starterExtra: number;
   tradeEnabled: boolean;
   tradeFeePct: number;
   tradeBalancePct: number;

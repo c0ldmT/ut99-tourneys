@@ -189,6 +189,8 @@ export class UdtRewardsService implements OnModuleInit {
     const ai = this.udt.aiIds();
     const managers = all.filter((s) => !ai.has(udtManagerOf(s.entrantId)!));
     const onBots = this.udt.traitsOnBots(season);
+    // High stakes (tickets were paid): bigger place rewards, the pot on top.
+    const highStakes = this.udtEvents.tickets(tournamentId).some((e) => e.ticket > 0);
     for (const s of managers) {
       const userId = udtManagerOf(s.entrantId)!;
       const place = s.placement ?? 99;
@@ -200,7 +202,8 @@ export class UdtRewardsService implements OnModuleInit {
         .all()
         .some((r) => managerEffects(onBots.get(r.botId) ?? []).team > 1);
       const amount = roundNeuro(
-        placeReward(place <= 4 ? place : 99, teamSize, index, onlyBase) * (midas ? 1.1 : 1),
+        placeReward(place <= 4 ? place : 99, teamSize, index, onlyBase, undefined, highStakes) *
+          (midas ? 1.1 : 1),
       );
       this.ledger.book({
         season,

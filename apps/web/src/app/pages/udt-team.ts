@@ -110,6 +110,11 @@ type Mode = 'dm' | 'mh';
               <p [class.error]="cost() > budget()" class="small">
                 {{ 'udt.found.cost' | t: { cost: cost(), budget: budget() } }}
               </p>
+              @if (extra() > 0) {
+                <p class="small" [class.error]="cost() > budget()" [class.ok]="cost() <= budget()">
+                  {{ 'udt.found.extra' | t: { free: budget() - cost(), extra: extra() } }}
+                </p>
+              }
             </div>
             <udt-card [bot]="preview()" />
           </div>
@@ -446,6 +451,9 @@ type Mode = 'dm' | 'mh';
       align-items: flex-start;
       margin-bottom: 18px;
     }
+    .ok {
+      color: var(--live);
+    }
     .found .submit {
       margin-top: 16px;
     }
@@ -588,7 +596,9 @@ export class UdtTeamPage {
     return !!this.inventory().find((c) => c.id === this.pickCard)?.needsWeapon;
   });
 
-  protected readonly budget = computed(() => this.view()?.starterBudget ?? 1500);
+  /** Extra points to allocate on top of the default starter (skill 3, average values). */
+  protected readonly extra = computed(() => this.view()?.starterExtra ?? 0);
+  protected readonly budget = computed(() => (this.view()?.starterBudget ?? 1500) + this.extra());
   protected readonly cost = computed(() => {
     this.rev();
     return Math.round(baseValue(Number(this.skill), valueScore(this.values)));

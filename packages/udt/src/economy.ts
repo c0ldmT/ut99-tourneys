@@ -47,6 +47,8 @@ export interface EconomyConfig {
     baseBotWin: number;
     /** Place rewards when every opponent was a base-bot team. */
     soloPlaces: number;
+    /** High stakes (ticket) tournaments: place rewards times this, on top of the pot. */
+    highStakesPlaces: number;
   };
   /** Reward factor per team size (more bots invested). */
   formatFactor: Readonly<Record<number, number>>;
@@ -85,9 +87,13 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
     game: 120,
     win: 180,
     mvp: 80,
-    places: [1200, 600, 300],
+    // The tournament win raised again on 20.10. (owner: as far as the economy allows): the
+    // simulator (8 seeds) ends the season at index 2.2 on average (max 3.6) with 3,000;
+    // 4,800 and more push it towards 3 and the cap.
+    places: [3000, 600, 300],
     baseBotWin: 0.5,
     soloPlaces: 0.3,
+    highStakesPlaces: 1.5,
   },
   formatFactor: { 1: 1, 2: 1.5, 3: 2, 5: 3 },
   // 6 per game (was 15): a 4-team double elimination (up to 5 games) leaves a bot at 70.
@@ -255,11 +261,13 @@ export function placeReward(
   index: number,
   onlyBaseBots: boolean,
   cfg: EconomyConfig = DEFAULT_ECONOMY,
+  highStakes = false,
 ): number {
   const p = cfg.rewards.places;
   const base = place === 1 ? p[0] : place === 2 ? p[1] : place <= 4 ? p[2] : 0;
   const solo = onlyBaseBots ? cfg.rewards.soloPlaces : 1;
-  return roundNeuro(base * factor(teamSize, cfg) * index * solo);
+  const hs = highStakes ? cfg.rewards.highStakesPlaces : 1;
+  return roundNeuro(base * factor(teamSize, cfg) * index * solo * hs);
 }
 
 /** Stamina after `games` UDT games. */
