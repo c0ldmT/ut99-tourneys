@@ -137,6 +137,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Mod 0.12.1: bots cut off from their opponents (DM-SpaceNoxx: upper ring, kicker) are moved to a start spot with a path to one; bouncing on a kicker counts as staying in place; repeated stuck spots get a detour; no more `Accessed None` in StakeOut after the AI help cleared an enemy.
 - Bets: the expert tip showed an internal id for Dream Team sides; a Dream Team bracket full of AI teams looked closed for humans.
 - Mod 0.10.1: bots no longer run back and forth on the spot or stay stuck (deathmatch games): hunts without a path or progress are given up, stuck bots jump aside, take detours and as a last resort move to a start spot (with Bot AI help).
 - Dream Team tournaments: registering on the tournament page enters the Dream Team (one sign-up, one count with the Dream Team events page); the page shows the teams with tag and name; old registrations of the tournament page are removed.

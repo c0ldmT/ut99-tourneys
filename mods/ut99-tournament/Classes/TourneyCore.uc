@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.12.0";
+const MOD_VERSION = "0.12.1";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -194,6 +194,11 @@ var Pawn HuntFor[32];              // target of a hunt this mod started
 var float HuntCheckAt[32];         // when the hunt's progress is checked next
 var float HuntDist[32];            // distance to the target at the last check
 var float HuntBlock[32];           // no hunts from this mod before this time
+var byte NoPathN[32];              // hunts refused in a row for lack of a path (mod 0.12.1)
+var byte NoPathStay[32];           // 1: stayed once, no start spot had a path to an opponent
+var Actor StuckGoal[32];           // where the bot was heading when it last got stuck
+var float StuckAt[32];             // when that was
+var byte StuckRep[32];             // times in a row stuck heading there (within 60 s each)
 
 //=============================================================================
 // Startup (from the game type)
@@ -2957,6 +2962,10 @@ function ResetWatch(int s, Bot B)
 	AreaSince[s] = Level.TimeSeconds;
 	AreaStage[s] = 0;
 	HuntFor[s] = None;
+	NoPathN[s] = 0;
+	NoPathStay[s] = 0;
+	StuckGoal[s] = None;
+	StuckRep[s] = 0;
 }
 
 // The nearest living opponent of B: players and bots, not of its team in team games.
@@ -3090,6 +3099,11 @@ function AntiIdle()
 // (3 s, 5 s), takes a detour (8 s, 14 s) and is moved to a start spot without a death (20 s);
 // a bot that has not left an area of 300 units for 12 s without a fight takes a far detour
 // (12 s, 24 s) and is moved to a start spot at 36 s. Each step goes to the server log.
+// Mod 0.12.1 (DM-SpaceNoxx: a bot on the upper ring, one on a kicker, the whole game): three
+// hunts in a row refused for lack of a path and no opponent reachable -> a start spot with a
+// path to one; the area is measured flat (bouncing counts); no far detour -> a near one, none
+// -> start spot 12 s later; stuck heading for the same point again and again -> detour, the
+// fourth time a start spot; an enemy is cleared with DropEnemy (StakeOut: Accessed None).
 //-----------------------------------------------------------------------------
 
 function BotLog(string S)
@@ -3136,10 +3150,56 @@ function bool HuntAllowed(Bot B, Pawn N)
 	if (Level.TimeSeconds < HuntBlock[s])
 		return false;
 	if (B.LineOfSightTo(N) || B.FindPathToward(N) != None)
+	{
+		NoPathN[s] = 0;
+		NoPathStay[s] = 0;
 		return true;
+	}
 	HuntBlock[s] = Level.TimeSeconds + 10;
-	BotLog(BName(B) $ ": no path to" @ BName(N) $ ", no hunt for 10 s");
+	if (NoPathN[s] < 250)
+		NoPathN[s]++;
+	BotLog(BName(B) $ ": no path to" @ BName(N) @ "(" $ NoPathN[s] @ "in a row), no hunt for 10 s");
 	return false;
+}
+
+// Clears B's enemy. Outside roaming and wandering the bot decides anew: states like StakeOut,
+// Attacking or a fall that ends in StakeOut use the enemy without a check (Accessed None).
+function DropEnemy(Bot B)
+{
+	B.bMustHunt = false;
+	B.OldEnemy = None;
+	B.Enemy = None;
+	if (B.IsInState('Roaming') || B.IsInState('Wandering') || B.IsInState('GameEnded') || B.IsInState('Dying'))
+		return;
+	// In the air, hit or charging an impact jump: it continues with NextState when done.
+	if (B.IsInState('FallingState') || B.IsInState('TakeHit') || B.IsInState('ImpactJumping'))
+	{
+		B.NextState = 'Roaming';
+		B.NextLabel = 'Begin';
+		// FireWhileFalling turns towards the enemy; Ducking waits for the landing.
+		if (B.IsInState('FallingState') && B.Physics == PHYS_Falling)
+			B.GotoState('FallingState', 'Ducking');
+		return;
+	}
+	B.WhatToDoNext('', '');
+}
+
+// An opponent B sees or finds a path to (None: none).
+function Pawn ReachableOpponent(Bot B)
+{
+	local Pawn P;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		if (P == B || !P.bIsPlayer || P.bDeleteMe || P.Health <= 0 || P.PlayerReplicationInfo == None)
+			continue;
+		if (P.PlayerReplicationInfo.bIsSpectator)
+			continue;
+		if ((TeamSize > 1 || Game.bTeamGame) && P.PlayerReplicationInfo.Team == B.PlayerReplicationInfo.Team)
+			continue;
+		if (B.LineOfSightTo(P) || B.FindPathToward(P) != None)
+			return P;
+	}
+	return None;
 }
 
 // Sends B after N (when allowed) and watches the hunt's progress.
@@ -3195,11 +3255,7 @@ function HuntGuard()
 		BotLog(BName(B) $ ": hunt of" @ BName(HuntFor[s]) @ "without progress for 6 s at" @ Where(B.Location) $ ", given up for 15 s");
 		HuntFor[s] = None;
 		HuntBlock[s] = Now + 15;
-		B.bMustHunt = false;
-		B.OldEnemy = None;
-		B.Enemy = None;
-		if (B.IsInState('Hunting'))
-			B.WhatToDoNext('', '');
+		DropEnemy(B);
 	}
 }
 
@@ -3208,9 +3264,33 @@ function bool UnstickBot(Bot B, int s)
 {
 	local bool bFight;
 	local float Now;
+	local Pawn Opp;
 
 	Now = Level.TimeSeconds;
 	bFight = B.Enemy != None && B.LineOfSightTo(B.Enemy);
+	if (bFight)
+		NoPathN[s] = 0;
+	// Cut off (three hunts in a row refused for lack of a path, about 30 s, no fight meanwhile):
+	// a ring or ledge only a jump or kicker leads to, a kicker the bot bounces on. When no
+	// opponent can be reached from here: to a start spot with a path to one.
+	// Bots with hold, defend or follow orders stay.
+	if (NoPathN[s] >= 3 && !bFight && (B.Orders == '' || B.Orders == 'FreeLance' || B.Orders == 'Attack'))
+	{
+		NoPathN[s] = 0;
+		Opp = ReachableOpponent(B);
+		if (Opp == None)
+		{
+			FreeRespawn(B, s, "no path to any opponent (3 hunts in a row)", true);
+			return true;
+		}
+		// Only the one it was sent after is out of reach: another one.
+		HuntBlock[s] = 0;
+		if (B.Enemy == None && (B.IsInState('Roaming') || B.IsInState('Wandering')) && ForceHunt(B, Opp))
+		{
+			BotLog(BName(B) $ ": hunts" @ BName(Opp) @ "instead (a path leads there)");
+			return true;
+		}
+	}
 	// Progress: 150 units from where it last made progress.
 	if (VSize(B.Location - StuckRef[s]) > 150)
 	{
@@ -3222,6 +3302,28 @@ function bool UnstickBot(Bot B, int s)
 	else if (B.Physics != PHYS_Falling && MayBeStuck(B, bFight))
 	{
 		StuckSec[s]++;
+		// Stuck again and again heading for the same point (within 60 s each time): a detour
+		// instead of jumping aside, from the fourth time on a start spot.
+		if (StuckSec[s] == 3)
+		{
+			if (B.MoveTarget != None && B.MoveTarget == StuckGoal[s] && Now - StuckAt[s] < 60)
+				StuckRep[s]++;
+			else
+				StuckRep[s] = 1;
+			StuckGoal[s] = B.MoveTarget;
+			StuckAt[s] = Now;
+			if (StuckRep[s] >= 4)
+			{
+				FreeRespawn(B, s, "stuck heading for" @ What(StuckGoal[s]) @ StuckRep[s] @ "times in a row", false);
+				return true;
+			}
+			if (StuckRep[s] >= 2)
+			{
+				BotLog(BName(B) $ ": stuck heading for" @ What(StuckGoal[s]) @ StuckRep[s] @ "times in a row, takes a detour");
+				if (Detour(B, s, 150, 900))
+					return true;
+			}
+		}
 		if (StuckSec[s] == 3 || StuckSec[s] == 5)
 		{
 			JumpAside(B, s);
@@ -3234,19 +3336,23 @@ function bool UnstickBot(Bot B, int s)
 		}
 		if (StuckSec[s] >= 20)
 		{
-			FreeRespawn(B, s, "stuck for 20 s");
+			FreeRespawn(B, s, "stuck for 20 s", false);
 			return true;
 		}
 	}
-	// The area: 300 units around a point; fights and camping do not count.
-	if (VSize(B.Location - AreaRef[s]) > 300 || bFight || B.bCamping || B.Orders == 'Hold' || B.Orders == 'Follow'
+	// The area: 300 units around a point (see LeftArea); fights and camping do not count.
+	if (LeftArea(B, s) || bFight || B.bCamping || B.Orders == 'Hold' || B.Orders == 'Follow'
 		|| B.IsInState('StakeOut') || Mover(B.Base) != None)
 	{
-		if (VSize(B.Location - AreaRef[s]) > 300)
+		if (LeftArea(B, s))
 		{
 			if (AreaStage[s] > 0)
 				BotLog(BName(B) $ ": left the area after" @ int(Now - AreaSince[s]) @ "s");
-			AreaRef[s] = B.Location;
+			// In the air (a kicker): the height stays the one it left from.
+			AreaRef[s].X = B.Location.X;
+			AreaRef[s].Y = B.Location.Y;
+			if (B.Physics != PHYS_Falling)
+				AreaRef[s].Z = B.Location.Z;
 			AreaStage[s] = 0;
 		}
 		AreaSince[s] = Now;
@@ -3257,22 +3363,34 @@ function bool UnstickBot(Bot B, int s)
 		AreaStage[s]++;
 		HuntBlock[s] = Now + 15;
 		BotLog(BName(B) $ ": has not left" @ Where(AreaRef[s]) @ "(300 units) for" @ int(Now - AreaSince[s]) @ "s, heading for" @ What(B.MoveTarget) $ ", enemy" @ BName(B.Enemy));
-		B.bMustHunt = false;
-		if (B.Enemy != None && !bFight)
+		if (B.Enemy != None)
+			DropEnemy(B);
+		else
+			B.bMustHunt = false;
+		// No far detour (or in the air): the near one; neither: the start spot 12 s later.
+		if (B.Physics == PHYS_Falling || (!Detour(B, s, 600, 2000) && !Detour(B, s, 150, 900)))
 		{
-			B.OldEnemy = None;
-			B.Enemy = None;
+			AreaStage[s] = 2;
+			AreaSince[s] = Now - 24;
 		}
-		Detour(B, s, 600, 2000);
 		return true;
 	}
 	if (AreaStage[s] == 2 && Now - AreaSince[s] >= 36)
 	{
 		AreaStage[s] = 3;
-		FreeRespawn(B, s, "has not left an area of 300 units for 36 s");
+		FreeRespawn(B, s, "has not left an area of 300 units for 36 s", false);
 		return true;
 	}
 	return false;
+}
+
+// Out of the area: 300 units away flat, or (on the ground) 400 units up or down. Heights in the
+// air do not count: a bot bouncing on a kicker stays in its area (mod 0.12.1).
+function bool LeftArea(Bot B, int s)
+{
+	if (VSize(Flat(B.Location - AreaRef[s])) > 300)
+		return true;
+	return B.Physics != PHYS_Falling && Abs(B.Location.Z - AreaRef[s].Z) > 400;
 }
 
 // Trying to move (not standing still on purpose, not riding or waiting for a lift, not fighting).
@@ -3334,8 +3452,8 @@ function JumpAside(Bot B, int s)
 }
 
 // A reachable path point MinD-MaxD units away, preferably to the side or behind; the bot walks
-// there and then searches its way again.
-function Detour(Bot B, int s, float MinD, float MaxD)
+// there and then searches its way again. False: none found.
+function bool Detour(Bot B, int s, float MinD, float MaxD)
 {
 	local NavigationPoint N, Best;
 	local vector Dir;
@@ -3368,8 +3486,8 @@ function Detour(Bot B, int s, float MinD, float MaxD)
 	}
 	if (Best == None)
 	{
-		BotLog(BName(B) $ ": at" @ Where(B.Location) $ ", no detour found");
-		return;
+		BotLog(BName(B) $ ": at" @ Where(B.Location) $ ", no detour found (" $ int(MinD) $ "-" $ int(MaxD) @ "units)");
+		return false;
 	}
 	BotLog(BName(B) $ ": at" @ Where(B.Location) $ ", heading for" @ What(B.MoveTarget) $ ": detour via" @ Best.Name);
 	if (MaxD > 900)
@@ -3378,7 +3496,7 @@ function Detour(Bot B, int s, float MinD, float MaxD)
 		B.MoveTarget = Best;
 	B.SpecialPause = 0;
 	if (!B.IsInState('Roaming') && !B.IsInState('Wandering') && !B.IsInState('FallBack') && !B.IsInState('Hunting'))
-		return; // fighting etc.: the next decision picks it up
+		return true; // fighting etc.: the next decision picks it up
 	B.TweenToRunning(0.1);
 	if (B.Enemy != None)
 	{
@@ -3392,21 +3510,98 @@ function Detour(Bot B, int s, float MinD, float MaxD)
 			B.bNoClearSpecial = true;
 		B.GotoState('Roaming', 'SpecialNavig');
 	}
+	return true;
 }
 
-// Last resort: to a start spot without dying (no death, no score change).
-function FreeRespawn(Bot B, int s, string Why)
+// A start spot from which B sees an opponent or finds a path to one (up to 12 tried, in random
+// order; None: there is none). The bot is tried there without collision (no pickups, triggers or
+// kickers touched) and standing, and is back where it was afterwards.
+function NavigationPoint StartWithPath(Bot B)
+{
+	local NavigationPoint N, Cand[32], Found;
+	local PlayerStart PS;
+	local int i, k, Num, Tried;
+	local vector Was, WasVel;
+	local EPhysics WasPhys;
+	local bool bActors, bBlockActors, bBlockPlayers, bTeamArea;
+
+	bTeamArea = Game.bTeamGame && TeamGamePlus(Game) != None && TeamGamePlus(Game).bSpawnInTeamArea;
+	for (N = Level.NavigationPointList; N != None && Num < 32; N = N.nextNavigationPoint)
+	{
+		PS = PlayerStart(N);
+		if (PS == None || !PS.bEnabled || PS.Region.Zone.bWaterZone)
+			continue;
+		if (bTeamArea && PS.TeamNumber != B.PlayerReplicationInfo.Team)
+			continue;
+		Cand[Num] = PS;
+		Num++;
+	}
+	if (Num == 0)
+		return None;
+	Was = B.Location;
+	WasVel = B.Velocity;
+	WasPhys = B.Physics;
+	bActors = B.bCollideActors;
+	bBlockActors = B.bBlockActors;
+	bBlockPlayers = B.bBlockPlayers;
+	B.SetCollision(false, false, false);
+	B.Velocity = vect(0,0,0);
+	B.SetPhysics(PHYS_Walking);
+	k = Rand(Num);
+	for (i = 0; i < Num && Tried < 12; i++)
+	{
+		N = Cand[k];
+		k++;
+		if (k >= Num)
+			k = 0;
+		if (VSize(N.Location - Was) < 200)
+			continue;
+		Tried++;
+		if (B.SetLocation(N.Location) && ReachableOpponent(B) != None)
+		{
+			Found = N;
+			break;
+		}
+	}
+	B.SetLocation(Was);
+	B.SetCollision(bActors, bBlockActors, bBlockPlayers);
+	B.SetPhysics(WasPhys);
+	B.Velocity = WasVel;
+	return Found;
+}
+
+// Last resort: to a start spot without dying (no death, no score change), one with a path to an
+// opponent when there is one. bNeedPath: only to such a spot, the first time without one the
+// bot stays (the opponent may be the one cut off), the next time it goes to any start spot (both
+// cut off from each other, e.g. one on a ring and one on a kicker).
+function FreeRespawn(Bot B, int s, string Why, bool bNeedPath)
 {
 	local NavigationPoint N;
 	local vector Was;
+	local bool bMoved;
 
 	Was = B.Location;
-	N = Level.Game.FindPlayerStart(B, B.PlayerReplicationInfo.Team);
-	if (N == None || !B.SetLocation(N.Location))
+	N = StartWithPath(B);
+	if (N == None && bNeedPath && NoPathStay[s] == 0)
+	{
+		NoPathStay[s] = 1;
+		BotLog(BName(B) $ ":" @ Why @ "at" @ Where(Was) $ ", no start spot with a path to an opponent, stays");
+		HuntBlock[s] = Level.TimeSeconds + 15;
+		return;
+	}
+	bMoved = N != None && B.SetLocation(N.Location);
+	// None with a path, or that one is taken (another player on it): any start spot.
+	if (!bMoved)
+	{
+		N = Level.Game.FindPlayerStart(B, B.PlayerReplicationInfo.Team);
+		bMoved = N != None && B.SetLocation(N.Location);
+	}
+	if (!bMoved)
 	{
 		BotLog(BName(B) $ ":" @ Why @ "at" @ Where(Was) $ ", respawn failed (no free start spot)");
 		StuckSec[s] = 0;
 		StuckRef[s] = B.Location;
+		StuckRep[s] = 0;
 		return;
 	}
 	B.SetRotation(N.Rotation);
@@ -3416,7 +3611,9 @@ function FreeRespawn(Bot B, int s, string Why)
 	B.SpecialPause = 0;
 	BotLog(BName(B) $ ":" @ Why @ "at" @ Where(Was) $ ", moved to" @ N.Name @ "(no death counted)");
 	ResetWatch(s, B);
-	if (B.IsInState('Roaming') || B.IsInState('Wandering') || B.IsInState('FallBack') || B.IsInState('Hunting'))
+	if (B.Enemy != None && !B.LineOfSightTo(B.Enemy))
+		DropEnemy(B);
+	else if (B.IsInState('Roaming') || B.IsInState('Wandering') || B.IsInState('FallBack') || B.IsInState('Hunting'))
 		B.WhatToDoNext('', '');
 }
 

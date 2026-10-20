@@ -73,6 +73,12 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > the AI help does not send a bot after an opponent while it is on one.
 > Mod 0.12.0: the chat lines of website bots also go to the bridge (`bs`), the website shows them in the kill feed of
 > the match page.
+> Mod 0.12.1: cut-off bots (AI help, deathmatch games). Three hunts in a row refused for lack of a path (about 30 s, no
+> fight) and no opponent reachable from there: the bot is moved to a start spot with a path to an opponent (the first
+> time none has one it stays, the next time any start spot). The area check ignores heights in the air (a bot bouncing
+> on a kicker no longer leaves its area); no far detour → a near one, none → start spot 12 s later. Stuck heading for
+> the same point again and again: a detour, the fourth time a start spot. A cleared enemy no longer causes
+> `Accessed None` in StakeOut.
 
 ## Classes
 
@@ -261,6 +267,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 57 | **Running on the spot, stuck bots** (mod 0.10.1) | Bot AI help on. Bot-only 1v1 and 2on2 on DM-Curse][ (and maps where bots stood under stairs or ran back and forth), a few games. No bot runs back and forth or stands in one place for more than ~15 s without a fight. `grep "UTTourney: bot" Tourney.log`: lines like `hunt of X without progress for 6 s ..., given up for 15 s`, `no path to X, no hunt for 10 s`, `stuck for 3 s ...: jumps aside`, `detour via PathNodeN`, `has not left (x,y,z) (300 units) for 12 s ...`, `moves again after ...`, rarely `moved to PlayerStartN (no death counted)`. Bots camping on purpose (sniper bots) are left alone; fights in a small room are not touched. Server log without `Accessed None` |
 | 58 | **Dream Team behaviour traits, group 2** (mod 0.11.0) | Dream Team games with a real server, roster bots with the new traits. Sniper's nest (DM-Deck16][, DM-Morpheus or another map with heights): the bot picks up the sniper rifle, goes up and camps there for a while (server log `sniper nests on this map: N`, `heads for the sniper's nest PathNodeN`, `... reached, camps`). Team player (2on2 or larger): two bots of a side attack the same opponent, `team player joins X's fight against Y`. Shuffle dancer: dodges left and right in fights (spectate it). Item controller (DM-Deck16][ or a map with shield belt/UDamage): `power items on this map: N`, it heads for the item before it is back (`item controller heads for ..., back in N s`) and waits next to it (`waits N s at ...`). Bots without these traits as in 0.10.1; server log without `Accessed None` |
 | 59 | **Bot chat in the kill feed** (mod 0.12.0) | A game with talking website bots (Bots → personality with lines, talkativeness high; Dream Team bots: My team → Look & lines). On the match page the bots' lines appear in the kill feed between the kills (name in its side's colour, the line in quotes). Bridge log without `bad line` for `bs` |
+| 60 | **Cut-off bots** (mod 0.12.1) | Bot AI help on. Bot-only 1v1 on DM-SpaceNoxx (upper ring, kickers), a few games. No bot stays on the ring or on a kicker for more than ~40 s without a fight. `grep "UTTourney: bot" Tourney.log`: `no path to X (N in a row)`, then `no path to any opponent (3 hunts in a row) at ..., moved to PlayerStartN (no death counted)` (or `..., stays` once); bouncing bots get `has not left ... for 12 s`. Other maps (DM-Curse][, DM-Deck16][) as in test 57. Server log without `Accessed None` (no more `StakeOut.ContinueStakeOut` / `RelativeStrength`) |
 
 ## SmartStockBots (optional)
 
