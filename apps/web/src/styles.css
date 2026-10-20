@@ -144,6 +144,18 @@ code,
   align-items: center;
   flex-wrap: wrap;
 }
+.between {
+  justify-content: space-between;
+}
+/* A card's header row (title and actions): one gap below, the title without its own margin. */
+.card > .row:first-child,
+.card > .spread:first-child {
+  margin-bottom: 14px;
+}
+.card > .row:first-child > h2,
+.card > .spread:first-child > h2 {
+  margin: 0;
+}
 .spread {
   display: flex;
   justify-content: space-between;
@@ -879,6 +891,7 @@ label.switch input:disabled + .tr {
 .udt-card {
   width: 180px;
   flex: none;
+  text-align: left;
   padding: 2px;
   border-radius: 16px;
   background: var(--rc);
@@ -892,19 +905,32 @@ label.switch input:disabled + .tr {
 .udt-card.small {
   width: 150px;
 }
+.udt-card.dim {
+  filter: grayscale(0.85) brightness(0.85);
+  box-shadow: none;
+}
+.udt-card.dim .note {
+  color: #fbbf5c;
+}
 .udt-card .in {
   border-radius: 14px;
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   height: 100%;
+  min-width: 0;
   background: radial-gradient(120% 70% at 50% 0%, var(--rg), transparent 65%), #0c0f16;
 }
 .udt-card .top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+.udt-card .sk {
+  flex: none;
 }
 .udt-card .ovr {
   font-family: var(--font-display);
@@ -913,13 +939,38 @@ label.switch input:disabled + .tr {
   font-size: 2.4rem;
   line-height: 0.85;
 }
-.udt-card .tier,
-.udt-card .rar {
-  font-size: 0.66rem;
+.udt-card .tier {
+  margin-top: -3px;
+  font-size: 0.6rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--rt);
+  white-space: nowrap;
+}
+.udt-card .meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  text-align: right;
+}
+.udt-card .meta > span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.udt-card .rar {
+  color: var(--rt);
+}
+.udt-card .lvl {
+  color: var(--muted);
 }
 .udt-card .pic {
   height: 70px;
@@ -938,7 +989,13 @@ label.switch input:disabled + .tr {
   font-weight: 700;
   font-size: 1.2rem;
   text-transform: uppercase;
-  line-height: 1;
+  line-height: 1.05;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.udt-card.small .name {
+  font-size: 1.05rem;
 }
 .udt-card .tag {
   color: var(--hot-text);
@@ -946,22 +1003,43 @@ label.switch input:disabled + .tr {
 .udt-card .stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 2px 6px;
-  font-size: 0.72rem;
+  gap: 4px;
+}
+.udt-card .stats span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  min-width: 0;
+}
+.udt-card .stats i {
+  font-style: normal;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: var(--muted);
 }
 .udt-card .stats b {
   font-family: var(--font-mono);
+  font-size: 0.85rem;
   color: var(--text);
-  margin-left: 3px;
 }
 .udt-card .foot {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 4px 8px;
   border-top: 1px solid var(--border);
   padding-top: 6px;
   font-size: 0.85rem;
+}
+.udt-card .foot .note {
+  font-size: 0.66rem;
+  color: var(--text-2);
+  line-height: 1.2;
 }
 .udt-bar {
   height: 5px;
@@ -1021,6 +1099,13 @@ label.switch input:disabled + .tr {
   text-transform: uppercase;
   border: 1px solid var(--line);
   color: var(--text-2);
+}
+* + .udt-mark {
+  margin-left: 6px;
+}
+.row > .udt-mark,
+.tags > .udt-mark {
+  margin-left: 0;
 }
 .udt-mark.strike {
   color: #fbbf5c;
@@ -1090,10 +1175,6 @@ label.switch input:disabled + .tr {
 }
 .udt-trait.slot::before {
   background: var(--line);
-}
-.udt-card .lvl {
-  color: var(--muted);
-  letter-spacing: 0.08em;
 }
 .udt-card .stats .up b {
   color: #86e8b4;
@@ -1490,12 +1571,8 @@ details.look[open] > summary {
 }
 .lookedit {
   display: grid;
-  gap: 10px;
-  margin-top: 10px;
-  padding: 12px;
-  border: 1px solid rgba(178, 107, 255, 0.35);
-  border-radius: var(--radius);
-  background: rgba(178, 107, 255, 0.05);
+  gap: 12px;
+  margin: 4px 0 14px;
 }
 
 /* Dream Team draw on the tournament page */
@@ -1514,6 +1591,23 @@ details.look[open] > summary {
 }
 .udt-seed ul {
   margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+/* Short explanations that open on a click */
+details.help {
+  margin-top: 12px;
+  color: var(--text-2);
+}
+details.help > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+details.help ul {
+  margin: 8px 0 0;
   padding-left: 18px;
   display: grid;
   gap: 4px;

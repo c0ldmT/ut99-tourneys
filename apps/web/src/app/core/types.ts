@@ -554,12 +554,13 @@ export interface BetMatchView {
     id: string;
     name: string;
     pick: string;
+    pickName?: string;
     amount: number;
     status: BetStatus;
     payout: number;
   }[];
   /** While open: the side of the strongest bot that bet. */
-  expert: { botId: string; name: string; pick: string } | null;
+  expert: { botId: string; name: string; pick: string; pickName?: string } | null;
 }
 
 export interface TournamentBets {
@@ -1026,6 +1027,8 @@ export interface UdtEvent {
   /** Finale: the teams that would play now (user ids). */
   qualified?: string[] | null;
   entries: number;
+  /** AI teams among the entries (they make room for humans). */
+  aiEntries?: number;
   entered: boolean;
   open: boolean;
   lineup: { bots: string[]; value: number; problems: string[] } | null;

@@ -20,6 +20,7 @@ import {
   bracketOf,
   salaryOf,
   SCRAP,
+  rosterCard,
   staminaColor,
   UdtCard,
   UdtNav,
@@ -106,18 +107,18 @@ type Mode = 'dm' | 'mh';
                   />
                 </label>
               }
-              <details class="look">
-                <summary>{{ 'udt.look.title' | t }}</summary>
-                <app-udt-bot-look [draft]="foundLook" [looks]="looks()" [allowClass]="true" />
-              </details>
               <p [class.error]="cost() > budget()" class="small">
                 {{ 'udt.found.cost' | t: { cost: cost(), budget: budget() } }}
               </p>
-              <button type="submit" class="primary" [disabled]="busy() || cost() > budget()">
-                {{ 'udt.found.submit' | t }}
-              </button>
             </div>
             <udt-card [bot]="preview()" />
+          </div>
+          <app-udt-bot-look [draft]="foundLook" [looks]="looks()" />
+          <div class="row submit">
+            <button type="submit" class="primary" [disabled]="busy() || cost() > budget()">
+              {{ 'udt.found.submit' | t }}
+            </button>
+            <span class="muted small">{{ 'udt.look.later' | t }}</span>
           </div>
         </form>
       } @else {
@@ -214,6 +215,14 @@ type Mode = 'dm' | 'mh';
             </button>
             <span class="muted small">{{ 'udt.lineupHint' | t }}</span>
           </div>
+          <details class="help small">
+            <summary>{{ 'udt.staminaHelp.title' | t }}</summary>
+            <ul>
+              @for (k of ['loss', 'rest', 'tired', 'bench', 'traits']; track k) {
+                <li>{{ 'udt.staminaHelp.' + k | t }}</li>
+              }
+            </ul>
+          </details>
         </section>
 
         <section class="card">
@@ -392,6 +401,10 @@ type Mode = 'dm' | 'mh';
       flex-wrap: wrap;
       gap: 28px;
       align-items: flex-start;
+      margin-bottom: 18px;
+    }
+    .found .submit {
+      margin-top: 16px;
     }
     .found .fields {
       flex: 1 1 320px;
@@ -590,7 +603,7 @@ export class UdtTeamPage {
   }
 
   protected card(b: UdtRosterBot): CardBot {
-    return { ...b, tag: this.view()?.team?.tag, stamina: b.stamina };
+    return rosterCard(b, this.view()?.team?.tag);
   }
 
   protected star(b: UdtRosterBot) {

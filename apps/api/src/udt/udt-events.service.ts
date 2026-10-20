@@ -373,6 +373,7 @@ export class UdtEventsService implements OnModuleInit {
       .all();
     const open = rows.filter((t) => t.phase !== 'finished' && t.phase !== 'aborted');
     const done = rows.filter((t) => t.phase === 'finished').slice(0, 5);
+    const ai = this.udt.aiIds();
     const entries = new Map<string, string[]>();
     for (const e of this.db
       .select()
@@ -402,6 +403,8 @@ export class UdtEventsService implements OnModuleInit {
             ? null
             : Math.round(rules.valueCap * this.udt.index(this.udt.season().number)),
         entries: who.length,
+        /** AI teams among them (a human takes the place of the last one when it is full). */
+        aiEntries: who.filter((u) => ai.has(u)).length,
         entered: who.includes(user.id),
         open: t.phase === 'draft' && t.registrationOpen && !rules.finale,
         /** Finale: the teams that would play now (top of the table). */

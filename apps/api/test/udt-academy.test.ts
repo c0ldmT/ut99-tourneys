@@ -152,9 +152,10 @@ describe('Unreal Dream Team: academy', () => {
           skill: 3,
           traits: avg,
           botClass: 'BotPack.TFemale1Bot',
+          look: { skin: 'SGirlSkins.army', personality: { lines: [{ kind: 'kill', text: 'Hi' }] } },
         })
       ).status,
-    ).toBe(400); // no model from common blueprints
+    ).toBe(200); // the model is cosmetic: free for every blueprint
     const ok = await mario.post('/udt/academy/build', {
       blueprintId: 'pE',
       name: 'Signa',
@@ -166,7 +167,9 @@ describe('Unreal Dream Team: academy', () => {
     const b = ok.body.own.find((x: { name: string }) => x.name === 'Signa');
     expect(b).toMatchObject({ skill: 5, own: { origin: 'blueprint' } });
     expect(b.udtTraits[0].code).toBe(ok.body.built.startTrait);
-    expect(ok.body.blueprints).toHaveLength(1);
+    expect(ok.body.blueprints).toHaveLength(0);
+    const blank = ok.body.own.find((x: { name: string }) => x.name === 'Blank');
+    expect(blank).toMatchObject({ botClass: 'BotPack.TFemale1Bot', skin: 'SGirlSkins.army' });
   });
 
   it('careers: every bot has one; admins retire bots into the hall of fame', async () => {

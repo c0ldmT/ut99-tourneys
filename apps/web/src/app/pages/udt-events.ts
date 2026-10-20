@@ -27,6 +27,9 @@ import { UdtNav } from '../core/udt';
               <div class="muted small">
                 {{ e.teamSize === 1 ? '1v1' : e.teamSize + 'v' + e.teamSize }} ·
                 {{ e.game === 'mh' ? 'Monster Hunt' : 'Deathmatch' }} · {{ e.entries }}/{{ e.size }}
+                @if (e.aiEntries) {
+                  ({{ 'udt.events.aiIn' | t: { n: e.aiEntries } }})
+                }
                 @if (e.scheduledAt) {
                   · {{ when(e.scheduledAt) }}
                 }
@@ -209,7 +212,11 @@ export class UdtEventsPage {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    <h1 class="disp">{{ 'udt.table.title' | t }}</h1>
+    <div class="udt-head">
+      <div>
+        <h1 class="disp">{{ 'udt.table.title' | t }}</h1>
+      </div>
+    </div>
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }

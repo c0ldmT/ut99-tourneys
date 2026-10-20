@@ -245,6 +245,9 @@ export class BetsService {
     const settled = this.settle(all);
     const library = this.bots.list();
     const names = this.names();
+    // Side names for the texts (a Dream Team entrant is "udt-<user>": its team name).
+    const entrants = this.log.projection(tournamentId)?.entrants ?? {};
+    const sideName = (id: string) => entrants[id]?.displayName ?? id;
     const matches = [...(b?.books.values() ?? [])]
       .filter((m) => m.entrants)
       .map((m) => {
@@ -279,12 +282,13 @@ export class BetsService {
                     id: isBotBettor(x.userId) ? x.userId.slice(4) : x.userId,
                     name: names.get(x.userId) ?? x.userId,
                     pick: x.pick,
+                    pickName: sideName(x.pick),
                     amount: x.amount,
                     status: x.status,
                     payout: x.payout,
                   })),
           /** While open: the side of the strongest bot that bet (not the amount). */
-          expert: m.state === 'open' ? this.expert(botBets, library) : null,
+          expert: m.state === 'open' ? this.expert(botBets, library, sideName) : null,
         };
       });
     return {
@@ -296,7 +300,11 @@ export class BetsService {
     };
   }
 
-  private expert(botBets: readonly SettledBet[], library: readonly LibraryBot[]) {
+  private expert(
+    botBets: readonly SettledBet[],
+    library: readonly LibraryBot[],
+    sideName: (id: string) => string,
+  ) {
     let best: { bot: LibraryBot; pick: string } | undefined;
     for (const x of botBets) {
       const bot = library.find((b) => b.id === x.userId.slice(4));
@@ -308,7 +316,14 @@ export class BetsService {
           (bot.traits.accuracy ?? 0) > (best.bot.traits.accuracy ?? 0));
       if (better) best = { bot, pick: x.pick };
     }
-    return best ? { botId: best.bot.id, name: best.bot.gameName, pick: best.pick } : null;
+    return best
+      ? {
+          botId: best.bot.id,
+          name: best.bot.gameName,
+          pick: best.pick,
+          pickName: sideName(best.pick),
+        }
+      : null;
   }
 
   private walletView(w: Wallet, season: Season) {

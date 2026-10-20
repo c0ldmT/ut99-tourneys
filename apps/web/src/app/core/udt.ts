@@ -75,6 +75,14 @@ export interface CardBot {
   career?: UdtCareer | null;
 }
 
+/** A roster bot (own, another team's, a trade partner's) as a card, with the team's tag. */
+export function rosterCard(
+  b: Omit<CardBot, 'tag'> & { career?: CardBot['career'] },
+  tag?: string,
+): CardBot {
+  return { ...b, ...(tag ? { tag } : {}), career: b.career ?? null };
+}
+
 /** A bot as a Dream Team card (rarity from the skill): skill, values, value, stamina. */
 @Component({
   selector: 'udt-card',
@@ -84,21 +92,19 @@ export interface CardBot {
     @let b = bot();
     @let v = b.effective?.traits ?? b.traits;
     @let sk = b.effective?.skill ?? b.skill;
-    <div class="udt-card r-{{ b.rarity }}" [class.small]="small()">
+    <div class="udt-card r-{{ b.rarity }}" [class.small]="small()" [class.dim]="dim()">
       <div class="in">
         <div class="top">
-          <div>
+          <div class="sk">
             <div class="ovr">{{ round(sk) }}{{ b.effective?.overflow ? '+' : '' }}</div>
-            <div class="tier">{{ skillName(sk) }}</div>
           </div>
-          <span class="rar"
-            >{{ rarityLabel() }}
+          <div class="meta">
+            <span class="rar">{{ rarityLabel() }}</span>
             @if (b.level) {
-              <br /><span class="lvl">{{ 'udt.level' | t }} {{ b.level }}</span>
+              <span class="lvl">Level {{ b.level }}</span>
             }
             @if (b.career) {
-              <br /><span
-                class="car"
+              <span
                 [class]="'car ph-' + b.career.phase"
                 [title]="'udt.career.age' | t: { n: b.career.age }"
                 >{{ 'udt.career.' + b.career.phase | t }}
@@ -109,8 +115,9 @@ export interface CardBot {
                 }
               </span>
             }
-          </span>
+          </div>
         </div>
+        <div class="tier">{{ skillName(sk) }}</div>
         @if (!small()) {
           <div class="pic">
             <svg width="96" height="68" viewBox="0 0 120 100" aria-hidden="true">
@@ -122,21 +129,21 @@ export interface CardBot {
             </svg>
           </div>
         }
-        <div class="name">
+        <div class="name" [title]="(b.tag ?? '') + b.name">
           @if (b.tag) {
             <span class="tag">{{ b.tag }}</span>
           }
           {{ b.name }}
         </div>
         <div class="stats">
-          <span [class.up]="v.accuracy !== b.traits.accuracy"
-            >GEN<b>{{ pct(v.accuracy) }}</b></span
+          <span [class.up]="v.accuracy !== b.traits.accuracy" title="Accuracy"
+            ><i>ACC</i><b>{{ pct(v.accuracy) }}</b></span
           >
-          <span [class.up]="v.alertness !== b.traits.alertness"
-            >WAC<b>{{ pct(v.alertness) }}</b></span
+          <span [class.up]="v.alertness !== b.traits.alertness" title="Alertness"
+            ><i>ALT</i><b>{{ pct(v.alertness) }}</b></span
           >
-          <span [class.up]="v.strafing !== b.traits.strafing"
-            >STR<b>{{ pct(v.strafing) }}</b></span
+          <span [class.up]="v.strafing !== b.traits.strafing" title="Strafing"
+            ><i>STR</i><b>{{ pct(v.strafing) }}</b></span
           >
         </div>
         @if (b.udtTraits?.length) {
@@ -149,13 +156,18 @@ export interface CardBot {
           </div>
         }
         @if (b.stamina !== undefined) {
-          <div class="udt-bar" [title]="'udt.stamina' | t">
+          <div class="udt-bar" [title]="('udt.stamina' | t) + ' ' + b.stamina">
             <i [style.width.%]="b.stamina" [style.background]="staminaColor(b.stamina)"></i>
           </div>
         }
-        @if (b.value !== undefined) {
+        @if (b.value !== undefined || note()) {
           <div class="foot">
-            <span class="neuro"><na-coin [size]="13" /> {{ b.value | neuro: false }}</span>
+            @if (b.value !== undefined) {
+              <span class="neuro"><na-coin [size]="13" /> {{ b.value | neuro: false }}</span>
+            }
+            @if (note()) {
+              <span class="note">{{ note() }}</span>
+            }
           </div>
         }
       </div>
@@ -165,6 +177,10 @@ export interface CardBot {
 export class UdtCard {
   readonly bot = input.required<CardBot>();
   readonly small = input(false);
+  /** Not available (e.g. cannot be traded): toned down, the reason in the foot. */
+  readonly dim = input(false);
+  /** A short line in the foot (e.g. why the bot cannot be traded). */
+  readonly note = input<string | null>(null);
   private readonly i18n = inject(I18n);
   protected readonly round = Math.round;
   protected readonly pct = pct;

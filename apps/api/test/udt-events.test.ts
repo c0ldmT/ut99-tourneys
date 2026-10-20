@@ -82,6 +82,8 @@ describe('Unreal Dream Team: events', () => {
     // The manager does not bet on the own match.
     const bets = (await mario.get(`/bets/tournaments/${id}`)).body;
     const own = bets.matches.find((m: any) => m.entrants.includes(nx.id));
+    // The expert tip names the side, not the entrant id.
+    for (const m of bets.matches) if (m.expert) expect(m.expert.pickName).not.toMatch(/^udt-/);
     if (own) {
       const r = await mario.req('PUT', `/bets/tournaments/${id}/${own.matchId}`, {
         pick: own.entrants[0],

@@ -161,6 +161,11 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 <p class="muted small">
                   {{ 'tp.udtRegistered' | t: { n: t.registrations.length, size: t.settings.size } }}
                 </p>
+                @if (
+                  !t.me.registered && t.registrations.length >= t.settings.size && aiTeams(t) > 0
+                ) {
+                  <p class="small">{{ 'tp.udtAiFull' | t }}</p>
+                }
                 @if (t.udt?.ticket) {
                   <p class="small">{{ 'tp.udtTicket' | t }}</p>
                 }
@@ -172,7 +177,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     </button>
                     <a class="btn" routerLink="/udt">{{ 'tp.udtLineup' | t }}</a>
                   </div>
-                } @else if (t.registrationOpen && t.registrations.length < t.settings.size) {
+                } @else if (
+                  t.registrationOpen && (t.registrations.length < t.settings.size || aiTeams(t) > 0)
+                ) {
                   <div class="row">
                     <button
                       class="primary udt"

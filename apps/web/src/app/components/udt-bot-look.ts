@@ -44,9 +44,10 @@ export function lookFromBot(b: LibraryBot): LookDraft {
   return d;
 }
 
-/** The API body (skin, face, voice, chat chance and lines). */
+/** The API body (model, skin, face, voice, chat chance and lines). */
 export function lookBody(d: LookDraft) {
   return {
+    botClass: d.botClass.trim(),
     skin: d.skin.trim(),
     face: d.face.trim(),
     voice: d.voice.trim(),
@@ -71,8 +72,9 @@ let nextId = 0;
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let d = draft();
-    <div class="fields">
-      @if (allowClass()) {
+    <fieldset>
+      <legend>{{ 'bots.sec.look' | t }}</legend>
+      <div class="fields">
         <div class="field">
           <label [for]="id + 'c'">{{ 'bots.class' | t }}</label>
           <input
@@ -89,113 +91,129 @@ let nextId = 0;
             }
           </datalist>
         </div>
-      }
-      <div class="field">
-        <label [for]="id + 's'">{{ 'bots.skin' | t }}</label>
-        <input
-          [id]="id + 's'"
-          [name]="id + 's'"
-          [attr.list]="id + 'sl'"
-          [placeholder]="'bots.default' | t"
-          [(ngModel)]="d.skin"
-        />
-        <datalist [id]="id + 'sl'">
-          @for (s of skins(); track s.name) {
-            <option [value]="s.name">{{ s.label }}</option>
-          }
-        </datalist>
+        <div class="field">
+          <label [for]="id + 's'">{{ 'bots.skin' | t }}</label>
+          <input
+            [id]="id + 's'"
+            [name]="id + 's'"
+            [attr.list]="id + 'sl'"
+            [placeholder]="'bots.default' | t"
+            [(ngModel)]="d.skin"
+          />
+          <datalist [id]="id + 'sl'">
+            @for (s of skins(); track s.name) {
+              <option [value]="s.name">{{ s.label }}</option>
+            }
+          </datalist>
+        </div>
+        <div class="field">
+          <label [for]="id + 'f'">{{ 'bots.face' | t }}</label>
+          <input
+            [id]="id + 'f'"
+            [name]="id + 'f'"
+            [attr.list]="id + 'fl'"
+            [placeholder]="'bots.default' | t"
+            [(ngModel)]="d.face"
+          />
+          <datalist [id]="id + 'fl'">
+            @for (f of faces(); track f.name) {
+              <option [value]="f.name">{{ f.label }}</option>
+            }
+          </datalist>
+        </div>
+        <div class="field">
+          <label [for]="id + 'v'">{{ 'bots.voice' | t }}</label>
+          <select [id]="id + 'v'" [name]="id + 'v'" [(ngModel)]="d.voice">
+            <option value="">{{ 'bots.default' | t }}</option>
+            @for (v of looks()?.voices ?? []; track v.name) {
+              <option [value]="v.name">{{ v.label }}</option>
+            }
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label [for]="id + 'f'">{{ 'bots.face' | t }}</label>
-        <input
-          [id]="id + 'f'"
-          [name]="id + 'f'"
-          [attr.list]="id + 'fl'"
-          [placeholder]="'bots.default' | t"
-          [(ngModel)]="d.face"
-        />
-        <datalist [id]="id + 'fl'">
-          @for (f of faces(); track f.name) {
-            <option [value]="f.name">{{ f.label }}</option>
-          }
-        </datalist>
-      </div>
-      <div class="field">
-        <label [for]="id + 'v'">{{ 'bots.voice' | t }}</label>
-        <select [id]="id + 'v'" [name]="id + 'v'" [(ngModel)]="d.voice">
-          <option value="">{{ 'bots.default' | t }}</option>
-          @for (v of looks()?.voices ?? []; track v.name) {
-            <option [value]="v.name">{{ v.label }}</option>
-          }
-        </select>
-      </div>
-    </div>
-    <label class="slider"
-      ><span>{{ 'bots.talk' | t }}</span>
-      <input type="range" [name]="id + 't'" min="0" max="100" step="5" [(ngModel)]="d.talk" />
-      <span class="mono val">{{ d.talk }} %</span>
-    </label>
-    <p class="muted small">{{ 'bots.linesHint' | t }}</p>
-    @for (k of kinds; track k) {
-      <div class="kind">
-        <div class="spread">
-          <b class="small">{{ 'bots.kind.' + k | t }}</b>
-          @if (count() < 64) {
-            <button type="button" class="link" (click)="d.lines[k].push('')">
-              + {{ 'bots.addLine' | t }}
-            </button>
+      <p class="muted small hint">{{ 'bots.lookHint' | t }}</p>
+    </fieldset>
+    <fieldset>
+      <legend>{{ 'bots.sec.personality' | t }}</legend>
+      <label class="slider"
+        ><span>{{ 'bots.talk' | t }}</span>
+        <input type="range" [name]="id + 't'" min="0" max="100" step="5" [(ngModel)]="d.talk" />
+        <span class="mono val">{{ d.talk }} %</span>
+      </label>
+      <p class="muted small">{{ 'udt.look.linesHint' | t }}</p>
+      @for (k of kinds; track k) {
+        <div class="kind">
+          <div class="spread">
+            <b>{{ 'bots.kind.' + k | t }}</b>
+            @if (count() < 64) {
+              <button type="button" class="link" (click)="d.lines[k].push('')">
+                + {{ 'bots.addLine' | t }}
+              </button>
+            }
+          </div>
+          @for (l of d.lines[k]; track $index) {
+            <div class="row line">
+              <input
+                [name]="id + k + $index"
+                [(ngModel)]="d.lines[k][$index]"
+                maxlength="120"
+                [placeholder]="'bots.linePlaceholder.' + k | t"
+              />
+              <button type="button" class="link" (click)="d.lines[k].splice($index, 1)">✕</button>
+            </div>
           }
         </div>
-        @for (l of d.lines[k]; track $index) {
-          <div class="row line">
-            <input
-              [name]="id + k + $index"
-              [(ngModel)]="d.lines[k][$index]"
-              maxlength="120"
-              [placeholder]="'bots.linePlaceholder.' + k | t"
-            />
-            <button type="button" class="link" (click)="d.lines[k].splice($index, 1)">✕</button>
-          </div>
-        }
-      </div>
-    }
+      }
+      <p class="muted small">{{ count() }}/64 {{ 'bots.linesCount' | t }}</p>
+    </fieldset>
   `,
   styles: `
     :host {
-      display: grid;
-      gap: 10px;
+      display: block;
     }
-    .fields {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 10px;
+    fieldset:last-of-type {
+      margin-bottom: 0;
     }
-    .field {
-      display: grid;
-      gap: 4px;
+    .hint {
+      margin: 0 0 4px;
     }
-    .slider {
-      display: flex;
+    label.slider {
+      display: grid;
+      grid-template-columns: 120px 1fr 48px;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      margin: 4px 0 8px;
     }
-    .slider input {
-      flex: 1;
+    label.slider input {
+      padding: 0;
+    }
+    .val {
+      text-align: right;
+    }
+    .kind {
+      margin: 10px 0;
+    }
+    .line {
+      margin: 4px 0;
+      flex-wrap: nowrap;
     }
     .line input {
       flex: 1;
+      min-width: 0;
     }
-    .kind {
-      display: grid;
-      gap: 4px;
+    @media (max-width: 560px) {
+      label.slider {
+        grid-template-columns: 1fr 48px;
+      }
+      label.slider span:first-child {
+        grid-column: 1 / -1;
+      }
     }
   `,
 })
 export class UdtBotLook {
   readonly draft = input.required<LookDraft>();
   readonly looks = input<UdtLooks | null>(null);
-  /** The model can be chosen (founding, rare blueprints). */
-  readonly allowClass = input(false);
   protected readonly id = `ul${nextId++}`;
   protected readonly kinds = UDT_LINE_KINDS;
 

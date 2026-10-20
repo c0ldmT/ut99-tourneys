@@ -154,7 +154,7 @@ interface Draft {
             @if (m.expert; as x) {
               <div class="expert small">
                 <span class="kpi">{{ 'bets.expertTitle' | t }}</span>
-                {{ 'bets.expert' | t: { bot: x.name, name: name(x.pick) } }}
+                {{ 'bets.expert' | t: { bot: x.name, name: x.pickName ?? name(x.pick) } }}
               </div>
             }
           }

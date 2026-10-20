@@ -60,6 +60,8 @@ const BotLines = z.object({
 });
 /** What a manager sets on an own bot: skin, face, voice and chat lines (not the values). */
 export const BotLookBody = z.object({
+  /** The model (bot class): cosmetic, free for own bots. */
+  botClass: LookRef.optional(),
   skin: LookRef.optional(),
   face: LookRef.optional(),
   voice: LookRef.optional(),
@@ -71,6 +73,7 @@ export type BotLook = z.infer<typeof BotLookBody>;
 export function lookFields(look: BotLook | undefined) {
   if (!look) return {};
   return {
+    ...(look.botClass !== undefined ? { botClass: look.botClass } : {}),
     ...(look.skin !== undefined ? { skin: look.skin } : {}),
     ...(look.face !== undefined ? { face: look.face } : {}),
     ...(look.personality ? { personality: look.personality } : {}),
@@ -457,7 +460,7 @@ export class UdtService {
     };
   }
 
-  /** The manager changes skin, face, voice and chat lines of an own bot (never its values). */
+  /** The manager changes model, skin, face, voice and chat lines of an own bot (never its values). */
   editBot(user: User, botId: string, body: BotLook): LibraryBot {
     this.assertOn();
     const b = this.bots.get(botId);

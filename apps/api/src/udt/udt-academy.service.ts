@@ -348,10 +348,6 @@ export class UdtAcademyService {
       throw badRequest(
         `the build costs ${buildCost(body.skill, body.traits)} of ${rule.budget} points: lower skill or values`,
       );
-    if (body.botClass && !rule.models)
-      throw badRequest('the model can be chosen from rare blueprints');
-    if (body.botClass && !this.bots.assets().botClasses.some((c) => c.name === body.botClass))
-      throw badRequest('unknown bot class');
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict(`a bot is called ${body.name} already`);
     this.licence(user, season, body.name);

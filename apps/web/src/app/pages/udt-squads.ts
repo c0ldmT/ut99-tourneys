@@ -4,7 +4,7 @@ import { Api, errorText } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import type { UdtRosterBot, UdtSquad, UdtSquadRow } from '../core/types';
-import { UdtCard, UdtNav, type CardBot } from '../core/udt';
+import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
 
 /** Every team of the Dream Team season (humans first), to look at their squads. */
 @Component({
@@ -13,8 +13,12 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
-    <h1 class="disp">{{ 'udt.squads.title' | t }}</h1>
-    <p class="muted">{{ 'udt.squads.intro' | t }}</p>
+    <div class="udt-head">
+      <div>
+        <h1 class="disp">{{ 'udt.squads.title' | t }}</h1>
+        <p class="muted">{{ 'udt.squads.intro' | t }}</p>
+      </div>
+    </div>
     @if (error()) {
       <p class="error">{{ error() }}</p>
     }
@@ -186,19 +190,6 @@ export class UdtSquadPage {
   }
 
   protected card(b: UdtRosterBot, tag: string): CardBot {
-    return {
-      name: b.name,
-      skill: b.skill,
-      rarity: b.rarity,
-      traits: b.traits,
-      value: b.value,
-      tag,
-      stamina: b.stamina,
-      udtTraits: b.udtTraits,
-      slots: b.slots,
-      level: b.level,
-      effective: b.effective,
-      career: b.career ?? null,
-    };
+    return rosterCard(b, tag);
   }
 }

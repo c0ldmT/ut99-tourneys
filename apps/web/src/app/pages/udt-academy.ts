@@ -64,7 +64,7 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
           {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt">{{ 'udt.nav.team' | t }}</a>
         </p>
       } @else {
-        <details class="card look">
+        <details class="card look" open>
           <summary>
             <b>{{ 'udt.look.next' | t }}</b>
             <span class="muted small">{{ 'udt.look.nextHint' | t }}</span>
@@ -189,17 +189,6 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
                         [ngModel]="bpVal()[k]"
                         (ngModelChange)="setBpVal(k, $event)"
                       />
-                    </label>
-                  }
-                  @if (bp.rule.models) {
-                    <label
-                      >{{ 'udt.academy.model' | t }}
-                      <select name="bpClass" [(ngModel)]="bpClass">
-                        <option [ngValue]="''">{{ 'bots.default' | t }}</option>
-                        @for (c of v.botClasses; track c.name) {
-                          <option [ngValue]="c.name">{{ c.label }}</option>
-                        }
-                      </select>
                     </label>
                   }
                   <div class="rg" [class.over]="bpCost() > bp.rule.budget">
@@ -444,7 +433,6 @@ export class UdtAcademyPage {
   protected readonly bpSkill = signal(3);
   protected readonly bpVal = signal({ accuracy: 50, alertness: 50, strafing: 50 });
   protected bpName = '';
-  protected bpClass = '';
   protected readonly blueprint = computed(
     () => this.a()?.blueprints.find((b) => b.id === this.bpId()) ?? this.a()?.blueprints[0] ?? null,
   );
@@ -511,7 +499,6 @@ export class UdtAcademyPage {
         name: this.bpName.trim(),
         skill: this.bpSkill(),
         traits: this.bpTraits(),
-        ...(this.bpClass ? { botClass: this.bpClass } : {}),
         look: lookBody(this.look()),
       });
       this.look.set(emptyLook());

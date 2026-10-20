@@ -12,7 +12,7 @@ import type {
   UdtTradePreview,
   UdtTrades,
 } from '../core/types';
-import { UdtCard, UdtNav, type CardBot } from '../core/udt';
+import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
 
 /**
  * Dream Team trades between managers: offers waiting for the manager and its own, a builder
@@ -135,121 +135,127 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
           @if (!partners().length) {
             <p class="muted small">{{ 'udt.trades.noPartners' | t }}</p>
           } @else {
-            <label
-              >{{ 'udt.trades.partner' | t }}
-              <select [ngModel]="partnerId()" (ngModelChange)="setPartner($event)" name="partner">
-                @for (p of partners(); track p.userId) {
-                  <option [ngValue]="p.userId">
-                    {{ p.tag }} {{ p.name }} ({{ p.ai ? ('udt.ai' | t) : p.manager }})
-                  </option>
-                }
-              </select>
-            </label>
-            <div class="builder">
-              <div class="col">
-                <h3>{{ 'udt.trades.youGive' | t }}</h3>
-                <div class="pick">
-                  @for (b of d.mine; track b.botId) {
-                    <button
-                      type="button"
-                      class="pb"
-                      [class.on]="give().includes(b.botId)"
-                      [disabled]="!!b.blocked"
-                      [attr.aria-pressed]="give().includes(b.botId)"
-                      [title]="b.blocked ? blockedText(b) : ''"
-                      (click)="toggle('give', b.botId)"
-                    >
-                      <udt-card [bot]="card(b)" [small]="true" />
-                      @if (b.blocked) {
-                        <span class="why">{{ blockedText(b) }}</span>
-                      }
-                    </button>
+            <div class="newoffer">
+              <label
+                >{{ 'udt.trades.partner' | t }}
+                <select [ngModel]="partnerId()" (ngModelChange)="setPartner($event)" name="partner">
+                  @for (p of partners(); track p.userId) {
+                    <option [ngValue]="p.userId">
+                      {{ p.tag }} {{ p.name }} ({{ p.ai ? ('udt.ai' | t) : p.manager }})
+                    </option>
                   }
+                </select>
+              </label>
+              <div class="builder">
+                <div class="col">
+                  <h3>{{ 'udt.trades.youGive' | t }}</h3>
+                  <div class="pick">
+                    @for (b of d.mine; track b.botId) {
+                      <button
+                        type="button"
+                        class="pb"
+                        [class.on]="give().includes(b.botId)"
+                        [disabled]="!!b.blocked"
+                        [attr.aria-pressed]="give().includes(b.botId)"
+                        [title]="b.blocked ? blockedText(b) : ''"
+                        (click)="toggle('give', b.botId)"
+                      >
+                        <udt-card
+                          [bot]="card(b)"
+                          [small]="true"
+                          [dim]="!!b.blocked"
+                          [note]="b.blocked ? blockedText(b) : null"
+                        />
+                      </button>
+                    }
+                  </div>
+                  <label
+                    >{{ 'udt.trades.addNeuro' | t }}
+                    <input
+                      type="number"
+                      min="0"
+                      step="10"
+                      name="giveNeuro"
+                      class="mono"
+                      [ngModel]="giveNeuro()"
+                      (ngModelChange)="setNeuro('give', $event)"
+                    />
+                  </label>
                 </div>
-                <label
-                  >{{ 'udt.trades.addNeuro' | t }}
-                  <input
-                    type="number"
-                    min="0"
-                    step="10"
-                    name="giveNeuro"
-                    class="mono"
-                    [ngModel]="giveNeuro()"
-                    (ngModelChange)="setNeuro('give', $event)"
-                  />
-                </label>
-              </div>
-              <div class="col">
-                <h3>{{ 'udt.trades.youGet' | t }}</h3>
-                <div class="pick">
-                  @for (b of partner()?.roster ?? []; track b.botId) {
-                    <button
-                      type="button"
-                      class="pb"
-                      [class.on]="take().includes(b.botId)"
-                      [disabled]="!!b.blocked"
-                      [attr.aria-pressed]="take().includes(b.botId)"
-                      [title]="b.blocked ? blockedText(b) : ''"
-                      (click)="toggle('take', b.botId)"
-                    >
-                      <udt-card [bot]="card(b, partner()?.tag)" [small]="true" />
-                      @if (b.blocked) {
-                        <span class="why">{{ blockedText(b) }}</span>
-                      }
-                    </button>
-                  }
+                <div class="col">
+                  <h3>{{ 'udt.trades.youGet' | t }}</h3>
+                  <div class="pick">
+                    @for (b of partner()?.roster ?? []; track b.botId) {
+                      <button
+                        type="button"
+                        class="pb"
+                        [class.on]="take().includes(b.botId)"
+                        [disabled]="!!b.blocked"
+                        [attr.aria-pressed]="take().includes(b.botId)"
+                        [title]="b.blocked ? blockedText(b) : ''"
+                        (click)="toggle('take', b.botId)"
+                      >
+                        <udt-card
+                          [bot]="card(b, partner()?.tag)"
+                          [small]="true"
+                          [dim]="!!b.blocked"
+                          [note]="b.blocked ? blockedText(b) : null"
+                        />
+                      </button>
+                    }
+                  </div>
+                  <label
+                    >{{ 'udt.trades.askNeuro' | t }}
+                    <input
+                      type="number"
+                      min="0"
+                      step="10"
+                      name="takeNeuro"
+                      class="mono"
+                      [ngModel]="takeNeuro()"
+                      (ngModelChange)="setNeuro('take', $event)"
+                    />
+                  </label>
                 </div>
-                <label
-                  >{{ 'udt.trades.askNeuro' | t }}
-                  <input
-                    type="number"
-                    min="0"
-                    step="10"
-                    name="takeNeuro"
-                    class="mono"
-                    [ngModel]="takeNeuro()"
-                    (ngModelChange)="setNeuro('take', $event)"
-                  />
-                </label>
               </div>
-            </div>
 
-            <div class="balance" [class.bad]="!!previewError()">
-              <div class="bars">
-                <div class="bl">
-                  <span class="kpi">{{ 'udt.trades.youGive' | t }}</span>
-                  <span class="udt-bar"><i [style.width.%]="share('give')"></i></span>
-                  <span class="mono">{{ giveValue() | neuro }}</span>
+              <div class="balance" [class.bad]="!!previewError()">
+                <div class="bars">
+                  <div class="bl">
+                    <span class="kpi">{{ 'udt.trades.youGive' | t }}</span>
+                    <span class="udt-bar"><i [style.width.%]="share('give')"></i></span>
+                    <span class="mono">{{ giveValue() | neuro }}</span>
+                  </div>
+                  <div class="bl">
+                    <span class="kpi">{{ 'udt.trades.youGet' | t }}</span>
+                    <span class="udt-bar"><i [style.width.%]="share('take')"></i></span>
+                    <span class="mono">{{ takeValue() | neuro }}</span>
+                  </div>
                 </div>
-                <div class="bl">
-                  <span class="kpi">{{ 'udt.trades.youGet' | t }}</span>
-                  <span class="udt-bar"><i [style.width.%]="share('take')"></i></span>
-                  <span class="mono">{{ takeValue() | neuro }}</span>
-                </div>
+                @if (previewError()) {
+                  <p class="small err">{{ previewError() }}</p>
+                } @else if (preview(); as p) {
+                  <p class="small muted">
+                    {{ 'udt.trades.feeYou' | t: { pct: p.feePct } }} {{ p.feeFrom | neuro }} ·
+                    {{ 'udt.trades.feeThem' | t }} {{ p.feeTo | neuro }}
+                  </p>
+                }
               </div>
-              @if (previewError()) {
-                <p class="small err">{{ previewError() }}</p>
-              } @else if (preview(); as p) {
-                <p class="small muted">
-                  {{ 'udt.trades.feeYou' | t: { pct: p.feePct } }} {{ p.feeFrom | neuro }} ·
-                  {{ 'udt.trades.feeThem' | t }} {{ p.feeTo | neuro }}
-                </p>
-              }
-            </div>
-            <label
-              >{{ 'udt.trades.message' | t }}
-              <input type="text" maxlength="200" name="msg" [(ngModel)]="message" />
-            </label>
-            <div class="row">
-              <button
-                type="button"
-                class="primary"
-                [disabled]="busy() || !preview() || !!previewError()"
-                (click)="send()"
-              >
-                {{ 'udt.trades.send' | t }}
-              </button>
-              <span class="muted small">{{ 'udt.trades.sendHint' | t }}</span>
+              <label
+                >{{ 'udt.trades.message' | t }}
+                <input type="text" maxlength="200" name="msg" [(ngModel)]="message" />
+              </label>
+              <div class="row">
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="busy() || !preview() || !!previewError()"
+                  (click)="send()"
+                >
+                  {{ 'udt.trades.send' | t }}
+                </button>
+                <span class="muted small">{{ 'udt.trades.sendHint' | t }}</span>
+              </div>
             </div>
           }
         </section>
@@ -340,18 +346,29 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
       font-style: italic;
       color: var(--text-2);
     }
+    .newoffer {
+      display: grid;
+      gap: 16px;
+    }
+    .newoffer > label,
+    .col > label {
+      display: grid;
+      gap: 6px;
+    }
     .builder {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 20px;
-      margin: 14px 0;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
     }
     .col {
-      flex: 1 1 320px;
       min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 12px;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: #0c0f16;
     }
     .col h3 {
       margin: 0;
@@ -359,6 +376,7 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
     .pick {
       display: flex;
       flex-wrap: wrap;
+      align-items: flex-start;
       gap: 10px;
     }
     .pb {
@@ -368,37 +386,41 @@ import { UdtCard, UdtNav, type CardBot } from '../core/udt';
       border-radius: 18px;
       border: 2px solid transparent;
       background: transparent;
-      opacity: 0.75;
       transition:
         transform 0.15s,
-        opacity 0.15s;
+        border-color 0.15s;
+    }
+    .pb:hover:not(:disabled) {
+      border-color: var(--line);
     }
     .pb.on {
-      opacity: 1;
       border-color: var(--udt);
       box-shadow: 0 0 0 4px rgba(178, 107, 255, 0.18);
       transform: translateY(-3px);
     }
-    .pb:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-    .why {
+    .pb.on::after {
+      content: '✓';
       position: absolute;
-      left: 8px;
-      right: 8px;
-      bottom: 10px;
-      padding: 2px 4px;
-      border-radius: 4px;
-      background: rgba(7, 8, 12, 0.85);
-      font-size: 0.66rem;
-      text-align: center;
+      top: -8px;
+      right: -8px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: var(--udt);
+      color: #0b0614;
+      font-weight: 800;
+      font-size: 0.8rem;
+    }
+    .pb:disabled {
+      cursor: not-allowed;
+      opacity: 1;
     }
     .balance {
       padding: 12px;
       border-radius: var(--radius-sm);
       border: 1px solid var(--border);
-      margin-bottom: 12px;
     }
     .balance.bad {
       border-color: rgba(255, 122, 135, 0.45);
@@ -527,7 +549,9 @@ export class UdtTradesPage {
   }
 
   protected card(b: UdtPartnerBot, tag?: string): CardBot {
-    return { ...b, tag };
+    // Own bots: the tag is the part of the game name in front of the bot's name.
+    const own = b.gameName.endsWith(b.name) ? b.gameName.slice(0, -b.name.length) : '';
+    return rosterCard(b, tag ?? own);
   }
 
   protected blockedText(b: UdtPartnerBot) {
