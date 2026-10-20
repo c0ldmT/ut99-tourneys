@@ -2,11 +2,12 @@
  * Bot duel simulator: the mod's skill curve and the Dream Team traits in 1v1 meetings
  * (calibration of the skill levels against the bots' own values).
  *
- *   pnpm --filter @tourney/api bot:sim [--curve scripts/bot-curves/proposal-v1.json]
+ *   pnpm --filter @tourney/api bot:sim [--curve scripts/bot-curves/my-try.json]
  *     [--base other.json] [--duels 300] [--seed 1] [--out bot-sim-report.html]
  *
  * "Ist" is the curve in mods/ut99-tournament/Classes/TourneySkillCurve.uc (or --base, rows on top
- * of it); --curve gives the rows of the proposal (on top of Ist). Rows a file leaves out stay as
+ * of it); --curve gives the rows of a proposal (on top of Ist; without it the report shows Ist
+ * only). `bot-curves/proposal-v1.json` is the curve of mod 0.14.0. Rows a file leaves out stay as
  * they are. The report compares both: guard rails, level matrix, accuracy heat map, what each
  * building block adds to a level, reaction from an ambush, hit rates, traits, a model check.
  */
@@ -38,7 +39,7 @@ import {
 const here = path.dirname(fileURLToPath(import.meta.url));
 const { values } = parseArgs({
   options: {
-    curve: { type: 'string', default: path.join(here, 'bot-curves', 'proposal-v1.json') },
+    curve: { type: 'string' },
     base: { type: 'string' },
     duels: { type: 'string', default: '400' },
     seed: { type: 'string', default: '1' },
@@ -52,11 +53,12 @@ const seed = Number(values.seed) || 1;
 const ucFile = path.resolve(here, '../../../mods/ut99-tournament/Classes/TourneySkillCurve.uc');
 let ist = existsSync(ucFile) ? curveFromUc(readFileSync(ucFile, 'utf8')) : CURRENT_CURVE;
 if (values.base) ist = withCurve(ist, readJson(values.base));
-const proposal = withCurve(ist, readJson(values.curve));
-const curves = [
+const proposal = values.curve ? withCurve(ist, readJson(values.curve)) : ist;
+const curves: { key: string; name: string; curve: SkillCurve }[] = [
   { key: 'ist', name: 'Ist (Mod)', curve: ist },
-  { key: 'neu', name: `Vorschlag (${path.basename(values.curve)})`, curve: proposal },
-] as const;
+];
+if (values.curve)
+  curves.push({ key: 'vgl', name: `Kurve ${path.basename(values.curve)}`, curve: proposal });
 
 const started = Date.now();
 const bot = (level: number, acc = 50, more: Partial<DuelBotSpec> = {}): DuelBotSpec => ({
@@ -90,7 +92,7 @@ interface CurveRun {
   weaponHits: Record<string, number>[];
   mario: DuelSeries;
   robust: { g1: number[]; g2: number[] };
-  traits: { label: string; win: number }[];
+  traits: { label: string; win: number; ambush: number }[];
 }
 
 const runs = curves.map(({ curve }) => {
@@ -132,21 +134,22 @@ const runs = curves.map(({ curve }) => {
     g2: STEPS.map((L) => win(bot(L, 100), bot(L + 1, 0), half)),
   };
   const ref = bot(3);
-  const traits: { label: string; win: number }[] = [];
+  const amb = opts(curve, { setup: 'ambush' });
+  const survives = (b: DuelBotSpec) => 1 - win(bot(4), b, amb);
+  const ambRef = survives(ref);
+  const traits: { label: string; win: number; ambush: number }[] = [];
+  const state = (label: string, more: Partial<DuelBotSpec>) => {
+    const b = bot(3, 50, more);
+    traits.push({ label, win: win(b, ref, o), ambush: survives(b) - ambRef });
+  };
   for (const t of TRAITS.filter((x) => x.category === 'values' || x.category === 'body')) {
     if (t.code === 'gun-nut') continue;
-    traits.push({
-      label: t.code,
-      win: win(bot(3, 50, { traits: [{ code: t.code as TraitCode }] }), ref, o),
-    });
+    state(t.code, { traits: [{ code: t.code as TraitCode }] });
   }
-  traits.push({ label: 'müde (Ausdauer)', win: win(bot(3, 50, { tired: true }), ref, o) });
-  for (const ph of ['rookie', 'peak', 'decline'] as const)
-    traits.push({ label: `Karriere: ${ph}`, win: win(bot(3, 50, { phase: ph }), ref, o) });
-  traits.push({
-    label: 'eigenes Modell (Skaarj, NaliCow …)',
-    win: win(bot(3, 50, { stock: false }), ref, o),
-  });
+  state('müde (Ausdauer)', { tired: true });
+  for (const ph of ['rookie', 'peak', 'decline'] as const) state(`Karriere: ${ph}`, { phase: ph });
+  state('eigenes Modell (Skaarj, NaliCow …)', { stock: false });
+  state('zum Vergleich: eine Stufe mehr', { level: 4 });
   const run: CurveRun = {
     g1,
     g2,
@@ -176,7 +179,7 @@ for (const [i, c] of curves.entries()) {
 // --- Report --------------------------------------------------------------------------------------
 const G1_LO = 0.6;
 const G1_HI = 0.72;
-const G2_MAX = 0.55;
+const G2_MAX = 0.58;
 const step = (L: number) => `${LEVEL_NAMES[L + 1]} > ${LEVEL_NAMES[L]}`;
 const g1ok = (s: DuelSeries) => s.winDecided >= G1_LO && s.winDecided <= G1_HI;
 const ok = (b: boolean) => `<span class="${b ? 'ok' : 'bad'}">${b ? '✓' : '✗'}</span>`;
@@ -238,7 +241,10 @@ const weaponHtml = (r: CurveRun) =>
   ).join('')}</table>`;
 
 const traitRows = runs[0]!.traits
-  .map((t, i) => `<tr><td>${t.label}</td>${cells((r) => cell(r.traits[i]!.win, true))}</tr>`)
+  .map(
+    (t, i) =>
+      `<tr><td>${t.label}</td>${cells((r) => cell(r.traits[i]!.win, true))}${both((r) => pct(r.traits[i]!.ambush, true))}</tr>`,
+  )
   .join('');
 
 const marioWeapons = WEAPONS.map(
@@ -303,8 +309,8 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${partsHtml(runs[i]!
 <div class="two">${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${weaponHtml(runs[i]!)}</div>`).join('')}</div>
 
 <h2>Traits und Zustände (Skilled/50 mit gegen ohne)</h2>
-<div class="card"><p class="muted">Werte-Traits über die Website-Regeln (effectiveValues), Körper-Traits wie im Mod. Nicht im Duell: Adrenaline (erst nach einem Kill), Verhaltens-Traits (Entscheidungen auf der Map), Lieblingswaffe. Phoenix wirkt im Spiel nur einmal pro Match, im Duell daher überschätzt. Ein Werte-Trait von +15 Accuracy kann nach G2 höchstens etwa 0,15 Stufen wert sein.</p>
-<table><tr><th>Trait / Zustand</th>${curves.map((c) => `<th>${c.name}</th>`).join('')}</tr>${traitRows}</table></div>
+<div class="card"><p class="muted">Werte-Traits über die Website-Regeln (effectiveValues), Körper-Traits wie im Mod. Nicht im Duell: Adrenaline (erst nach einem Kill), Verhaltens-Traits (Entscheidungen auf der Map), Lieblingswaffe. Phoenix wirkt im Spiel nur einmal pro Match, im Duell daher überschätzt. Werte-Traits wirken seit Mod 0.14.0 als Vorteile auf der Kurve (Zielfehler, Reaktion, Sicht, Drehen, Ausweichen). Spalten: Siegquote im offenen Duell gegen denselben Bot ohne Trait, und Punkte mehr Überleben beim Überfall (wo Wahrnehmung zählt).</p>
+<table><tr><th>Trait / Zustand</th>${curves.map((c) => `<th>Duell ${c.key}</th>`).join('')}${curves.map((c) => `<th>Überfall ${c.key}</th>`).join('')}</tr>${traitRows}</table></div>
 
 <h2>Marios Fall je Waffe: Skill 3/Acc 80 gegen Skill 5/Acc 45</h2>
 <div class="card"><table><tr><th>Waffe</th>${curves.map((c) => `<th>${c.name}</th>`).join('')}</tr>${marioWeapons}</table></div>
@@ -313,7 +319,7 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${partsHtml(runs[i]!
 <div class="card"><p class="muted">Alle Zielfehler × 0,5 (kein Kurvenwert, nur Prüfung, ob die Schlüsse am Modell hängen). Kürzere Kämpfe machen Reaktion und Drehen wichtiger.</p>
 <table><tr><th>Schritt</th>${curves.map((c) => `<th>G1 ${c.key}</th>`).join('')}${curves.map((c) => `<th>G2 ${c.key}</th>`).join('')}</tr>${robustRows}</table></div>
 
-<h2>Kurve: Ist → Vorschlag</h2>
+<h2>Kurve: Ist → Vergleich</h2>
 <div class="card"><table class="curve"><tr><th>Zeile</th><th>Mod</th>${LV.map((L) => `<th>${short(L)}</th>`).join('')}</tr>${curveRows}</table></div>
 
 <h2>Modell und Annahmen</h2>

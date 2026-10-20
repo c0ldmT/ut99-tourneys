@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   cannotAssign,
   craftCost,
+  edgeScore,
   effectiveValues,
+  gameEdge,
+  NO_EDGE,
   levelOf,
   modCodes,
   managerEffects,
@@ -46,14 +49,29 @@ describe('levels and slots', () => {
 });
 
 describe('values traits', () => {
-  it('raises the values on the 0..100 scale and clamps them', () => {
-    const e = effectiveValues(3, { accuracy: 0.95, alertness: 0 }, [
+  it('raises strafing and camping; aim and perception traits leave the values alone', () => {
+    const e = effectiveValues(3, { accuracy: 0.95, alertness: 0, strafing: 0.9 }, [
       { code: 'steady-hand' },
       { code: 'watchdog' },
+      { code: 'side-stepper' },
+      { code: 'patient-hunter' },
     ]);
-    expect(e.values.accuracy).toBe(1);
-    expect(e.values.alertness).toBe(0.2);
+    expect(e.values.accuracy).toBe(0.95);
+    expect(e.values.alertness).toBe(0);
+    expect(e.values.strafing).toBe(1);
+    expect(e.values.camping).toBe(0.8);
     expect(e.skill).toBe(3);
+  });
+
+  it('turns values traits into edges on the skill curve', () => {
+    expect(gameEdge([])).toEqual(NO_EDGE);
+    const e = gameEdge([{ code: 'eagle-eye' }, { code: 'steady-hand' }, { code: 'watchdog' }]);
+    expect(e.aim).toBeCloseTo(0.86 * 0.93);
+    expect(e.react).toBeCloseTo(0.5);
+    expect(e.view).toBe(40);
+    expect(gameEdge([{ code: 'side-stepper' }]).dodge).toBe(2);
+    // The market value moves as much as with the old value boosts (+15 accuracy).
+    expect(edgeScore([{ code: 'eagle-eye' }])).toBeCloseTo(0.45 * 0.15);
   });
 
   it('gives the gun nut its weapon and the bouncer its jumps', () => {
@@ -115,11 +133,15 @@ describe('packs', () => {
     expect(TRAITS.length).toBe(33);
   });
 
-  it('gives the mod the body trait codes and values them', () => {
-    expect(modCodes([{ code: 'phoenix' }, { code: 'watchdog' }, { code: 'revenant' }])).toEqual([
-      'px',
-      'rg',
-    ]);
+  it('gives the mod the game trait codes and values them', () => {
+    expect(
+      modCodes([
+        { code: 'phoenix' },
+        { code: 'watchdog' },
+        { code: 'revenant' },
+        { code: 'bouncer' },
+      ]),
+    ).toEqual(['px', 'wd', 'rg']);
     expect(traitValueFactor(4, {}, [{ code: 'phoenix' }])).toBeCloseTo(1.2);
   });
 });

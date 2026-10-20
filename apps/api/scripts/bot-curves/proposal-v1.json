@@ -1,7 +1,7 @@
 {
-  "$comment": "Proposal v1 (21.10.2026): rows that differ from mod 0.13.0. accGain, sightReact and fireDelay are not in the mod yet. accGain = share x (1 - acc): the bot's own accuracy changes its aim error by up to +-16 % (Novice) to +-32 % (Inhuman). Godlike gets a negative base accuracy: its internal skill 3 alone is a big step.",
+  "$comment": "Curve v1 (21.10.2026), in mod 0.14.0: the rows that differ from mod 0.13.0. accGain = share x (1 - acc): the bot's own accuracy changes its aim error by up to +-19 % (Novice) to +-35 % (Inhuman). Godlike gets a negative base accuracy: its internal skill 3 alone is a big step.",
   "acc": [-1.8, -1.35, -0.95, -0.6, -0.3, 0, 0.12, -0.2],
-  "accGain": [0.448, 0.376, 0.332, 0.32, 0.325, 0.3, 0.282, 0.36],
+  "accGain": [0.532, 0.447, 0.39, 0.336, 0.364, 0.33, 0.308, 0.396],
   "fireDelay": [0.4, 0.3, 0.2, 0.12, 0.05, 0, 0, 0],
   "sightReact": [0.6, 0.48, 0.37, 0.28, 0.2, 0.13, 0.07, 0.03],
   "react": [1.0, 0.85, 0.7, 0.55, 0.4, 0.3, 0.2, 0.12],

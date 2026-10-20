@@ -7,7 +7,7 @@
  * numbers are to be read relative to each other. Deterministic for a seed.
  */
 import { PHASE_EFFECT, type CareerPhase } from './career.js';
-import { effectiveValues, modCodes, type TraitOnBot } from './traits.js';
+import { effectiveValues, gameEdge, modCodes, type GameEdge, type TraitOnBot } from './traits.js';
 
 // ---------- the skill curve ----------
 
@@ -44,14 +44,14 @@ export interface SkillCurve {
   /** Seconds it fires at a target it no longer sees (not in a duel, kept for the file). */
   blind: CurveRow;
   blindSplash: CurveRow;
-  /**
-   * Not in the mod yet (1 = today): how much of the bot's own accuracy value counts at this
-   * level (the website's accuracy × this).
-   */
+  /** Mod 0.14.0: how much of the bot's own accuracy value counts at this level (value × this). */
   accGain: CurveRow;
-  /** Not in the mod yet (0 = today): seconds from seeing or hearing the enemy to turning. */
+  /** Mod 0.14.0: seconds from seeing or hearing a new enemy to turning and firing. */
   sightReact: CurveRow;
-  /** Not in the mod yet (0 = today): pauses between shots, as a share of the weapon's rate. */
+  /**
+   * Mod 0.14.0: fire pauses; the bot holds fire D / (1 + D) of the time, here as longer pauses
+   * between shots (weapon rate × (1 + D)).
+   */
   fireDelay: CurveRow;
 }
 
@@ -74,28 +74,31 @@ export const CURVE_PROPS: Readonly<Partial<Record<CurveKey, string>>> = {
   lag: 'TLag',
   blind: 'TBlind',
   blindSplash: 'TBlindSplash',
+  accGain: 'TAccGain',
+  sightReact: 'TSightReact',
+  fireDelay: 'TFireDelay',
 };
 
-/** Mod 0.13.0 (TourneySkillCurve defaultproperties; a test compares them with the .uc file). */
+/** Mod 0.14.0, curve v1 (TourneySkillCurve defaultproperties; a test compares them with the .uc file). */
 export const CURRENT_CURVE: SkillCurve = {
-  speed: [0.7, 0.77, 0.83, 0.9, 1, 1, 1, 1],
-  yaw: [34000, 38000, 42000, 46000, 50000, 58000, 68000, 100000],
+  speed: [0.7, 0.76, 0.82, 0.88, 0.94, 1, 1, 1],
+  yaw: [26000, 30000, 34000, 39000, 45000, 55000, 68000, 100000],
   fov: [100, 110, 120, 130, 140, 155, 180, 200],
-  acc: [-1.2, -0.9, -0.6, -0.35, 0, 0, 0, 0],
+  acc: [-1.8, -1.35, -0.95, -0.6, -0.3, 0, 0.12, -0.2],
   hear: [0.8, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.2],
   flinch: [0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0, 0],
   duck: [0.1, 0.15, 0.22, 0.3, 0.33, 0.55, 0.77, 0.95],
   tact: [0.05, 0.08, 0.12, 0.16, 0.2, 0.24, 0.28, 0.3],
   runDodge: [6, 5, 4, 3, 2.2, 1.5, 0.8, 0.4],
-  react: [0.7, 0.6, 0.5, 0.4, 0.3, 0.25, 0.18, 0.12],
+  react: [1.0, 0.85, 0.7, 0.55, 0.4, 0.3, 0.2, 0.12],
   right: [0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, 1],
   driftHz: [0.8, 1, 1.2, 1.4, 1.7, 2, 2.4, 3],
   lag: [0.1, 0.08, 0.07, 0.06, 0.04, 0.03, 0.02, 0.01],
   blind: [1.5, 1.3, 1.1, 1, 0.9, 0.8, 0.7, 0.6],
   blindSplash: [1, 1, 1, 1, 1.2, 1.2, 1.5, 1.5],
-  accGain: [1, 1, 1, 1, 1, 1, 1, 1],
-  sightReact: [0, 0, 0, 0, 0, 0, 0, 0],
-  fireDelay: [0, 0, 0, 0, 0, 0, 0, 0],
+  accGain: [0.532, 0.447, 0.39, 0.336, 0.364, 0.33, 0.308, 0.396],
+  sightReact: [0.6, 0.48, 0.37, 0.28, 0.2, 0.13, 0.07, 0.03],
+  fireDelay: [0.4, 0.3, 0.2, 0.12, 0.05, 0, 0, 0],
 };
 
 export const LEVEL_NAMES = [
@@ -273,6 +276,8 @@ export interface ResolvedBot {
   jumpy: boolean;
   stock: boolean;
   body: { armour: boolean; thick: boolean; glass: boolean; vampire: boolean; phoenix: boolean };
+  /** Values traits in the game (mod 0.14.0): multipliers on the curve. */
+  edge: GameEdge;
 }
 
 /** The values the game gets for a bot (traits, tiredness and career phase as the website sends). */
@@ -305,6 +310,7 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
       vampire: codes.has('vp'),
       phoenix: codes.has('px'),
     },
+    edge: gameEdge(b.traits ?? []),
   };
 }
 
@@ -494,7 +500,8 @@ function fighter(
 
 /** The enemy in the bot's view (Bot.SetPeripheralVision with the curve's BaseAlertness). */
 function sees(f: Fighter, c: SkillCurve): boolean {
-  const pv = Math.min(0.9, Math.cos(((c.fov[f.lv.view]! / 2) * Math.PI) / 180) - f.r.alertness);
+  const fov = Math.min(360, c.fov[f.lv.view]! + f.r.edge.view);
+  const pv = Math.min(0.9, Math.cos(((fov / 2) * Math.PI) / 180) - f.r.alertness);
   return Math.cos(toRad(f.off)) > pv;
 }
 
@@ -584,7 +591,7 @@ function play(
     if (x.hp <= 0 || e.hp <= 0) return;
     // Awareness: sight (polled), hearing the enemy's shots of the last step.
     if (!x.aware) {
-      if (sees(x, c)) becomeAware(x, t, rng() * 0.1 + c.sightReact[x.lv.react]!);
+      if (sees(x, c)) becomeAware(x, t, rng() * 0.1 + c.sightReact[x.lv.react]! * x.r.edge.react);
       else if (e.shotSeq > x.heardSeq) {
         x.heardSeq = e.shotSeq;
         const p =
@@ -592,7 +599,7 @@ function play(
           c.hear[x.lv.view]! *
           (1 + 0.3 * x.r.alertness) *
           Math.min(1.5, Math.max(0.5, 1200 / D));
-        if (rng() < p) becomeAware(x, t, 0.1 + c.sightReact[x.lv.react]!);
+        if (rng() < p) becomeAware(x, t, 0.1 + c.sightReact[x.lv.react]! * x.r.edge.react);
       }
       if (!x.aware) {
         // Roaming: the view swings with the path.
@@ -605,11 +612,11 @@ function play(
       if (t >= x.wrongAt) {
         x.wrongAt = Infinity;
         x.wrongOff = 9000 + rng() * 9000;
-        x.wrongUntil = t + c.react[x.lv.react]!;
+        x.wrongUntil = t + c.react[x.lv.react]! * x.r.edge.react;
         x.engagedAt = Infinity;
       }
       const goal = t < x.wrongUntil ? x.wrongOff : 0;
-      const turn = c.yaw[x.lv.turn]! * STEP;
+      const turn = c.yaw[x.lv.turn]! * x.r.edge.turn * STEP;
       x.off = x.off > goal ? Math.max(goal, x.off - turn) : Math.min(goal, x.off + turn);
       if (x.off === 0 && x.engagedAt === Infinity) x.engagedAt = t + 0.2;
     }
@@ -618,7 +625,7 @@ function play(
     if (t >= x.duckRollAt) {
       x.duckRollAt = t + 1;
       const P = 0.33 + 0.22 * internal(x.lv.dodge);
-      x.duckWindow = rng() * P < c.duck[x.lv.dodge]!;
+      x.duckWindow = rng() * P < c.duck[x.lv.dodge]! * x.r.edge.dodge;
     }
     // Fire.
     if (t >= x.engagedAt && x.off < FIRE_CONE && t >= x.nextShot && t >= x.flinchUntil) fire(i, t);
@@ -643,13 +650,14 @@ function play(
           // Dodge in the fighting move: none with the rocket launcher (splash); jumpy bots and
           // skill 1+ the game's own 35 % (× chance skill × rand > 0.4), below the curve's TTact.
           const Sd = internal(x.lv.dodge);
-          const pd = w.splash
-            ? 0
-            : x.r.jumpy
-              ? 0.35
-              : Sd >= 1
-                ? 0.35 * Math.max(0, 1 - 0.4 / Sd)
-                : c.tact[x.lv.dodge]!;
+          const pd =
+            (w.splash
+              ? 0
+              : x.r.jumpy
+                ? 0.35
+                : Sd >= 1
+                  ? 0.35 * Math.max(0, 1 - 0.4 / Sd)
+                  : c.tact[x.lv.dodge]!) * x.r.edge.dodge;
           if (rng() < pd) dodge(x, t, Math.sign(x.strafeDir));
         } else {
           x.vy = 0;
@@ -687,6 +695,7 @@ function play(
       if (t - x.engagedAt < 2.5 - S) E *= 2;
     }
     const acc = c.acc[L]! + c.accGain[L]! * x.r.accuracy;
+    E *= x.r.edge.aim;
     if (x.r.stock) E *= Math.max(0, 1 - acc);
     else if (w.speed === 0 || acc < 0) E -= E * acc;
     return Math.max(0, E * aimModel);
@@ -811,7 +820,7 @@ function play(
       if (flinched) v.turnAt = v.flinchUntil;
       else if (internal(L) > 3 * rng()) v.turnAt = t + 0.05;
       else {
-        v.turnAt = t + c.react[L]! * (0.8 + 0.4 * rng());
+        v.turnAt = t + c.react[L]! * v.r.edge.react * (0.8 + 0.4 * rng());
         if (rng() >= c.right[L]!) v.wrongAt = v.turnAt;
       }
     }

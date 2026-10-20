@@ -1,5 +1,5 @@
 //=============================================================================
-// TourneySkillCurve (mod 0.13.0)
+// TourneySkillCurve (mod 0.13.0, curve v1 and trait edges in 0.14.0)
 // One skill curve for all tournament bots instead of UT's novice switch. UT runs
 // the levels Novice..Skilled as "novice" bots (half speed, narrow view, no dodging,
 // no leading, random waiting, less damage against players) and Adept..Godlike as
@@ -15,6 +15,10 @@
 //   for dodging projectiles), dodges in fights below Masterful, dodges while running,
 //   no blind fire at walls for long, a hit from out of view turns the bot.
 // - Hits: fewer flinches (the hit animation that stops the bot).
+// - 0.14.0: the bot's own accuracy counts by level (TAccGain), a pause after seeing a new
+//   enemy (TSightReact: no turning, no firing) and fire pauses (TFireDelay); Dream Team
+//   values traits as edges (aim error, reaction, view, turn rate, dodges; codes in "btrt").
+//   Tuned with the duel simulator (pnpm --filter @tourney/api bot:sim, decision 157).
 // - SmartStockBots: its MoveWithDodge (it sets bCanDuck every 0.1 s) and
 //   FixMinigun (doubles the minigun's aim error) are switched off at run time;
 //   the ini stays untouched, everything else of it keeps working.
@@ -45,6 +49,13 @@ var byte CTurnTries[32];
 var float CDodgeAt[32];           // no dodge while running before this time
 var byte CInTact[32];             // 1: in the current fighting move (TacticalMove) already rolled
 var float CBlindLog[32];
+// Trait edges (mod 0.14.0): aim error x, reaction times x, view + degrees, turn rate x, dodges x.
+var float CEAim[32], CEReact[32], CEView[32], CETurn[32], CEDodge[32];
+var Pawn CLastEnemy[32];          // the enemy it last reacted to (a new one: TSightReact)
+var Pawn CPrevEnemy[32];          // the one before (switching back costs no reaction)
+var float CFreezeUntil[32];       // no turning before this time (reaction to a new enemy)
+var float CHoldUntil[32];         // no firing before this time (reaction, fire pause)
+var float CReactAt[32];           // when it last took in a new enemy (at most every 1.5 s)
 
 // The curve, index = level 0..7 (Novice, Average, Experienced, Skilled, Adept, Masterful,
 // Inhuman, Godlike). See docs/decisions.md 149.
@@ -63,6 +74,9 @@ var float TDriftHz[8];            // aim error: how often it picks a new directi
 var float TLag[8];                // aim: seconds it is behind a moving target
 var float TBlind[8];              // seconds it fires at a target it no longer sees
 var float TBlindSplash[8];        // extra seconds with splash weapons near the last seen spot
+var float TAccGain[8];            // share of the bot's own accuracy that counts (0.14.0)
+var float TSightReact[8];         // seconds from a new enemy to turning and firing (0.14.0)
+var float TFireDelay[8];          // fire pauses: share of the time it holds fire (0.14.0)
 
 function Init(TourneyCore C)
 {
@@ -119,6 +133,12 @@ function int Slot(Bot B, bool bCreate)
 	if (!bCreate || Free < 0)
 		return -1;
 	CBot[Free] = B;
+	SetEdges(Free, 0);
+	CLastEnemy[Free] = None;
+	CPrevEnemy[Free] = None;
+	CFreezeUntil[Free] = 0;
+	CHoldUntil[Free] = 0;
+	CReactAt[Free] = -10;
 	CHitBy[Free] = None;
 	CTurnTries[Free] = 0;
 	CDodgeAt[Free] = 0;
@@ -164,8 +184,9 @@ function TraitValues(Bot B)
 }
 
 // After InitializeSkill and the bot's traits (the core's ApplyBotConfig). Lv: tournament
-// skill 0..7, -1 = as before (a new bot: from its game skill).
-function Setup(Bot B, int Lv)
+// skill 0..7, -1 = as before (a new bot: from its game skill). Edges: the Dream Team values
+// traits of the bot (bits, TourneyCore.ParseValueTraits).
+function Setup(Bot B, int Lv, int Edges)
 {
 	local int s;
 	local bool bNew;
@@ -186,6 +207,13 @@ function Setup(Bot B, int Lv)
 	CTraitJumpy[s] = 0;
 	if (B.bJumpy)
 		CTraitJumpy[s] = 1;
+	SetEdges(s, Edges);
+	if (bNew)
+	{
+		CLastEnemy[s] = None;
+		CFreezeUntil[s] = 0;
+		CHoldUntil[s] = 0;
+	}
 	SetCurve(B);
 	if (bOn)
 		ApplyBase(B, s);
@@ -206,6 +234,64 @@ function SetCurve(Bot B)
 		TourneyBossBot(B).Curve = self;
 }
 
+// The values traits as edges on the curve (the same numbers as gameEdge in packages/udt
+// traits.ts): 1 steady hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16 eagle eye,
+// 32 all-rounder.
+function SetEdges(int s, int Bits)
+{
+	CEAim[s] = 1.0;
+	CEReact[s] = 1.0;
+	CEView[s] = 0;
+	CETurn[s] = 1.0;
+	CEDodge[s] = 1.0;
+	if ((Bits & 1) != 0)
+		CEAim[s] *= 0.93;
+	if ((Bits & 2) != 0)
+	{
+		CEReact[s] *= 0.5;
+		CEView[s] += 40;
+		CETurn[s] *= 1.2;
+	}
+	if ((Bits & 4) != 0)
+		CEDodge[s] *= 2.0;
+	if ((Bits & 8) != 0)
+		CEAim[s] *= 0.88;
+	if ((Bits & 16) != 0)
+		CEAim[s] *= 0.86;
+	if ((Bits & 32) != 0)
+	{
+		CEAim[s] *= 0.88;
+		CEReact[s] *= 0.75;
+		CEView[s] += 20;
+		CETurn[s] *= 1.05;
+		CEDodge[s] *= 1.3;
+	}
+}
+
+// Turn rate of slot s now (0 while it takes in a new enemy).
+function int YawOf(int s)
+{
+	if (Level.TimeSeconds < CFreezeUntil[s])
+		return 0;
+	return int(TYaw[CLv[s]] * CETurn[s]);
+}
+
+// The tournament's bot classes ask before they fire (reaction to a new enemy, fire pauses).
+function bool HoldFire(Bot B)
+{
+	local int s;
+	if (!bOn || B == None || B.Enemy == None || B.bComboPaused || B.bFiringPaused || B.bShootSpecial)
+		return false;
+	if (B.Weapon != None && B.Weapon.bMeleeWeapon)
+		return false;
+	s = Slot(B, false);
+	if (s < 0)
+		return false;
+	// The enemy may be new since the last tick (SeePlayer fires at once).
+	SightReact(B, s);
+	return Level.TimeSeconds < CHoldUntil[s];
+}
+
 // The game's peripheral vision for the full AI at skill S (Bot.SetPeripheralVision).
 function float GamePV(float S)
 {
@@ -222,7 +308,7 @@ function ApplyBase(Bot B, int s)
 	B.bNovice = false;
 	B.bThreePlus = false;
 	B.Skill = FMax(0, L - 4);
-	PV = Cos(TFov[L] * Pi / 360.0);
+	PV = Cos(FMin(360, TFov[L] + CEView[s]) * Pi / 360.0);
 	// SetPeripheralVision (also from the respawn's ReSetSkill) takes GamePV - BaseAlertness: this gives the curve's
 	// view, the trait's alertness widens or narrows it as before.
 	B.BaseAlertness = GamePV(B.Skill) - PV + CTraitAlert[s];
@@ -231,10 +317,12 @@ function ApplyBase(Bot B, int s)
 	B.bLeadTarget = true;
 	B.ReFireRate = B.default.ReFireRate * (1 - 0.25 * B.Skill);
 	B.SetPeripheralVision();
-	B.Accuracy = TAcc[L] + CTraitAcc[s];
+	// The bot's own accuracy counts by level; the aim edge scales the remaining error
+	// (the aim error is multiplied by 1 - Accuracy).
+	B.Accuracy = 1.0 - CEAim[s] * (1.0 - (TAcc[L] + TAccGain[L] * CTraitAcc[s]));
 	B.HearingThreshold = FMax(0.05, B.default.HearingThreshold + 0.5 * (1.0 - THear[L]));
 	B.MaxDesiredSpeed = TSpeed[L];
-	B.RotationRate.Yaw = TYaw[L];
+	B.RotationRate.Yaw = YawOf(s);
 	CWindowAt[s] = 0;
 }
 
@@ -339,6 +427,10 @@ function Timer()
 			CHitBy[s] = None;
 			CWindowAt[s] = 0; // the respawn's ReSetSkill sets bCanDuck: roll anew at once
 			CInTact[s] = 0;
+			CLastEnemy[s] = None;
+			CPrevEnemy[s] = None;
+			CFreezeUntil[s] = 0;
+			CHoldUntil[s] = 0;
 			continue;
 		}
 		BotStep(B, s);
@@ -361,8 +453,9 @@ function BotStep(Bot B, int s)
 	}
 	if (B.MaxDesiredSpeed != TSpeed[L] && !B.IsInState('ImpactJumping'))
 		B.MaxDesiredSpeed = TSpeed[L];
-	if (B.RotationRate.Yaw != TYaw[L])
-		B.RotationRate.Yaw = TYaw[L];
+	SightReact(B, s);
+	if (B.RotationRate.Yaw != YawOf(s))
+		B.RotationRate.Yaw = YawOf(s);
 	// The game's minigun aim error (SmartStockBots doubled it before it was switched off).
 	if (minigun2(B.Weapon) != None && B.Weapon.AimError != B.Weapon.default.AimError)
 		B.Weapon.AimError = B.Weapon.default.AimError;
@@ -372,10 +465,11 @@ function BotStep(Bot B, int s)
 	{
 		CWindowAt[s] = Now + 1.0;
 		P = 0.33 + 0.22 * B.Skill;
-		bDuck = FRand() * P < TDuck[L];
+		bDuck = FRand() * P < TDuck[L] * CEDodge[s];
 		B.bCanDuck = bDuck;
 	}
 	FightDodge(B, s);
+	FirePause(B, s);
 	BlindFire(B, s);
 	TurnToHit(B, s);
 	RunDodge(B, s);
@@ -387,6 +481,7 @@ function BotStep(Bot B, int s)
 function FightDodge(Bot B, int s)
 {
 	local vector Y;
+	local float P;
 	if (!B.IsInState('TacticalMove'))
 	{
 		CInTact[s] = 0;
@@ -395,11 +490,23 @@ function FightDodge(Bot B, int s)
 	if (CInTact[s] == 1)
 		return;
 	CInTact[s] = 1;
-	if (B.Skill >= 1 || CTraitJumpy[s] == 1 || B.Enemy == None || B.Physics != PHYS_Walking)
+	if (B.Enemy == None || B.Physics != PHYS_Walking)
 		return;
 	if (B.Weapon != None && B.Weapon.bRecommendSplashDamage)
 		return;
-	if (FRand() >= TTact[CLv[s]])
+	// Below Masterful (not jumpy) the curve's chance; otherwise the game dodges by itself (35 %
+	// when jumpy or skill x rand > 0.4) and a dodge edge (side-stepper) adds the rest.
+	if (B.Skill < 1 && CTraitJumpy[s] == 0)
+		P = TTact[CLv[s]] * CEDodge[s];
+	else
+	{
+		if (CTraitJumpy[s] == 1)
+			P = 0.35;
+		else
+			P = 0.35 * FMax(0, 1 - 0.4 / B.Skill);
+		P = P * (CEDodge[s] - 1.0);
+	}
+	if (P <= 0 || FRand() >= P)
 		return;
 	Y = Normal(B.Enemy.Location - B.Location) Cross vect(0,0,1);
 	Y.Z = 0;
@@ -409,6 +516,62 @@ function FightDodge(Bot B, int s)
 		B.TryToDuck(-Y, true);
 	else
 		B.TryToDuck(Y, false);
+}
+
+// A new enemy: the bot takes it in first (no turning, no firing) for TSightReact (x the
+// reaction edge, +-20 %). Switching back to the enemy before (the game returns to OldEnemy)
+// costs nothing, and so does a new one within 1.5 s of the last reaction (several enemies).
+function SightReact(Bot B, int s)
+{
+	local float T;
+	local Pawn E;
+	E = B.Enemy;
+	if (E == None || E == CLastEnemy[s])
+		return;
+	if (E == CPrevEnemy[s])
+	{
+		CPrevEnemy[s] = CLastEnemy[s];
+		CLastEnemy[s] = E;
+		return;
+	}
+	CPrevEnemy[s] = CLastEnemy[s];
+	CLastEnemy[s] = E;
+	if (Level.TimeSeconds - CReactAt[s] < 1.5)
+		return;
+	T = TSightReact[CLv[s]] * CEReact[s] * (0.8 + 0.4 * FRand());
+	if (T <= 0)
+		return;
+	CReactAt[s] = Level.TimeSeconds;
+	CFreezeUntil[s] = Level.TimeSeconds + T;
+	CHoldUntil[s] = FMax(CHoldUntil[s], Level.TimeSeconds + T);
+	B.RotationRate.Yaw = 0;
+}
+
+// Fire pauses (TFireDelay D: it holds fire about D / (1 + D) of the time): while firing at an
+// enemy it stops now and then for 0.4-0.6 s (a pause starts with 0.2 * D per tick). While
+// held it does not fire; the stock classes also skip FireWeapon (HoldFire). Not with melee
+// weapons (releasing the impact hammer would fire it) or during a shock combo.
+function FirePause(Bot B, int s)
+{
+	local float D;
+	if (B.Enemy == None || B.bComboPaused || B.bFiringPaused || B.bShootSpecial)
+		return;
+	if (B.Weapon != None && B.Weapon.bMeleeWeapon)
+		return;
+	if (Level.TimeSeconds < CHoldUntil[s])
+	{
+		B.bFire = 0;
+		B.bAltFire = 0;
+		return;
+	}
+	D = TFireDelay[CLv[s]];
+	if (D <= 0 || (B.bFire == 0 && B.bAltFire == 0))
+		return;
+	if (FRand() >= 0.2 * D)
+		return;
+	CHoldUntil[s] = Level.TimeSeconds + 0.4 + 0.2 * FRand();
+	B.bFire = 0;
+	B.bAltFire = 0;
 }
 
 // No fire at a wall for long: a bot that has not seen its target for TBlind seconds stops
@@ -472,7 +635,7 @@ function TurnToHit(Bot B, int s)
 		B.DesiredRotation = R;
 		CHitBy[s] = P;
 		CTurnTries[s] = 1;
-		CTurnAt[s] = Level.TimeSeconds + TReact[L];
+		CTurnAt[s] = Level.TimeSeconds + TReact[L] * CEReact[s];
 		return;
 	}
 	CTurnTries[s] = 0;
@@ -522,7 +685,7 @@ function OnHit(Pawn Victim, Pawn By, int Damage)
 		return; // in view: the game turns it
 	CHitBy[s] = By;
 	CTurnTries[s] = 0;
-	CTurnAt[s] = Level.TimeSeconds + TReact[L] * (0.8 + 0.4 * FRand());
+	CTurnAt[s] = Level.TimeSeconds + TReact[L] * CEReact[s] * (0.8 + 0.4 * FRand());
 }
 
 // Dodges while running (as players do): along a straight, flat stretch to the next path
@@ -571,7 +734,7 @@ function RunDodge(Bot B, int s)
 		return;
 	if (!FloorNear(B, Land) || !FloorNear(B, B.Location + Dir * (0.5 * Speed * Air)))
 		return;
-	CDodgeAt[s] = Level.TimeSeconds + TRunDodge[L] * (1.0 + 0.5 * FRand());
+	CDodgeAt[s] = Level.TimeSeconds + TRunDodge[L] / CEDodge[s] * (1.0 + 0.5 * FRand());
 	B.SetFall();
 	B.Velocity = Dir * Speed;
 	B.Velocity.Z = 210;
@@ -703,20 +866,20 @@ defaultproperties
 {
 	RemoteRole=ROLE_None
 	bOn=True
-	TSpeed(0)=0.70
-	TSpeed(1)=0.77
-	TSpeed(2)=0.83
-	TSpeed(3)=0.90
-	TSpeed(4)=1.0
-	TSpeed(5)=1.0
-	TSpeed(6)=1.0
-	TSpeed(7)=1.0
-	TYaw(0)=34000
-	TYaw(1)=38000
-	TYaw(2)=42000
-	TYaw(3)=46000
-	TYaw(4)=50000
-	TYaw(5)=58000
+	TSpeed(0)=0.7
+	TSpeed(1)=0.76
+	TSpeed(2)=0.82
+	TSpeed(3)=0.88
+	TSpeed(4)=0.94
+	TSpeed(5)=1
+	TSpeed(6)=1
+	TSpeed(7)=1
+	TYaw(0)=26000
+	TYaw(1)=30000
+	TYaw(2)=34000
+	TYaw(3)=39000
+	TYaw(4)=45000
+	TYaw(5)=55000
 	TYaw(6)=68000
 	TYaw(7)=100000
 	TFov(0)=100
@@ -727,14 +890,14 @@ defaultproperties
 	TFov(5)=155
 	TFov(6)=180
 	TFov(7)=200
-	TAcc(0)=-1.2
-	TAcc(1)=-0.9
-	TAcc(2)=-0.6
-	TAcc(3)=-0.35
-	TAcc(4)=0
+	TAcc(0)=-1.8
+	TAcc(1)=-1.35
+	TAcc(2)=-0.95
+	TAcc(3)=-0.6
+	TAcc(4)=-0.3
 	TAcc(5)=0
-	TAcc(6)=0
-	TAcc(7)=0
+	TAcc(6)=0.12
+	TAcc(7)=-0.2
 	THear(0)=0.8
 	THear(1)=0.85
 	THear(2)=0.9
@@ -775,13 +938,13 @@ defaultproperties
 	TRunDodge(5)=1.5
 	TRunDodge(6)=0.8
 	TRunDodge(7)=0.4
-	TReact(0)=0.70
-	TReact(1)=0.60
-	TReact(2)=0.50
-	TReact(3)=0.40
-	TReact(4)=0.30
-	TReact(5)=0.25
-	TReact(6)=0.18
+	TReact(0)=1.0
+	TReact(1)=0.85
+	TReact(2)=0.7
+	TReact(3)=0.55
+	TReact(4)=0.4
+	TReact(5)=0.3
+	TReact(6)=0.2
 	TReact(7)=0.12
 	TRight(0)=0.70
 	TRight(1)=0.75
@@ -823,4 +986,28 @@ defaultproperties
 	TBlindSplash(5)=1.2
 	TBlindSplash(6)=1.5
 	TBlindSplash(7)=1.5
+	TAccGain(0)=0.532
+	TAccGain(1)=0.447
+	TAccGain(2)=0.39
+	TAccGain(3)=0.336
+	TAccGain(4)=0.364
+	TAccGain(5)=0.33
+	TAccGain(6)=0.308
+	TAccGain(7)=0.396
+	TSightReact(0)=0.6
+	TSightReact(1)=0.48
+	TSightReact(2)=0.37
+	TSightReact(3)=0.28
+	TSightReact(4)=0.2
+	TSightReact(5)=0.13
+	TSightReact(6)=0.07
+	TSightReact(7)=0.03
+	TFireDelay(0)=0.4
+	TFireDelay(1)=0.3
+	TFireDelay(2)=0.2
+	TFireDelay(3)=0.12
+	TFireDelay(4)=0.05
+	TFireDelay(5)=0
+	TFireDelay(6)=0
+	TFireDelay(7)=0
 }

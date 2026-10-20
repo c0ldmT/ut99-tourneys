@@ -301,8 +301,9 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * kamikaze (flak, charges), bs berserker (hurt: no retreat), rg revenant (hunts its last
    * killer), bh bounty hunter (hunts the leader); mod 0.11.0: sn sniper's nest (high points
    * with the sniper rifle), tp team player (focus fire in team games), sd shuffle dancer (dodges
-   * in a fight), ic item controller (armour, belts and amplifiers at respawn time). Unknown codes
-   * are ignored.
+   * in a fight), ic item controller (armour, belts and amplifiers at respawn time); mod 0.14.0
+   * values traits as edges on the skill curve: sh steady hand, wd watchdog, ss side-stepper, ph
+   * patient hunter, ee eagle eye, ar all-rounder. Unknown codes are ignored.
    */
   z.object({ t: z.literal('btrt'), name: str(MAX_NAME_CHARS), c: str(64) }),
   /**

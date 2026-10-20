@@ -88,6 +88,14 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > of view turns it after 0.12-0.7 s (low levels sometimes the wrong way first). No damage malus against players. The
 > stock bot classes are spawned as `TourneyMale1Bot` etc. (same bot, drifting aim); other classes get everything but
 > the aim. SmartStockBots: `MoveWithDodge` and `FixMinigun` are switched off at run time (log line, ini untouched).
+> Mod 0.14.0: skill curve v1, tuned with the duel simulator (`pnpm --filter @tourney/api bot:sim`): the level is the
+> main strength, the bot's own accuracy counts less (aim error ±19 %-35 %), low levels aim worse, turn slower (26k-100k)
+> and take in a new enemy first (0.6 s Novice-0.03 s Godlike: no turning, no firing), hold fire now and then (Novice
+> about 30 % of the time, none from Masterful), turn later to hits from behind (1.0-0.12 s). Dream Team values traits
+> act as edges on the curve (codes in `btrt`): steady hand / patient hunter / eagle eye aim error -7/-12/-14 %,
+> watchdog reacts twice as fast with +40° view and 20 % faster turning, side-stepper dodges twice as often,
+> all-rounder a bit of everything. Fire holds work fully on the stock classes (`FireWeapon`); other classes stop
+> firing at the next 0.1 s tick.
 
 ## Classes
 
@@ -278,6 +286,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 59 | **Bot chat in the kill feed** (mod 0.12.0) | A game with talking website bots (Bots → personality with lines, talkativeness high; Dream Team bots: My team → Look & lines). On the match page the bots' lines appear in the kill feed between the kills (name in its side's colour, the line in quotes). Bridge log without `bad line` for `bs` |
 | 60 | **Cut-off bots** (mod 0.12.1) | Bot AI help on. Bot-only 1v1 on DM-SpaceNoxx (upper ring, kickers), a few games. No bot stays on the ring or on a kicker for more than ~40 s without a fight. `grep "UTTourney: bot" Tourney.log`: `no path to X (N in a row)`, then `no path to any opponent (3 hunts in a row) at ..., moved to PlayerStartN (no death counted)` (or `..., stays` once); bouncing bots get `has not left ... for 12 s`. Other maps (DM-Curse][, DM-Deck16][) as in test 57. Server log without `Accessed None` (no more `StakeOut.ContinueStakeOut` / `RelativeStrength`) |
 | 61 | **Skill curve** (mod 0.13.0) | Settings → Bot AI help → "Skill curve" on. Bot-only 1v1s at Novice, Skilled, Adept and Godlike (DM-Deck16][, DM-Curse][), one Monster Hunt run. Server log: `skill curve True`, with SmartStockBots `SmartStockBots: MoveWithDodge False (was True), FixMinigun False (was True)`; `spawned bot ... class TourneyMale1Bot` (stock classes). Spectate in first person: Novice clearly slower than before (70 %), Skilled almost full speed; low levels dodge now and then (also forward while running), high levels often. Minigun and pulse gun swing smoothly past the target instead of jittering. A bot that loses sight stops firing after about a second (`has not seen X for N s, stops firing at ..., hunts`); shot from behind it turns round (`hit from out of view by X, turns to it`). Setting off: `skill curve False`, bots as in 0.12.1 (stock classes, SmartStockBots values back). Server log without `Accessed None` |
+| 62 | **Skill curve v1 and trait edges** (mod 0.14.0) | Skill curve on. Bot-only 1v1s Novice vs Skilled and Adept vs Godlike (DM-Deck16][): Novice clearly turns slower, pauses a moment before it turns to a new enemy and stops firing now and then; Godlike unchanged (fires at once, no pauses). Skilled with accuracy 100 (control center) vs Masterful with accuracy 0: Masterful should win most games. Dream Team game with a bot with eagle eye and one with watchdog: no script errors; the watchdog bot turns quickly to hits from behind. Impact hammer still charges and fires (no fire pause with melee weapons), shock combos still work. Server log without `Accessed None` |
 
 ## SmartStockBots (optional)
 

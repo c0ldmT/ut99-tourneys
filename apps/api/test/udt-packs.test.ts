@@ -90,7 +90,8 @@ describe('Unreal Dream Team: packs and traits', () => {
     expect(put.status, JSON.stringify(put.body)).toBe(200);
     const bot = put.body.roster[0];
     expect(bot).toMatchObject({ level: 1, slots: 1, udtTraits: [{ code: 'eagle-eye' }] });
-    expect(bot.effective.traits.accuracy).toBeCloseTo(0.3);
+    // Eagle eye acts in the game (aim edge, code `ee`), not on the values.
+    expect(bot.effective.traits.accuracy ?? 0).toBeCloseTo(0);
     // Level 1: one slot only.
     expect((await mario.post('/udt/traits/tB/assign', { botId: mira })).status).toBe(409);
     db.update(udtRoster).set({ xp: 180 }).run(); // level 5: three slots
@@ -102,7 +103,7 @@ describe('Unreal Dream Team: packs and traits', () => {
         { code: 'eagle-eye' },
         { code: 'claudius' },
       ]).skill,
-      traits: expect.objectContaining({ accuracy: 0.3 }),
+      traits: expect.not.objectContaining({ accuracy: 0.3 }),
       overflow: false,
     });
     // The starter bot counts 0 in the team value, but its traits still change its market value.

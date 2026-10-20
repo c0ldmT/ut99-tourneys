@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.13.0";
+const MOD_VERSION = "0.14.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -141,6 +141,9 @@ var float CfgAdrSpeed[16];         // the ground speed before the boost
 var int CfgBeh[16];                // behaviour traits (btrt, mod 0.10.0): 1 vulture, 2 kamikaze,
                                    // 4 berserker, 8 revenant, 16 bounty hunter
 var byte CfgAggr[16];              // 1 = the hurt bot's aggressiveness was changed by a trait
+var byte CfgVal[16];               // values traits as curve edges (btrt, mod 0.14.0): 1 steady
+                                   // hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16
+                                   // eagle eye, 32 all-rounder (TourneySkillCurve.SetEdges)
 var string CfgAvenge[16];          // revenant: its last killer
                                    // mod 0.11.0: 32 sniper's nest, 64 team player, 128 shuffle
                                    // dancer, 256 item controller
@@ -431,6 +434,7 @@ function HandleBridgeMessage(TourneyMsg M)
 			{
 				CfgBody[i] = byte(ParseGameTraits(M.Get("c")));
 				CfgBeh[i] = ParseBehaviourTraits(M.Get("c"));
+				CfgVal[i] = byte(ParseValueTraits(M.Get("c")));
 			}
 			break;
 		case "bpers":
@@ -2714,6 +2718,7 @@ function int FindCfg(string BName, bool bCreate)
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
 	CfgBeh[i] = 0;
+	CfgVal[i] = 0;
 	CfgNest[i] = None;
 	CfgLastNest[i] = None;
 	CfgNestNext[i] = 0;
@@ -2767,7 +2772,7 @@ function ClearPersonality(int c)
 // for a bot that is already in the level when its "bot" line comes.
 function ApplyBotConfig(Bot B, string BName)
 {
-	local int c;
+	local int c, Edges;
 	local byte T;
 	local class<Weapon> W;
 	local class<VoicePack> V;
@@ -2778,8 +2783,10 @@ function ApplyBotConfig(Bot B, string BName)
 	if (Curve != None)
 		Curve.TraitValues(B);
 	c = FindCfg(BName, false);
+	Edges = 0;
 	if (c >= 0)
 	{
+		Edges = CfgVal[c];
 		T = 255;
 		if ((TeamSize > 1 || Game.bTeamGame) && B.PlayerReplicationInfo.Team < 4)
 			T = B.PlayerReplicationInfo.Team;
@@ -2814,7 +2821,7 @@ function ApplyBotConfig(Bot B, string BName)
 	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
 		B.PlayerReplicationInfo.VoiceType = class<VoicePack>(DynamicLoadObject(B.VoiceType, class'Class'));
 	if (Curve != None)
-		Curve.Setup(B, BotLevel(BName));
+		Curve.Setup(B, BotLevel(BName), Edges);
 }
 
 // The tournament skill (0..7) of a bot of the match, -1 = not in the list.
@@ -4398,6 +4405,42 @@ function LoadCache()
 //=============================================================================
 // Unreal Dream Team: game traits of website bots (btrt, mod 0.9.0)
 //=============================================================================
+
+// Values traits (mod 0.14.0): "ee,wd" -> bits of CfgVal (edges on the skill curve); unknown
+// codes are ignored.
+function int ParseValueTraits(string S)
+{
+	local int Bits, p;
+	local string Code;
+	Bits = 0;
+	while (S != "")
+	{
+		p = InStr(S, ",");
+		if (p < 0)
+		{
+			Code = S;
+			S = "";
+		}
+		else
+		{
+			Code = Left(S, p);
+			S = Mid(S, p + 1);
+		}
+		if (Code == "sh")
+			Bits = Bits | 1;
+		else if (Code == "wd")
+			Bits = Bits | 2;
+		else if (Code == "ss")
+			Bits = Bits | 4;
+		else if (Code == "ph")
+			Bits = Bits | 8;
+		else if (Code == "ee")
+			Bits = Bits | 16;
+		else if (Code == "ar")
+			Bits = Bits | 32;
+	}
+	return Bits;
+}
 
 // "px,vp" -> bits of CfgBody; unknown codes are ignored.
 function int ParseGameTraits(string S)

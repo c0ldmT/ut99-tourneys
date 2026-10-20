@@ -9,6 +9,7 @@ import {
   fromPct,
   resolveBot,
   toPct,
+  VALUE_EDGES,
   withCurve,
 } from '../src/index.js';
 
@@ -19,6 +20,18 @@ describe('skill curve data', () => {
   it('matches the defaultproperties of TourneySkillCurve.uc', () => {
     const uc = file('../../../mods/ut99-tournament/Classes/TourneySkillCurve.uc');
     expect(curveFromUc(uc)).toEqual(CURRENT_CURVE);
+  });
+
+  it('has the same trait edges as the mod', () => {
+    const uc = file('../../../mods/ut99-tournament/Classes/TourneySkillCurve.uc');
+    const code = { aim: 'CEAim', react: 'CEReact', turn: 'CETurn', dodge: 'CEDodge' } as const;
+    for (const [trait, e] of Object.entries(VALUE_EDGES)) {
+      for (const [k, prop] of Object.entries(code)) {
+        const v = e[k as keyof typeof code];
+        if (v !== undefined) expect(uc, `${trait} ${k}`).toContain(`${prop}[s] *= ${v}`);
+      }
+      if (e.view) expect(uc, `${trait} view`).toContain(`CEView[s] += ${e.view}`);
+    }
   });
 
   it('reads the proposal file and checks curve rows', () => {
@@ -34,7 +47,7 @@ describe('bots for the duel', () => {
   it('applies Dream Team traits, tiredness and the career phase', () => {
     expect(fromPct(80)).toBeCloseTo(0.6);
     expect(toPct(0.6)).toBe(80);
-    expect(resolveBot({ level: 3, traits: [{ code: 'eagle-eye' }] }).accuracy).toBeCloseTo(0.3);
+    expect(resolveBot({ level: 3, traits: [{ code: 'eagle-eye' }] }).edge.aim).toBeCloseTo(0.86);
     expect(resolveBot({ level: 3, traits: [{ code: 'claudius' }] }).level).toBe(4);
     expect(resolveBot({ level: 3, accuracy: 0.5, tired: true }).accuracy).toBeCloseTo(0.3);
     expect(resolveBot({ level: 3, phase: 'decline' }).accuracy).toBeCloseTo(-0.12);

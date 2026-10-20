@@ -1,6 +1,6 @@
 /**
- * Unreal Dream Team traits: category A (play-style values, sent to the game as the bot's
- * effective values), B (body: the mod changes damage, health, armour and speed in the game,
+ * Unreal Dream Team traits: category A (play-style values sent to the game as the bot's
+ * effective values; since mod 0.14.0 most act as edges on the skill curve, see gameEdge), B (body: the mod changes damage, health, armour and speed in the game,
  * mod 0.9.0), C (behaviour: the mod steers the bot's AI, groups in mod 0.10.0 and 0.11.0) and D (manager:
  * economy and career on the website). Traits only work in Dream Team games and last one season.
  */
@@ -49,21 +49,21 @@ export interface TraitDef {
   category: TraitCategory;
   /** The trait needs a choice when it is put on a bot (gun nut: the weapon). */
   needsWeapon?: boolean;
-  /** Body and behaviour traits: the code in the mod's `btrt` line. */
+  /** Body, behaviour and (mod 0.14.0) values traits: the code in the mod's `btrt` line. */
   mod?: string;
 }
 
 /** The catalogue v1 (owner approved), phase 2 part: values and manager traits. */
 export const TRAITS: readonly TraitDef[] = [
-  { code: 'steady-hand', rarity: 'common', category: 'values' },
+  { code: 'steady-hand', rarity: 'common', category: 'values', mod: 'sh' },
   { code: 'bouncer', rarity: 'common', category: 'values' },
-  { code: 'watchdog', rarity: 'uncommon', category: 'values' },
-  { code: 'side-stepper', rarity: 'uncommon', category: 'values' },
+  { code: 'watchdog', rarity: 'uncommon', category: 'values', mod: 'wd' },
+  { code: 'side-stepper', rarity: 'uncommon', category: 'values', mod: 'ss' },
   { code: 'gun-nut', rarity: 'uncommon', category: 'values', needsWeapon: true },
   { code: 'daredevil', rarity: 'rare', category: 'values' },
-  { code: 'patient-hunter', rarity: 'rare', category: 'values' },
-  { code: 'eagle-eye', rarity: 'rare', category: 'values' },
-  { code: 'all-rounder', rarity: 'epic', category: 'values' },
+  { code: 'patient-hunter', rarity: 'rare', category: 'values', mod: 'ph' },
+  { code: 'eagle-eye', rarity: 'rare', category: 'values', mod: 'ee' },
+  { code: 'all-rounder', rarity: 'epic', category: 'values', mod: 'ar' },
   { code: 'claudius', rarity: 'legendary', category: 'values' },
   { code: 'quick-recovery', rarity: 'common', category: 'manager' },
   { code: 'iron-lung', rarity: 'uncommon', category: 'manager' },
@@ -198,23 +198,14 @@ export function effectiveValues<T extends PlayValues>(
   const v: T & PlayValues = { ...values };
   let s = skill;
   const has = (c: TraitCode) => traits.find((t) => t.code === c);
-  if (has('steady-hand')) v.accuracy = up(v.accuracy, 5);
-  if (has('watchdog')) v.alertness = up(v.alertness, 10);
+  // Steady hand, watchdog, eagle eye and the all-rounder act in the game (gameEdge), not on
+  // the values; the side-stepper also strafes more, the patient hunter camps.
   if (has('side-stepper')) v.strafing = up(v.strafing, 10);
   if (has('bouncer')) v.jumpy = true;
   const gun = has('gun-nut');
   if (gun?.weapon) v.favoriteWeapon = gun.weapon;
   if (has('daredevil')) v.combatStyle = up(v.combatStyle, 25);
-  if (has('patient-hunter')) {
-    v.camping = Math.max(v.camping ?? 0, 0.8);
-    v.accuracy = up(v.accuracy, 8);
-  }
-  if (has('eagle-eye')) v.accuracy = up(v.accuracy, 15);
-  if (has('all-rounder')) {
-    v.accuracy = up(v.accuracy, 8);
-    v.alertness = up(v.alertness, 8);
-    v.strafing = up(v.strafing, 8);
-  }
+  if (has('patient-hunter')) v.camping = Math.max(v.camping ?? 0, 0.8);
   let overflow = false;
   if (has('claudius')) {
     if (s + 1 > 7) {
@@ -227,6 +218,60 @@ export function effectiveValues<T extends PlayValues>(
   }
   return { skill: s, values: v, overflow };
 }
+
+// ---------- category A in the game: edges on the skill curve ----------
+
+/**
+ * What values traits change in the game (mod 0.14.0): multipliers on the skill curve, the same
+ * at every level, so a trait is a share of a level in one part and the level stays the main
+ * strength. aim: aim error ×; react: reaction times (seeing, hits from behind) ×; view: field
+ * of view + degrees; turn: turn rate ×; dodge: chances to dodge ×.
+ */
+export interface GameEdge {
+  aim: number;
+  react: number;
+  view: number;
+  turn: number;
+  dodge: number;
+}
+
+export const NO_EDGE: GameEdge = { aim: 1, react: 1, view: 0, turn: 1, dodge: 1 };
+
+/**
+ * Per trait: its edge (tuned with the duel simulator `bot:sim`; the mod has the same numbers in
+ * TourneySkillCurve) and what it adds to the value score for the market value (as much as its
+ * old value boosts did: +5/+10/+8/+15/+8 on the 0..100 scale; the side-stepper's strafing is a
+ * value already).
+ */
+export const VALUE_EDGES: Readonly<
+  Partial<Record<TraitCode, Partial<GameEdge> & { score: number }>>
+> = {
+  'steady-hand': { aim: 0.93, score: 0.0225 },
+  watchdog: { react: 0.5, view: 40, turn: 1.2, score: 0.03 },
+  'side-stepper': { dodge: 2, score: 0 },
+  'patient-hunter': { aim: 0.88, score: 0.036 },
+  'eagle-eye': { aim: 0.86, score: 0.0675 },
+  'all-rounder': { aim: 0.88, react: 0.75, view: 20, turn: 1.05, dodge: 1.3, score: 0.08 },
+};
+
+/** The bot's edges in the game: multipliers multiply, degrees add. */
+export function gameEdge(traits: readonly TraitOnBot[]): GameEdge {
+  const e = { ...NO_EDGE };
+  for (const t of traits) {
+    const x = VALUE_EDGES[t.code];
+    if (!x) continue;
+    e.aim *= x.aim ?? 1;
+    e.react *= x.react ?? 1;
+    e.view += x.view ?? 0;
+    e.turn *= x.turn ?? 1;
+    e.dodge *= x.dodge ?? 1;
+  }
+  return e;
+}
+
+/** What the edges of the traits add to the value score (market value). */
+export const edgeScore = (traits: readonly TraitOnBot[]): number =>
+  traits.reduce((n, t) => n + (VALUE_EDGES[t.code]?.score ?? 0), 0);
 
 // ---------- category D: manager effects ----------
 
@@ -287,7 +332,9 @@ export function traitValueFactor(
   if (!traits.length) return 1;
   const e = effectiveValues(skill, values, traits);
   const plain = baseValue(skill, valueScore(values), cfg);
-  const eff = baseValue(e.skill, valueScore(e.values), cfg) * (e.overflow ? 1.1 : 1);
+  const eff =
+    baseValue(e.skill, Math.min(1, valueScore(e.values) + edgeScore(traits)), cfg) *
+    (e.overflow ? 1.1 : 1);
   const body = traits.reduce((n, t) => {
     const d = traitDef(t.code);
     return n + (d?.category === 'body' || d?.category === 'behaviour' ? BODY_VALUE[d.rarity] : 0);
