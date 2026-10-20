@@ -79,19 +79,19 @@ describe('market values', () => {
 
 describe('rewards and stamina', () => {
   it('pays games, wins, MVPs and places by format and index', () => {
-    expect(matchReward({ won: true, mvp: true, teamSize: 1, vsBaseBots: false }, 1)).toBe(190);
-    expect(matchReward({ won: true, mvp: false, teamSize: 1, vsBaseBots: true }, 1)).toBe(110);
-    expect(matchReward({ won: false, mvp: false, teamSize: 5, vsBaseBots: false }, 2)).toBe(360);
-    expect(placeReward(1, 1, 1, false)).toBe(600);
-    expect(placeReward(2, 2, 1, false)).toBe(450);
-    expect(placeReward(3, 1, 1, false)).toBe(150);
+    expect(matchReward({ won: true, mvp: true, teamSize: 1, vsBaseBots: false }, 1)).toBe(380);
+    expect(matchReward({ won: true, mvp: false, teamSize: 1, vsBaseBots: true }, 1)).toBe(210);
+    expect(matchReward({ won: false, mvp: false, teamSize: 5, vsBaseBots: false }, 2)).toBe(720);
+    expect(placeReward(1, 1, 1, false)).toBe(1200);
+    expect(placeReward(2, 2, 1, false)).toBe(900);
+    expect(placeReward(3, 1, 1, false)).toBe(300);
     expect(placeReward(5, 1, 1, false)).toBe(0);
-    expect(placeReward(1, 1, 1, true)).toBe(180);
+    expect(placeReward(1, 1, 1, true)).toBe(360);
   });
 
   it('tires bots and lets them rest', () => {
-    expect(staminaAfterGames(100, 3)).toBe(55);
-    expect(staminaAfterGames(20, 3)).toBe(0);
+    expect(staminaAfterGames(100, 3)).toBe(82);
+    expect(staminaAfterGames(15, 3)).toBe(0);
     expect(staminaRecovered(55, 1)).toBe(85);
     expect(staminaRecovered(90, 1)).toBe(100);
     expect(tiredPenalty(39)).toBe(1);

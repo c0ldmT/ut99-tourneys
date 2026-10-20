@@ -79,16 +79,19 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   demandMax: 0.15,
   salaryRate: { weak: 3, mid: 5, strong: 8 },
   sellBack: 0.85,
+  // Doubled on 20.10. (owner: at least +50 %); the simulator keeps the index moderate up to
+  // twice the rewards (about 1.7 at the season's end), beyond that it runs away (3.8 at 2.5x).
   rewards: {
-    game: 60,
-    win: 90,
-    mvp: 40,
-    places: [600, 300, 150],
+    game: 120,
+    win: 180,
+    mvp: 80,
+    places: [1200, 600, 300],
     baseBotWin: 0.5,
     soloPlaces: 0.3,
   },
   formatFactor: { 1: 1, 2: 1.5, 3: 2, 5: 3 },
-  stamina: { perGame: 15, perDay: 30, tiredBelow: 40 },
+  // 6 per game (was 15): a 4-team double elimination (up to 5 games) leaves a bot at 70.
+  stamina: { perGame: 6, perDay: 30, tiredBelow: 40 },
   packs: {
     standard: { price: 1500, rates: [60, 25, 10, 4, 1], pityEpic: 10, pityLegendary: 50 },
     premium: { price: 4000, rates: [35, 35, 20, 8, 2], pityEpic: 7, pityLegendary: 30 },
