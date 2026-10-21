@@ -223,7 +223,7 @@ export class Api {
     dm?: (string | null)[];
     mh?: (string | null)[];
     bench?: (string | null)[];
-  }) => this.call<UdtRosterBot[]>('PUT', '/udt/lineup', body, { ok: 'ok.udt.lineup' });
+  }) => this.call<UdtRosterBot[]>('PUT', '/udt/lineup', body);
   udtMarket = () => this.call<UdtMarket>('GET', '/udt/market');
   udtBuy = (botId: string) =>
     this.call<UdtMarket>('POST', '/udt/market/buy', { botId }, { ok: 'ok.udt.bought' });

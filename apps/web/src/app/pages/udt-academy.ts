@@ -1,7 +1,6 @@
-import { UdtRename } from '../components/udt-rename';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
@@ -15,15 +14,13 @@ import type {
 } from '../core/types';
 import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from '../core/udt';
 
-type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
-
 /**
  * Dream Team academy: licences, scouting three talents (values and potential as ranges),
  * apprentices of mentors, developing own bots with points, nominating them for graduation.
  */
 @Component({
   selector: 'app-udt-academy',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtRename],
+  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -270,7 +267,11 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
           <div class="own">
             @for (b of v.own; track b.botId) {
               <div class="ob">
-                <udt-card [bot]="ownCard(b, v.tag)" />
+                <udt-card
+                  [bot]="ownCard(b, v.tag)"
+                  [points]="b.own!.points"
+                  (pointsClick)="toTeam(b.botId)"
+                />
                 <div class="oinfo">
                   <div class="rg">
                     <span>{{ 'udt.academy.potential' | t }}</span
@@ -282,21 +283,15 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
                     <span>{{ 'udt.academy.points' | t }}</span
                     ><b class="mono">{{ b.own!.points }}</b>
                   </div>
-                  @if (b.own!.canRename) {
-                    <udt-rename [botId]="b.botId" [name]="b.name" (renamed)="load()" />
-                  }
-                  <div class="dev">
-                    @for (s of stats; track s) {
-                      <button
-                        type="button"
-                        [disabled]="busy() || b.own!.points < v.developCost[s]"
-                        (click)="develop(b, s)"
-                      >
-                        {{ 'udt.academy.dev.' + s | t }}
-                        <span class="muted small">· {{ v.developCost[s] }}</span>
-                      </button>
-                    }
-                  </div>
+                  <a
+                    class="btn"
+                    [class.primary]="b.own!.points > 0 || b.own!.canRename"
+                    routerLink="/udt"
+                    [queryParams]="{ bot: b.botId }"
+                    >{{
+                      (b.own!.canRename ? 'udt.academy.toPanelRename' : 'udt.academy.toPanel') | t
+                    }}</a
+                  >
                   @if (gradOf(b.botId); as gb) {
                     <div class="rg">
                       <span>{{ 'udt.academy.games' | t }}</span
@@ -400,15 +395,6 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
     .over {
       color: var(--danger);
     }
-    .dev {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 6px;
-    }
-    .dev button {
-      min-height: 36px;
-      padding: 4px 8px;
-    }
   `,
 })
 export class UdtAcademyPage {
@@ -420,7 +406,7 @@ export class UdtAcademyPage {
   protected readonly names = signal<Partial<Record<number, string>>>({});
   protected readonly mentorNames = signal<Partial<Record<string, string>>>({});
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
-  protected readonly stats: Stat[] = ['accuracy', 'alertness', 'strafing', 'skill'];
+  private readonly router = inject(Router);
   protected readonly bpId = signal<string | null>(null);
   protected readonly bpSkill = signal(3);
   protected readonly bpVal = signal({ accuracy: 50, alertness: 50, strafing: 50 });
@@ -573,11 +559,9 @@ export class UdtAcademyPage {
     });
   }
 
-  protected async develop(b: UdtRosterBot, s: Stat) {
-    await this.act(async () => {
-      await this.api.udtDevelop(b.botId, s);
-      this.a.set(await this.api.udtAcademy());
-    });
+  /** Development and renaming are on My team (the bot's details). */
+  protected toTeam(botId: string) {
+    void this.router.navigate(['/udt'], { queryParams: { bot: botId } });
   }
 
   protected async nominate(id: string) {

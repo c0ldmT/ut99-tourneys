@@ -1702,6 +1702,36 @@ const en = {
   'udt.market.cheap': 'cheaper',
   'udt.market.cheapTitle':
     'On offer for days without a buyer: the value carries a discount (up to −15 %).',
+  'udt.board.hint':
+    'Drag cards between the places (they swap), from the roster into the lineup and back, traits onto bots – or tap a card and then its new place. Every change is saved at once; the lineup counts until the bracket is drawn.',
+  'udt.board.free': 'free',
+  'udt.board.pickedBot': 'tap a place, a bot to swap with, or the roster',
+  'udt.board.pickedTrait': 'tap the bot that gets it',
+  'udt.board.details': 'Details',
+  'udt.board.out': 'Out of the lineup',
+  'udt.board.outZone': 'Drop here (or on a roster card) to take a bot out of the lineup',
+  'udt.board.traits': 'Traits ({n})',
+  'udt.board.undo': 'Undo',
+  'udt.points.plaque': '{n} development points to give: open',
+  'udt.points.xpBar': 'Experience: {xp} of {need} XP to level {lv}',
+  'udt.points.explain':
+    'Every level from level 2 brings one point. +5 on a value costs 1 point, +1 skill costs 3.',
+  'udt.points.potential': 'Skill grows up to the potential ({p}; now {now}).',
+  'udt.points.cost': '{n} point(s)',
+  'udt.points.why.points': 'Not enough points',
+  'udt.points.why.potential': 'The potential is reached',
+  'udt.points.why.max': 'At its maximum (100)',
+  'udt.points.bought':
+    'Bought bots do not get development points: they get stronger with traits (more places from level 5 and 10).',
+  'udt.points.noTraits': 'No trait yet – drag one from the trait tray onto the bot.',
+  'udt.points.renamed': 'Renamed already (once per bot).',
+  'udt.points.xpLine':
+    '{xp} / {need} XP – {left} more to level {lv}. 10 XP per Dream Team game, 15 more for a win.',
+  'udt.academy.toPanel': 'Develop on My team',
+  'udt.academy.toPanelRename': 'Develop and rename on My team',
+  'udt.events.lineupNote':
+    'Your lineup counts until the bracket is drawn (at the start time, or earlier by an organizer): change it on My team before that.',
+  'udt.board.benchDup': 'Plays #{n} in this mode – this bench place counts in the other mode',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3421,6 +3451,37 @@ const de: Record<TKey, string> = {
   'udt.market.cheap': 'günstiger',
   'udt.market.cheapTitle':
     'Seit Tagen ohne Käufer im Angebot: Der Wert hat einen Abschlag (bis −15 %).',
+  'udt.board.hint':
+    'Zieh Karten zwischen die Plätze (sie tauschen), aus dem Kader in die Aufstellung und zurück, Traits auf Bots – oder tipp eine Karte an und dann ihren neuen Platz. Jede Änderung wird sofort gespeichert; die Aufstellung zählt bis zur Auslosung.',
+  'udt.board.free': 'frei',
+  'udt.board.pickedBot': 'tipp einen Platz, einen Bot zum Tauschen oder den Kader an',
+  'udt.board.pickedTrait': 'tipp den Bot an, der ihn bekommt',
+  'udt.board.details': 'Details',
+  'udt.board.out': 'Aus der Aufstellung',
+  'udt.board.outZone':
+    'Hier (oder auf eine Kader-Karte) ablegen, um einen Bot aus der Aufstellung zu nehmen',
+  'udt.board.traits': 'Traits ({n})',
+  'udt.board.undo': 'Rückgängig',
+  'udt.points.plaque': '{n} Entwicklungspunkte zu vergeben: öffnen',
+  'udt.points.xpBar': 'Erfahrung: {xp} von {need} XP bis Level {lv}',
+  'udt.points.explain':
+    'Jedes Level ab Level 2 bringt einen Punkt. +5 auf einen Wert kostet 1 Punkt, +1 Skill kostet 3.',
+  'udt.points.potential': 'Skill wächst bis zum Potenzial ({p}; jetzt {now}).',
+  'udt.points.cost': '{n} Punkt(e)',
+  'udt.points.why.points': 'Nicht genug Punkte',
+  'udt.points.why.potential': 'Das Potenzial ist erreicht',
+  'udt.points.why.max': 'Schon am Maximum (100)',
+  'udt.points.bought':
+    'Gekaufte Bots bekommen keine Entwicklungspunkte: Sie werden mit Traits stärker (mehr Plätze ab Level 5 und 10).',
+  'udt.points.noTraits': 'Noch kein Trait – zieh einen aus der Trait-Leiste auf den Bot.',
+  'udt.points.renamed': 'Schon umbenannt (einmal pro Bot).',
+  'udt.points.xpLine':
+    '{xp} / {need} XP – noch {left} bis Level {lv}. 10 XP pro Dream-Team-Spiel, 15 mehr für einen Sieg.',
+  'udt.academy.toPanel': 'In Mein Team entwickeln',
+  'udt.academy.toPanelRename': 'In Mein Team entwickeln & umbenennen',
+  'udt.events.lineupNote':
+    'Deine Aufstellung zählt bis zur Auslosung (zur Startzeit oder früher durch einen Organisator): Ändere sie vorher unter Mein Team.',
+  'udt.board.benchDup': 'Spielt in diesem Modus auf #{n} – dieser Bankplatz zählt im anderen Modus',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

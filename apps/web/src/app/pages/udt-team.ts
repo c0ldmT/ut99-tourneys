@@ -1,28 +1,20 @@
-import {
-  emptyLook,
-  lookBody,
-  lookFromBot,
-  UdtBotLook,
-  type LookDraft,
-  type UdtLooks,
-} from '../components/udt-bot-look';
+import { emptyLook, lookBody, UdtBotLook, type UdtLooks } from '../components/udt-bot-look';
+import { UdtBotPanel } from '../components/udt-bot-panel';
+import { UdtLineupBoard, type TraitDrop } from '../components/udt-lineup-board';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { UdtRename } from '../components/udt-rename';
+import { ActivatedRoute } from '@angular/router';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe, NeuroStore } from '../core/neuro';
-import type { UdtLedgerEntry, UdtPacks, UdtRosterBot, UdtTraitOnBot, UdtView } from '../core/types';
+import { Toasts } from '../core/toast';
+import type { UdtLedgerEntry, UdtPacks, UdtView } from '../core/types';
+import type { LineupDraft } from '../core/udt-lineup';
 import {
   baseValue,
   botRarity,
-  bracketOf,
   salaryOf,
-  SCRAP,
-  rosterCard,
-  staminaColor,
   UdtCard,
   UdtNav,
   valueScore,
@@ -30,21 +22,19 @@ import {
 } from '../core/udt';
 import { DEFAULT_ECONOMY } from '@tourney/udt';
 
-type Mode = 'dm' | 'mh';
-
 /** Dream Team: founding the team (starter bot), the lineups, the roster and the ledger. */
 @Component({
   selector: 'app-udt-team',
   imports: [
     FormsModule,
-    RouterLink,
     TPipe,
     NeuroPipe,
     Coin,
     UdtCard,
     UdtNav,
     UdtBotLook,
-    UdtRename,
+    UdtLineupBoard,
+    UdtBotPanel,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -166,69 +156,16 @@ type Mode = 'dm' | 'mh';
         </div>
 
         <section class="card">
-          <div class="row between">
-            <h2>{{ 'udt.lineup' | t }}</h2>
-            <div class="seg">
-              <button type="button" [class.on]="mode() === 'dm'" (click)="mode.set('dm')">
-                Deathmatch
-              </button>
-              <button type="button" [class.on]="mode() === 'mh'" (click)="mode.set('mh')">
-                Monster Hunt
-              </button>
-            </div>
-          </div>
-          <div class="udt-arena">
-            @for (s of slots; track s) {
-              @if (inSlot(s); as b) {
-                <udt-card [bot]="card(b)" [small]="true" />
-              } @else {
-                <div class="empty">#{{ s }}</div>
-              }
-            }
-          </div>
-          <div class="slots">
-            @for (s of slots; track s) {
-              <label
-                >#{{ s }}
-                <select
-                  [ngModel]="slotValue(s)"
-                  (ngModelChange)="setSlot(s, $event)"
-                  [name]="'s' + s"
-                >
-                  <option [ngValue]="null">–</option>
-                  @for (b of v.roster; track b.botId) {
-                    <option [ngValue]="b.botId">{{ b.name }} ({{ b.skill }})</option>
-                  }
-                </select>
-              </label>
-            }
-            @for (s of [1, 2]; track s) {
-              <label
-                >{{ 'udt.bench' | t }} {{ s }}
-                <select
-                  [ngModel]="benchValue(s)"
-                  (ngModelChange)="setBench(s, $event)"
-                  [name]="'b' + s"
-                >
-                  <option [ngValue]="null">–</option>
-                  @for (b of v.roster; track b.botId) {
-                    <option [ngValue]="b.botId">{{ b.name }}</option>
-                  }
-                </select>
-              </label>
-            }
-          </div>
-          <div class="row">
-            <button
-              type="button"
-              class="primary"
-              [disabled]="busy() || !dirty()"
-              (click)="saveLineup()"
-            >
-              {{ 'common.save' | t }}
-            </button>
-            <span class="muted small">{{ 'udt.lineupHint' | t }}</span>
-          </div>
+          <udt-lineup-board
+            [roster]="v.roster"
+            [draft]="draft()"
+            [tag]="v.team.tag"
+            [inventory]="inventory()"
+            [weapons]="weapons()"
+            (changed)="saveLineup($event)"
+            (trait)="assign($event)"
+            (open)="openBot($event)"
+          />
           <details class="help small">
             <summary>{{ 'udt.staminaHelp.title' | t }}</summary>
             <ul>
@@ -238,208 +175,14 @@ type Mode = 'dm' | 'mh';
             </ul>
           </details>
         </section>
-
-        <section class="card">
-          <div class="row between">
-            <h2>{{ 'udt.roster' | t: { n: v.roster.length } }}</h2>
-            <a routerLink="/udt/market">{{ 'udt.toMarket' | t }}</a>
-          </div>
-          <div class="roster">
-            @for (b of v.roster; track b.botId) {
-              <div class="rrow">
-                <span class="udt-chip r-{{ b.rarity }}"
-                  ><span>{{ b.effective.skill }}{{ b.effective.overflow ? '+' : '' }}</span></span
-                >
-                <span class="grow">
-                  <b>{{ b.gameName }}</b>
-                  @if (b.starter) {
-                    <span class="udt-mark own">{{ 'udt.starter' | t }}</span>
-                  } @else if (b.own) {
-                    <span class="udt-mark own">{{ 'udt.academy.origin.' + b.own.origin | t }}</span>
-                  }
-                  @if (b.own && b.own.points > 0) {
-                    <a routerLink="/udt/academy" class="udt-mark star">{{
-                      'udt.academy.pointsFree' | t: { n: b.own.points }
-                    }}</a>
-                  }
-                  @if (b.striking) {
-                    <span class="udt-mark strike">{{ 'udt.strike' | t }}</span>
-                  }
-                  @if (b.stamina < 40) {
-                    <span class="udt-mark tired">{{ 'udt.tired' | t }}</span>
-                  }
-                  @if (star(b)) {
-                    <span class="udt-mark star">Star</span>
-                  }
-                  <span class="muted small block"
-                    >{{ 'udt.level' | t }} {{ b.level }} · XP {{ b.xp }} · {{ 'udt.paid' | t }}
-                    {{ b.price | neuro }}</span
-                  >
-                  <span class="udt-traits tline">
-                    @for (tr of b.udtTraits; track tr.id) {
-                      <span
-                        class="udt-trait r-{{ tr.rarity }}"
-                        [title]="'udt.traitE.' + tr.code | t"
-                        >{{ 'udt.trait.' + tr.code | t }}
-                        <button
-                          type="button"
-                          class="x"
-                          [attr.aria-label]="'udt.traits.remove' | t"
-                          [disabled]="busy()"
-                          (click)="unassign(tr)"
-                        >
-                          ×
-                        </button></span
-                      >
-                    }
-                    @if (b.udtTraits.length < b.slots) {
-                      <button
-                        type="button"
-                        class="udt-trait slot add"
-                        [disabled]="busy()"
-                        (click)="openAssign(b)"
-                      >
-                        + {{ 'udt.traits.add' | t }} ({{
-                          'udt.traits.free' | t: { n: b.slots - b.udtTraits.length }
-                        }})
-                      </button>
-                    }
-                  </span>
-                  @if (assignFor() === b.botId) {
-                    <span class="assign">
-                      @if (inventory().length) {
-                        <select [(ngModel)]="pickCard" name="pick" (ngModelChange)="tick()">
-                          @for (c of inventory(); track c.id) {
-                            <option [ngValue]="c.id">
-                              {{ 'udt.trait.' + c.code | t }} – {{ 'udt.traitE.' + c.code | t }}
-                            </option>
-                          }
-                        </select>
-                        @if (needsWeapon()) {
-                          <select
-                            [(ngModel)]="pickWeapon"
-                            name="weapon"
-                            [attr.aria-label]="'udt.traits.weapon' | t"
-                          >
-                            @for (w of weapons(); track w.name) {
-                              <option [ngValue]="w.name">{{ w.label }}</option>
-                            }
-                          </select>
-                        }
-                        <button
-                          type="button"
-                          class="primary"
-                          [disabled]="busy() || !pickCard"
-                          (click)="assign(b)"
-                        >
-                          {{ 'udt.traits.put' | t }}
-                        </button>
-                      } @else {
-                        <span class="muted small"
-                          >{{ 'udt.traits.none' | t }}
-                          <a routerLink="/udt/packs">{{ 'udt.nav.packs' | t }}</a></span
-                        >
-                      }
-                      <button type="button" (click)="assignFor.set(null)">
-                        {{ 'common.cancel' | t }}
-                      </button>
-                    </span>
-                  }
-                </span>
-                <span class="stam"
-                  ><span class="udt-bar"
-                    ><i [style.width.%]="b.stamina" [style.background]="color(b.stamina)"></i></span
-                  ><span class="mono small">{{ b.stamina }}</span></span
-                >
-                <span class="neuro mono">{{ b.value | neuro }}</span>
-                @if (!b.starter && !b.own) {
-                  <button type="button" (click)="sell(b)" [disabled]="busy()">
-                    {{ 'udt.sell' | t }}
-                  </button>
-                }
-                @if (b.stamina < 100) {
-                  <button
-                    type="button"
-                    [disabled]="busy()"
-                    (click)="openRest(b)"
-                    [title]="'udt.rest.hint' | t: { n: restPrice }"
-                  >
-                    {{ 'udt.rest.button' | t }}
-                  </button>
-                }
-                @if (b.own) {
-                  <button
-                    type="button"
-                    [disabled]="busy()"
-                    (click)="openLook(b)"
-                    [title]="'udt.look.edit' | t"
-                  >
-                    {{ 'udt.look.button' | t }}
-                  </button>
-                }
-              </div>
-              @if (restFor() === b.botId) {
-                <div class="restbox">
-                  <label class="restslider"
-                    ><span>{{ 'udt.rest.points' | t }}</span>
-                    <input
-                      type="range"
-                      name="rest"
-                      min="1"
-                      [max]="100 - b.stamina"
-                      step="1"
-                      [ngModel]="restPoints()"
-                      (ngModelChange)="restPoints.set(+$event)"
-                    />
-                    <span class="mono">+{{ restPoints() }}</span>
-                  </label>
-                  <span class="small muted">
-                    {{ 'udt.stamina' | t }} {{ b.stamina }} → {{ b.stamina + restPoints() }}
-                  </span>
-                  <span class="row">
-                    <button
-                      type="button"
-                      class="primary"
-                      [disabled]="
-                        busy() ||
-                        restPoints() * restPrice > (spendable() ?? v.wallet?.spendable ?? 0)
-                      "
-                      (click)="rest(b)"
-                    >
-                      {{ 'udt.rest.buy' | t }} · {{ restPoints() * restPrice | neuro }}
-                    </button>
-                    <button type="button" (click)="restFor.set(null)">
-                      {{ 'common.cancel' | t }}
-                    </button>
-                  </span>
-                </div>
-              }
-              @if (lookFor() === b.botId) {
-                @if (lookDraft(); as ld) {
-                  <div class="lookedit">
-                    @if (b.own?.canRename) {
-                      <udt-rename [botId]="b.botId" [name]="b.name" (renamed)="renamed()" />
-                    }
-                    <app-udt-bot-look [draft]="ld" [looks]="looks()" />
-                    <span class="row">
-                      <button
-                        type="button"
-                        class="primary"
-                        [disabled]="busy()"
-                        (click)="saveLook(b)"
-                      >
-                        {{ 'common.save' | t }}
-                      </button>
-                      <button type="button" (click)="lookFor.set(null)">
-                        {{ 'common.cancel' | t }}
-                      </button>
-                    </span>
-                  </div>
-                }
-              }
-            }
-          </div>
-        </section>
+        <udt-bot-panel
+          [bot]="panelBot()"
+          [tag]="v.team.tag"
+          [spendable]="spendable() ?? v.wallet?.spendable ?? null"
+          [looks]="looks()"
+          (changed)="load()"
+          (closed)="panelId.set(null)"
+        />
 
         <section class="card">
           <h2>{{ 'udt.ledger' | t }}</h2>
@@ -478,27 +221,6 @@ type Mode = 'dm' | 'mh';
       flex-direction: column;
       gap: 10px;
     }
-    .between {
-      justify-content: space-between;
-      align-items: center;
-    }
-    .empty {
-      width: var(--slot-w, 150px);
-      min-height: 150px;
-      border: 2px dashed var(--line);
-      border-radius: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-    }
-    .slots {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 10px;
-      margin: 14px 0;
-    }
-    .roster .rrow,
     .lrow {
       display: flex;
       align-items: center;
@@ -511,46 +233,6 @@ type Mode = 'dm' | 'mh';
       flex: 1 1 200px;
       min-width: 0;
     }
-    .block {
-      display: block;
-    }
-    .stam {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      width: 120px;
-    }
-    .stam .udt-bar {
-      flex: 1;
-    }
-    .tline {
-      margin-top: 6px;
-    }
-    .udt-trait .x {
-      min-height: 0;
-      height: 16px;
-      padding: 0 2px;
-      border: 0;
-      background: transparent;
-      color: inherit;
-      line-height: 1;
-    }
-    .udt-trait.add {
-      cursor: pointer;
-      min-height: 0;
-      font: inherit;
-      font-size: 0.68rem;
-    }
-    .assign {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-top: 8px;
-    }
-    .assign select {
-      max-width: 100%;
-    }
     .up {
       color: var(--live);
     }
@@ -562,13 +244,12 @@ type Mode = 'dm' | 'mh';
 export class UdtTeamPage {
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
+  private readonly toasts = inject(Toasts);
   protected readonly view = signal<UdtView | null>(null);
   protected readonly ledger = signal<UdtLedgerEntry[]>([]);
   /** The shared Neuro state (the same as in the navbar). */
   protected readonly spendable = inject(NeuroStore).spendable;
   protected readonly busy = signal(false);
-  protected readonly mode = signal<Mode>('dm');
-  protected readonly slots = [1, 2, 3, 4, 5];
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
   // Founding form
   protected teamName = '';
@@ -581,37 +262,26 @@ export class UdtTeamPage {
     strafing: 0,
   };
   private readonly rev = signal(0);
-  // Look and chat lines: of the starter (founding) and of an own bot (editing)
+  // Look and chat lines of the starter (founding); the bot panel edits own bots
   protected readonly foundLook = emptyLook();
   protected readonly looks = signal<UdtLooks | null>(null);
-  protected readonly lookFor = signal<string | null>(null);
-  protected readonly lookDraft = signal<LookDraft | null>(null);
-  // Rest with Neuro
-  protected readonly restFor = signal<string | null>(null);
-  protected readonly restPoints = signal(1);
   /** Neuro per stamina point (rest with Neuro). */
   protected readonly restPrice = DEFAULT_ECONOMY.restPrice;
-  // Lineup draft (bot ids per slot) and whether it differs from the saved one
-  private readonly draft = signal<{
-    dm: (string | null)[];
-    mh: (string | null)[];
-    bench: (string | null)[];
-  }>({
-    dm: [],
-    mh: [],
-    bench: [],
-  });
-  protected readonly dirty = signal(false);
-  protected readonly assignFor = signal<string | null>(null);
+  /** The saved lineups (bot ids per slot); the board changes and saves them at once. */
+  protected readonly draft = signal<LineupDraft>({ dm: [], mh: [], bench: [] });
   private readonly packs = signal<UdtPacks | null>(null);
   protected readonly inventory = computed(() => this.packs()?.inventory ?? []);
   protected readonly weapons = computed(() => this.packs()?.weapons ?? []);
-  protected pickCard: string | null = null;
-  protected pickWeapon: string | null = null;
-  protected readonly needsWeapon = computed(() => {
-    this.rev();
-    return !!this.inventory().find((c) => c.id === this.pickCard)?.needsWeapon;
-  });
+  /** The bot whose details are open (bot panel). */
+  protected readonly panelId = signal<string | null>(null);
+  protected readonly panelBot = computed(
+    () => this.view()?.roster.find((b) => b.botId === this.panelId()) ?? null,
+  );
+  /** Saves one after the other (fast drops). */
+  private saving: Promise<void> = Promise.resolve();
+  /** Lineup saves not yet answered; a failed one reloads once all are answered. */
+  private pending = 0;
+  private failed = false;
 
   /** Extra points to allocate on top of the default starter (skill 3, average values). */
   protected readonly extra = computed(() => this.view()?.starterExtra ?? 0);
@@ -639,6 +309,9 @@ export class UdtTeamPage {
   );
 
   constructor() {
+    // ?bot=<id> (e.g. from the academy) opens that bot's details.
+    const bot = inject(ActivatedRoute).snapshot.queryParamMap.get('bot');
+    if (bot) this.panelId.set(bot);
     void this.load();
   }
 
@@ -646,10 +319,14 @@ export class UdtTeamPage {
     try {
       const v = await this.api.udt();
       this.view.set(v);
-      this.resetDraft(v);
+      // While lineup saves run, the board shows the newest change (synced when they are done).
+      if (!this.pending) this.resetDraft(v);
       if (v.enabled && v.season !== null && !this.looks())
         this.looks.set(await this.api.udtLooks().catch(() => null));
-      if (v.team) this.ledger.set(await this.api.udtLedger());
+      if (v.team) {
+        this.ledger.set(await this.api.udtLedger());
+        this.packs.set(await this.api.udtPacks());
+      }
     } catch {
       // the toast shows the error
     }
@@ -659,7 +336,6 @@ export class UdtTeamPage {
     const at = (key: 'dmSlot' | 'mhSlot' | 'bench', n: number) =>
       Array.from({ length: n }, (_, i) => v.roster.find((b) => b[key] === i + 1)?.botId ?? null);
     this.draft.set({ dm: at('dmSlot', 5), mh: at('mhSlot', 5), bench: at('bench', 2) });
-    this.dirty.set(false);
   }
 
   protected tick() {
@@ -675,89 +351,43 @@ export class UdtTeamPage {
     this.tick();
   }
 
-  protected card(b: UdtRosterBot): CardBot {
-    return rosterCard(b, this.view()?.team?.tag);
+  protected openBot(id: string) {
+    this.panelId.set(id);
   }
 
-  protected star(b: UdtRosterBot) {
-    return bracketOf(b.effective.skill) === 'strong';
-  }
-
-  protected async openAssign(b: UdtRosterBot) {
-    await this.act(async () => {
-      const p = await this.api.udtPacks();
-      this.packs.set(p);
-      this.pickCard = p.inventory[0]?.id ?? null;
-      this.pickWeapon = p.weapons[0]?.name ?? null;
-      this.assignFor.set(b.botId);
-      this.tick();
+  /** A drop on the board: shown at once, saved, with "undo" in the toast. */
+  protected saveLineup(next: LineupDraft, undo = true) {
+    const before = this.draft();
+    this.draft.set(next);
+    this.pending++;
+    this.saving = this.saving.then(async () => {
+      try {
+        const roster = await this.api.udtLineup(next);
+        const v = this.view();
+        if (v) this.view.set({ ...v, roster });
+        this.toasts.success(
+          this.i18n.t('ok.udt.lineup'),
+          undo
+            ? { label: this.i18n.t('udt.board.undo'), run: () => this.saveLineup(before, false) }
+            : undefined,
+        );
+      } catch {
+        // the toast shows the error; back to what the server has once all saves are answered
+        this.failed = true;
+      }
+      if (--this.pending) return;
+      const v = this.view();
+      if (this.failed) {
+        this.failed = false;
+        await this.load();
+      } else if (v) this.resetDraft(v);
     });
   }
 
-  protected async assign(b: UdtRosterBot) {
-    const card = this.pickCard;
-    if (!card) return;
+  protected async assign(t: TraitDrop) {
     await this.act(async () => {
-      const v = await this.api.udtAssign(
-        card,
-        b.botId,
-        this.needsWeapon() ? (this.pickWeapon ?? undefined) : undefined,
-      );
-      this.view.set(v);
-      this.assignFor.set(null);
-    });
-  }
-
-  protected async unassign(t: UdtTraitOnBot) {
-    const name = this.i18n.t(`udt.trait.${t.code}`);
-    const n = SCRAP[t.rarity];
-    if (!confirm(this.i18n.t('udt.traits.removeConfirm', { name, n }))) return;
-    await this.act(async () => {
-      this.view.set(await this.api.udtUnassign(t.id));
-    });
-  }
-
-  protected color(s: number) {
-    return staminaColor(s);
-  }
-
-  protected slotValue(s: number) {
-    return this.draft()[this.mode()][s - 1] ?? null;
-  }
-
-  protected benchValue(s: number) {
-    return this.draft().bench[s - 1] ?? null;
-  }
-
-  protected inSlot(s: number): UdtRosterBot | undefined {
-    const id = this.slotValue(s);
-    return id ? this.view()?.roster.find((b) => b.botId === id) : undefined;
-  }
-
-  protected setSlot(s: number, id: string | null) {
-    const d = structuredClone(this.draft());
-    const list = d[this.mode()];
-    while (list.length < 5) list.push(null);
-    // A bot in one slot only: move it.
-    for (let i = 0; i < list.length; i++) if (id && list[i] === id) list[i] = null;
-    list[s - 1] = id;
-    this.draft.set(d);
-    this.dirty.set(true);
-  }
-
-  protected setBench(s: number, id: string | null) {
-    const d = structuredClone(this.draft());
-    while (d.bench.length < 2) d.bench.push(null);
-    for (let i = 0; i < d.bench.length; i++) if (id && d.bench[i] === id) d.bench[i] = null;
-    d.bench[s - 1] = id;
-    this.draft.set(d);
-    this.dirty.set(true);
-  }
-
-  protected async saveLineup() {
-    await this.act(async () => {
-      await this.api.udtLineup(this.draft());
-      await this.load();
+      this.view.set(await this.api.udtAssign(t.cardId, t.botId, t.weapon));
+      this.packs.set(await this.api.udtPacks());
     });
   }
 
@@ -781,61 +411,6 @@ export class UdtTeamPage {
       });
       this.view.set(v);
       this.resetDraft(v);
-    });
-  }
-
-  /** Opens the look and lines of an own bot (its current values from the library). */
-  protected async openLook(b: UdtRosterBot) {
-    if (this.lookFor() === b.botId) {
-      this.lookFor.set(null);
-      return;
-    }
-    await this.act(async () => {
-      const bot = await this.api.botProfile(b.botId);
-      this.lookDraft.set(lookFromBot(bot));
-      this.lookFor.set(b.botId);
-    });
-  }
-
-  protected openRest(b: UdtRosterBot) {
-    if (this.restFor() === b.botId) {
-      this.restFor.set(null);
-      return;
-    }
-    this.restPoints.set(100 - b.stamina);
-    this.restFor.set(b.botId);
-  }
-
-  protected async rest(b: UdtRosterBot) {
-    await this.act(async () => {
-      const v = await this.api.udtRest(b.botId, this.restPoints());
-      this.view.set(v);
-      this.resetDraft(v);
-      this.restFor.set(null);
-      this.ledger.set(await this.api.udtLedger());
-    });
-  }
-
-  /** After the one renaming: the roster shows the new name, the look editor stays open. */
-  protected async renamed() {
-    await this.load();
-  }
-
-  protected async saveLook(b: UdtRosterBot) {
-    const d = this.lookDraft();
-    if (!d) return;
-    await this.act(async () => {
-      await this.api.udtEditBot(b.botId, lookBody(d));
-      this.lookFor.set(null);
-      await this.load();
-    });
-  }
-
-  protected async sell(b: UdtRosterBot) {
-    if (!confirm(this.i18n.t('udt.sellConfirm', { name: b.name }))) return;
-    await this.act(async () => {
-      await this.api.udtSell(b.botId);
-      await this.load();
     });
   }
 

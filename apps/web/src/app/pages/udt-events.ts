@@ -17,6 +17,7 @@ import { UdtNav } from '../core/udt';
     <div class="udt-head">
       <div>
         <h1 class="disp">{{ 'udt.events.title' | t }}</h1>
+        <p class="muted">{{ 'udt.events.lineupNote' | t }}</p>
       </div>
     </div>
     @if (hasTeam()) {

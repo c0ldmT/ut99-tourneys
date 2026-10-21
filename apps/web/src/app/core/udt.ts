@@ -15,6 +15,7 @@ import {
   botRarity,
   bracketOf,
   buildCost,
+  xpForLevel,
   managerEffects,
   RARITIES,
   SCRAP,
@@ -75,6 +76,8 @@ export interface CardBot {
   udtTraits?: UdtTraitOnBot[];
   slots?: number;
   level?: number;
+  /** Dream Team experience (roster bots): the card shows the way to the next level. */
+  xp?: number;
   effective?: { skill: number; traits: BotTraitsView; overflow: boolean };
   career?: UdtCareer | null;
 }
@@ -97,6 +100,20 @@ export function rosterCard(
     @let v = b.effective?.traits ?? b.traits;
     @let sk = b.effective?.skill ?? b.skill;
     <div class="udt-card r-{{ b.rarity }}" [class.small]="small()" [class.dim]="dim()">
+      @if (points() > 0) {
+        <button
+          type="button"
+          class="udt-plaque"
+          [title]="'udt.points.plaque' | t: { n: points() }"
+          [attr.aria-label]="'udt.points.plaque' | t: { n: points() }"
+          (click)="$event.stopPropagation(); pointsClick.emit()"
+          (pointerdown)="$event.stopPropagation()"
+          (mousedown)="$event.stopPropagation()"
+          (touchstart)="$event.stopPropagation()"
+        >
+          +{{ points() }}
+        </button>
+      }
       <div class="in">
         <div class="top">
           <div class="sk">
@@ -167,6 +184,14 @@ export function rosterCard(
             <i [style.width.%]="b.stamina" [style.background]="staminaColor(b.stamina)"></i>
           </div>
         }
+        @if (xpStep(); as x) {
+          <div
+            class="udt-bar xp"
+            [title]="'udt.points.xpBar' | t: { xp: x.in, need: x.need, lv: (b.level ?? 1) + 1 }"
+          >
+            <i [style.width.%]="x.pct"></i>
+          </div>
+        }
         @if (b.value !== undefined || note()) {
           <div class="foot">
             @if (b.value !== undefined) {
@@ -188,6 +213,11 @@ export class UdtCard {
   readonly dim = input(false);
   /** A short line in the foot (e.g. why the bot cannot be traded). */
   readonly note = input<string | null>(null);
+  /** Development points to give (own bots): a gold plaque, a click opens them. */
+  readonly points = input(0);
+  readonly pointsClick = output<void>();
+  /** XP within the level and what the next level needs (roster bots). */
+  protected readonly xpStep = computed(() => xpStep(this.bot().xp, this.bot().level));
   private readonly i18n = inject(I18n);
   protected readonly round = Math.round;
   protected readonly pct = pct;
@@ -198,6 +228,15 @@ export class UdtCard {
   protected staminaColor(s: number) {
     return staminaColor(s);
   }
+}
+
+/** XP of a bot within its level: what it has, what the next level needs, as a share. */
+export function xpStep(xp: number | undefined, level: number | undefined) {
+  if (xp === undefined || !level) return null;
+  const from = xpForLevel(level);
+  const need = xpForLevel(level + 1) - from;
+  const got = Math.max(0, xp - from);
+  return { in: got, need, pct: Math.min(100, Math.round((got / need) * 100)) };
 }
 
 export function staminaColor(s: number): string {

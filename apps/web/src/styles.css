@@ -915,6 +915,7 @@ label.switch input:disabled + .tr {
   font-size: 1.25rem;
 }
 .udt-card {
+  position: relative;
   width: 180px;
   flex: none;
   text-align: left;
@@ -1566,6 +1567,45 @@ udt-pack-stage .stage.lg .rays {
 .udt-card .frm.f-cold {
   color: var(--danger);
   background: rgba(255, 92, 108, 0.12);
+}
+.udt-plaque {
+  position: absolute;
+  z-index: 2;
+  top: -9px;
+  right: -9px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 0;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 2px solid #0c0f16;
+  background: linear-gradient(135deg, #ffe08a, #f5b83d 60%, #d98e1c);
+  color: #2a1a00;
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 0 0 0 rgba(245, 184, 61, 0.6);
+  animation: udt-plaque 2.2s ease-out infinite;
+}
+@keyframes udt-plaque {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 184, 61, 0.55);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 10px rgba(245, 184, 61, 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .udt-plaque {
+    animation: none;
+  }
+}
+.udt-bar.xp {
+  height: 3px;
+}
+.udt-bar.xp i {
+  background: var(--udt);
 }
 .udt-card .car {
   letter-spacing: 0.08em;
