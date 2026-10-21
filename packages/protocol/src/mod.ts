@@ -317,7 +317,8 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * with the sniper rifle), tp team player (focus fire in team games), sd shuffle dancer (dodges
    * in a fight), ic item controller (armour, belts and amplifiers at respawn time); mod 0.14.0
    * values traits as edges on the skill curve: sh steady hand, wd watchdog, ss side-stepper, ph
-   * patient hunter, ee eagle eye, ar all-rounder. Unknown codes are ignored.
+   * patient hunter, ee eagle eye, ar all-rounder; mod 0.15.0: dd daredevil, bo bouncer. Unknown
+   * codes are ignored.
    */
   z.object({ t: z.literal('btrt'), name: str(MAX_NAME_CHARS), c: str(64) }),
   /**

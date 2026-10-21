@@ -1,5 +1,5 @@
 //=============================================================================
-// TourneySkillCurve (mod 0.13.0, curve v1 and trait edges in 0.14.0)
+// TourneySkillCurve (mod 0.13.0, curve v1 and trait edges in 0.14.0, bot errors in 0.15.0)
 // One skill curve for all tournament bots instead of UT's novice switch. UT runs
 // the levels Novice..Skilled as "novice" bots (half speed, narrow view, no dodging,
 // no leading, random waiting, less damage against players) and Adept..Godlike as
@@ -19,6 +19,10 @@
 //   enemy (TSightReact: no turning, no firing) and fire pauses (TFireDelay); Dream Team
 //   values traits as edges (aim error, reaction, view, turn rate, dodges; codes in "btrt").
 //   Tuned with the duel simulator (pnpm --filter @tourney/api bot:sim, decision 157).
+// - 0.15.0: own projectile dodges instead of UT's (bCanDuck off): a reaction time
+//   (TDodgeLate) and sometimes the wrong side (TDodgeErr), also in fighting moves; leading
+//   switched off now and then (TLeadOff); UT's advanced tactics kept by level (TAdvTactics);
+//   the strafing value scales the dodge chances (TStrafeDodge). Decision 174.
 // - SmartStockBots: its MoveWithDodge (it sets bCanDuck every 0.1 s) and
 //   FixMinigun (doubles the minigun's aim error) are switched off at run time;
 //   the ini stays untouched, everything else of it keeps working.
@@ -56,6 +60,16 @@ var Pawn CPrevEnemy[32];          // the one before (switching back costs no rea
 var float CFreezeUntil[32];       // no turning before this time (reaction to a new enemy)
 var float CHoldUntil[32];         // no firing before this time (reaction, fire pause)
 var float CReactAt[32];           // when it last took in a new enemy (at most every 1.5 s)
+// Mod 0.15.0.
+var float CTraitStrafe[32];       // the bot's strafing value (-1..1)
+var float CPDodgeAt[32];          // a projectile dodge waiting for its reaction time (0 = none)
+var vector CPDodgeDir[32];
+var float CThreatAt[32];          // last shot at it it saw coming, and the side away from it
+var vector CThreatSide[32];
+var Projectile CSeen[128];        // 4 per bot: projectiles already rolled for
+var byte CSeenNext[32];
+var float CLeadAt[32];            // next roll of leading
+var byte CAdvSeen[32];            // 1: the game's advanced tactics already rolled for
 
 // The curve, index = level 0..7 (Novice, Average, Experienced, Skilled, Adept, Masterful,
 // Inhuman, Godlike). See docs/decisions.md 149.
@@ -77,6 +91,11 @@ var float TBlindSplash[8];        // extra seconds with splash weapons near the 
 var float TAccGain[8];            // share of the bot's own accuracy that counts (0.14.0)
 var float TSightReact[8];         // seconds from a new enemy to turning and firing (0.14.0)
 var float TFireDelay[8];          // fire pauses: share of the time it holds fire (0.14.0)
+var float TDodgeLate[8];          // seconds from seeing a shot coming to the dodge (0.15.0)
+var float TDodgeErr[8];           // chance a dodge goes to the wrong side (0.15.0)
+var float TLeadOff[8];            // chance it does not lead its target, rolled every 2 s (0.15.0)
+var float TStrafeDodge[8];        // dodge chances x (1 + this x strafing) (0.15.0)
+var float TAdvTactics[8];         // share of the game's advanced tactics it keeps (0.15.0)
 
 function Init(TourneyCore C)
 {
@@ -139,6 +158,16 @@ function int Slot(Bot B, bool bCreate)
 	CFreezeUntil[Free] = 0;
 	CHoldUntil[Free] = 0;
 	CReactAt[Free] = -10;
+	CTraitStrafe[Free] = 0;
+	CPDodgeAt[Free] = 0;
+	CThreatAt[Free] = -10;
+	CLeadAt[Free] = 0;
+	CAdvSeen[Free] = 0;
+	CSeenNext[Free] = 0;
+	CSeen[Free * 4] = None;
+	CSeen[Free * 4 + 1] = None;
+	CSeen[Free * 4 + 2] = None;
+	CSeen[Free * 4 + 3] = None;
 	CHitBy[Free] = None;
 	CTurnTries[Free] = 0;
 	CDodgeAt[Free] = 0;
@@ -207,6 +236,7 @@ function Setup(Bot B, int Lv, int Edges)
 	CTraitJumpy[s] = 0;
 	if (B.bJumpy)
 		CTraitJumpy[s] = 1;
+	CTraitStrafe[s] = FClamp(B.StrafingAbility, -1, 1);
 	SetEdges(s, Edges);
 	if (bNew)
 	{
@@ -236,7 +266,7 @@ function SetCurve(Bot B)
 
 // The values traits as edges on the curve (the same numbers as gameEdge in packages/udt
 // traits.ts): 1 steady hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16 eagle eye,
-// 32 all-rounder.
+// 32 all-rounder, 64 daredevil, 128 bouncer.
 function SetEdges(int s, int Bits)
 {
 	CEAim[s] = 1.0;
@@ -266,6 +296,16 @@ function SetEdges(int s, int Bits)
 		CETurn[s] *= 1.05;
 		CEDodge[s] *= 1.3;
 	}
+	if ((Bits & 64) != 0)
+		CEReact[s] *= 0.9;
+	if ((Bits & 128) != 0)
+		CEDodge[s] *= 1.2;
+}
+
+// Dodge chances x: the trait edge and the strafing value (TStrafeDodge).
+function float DodgeMul(int s)
+{
+	return CEDodge[s] * FMax(0, 1 + TStrafeDodge[CLv[s]] * CTraitStrafe[s]);
 }
 
 // Turn rate of slot s now (0 while it takes in a new enemy).
@@ -412,6 +452,7 @@ function Timer()
 		Core.Game.bNoviceMode = false;
 	if (Level.Game != None && Level.Game.bGameEnded)
 		return;
+	ScanShots();
 	for (s = 0; s < MAXC; s++)
 	{
 		B = CBot[s];
@@ -431,6 +472,8 @@ function Timer()
 			CPrevEnemy[s] = None;
 			CFreezeUntil[s] = 0;
 			CHoldUntil[s] = 0;
+			CPDodgeAt[s] = 0;
+			CAdvSeen[s] = 0;
 			continue;
 		}
 		BotStep(B, s);
@@ -440,8 +483,8 @@ function Timer()
 function BotStep(Bot B, int s)
 {
 	local int L;
-	local float Now, P;
-	local bool bDuck;
+	local float Now;
+	local vector AX, AY, AZ;
 
 	L = CLv[s];
 	Now = Level.TimeSeconds;
@@ -459,15 +502,40 @@ function BotStep(Bot B, int s)
 	// The game's minigun aim error (SmartStockBots doubled it before it was switched off).
 	if (minigun2(B.Weapon) != None && B.Weapon.AimError != B.Weapon.default.AimError)
 		B.Weapon.AimError = B.Weapon.default.AimError;
-	// Dodge window, rolled once a second: the game dodges a projectile (WarnTarget) only with
-	// bCanDuck, then with 0.33 + 0.22 * skill.
-	if (Now >= CWindowAt[s])
+	// Projectiles: the curve dodges them itself (ScanShots); the game's WarnTarget stays off.
+	B.bCanDuck = false;
+	if (CPDodgeAt[s] > 0 && Now >= CPDodgeAt[s])
 	{
-		CWindowAt[s] = Now + 1.0;
-		P = 0.33 + 0.22 * B.Skill;
-		bDuck = FRand() * P < TDuck[L] * CEDodge[s];
-		B.bCanDuck = bDuck;
+		CPDodgeAt[s] = 0;
+		if (B.Physics == PHYS_Walking && !B.IsInState('TakeHit') && !B.IsInState('ImpactJumping') && !B.Region.Zone.bWaterZone)
+		{
+			GetAxes(B.Rotation, AX, AY, AZ);
+			B.TryToDuck(CPDodgeDir[s], (CPDodgeDir[s] Dot AY) < 0);
+		}
 	}
+	// An enemy it leaves alone (only a melee weapon, see TourneyCore.MeleeStuck): the game
+	// takes it up again on sight, the curve drops it again.
+	if (Core != None && Core.MeleeSkipped(B))
+		Core.DropEnemy(B);
+	// Leading, rolled every 2 s (ReSetSkill turns it on at the respawn, this decides).
+	if (Now >= CLeadAt[s])
+	{
+		CLeadAt[s] = Now + 2;
+		B.bLeadTarget = FRand() >= TLeadOff[L];
+	}
+	// The game's advanced tactics (detours when it moves in a fight): kept by level, rolled
+	// once each time the game switches them on.
+	if (B.bAdvancedTactics)
+	{
+		if (CAdvSeen[s] == 0)
+		{
+			CAdvSeen[s] = 1;
+			if (FRand() >= TAdvTactics[L])
+				B.bAdvancedTactics = false;
+		}
+	}
+	else
+		CAdvSeen[s] = 0;
 	FightDodge(B, s);
 	FirePause(B, s);
 	BlindFire(B, s);
@@ -482,6 +550,7 @@ function FightDodge(Bot B, int s)
 {
 	local vector Y;
 	local float P;
+	local bool bAway;
 	if (!B.IsInState('TacticalMove'))
 	{
 		CInTact[s] = 0;
@@ -497,14 +566,14 @@ function FightDodge(Bot B, int s)
 	// Below Masterful (not jumpy) the curve's chance; otherwise the game dodges by itself (35 %
 	// when jumpy or skill x rand > 0.4) and a dodge edge (side-stepper) adds the rest.
 	if (B.Skill < 1 && CTraitJumpy[s] == 0)
-		P = TTact[CLv[s]] * CEDodge[s];
+		P = TTact[CLv[s]] * DodgeMul(s);
 	else
 	{
 		if (CTraitJumpy[s] == 1)
 			P = 0.35;
 		else
 			P = 0.35 * FMax(0, 1 - 0.4 / B.Skill);
-		P = P * (CEDodge[s] - 1.0);
+		P = P * (DodgeMul(s) - 1.0);
 	}
 	if (P <= 0 || FRand() >= P)
 		return;
@@ -512,10 +581,115 @@ function FightDodge(Bot B, int s)
 	Y.Z = 0;
 	if (VSize(Y) < 0.1)
 		return;
-	if (FRand() < 0.5)
-		B.TryToDuck(-Y, true);
+	// A shot it saw coming in the last second: away from it, with TDodgeErr the wrong way;
+	// otherwise either side.
+	if (Level.TimeSeconds - CThreatAt[s] < 1.0)
+	{
+		bAway = (Y Dot CThreatSide[s]) > 0;
+		if (FRand() < TDodgeErr[CLv[s]])
+			bAway = !bAway;
+	}
 	else
+		bAway = FRand() < 0.5;
+	if (bAway)
 		B.TryToDuck(Y, false);
+	else
+		B.TryToDuck(-Y, true);
+}
+
+//-----------------------------------------------------------------------------
+// Projectiles (mod 0.15.0): the curve dodges them itself, with a reaction time and errors.
+//-----------------------------------------------------------------------------
+
+// Every 0.1 s: each projectile in flight against each bot.
+function ScanShots()
+{
+	local Projectile P;
+	local int s, n;
+	n = 0;
+	foreach AllActors(class'Projectile', P)
+	{
+		if (P.bDeleteMe || P.Instigator == None || VSize(P.Velocity) < 200)
+			continue;
+		// Tracers, translocator discs and shell cases are no shots.
+		if (P.IsA('MTracer') || P.IsA('TranslocatorTarget') || P.IsA('UT_ShellCase'))
+			continue;
+		n++;
+		if (n > 40)
+			return; // a flak storm: enough
+		for (s = 0; s < MAXC; s++)
+			if (CBot[s] != None && !CBot[s].bDeleteMe && CBot[s].Health > 0)
+				ShotAt(CBot[s], s, P);
+	}
+}
+
+function bool SeenShot(int s, Projectile P)
+{
+	local int k;
+	for (k = 0; k < 4; k++)
+		if (CSeen[s * 4 + k] == P)
+			return true;
+	k = CSeenNext[s];
+	CSeen[s * 4 + k] = P;
+	k++;
+	if (k >= 4)
+		k = 0;
+	CSeenNext[s] = k;
+	return false;
+}
+
+// A shot of its enemy that passes within 120 units in 0.15-2 s and that it can see coming (the
+// shooter in its view): once per projectile it dodges with TDuck (x edges), after TDodgeLate,
+// away from the path or (TDodgeErr) towards it. Too late when the shot is there first.
+function ShotAt(Bot B, int s, Projectile P)
+{
+	local vector V, D, C, Off, Y;
+	local float T, Chance, Late;
+	local int L;
+	if (P.Instigator == B || B.Enemy == None || P.Instigator != B.Enemy || CPDodgeAt[s] > 0)
+		return;
+	if (B.Physics != PHYS_Walking || B.Region.Zone.bWaterZone || B.IsInState('TakeHit'))
+		return;
+	// One roll per volley (flak chunks, several rockets).
+	if (Level.TimeSeconds - CThreatAt[s] < 0.3)
+		return;
+	V = P.Velocity;
+	D = B.Location - P.Location;
+	T = (D Dot V) / (V Dot V);
+	if (T < 0.15 || T > 2.0)
+		return;
+	C = P.Location + V * T;
+	if (Abs(B.Location.Z - C.Z) > 2 * B.CollisionHeight)
+		return; // passes above or below (another floor)
+	Off = B.Location - C;
+	Off.Z = 0;
+	if (VSize(Off) > 120)
+		return;
+	if ((Normal(P.Instigator.Location - B.Location) Dot vector(B.Rotation)) < B.PeripheralVision)
+		return;
+	if (SeenShot(s, P))
+		return;
+	L = CLv[s];
+	Y = V Cross vect(0,0,1);
+	if (VSize(Y) < 0.5)
+		return; // falls straight down
+	Y = Normal(Y);
+	if ((Off Dot Y) < 0)
+		Y = -Y;
+	else if (VSize(Off) < 5 && FRand() < 0.5)
+		Y = -Y;
+	CThreatAt[s] = Level.TimeSeconds;
+	CThreatSide[s] = Y;
+	Chance = FMin(1, TDuck[L] * DodgeMul(s));
+	if (FRand() >= Chance)
+		return;
+	Late = TDodgeLate[L] * CEReact[s] * (0.8 + 0.4 * FRand());
+	if (Late > T - 0.05)
+		return;
+	if (FRand() < TDodgeErr[L])
+		Y = -Y;
+	CPDodgeAt[s] = FMax(Level.TimeSeconds + Late, Level.TimeSeconds + 0.01);
+	CPDodgeDir[s] = Y;
 }
 
 // A new enemy: the bot takes it in first (no turning, no firing) for TSightReact (x the
@@ -734,7 +908,7 @@ function RunDodge(Bot B, int s)
 		return;
 	if (!FloorNear(B, Land) || !FloorNear(B, B.Location + Dir * (0.5 * Speed * Air)))
 		return;
-	CDodgeAt[s] = Level.TimeSeconds + TRunDodge[L] / CEDodge[s] * (1.0 + 0.5 * FRand());
+	CDodgeAt[s] = Level.TimeSeconds + TRunDodge[L] / FMax(0.1, DodgeMul(s)) * (1.0 + 0.5 * FRand());
 	B.SetFall();
 	B.Velocity = Dir * Speed;
 	B.Velocity.Z = 210;
@@ -890,11 +1064,11 @@ defaultproperties
 	TFov(5)=155
 	TFov(6)=180
 	TFov(7)=200
-	TAcc(0)=-1.8
+	TAcc(0)=-2.0
 	TAcc(1)=-1.35
 	TAcc(2)=-0.95
 	TAcc(3)=-0.6
-	TAcc(4)=-0.3
+	TAcc(4)=-0.2
 	TAcc(5)=0
 	TAcc(6)=0.12
 	TAcc(7)=-0.2
@@ -986,11 +1160,11 @@ defaultproperties
 	TBlindSplash(5)=1.2
 	TBlindSplash(6)=1.5
 	TBlindSplash(7)=1.5
-	TAccGain(0)=0.532
+	TAccGain(0)=0.57
 	TAccGain(1)=0.447
 	TAccGain(2)=0.39
 	TAccGain(3)=0.336
-	TAccGain(4)=0.364
+	TAccGain(4)=0.336
 	TAccGain(5)=0.33
 	TAccGain(6)=0.308
 	TAccGain(7)=0.396
@@ -1010,4 +1184,44 @@ defaultproperties
 	TFireDelay(5)=0
 	TFireDelay(6)=0
 	TFireDelay(7)=0
+	TDodgeLate(0)=0.35
+	TDodgeLate(1)=0.3
+	TDodgeLate(2)=0.25
+	TDodgeLate(3)=0.2
+	TDodgeLate(4)=0.15
+	TDodgeLate(5)=0.1
+	TDodgeLate(6)=0.06
+	TDodgeLate(7)=0.03
+	TDodgeErr(0)=0.4
+	TDodgeErr(1)=0.35
+	TDodgeErr(2)=0.3
+	TDodgeErr(3)=0.25
+	TDodgeErr(4)=0.2
+	TDodgeErr(5)=0.15
+	TDodgeErr(6)=0.1
+	TDodgeErr(7)=0.05
+	TLeadOff(0)=0.5
+	TLeadOff(1)=0.42
+	TLeadOff(2)=0.35
+	TLeadOff(3)=0.28
+	TLeadOff(4)=0.2
+	TLeadOff(5)=0.12
+	TLeadOff(6)=0.06
+	TLeadOff(7)=0
+	TStrafeDodge(0)=0.6
+	TStrafeDodge(1)=0.6
+	TStrafeDodge(2)=0.6
+	TStrafeDodge(3)=0.6
+	TStrafeDodge(4)=0.6
+	TStrafeDodge(5)=0.6
+	TStrafeDodge(6)=0.6
+	TStrafeDodge(7)=0.6
+	TAdvTactics(0)=0.2
+	TAdvTactics(1)=0.3
+	TAdvTactics(2)=0.4
+	TAdvTactics(3)=0.5
+	TAdvTactics(4)=0.7
+	TAdvTactics(5)=0.85
+	TAdvTactics(6)=1
+	TAdvTactics(7)=1
 }

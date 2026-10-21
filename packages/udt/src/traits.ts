@@ -56,11 +56,11 @@ export interface TraitDef {
 /** The catalogue v1 (owner approved), phase 2 part: values and manager traits. */
 export const TRAITS: readonly TraitDef[] = [
   { code: 'steady-hand', rarity: 'common', category: 'values', mod: 'sh' },
-  { code: 'bouncer', rarity: 'common', category: 'values' },
+  { code: 'bouncer', rarity: 'common', category: 'values', mod: 'bo' },
   { code: 'watchdog', rarity: 'uncommon', category: 'values', mod: 'wd' },
   { code: 'side-stepper', rarity: 'uncommon', category: 'values', mod: 'ss' },
   { code: 'gun-nut', rarity: 'uncommon', category: 'values', needsWeapon: true },
-  { code: 'daredevil', rarity: 'rare', category: 'values' },
+  { code: 'daredevil', rarity: 'rare', category: 'values', mod: 'dd' },
   { code: 'patient-hunter', rarity: 'rare', category: 'values', mod: 'ph' },
   { code: 'eagle-eye', rarity: 'rare', category: 'values', mod: 'ee' },
   { code: 'all-rounder', rarity: 'epic', category: 'values', mod: 'ar' },
@@ -239,9 +239,9 @@ export const NO_EDGE: GameEdge = { aim: 1, react: 1, view: 0, turn: 1, dodge: 1 
 
 /**
  * Per trait: its edge (tuned with the duel simulator `bot:sim`; the mod has the same numbers in
- * TourneySkillCurve) and what it adds to the value score for the market value (as much as its
- * old value boosts did: +5/+10/+8/+15/+8 on the 0..100 scale; the side-stepper's strafing is a
- * value already).
+ * TourneySkillCurve) and what it adds to the value score for the market value (fixed: what the
+ * old value boosts +5/+10/+8/+15/+8 added at the weights of decision 106; the side-stepper's
+ * strafing is a value already; daredevil and bouncer a little).
  */
 export const VALUE_EDGES: Readonly<
   Partial<Record<TraitCode, Partial<GameEdge> & { score: number }>>
@@ -252,6 +252,9 @@ export const VALUE_EDGES: Readonly<
   'patient-hunter': { aim: 0.88, score: 0.036 },
   'eagle-eye': { aim: 0.86, score: 0.0675 },
   'all-rounder': { aim: 0.88, react: 0.75, view: 20, turn: 1.05, dodge: 1.3, score: 0.08 },
+  // Mod 0.15.0 (decision 175): style traits with a small edge.
+  daredevil: { react: 0.9, score: 0.02 },
+  bouncer: { dodge: 1.2, score: 0.01 },
 };
 
 /** The bot's edges in the game: multipliers multiply, degrees add. */

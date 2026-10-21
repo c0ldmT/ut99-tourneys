@@ -184,12 +184,22 @@ export interface BotValues {
 }
 
 /**
- * How good the values of a bot are, 0..1: accuracy counts most, then alertness and strafing.
+ * Weights of the values in the value score, by what they do in a fight (duel simulator with mod
+ * 0.15.0: accuracy ≈ one level, alertness ≈ half a level, strafing 0.2-0.7 levels; decision 175).
+ */
+export const VALUE_WEIGHTS = { accuracy: 0.55, alertness: 0.2, strafing: 0.25 } as const;
+
+/**
+ * How good the values of a bot are, 0..1: accuracy counts most, then strafing and alertness.
  * Missing values count as average (0).
  */
 export function valueScore(v: BotValues = {}): number {
   const n = (x: number | undefined) => (clamp(x ?? 0, -1, 1) + 1) / 2;
-  return round3(0.45 * n(v.accuracy) + 0.3 * n(v.alertness) + 0.25 * n(v.strafing));
+  return round3(
+    VALUE_WEIGHTS.accuracy * n(v.accuracy) +
+      VALUE_WEIGHTS.alertness * n(v.alertness) +
+      VALUE_WEIGHTS.strafing * n(v.strafing),
+  );
 }
 
 /** Base value at index 1.0: the skill's range, positioned by the value score (skill may be real). */

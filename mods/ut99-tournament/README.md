@@ -102,6 +102,13 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > menu works with. The bridge keeps the answers (`models.json` in its data folder, asked again when a package changes)
 > and sends them to the website, so new models (War Boss, Xan Mark II, custom packs) get their skins, faces and voices
 > without maintenance. Nothing changes in the game.
+> Mod 0.15.0: bot errors and dodging (decision 174, tuned with the duel simulator). The curve dodges projectiles itself
+> (UT's own dodge is off): a shot of its enemy it can see coming, after a reaction time (0.35 s Novice … 0.03 s
+> Godlike), sometimes to the wrong side (40 % … 5 %), also in fighting moves; low levels sometimes do not lead their
+> target (50 % … 0); UT's advanced tactics are kept by level (20 % … 100 %); the strafing value makes bots dodge more
+> (up to +60 %). Base accuracy Novice -2.0, Adept -0.2. A bot with only a melee weapon that has not got to its enemy for
+> 5 s (DM-SpaceNoxx: both out of ammo on the kickers) leaves it alone for 10 s and looks for a weapon (AI help).
+> Dream Team: daredevil reacts 10 % faster, bouncer dodges 20 % more often (codes `dd`, `bo` in `btrt`).
 
 ## Classes
 
@@ -294,6 +301,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 61 | **Skill curve** (mod 0.13.0) | Settings → Bot AI help → "Skill curve" on. Bot-only 1v1s at Novice, Skilled, Adept and Godlike (DM-Deck16][, DM-Curse][), one Monster Hunt run. Server log: `skill curve True`, with SmartStockBots `SmartStockBots: MoveWithDodge False (was True), FixMinigun False (was True)`; `spawned bot ... class TourneyMale1Bot` (stock classes). Spectate in first person: Novice clearly slower than before (70 %), Skilled almost full speed; low levels dodge now and then (also forward while running), high levels often. Minigun and pulse gun swing smoothly past the target instead of jittering. A bot that loses sight stops firing after about a second (`has not seen X for N s, stops firing at ..., hunts`); shot from behind it turns round (`hit from out of view by X, turns to it`). Setting off: `skill curve False`, bots as in 0.12.1 (stock classes, SmartStockBots values back). Server log without `Accessed None` |
 | 62 | **Skill curve v1 and trait edges** (mod 0.14.0) | Skill curve on. Bot-only 1v1s Novice vs Skilled and Adept vs Godlike (DM-Deck16][): Novice clearly turns slower, pauses a moment before it turns to a new enemy and stops firing now and then; Godlike unchanged (fires at once, no pauses). Skilled with accuracy 100 (control center) vs Masterful with accuracy 0: Masterful should win most games. Dream Team game with a bot with eagle eye and one with watchdog: no script errors; the watchdog bot turns quickly to hits from behind. Impact hammer still charges and fires (no fire pause with melee weapons), shock combos still work. Server log without `Accessed None` |
 | 63 | **Bot class defaults** (mod 0.14.1) | Bridge and website updated, then start any tournament (or the lobby) once. Bridge log: no `bad line` / `unknown bridge message describe`; the bridge's data folder has `models.json` with War Boss, Xan Mark II and Skaarj Hybrid. Control center → Bots → new bot: War Boss and Xan Mark II no longer show the "unknown model" hint and offer the skins and voices UT's own bot setup shows for them; Skaarj Hybrid still offers Arena Warrior / Cyborg Trooper / Pit Fighter. Next server start: `models.json` stays unchanged (not asked again). Server log without `Accessed None` |
+| 64 | **Bot errors and dodging** (mod 0.15.0) | Skill curve on, AI help on. Bot-only 1v1s Novice vs Skilled with rocket launcher and pulse gun (DM-Deck16][): the Novice dodges rockets late or to the wrong side now and then and does not always lead; Godlike dodges cleanly and leads. A bot with strafing 100 (control center) dodges visibly more than one with 0. DM-SpaceNoxx 1v1 until both are out of ammo: log `only a melee weapon, has not got to X for 5 s ..., leaves it for 10 s and looks for a weapon`, the bots leave the kickers. Impact hammer fights at close range still happen (no log while they hit each other). Dream Team bot with daredevil or bouncer: no script errors. Server log without `Accessed None`; Pi load in a 4-bot game as before |
 
 ## SmartStockBots (optional)
 

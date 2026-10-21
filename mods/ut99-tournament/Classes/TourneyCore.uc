@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.14.1";
+const MOD_VERSION = "0.15.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -143,7 +143,8 @@ var int CfgBeh[16];                // behaviour traits (btrt, mod 0.10.0): 1 vul
 var byte CfgAggr[16];              // 1 = the hurt bot's aggressiveness was changed by a trait
 var byte CfgVal[16];               // values traits as curve edges (btrt, mod 0.14.0): 1 steady
                                    // hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16
-                                   // eagle eye, 32 all-rounder (TourneySkillCurve.SetEdges)
+                                   // eagle eye, 32 all-rounder, 0.15.0: 64 daredevil, 128
+                                   // bouncer (TourneySkillCurve.SetEdges)
 var string CfgAvenge[16];          // revenant: its last killer
                                    // mod 0.11.0: 32 sniper's nest, 64 team player, 128 shuffle
                                    // dancer, 256 item controller
@@ -204,6 +205,10 @@ var byte NoPathStay[32];           // 1: stayed once, no start spot had a path t
 var Actor StuckGoal[32];           // where the bot was heading when it last got stuck
 var float StuckAt[32];             // when that was
 var byte StuckRep[32];             // times in a row stuck heading there (within 60 s each)
+var float MeleeHit[32];            // when the bot last hurt someone (mod 0.15.0)
+var byte MeleeSec[32];             // seconds with only a melee weapon and its enemy out of reach
+var Pawn MeleeSkip[32];            // an enemy it leaves alone until MeleeSkipUntil
+var float MeleeSkipUntil[32];
 
 //=============================================================================
 // Startup (from the game type)
@@ -3045,6 +3050,10 @@ function ResetWatch(int s, Bot B)
 	NoPathStay[s] = 0;
 	StuckGoal[s] = None;
 	StuckRep[s] = 0;
+	MeleeHit[s] = Level.TimeSeconds;
+	MeleeSec[s] = 0;
+	MeleeSkip[s] = None;
+	MeleeSkipUntil[s] = 0;
 }
 
 // The nearest living opponent of B: players and bots, not of its team in team games.
@@ -3339,6 +3348,75 @@ function HuntGuard()
 }
 
 // AI help: stuck bots and bots that run about on the spot. True: something was done this second.
+// Only a melee weapon and an enemy it does not get to (mod 0.15.0; DM-SpaceNoxx: both bots out
+// of ammo with the impact hammer, bouncing on the kickers in sight of each other for minutes):
+// after 5 s without hurting anyone while that enemy stays 200 units away it leaves it alone for
+// 10 s and roams (with no weapon the game rates weapons and ammo high).
+function bool MeleeStuck(Bot B, int s)
+{
+	local float Now;
+	Now = Level.TimeSeconds;
+	if (MeleeSkip[s] != None && Now < MeleeSkipUntil[s])
+	{
+		if (B.Enemy == MeleeSkip[s] && OnlyMelee(B))
+		{
+			DropEnemy(B);
+			return true;
+		}
+		return false;
+	}
+	MeleeSkip[s] = None;
+	if (B.Enemy == None || !OnlyMelee(B) || Now - MeleeHit[s] < 5 || VSize(B.Enemy.Location - B.Location) < 200)
+	{
+		MeleeSec[s] = 0;
+		return false;
+	}
+	if (MeleeSec[s] < 250)
+		MeleeSec[s]++;
+	if (MeleeSec[s] < 5)
+		return false;
+	MeleeSec[s] = 0;
+	BotLog(BName(B) $ ": only a melee weapon, has not got to" @ BName(B.Enemy) @ "for 5 s at" @ Where(B.Location) $ ", leaves it for 10 s and looks for a weapon");
+	MeleeSkip[s] = B.Enemy;
+	MeleeSkipUntil[s] = Now + 10;
+	HuntBlock[s] = Now + 10;
+	DropEnemy(B);
+	return true;
+}
+
+// The curve asks every 0.1 s: B's enemy is one it leaves alone right now (MeleeStuck).
+function bool MeleeSkipped(Bot B)
+{
+	local int s;
+	if (B == None || B.Enemy == None || IdleCount == 0)
+		return false;
+	for (s = 0; s < IdleCount; s++)
+		if (IdleBot[s] == B)
+			return MeleeSkip[s] != None && B.Enemy == MeleeSkip[s] && Level.TimeSeconds < MeleeSkipUntil[s] && OnlyMelee(B);
+	return false;
+}
+
+// The bot holds a melee weapon (or the translocator) and has nothing else with ammo.
+function bool OnlyMelee(Bot B)
+{
+	local Inventory Inv;
+	local Weapon W;
+	local int n;
+	if (B.Weapon == None || (!B.Weapon.bMeleeWeapon && !B.Weapon.IsA('Translocator')))
+		return false;
+	n = 0;
+	for (Inv = B.Inventory; Inv != None && n < 100; Inv = Inv.Inventory)
+	{
+		n++;
+		W = Weapon(Inv);
+		if (W == None || W.bMeleeWeapon || W.IsA('Translocator'))
+			continue;
+		if (W.AmmoType == None || W.AmmoType.AmmoAmount > 0)
+			return false;
+	}
+	return true;
+}
+
 function bool UnstickBot(Bot B, int s)
 {
 	local bool bFight;
@@ -3346,6 +3424,8 @@ function bool UnstickBot(Bot B, int s)
 	local Pawn Opp;
 
 	Now = Level.TimeSeconds;
+	if (MeleeStuck(B, s))
+		return true;
 	bFight = B.Enemy != None && B.LineOfSightTo(B.Enemy);
 	if (bFight)
 		NoPathN[s] = 0;
@@ -4480,6 +4560,10 @@ function int ParseValueTraits(string S)
 			Bits = Bits | 16;
 		else if (Code == "ar")
 			Bits = Bits | 32;
+		else if (Code == "dd")
+			Bits = Bits | 64;
+		else if (Code == "bo")
+			Bits = Bits | 128;
 	}
 	return Bits;
 }
@@ -4554,11 +4638,17 @@ function ResetGameTraits()
 // per game leaves 50 health).
 function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name DamageType)
 {
-	local int cv, ci, Heal;
+	local int cv, ci, Heal, ms;
 	if (ActualDamage <= 0 || Victim == None)
 		return;
 	if (Curve != None)
 		Curve.OnHit(Victim, InstigatedBy, ActualDamage);
+	if (Bot(InstigatedBy) != None && InstigatedBy != Victim)
+	{
+		ms = IdleSlot(Bot(InstigatedBy));
+		if (ms >= 0)
+			MeleeHit[ms] = Level.TimeSeconds;
+	}
 	cv = GameTraitCfg(Victim);
 	ci = -1;
 	if (InstigatedBy != Victim)

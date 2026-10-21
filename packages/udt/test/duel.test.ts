@@ -34,11 +34,11 @@ describe('skill curve data', () => {
     }
   });
 
-  it('reads the plan for mod 0.15.0 (rows the mod does not have yet)', () => {
+  it('has the plan for mod 0.15.0 in the mod', () => {
     const raw = JSON.parse(file('../../../apps/api/scripts/bot-curves/plan-0.15.json'));
     const c = withCurve(CURRENT_CURVE, raw);
+    expect(c).toEqual(CURRENT_CURVE);
     expect(c.dodgeErr[0]).toBeGreaterThan(0);
-    expect(CURRENT_CURVE.dodgeErr.every((v) => v === 0)).toBe(true);
     const r = duelSeries(bot(3), bot(2), { duels: 40, seed: 2, curve: c });
     expect(r.winDecided).toBeGreaterThan(0.3);
   });

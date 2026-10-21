@@ -22,6 +22,7 @@ import {
   CURVE_PROPS,
   LEVEL_NAMES,
   TRAITS,
+  VALUE_WEIGHTS,
   WEAPONS,
   accuracyToMatch,
   curveFromUc,
@@ -114,12 +115,8 @@ const VALUE_NAMES: Record<ValueKey, string> = {
   jumpy: 'Jumpy',
 };
 const VALUE_LEVELS = [1, 3, 5, 7];
-/** The Dream Team market value weights today (valueScore in packages/udt economy.ts). */
-const SCORE_WEIGHTS: Partial<Record<ValueKey, number>> = {
-  accuracy: 0.45,
-  alertness: 0.3,
-  strafing: 0.25,
-};
+/** The Dream Team market value weights (valueScore in packages/udt economy.ts). */
+const SCORE_WEIGHTS: Partial<Record<ValueKey, number>> = { ...VALUE_WEIGHTS };
 interface ValueRow {
   key: ValueKey;
   level: number;
@@ -419,8 +416,8 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${valuesHtml(runs[i]
 <li>Zielen nach AdjustAim/AimSpread: AimError × Relativbewegung (11 − 10·dot) × Hitscan (0,5 + 0,19·S) × (1,7 − 0,4·(S+½)) × 1,2 nach Treffer/in der Luft × 2 erster Schuss auf ein neues Ziel (nur bis Skill-intern 2) × (1 − Acc); Acc = TAcc + accGain × eigener Wert. Standardklassen driften (TDriftHz, TLag), eigene Modelle würfeln pro Schuss. Treffer: seitlicher Versatz &lt; 17 uu; Projektile fliegen mit Vorhalten 0,7–1,0; Rocket mit Splash an den Füßen, Flak 8 Splitter.</li>
 <li>Reaktion: Sicht im Sichtfeld (cos(Fov/2) − Wachsamkeit), Hören bei Schüssen (Annahme 30 % je Schuss × THear), Treffer von hinten: nach Treffer-Animation oder mit Chance S/3 sofort, sonst nach TReact (mit 1 − TRight erst falsch herum); nach Sicht/Gehör sightReact, Drehen mit TYaw, 0,2 s Tween; Feuern nur ≤ 22° zum Ziel; fireDelay verlängert die Pausen zwischen Schüssen.</li>
 <li>Bewegung: Kampfmanöver alle 0,8–1,6 s (Anteil 50 % + 40 % × Strafing), Tempo 400 × TSpeed in zufälliger Richtung, Ausweichsprung im Kampfmanöver (unter Masterful TTact, darüber und mit Jumpy UTs eigene 35 %-Regel – TTact ab Masterful wirkt im Mod nicht; nie mit Rocket), Projektil-Ausweichen (TDuck-Fenster, dann 0,33 + 0,22·S, Schütze im Blick ≤ 37°).</li>
-<li>Spielwerte: Strafing = Anteil seitlicher Kampfmanöver (Plan 0.15: auch Ausweich-Chancen × (1 + strafeDodge × Strafing)); Alertness = Sichtfeld und Gehör; Kampfstil = UTs Aggression (CombatStyle 0,1 + 0,7 × Wert): Ansturm auf den Gegner (Abstand schrumpft, kaum seitlich), vorsichtige Bots weichen zurück; Jumpy = 35 % Ausweichen im Kampfmanöver und Hüpfer (in der Luft). Camping wirkt im Duell nicht.</li>
-<li>Plan 0.15 (Zeilen dodgeLate, dodgeErr, leadOff, strafeDodge; heute 0): eigenes Projektil-Ausweichen mit Reaktionszeit und falscher Seite, zeitweise kein Vorhalten.</li>
+<li>Spielwerte: Strafing = Anteil seitlicher Kampfmanöver und Ausweich-Chancen × (1 + strafeDodge × Strafing); Alertness = Sichtfeld und Gehör; Kampfstil = UTs Aggression (CombatStyle 0,1 + 0,7 × Wert): Ansturm auf den Gegner (Abstand schrumpft, kaum seitlich), vorsichtige Bots weichen zurück; Jumpy = 35 % Ausweichen im Kampfmanöver und Hüpfer (in der Luft). Camping wirkt im Duell nicht.</li>
+<li>Mod 0.15.0: eigenes Projektil-Ausweichen (Chance TDuck × Vorteile, nur wenn der Bot den Schützen sieht, Flugzeit ≥ 0,15 s) mit Reaktionszeit (dodgeLate) und falscher Seite (dodgeErr), zeitweise kein Vorhalten (leadOff), Strafing skaliert die Ausweich-Chancen (strafeDodge); advTactics wirkt nur auf der Map.</li>
 <li>Treffer-Animation nach Bot.PlayHit (0,4 s ohne Feuern), Anteil TFlinch für die optionalen.</li>
 <li>Absolute Zahlen (Trefferquoten, Zeit bis Kill) sind grob; zum Abstimmen zählen die Vergleiche. Abgleich mit echten Logs steht aus.</li>
 </ul></div>

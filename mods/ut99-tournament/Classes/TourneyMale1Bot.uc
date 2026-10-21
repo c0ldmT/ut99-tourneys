@@ -1,5 +1,5 @@
 //=============================================================================
-// TourneyMale1Bot (mod 0.13.0, fire hold 0.14.0)
+// TourneyMale1Bot (mod 0.13.0, fire hold 0.14.0, leading 0.15.0)
 // Botpack.TMale1Bot (male commando) as the tournament spawns it with the skill curve: the same
 // bot, only its aim error drifts (TourneySkillCurve.AimDrift) instead of jumping with every
 // shot. Without the curve (or before it is set) the game's own aim.
@@ -15,7 +15,8 @@ function rotator AdjustAim(float projSpeed, vector projStart, int aimerror, bool
 	if (Curve == None || Curve.bDeleteMe || !Curve.bOn)
 		return Super.AdjustAim(projSpeed, projStart, aimerror, leadTarget, warnTarget);
 	Spread = Curve.AimSpread(self, projSpeed, aimerror);
-	R = Super.AdjustAim(projSpeed, projStart, 0, leadTarget, warnTarget);
+	// Mod 0.15.0: bLeadTarget (the curve's TLeadOff) decides whether it leads this time.
+	R = Super.AdjustAim(projSpeed, projStart, 0, leadTarget && bLeadTarget, warnTarget);
 	return Curve.AimDrift(self, R, Spread, projStart);
 }
 

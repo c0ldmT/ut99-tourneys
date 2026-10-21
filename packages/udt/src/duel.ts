@@ -54,19 +54,18 @@ export interface SkillCurve {
    */
   fireDelay: CurveRow;
   /**
-   * Planned for mod 0.15.0 (0 = mod 0.14.0): the mod dodges projectiles itself; seconds from the
-   * shot to the dodge (too late when the shot is there first).
+   * Mod 0.15.0: the mod dodges projectiles itself (chance `duck`); seconds from the shot to the
+   * dodge (too late when the shot is there first).
    */
   dodgeLate: CurveRow;
-  /** Planned for mod 0.15.0 (0 = mod 0.14.0): chance a dodge goes to the wrong side. */
+  /** Mod 0.15.0: chance a dodge goes to the wrong side. */
   dodgeErr: CurveRow;
-  /** Planned for mod 0.15.0 (0 = mod 0.14.0): chance it does not lead its target (per 2 s). */
+  /** Mod 0.15.0: chance it does not lead its target (rolled every 2 s; stock classes only). */
   leadOff: CurveRow;
-  /**
-   * Planned for mod 0.15.0 (0 = mod 0.14.0): the strafing value scales the dodge chances,
-   * × (1 + this × strafing) (strafing -1..1).
-   */
+  /** Mod 0.15.0: the strafing value scales the dodge chances, × (1 + this × strafing). */
   strafeDodge: CurveRow;
+  /** Mod 0.15.0: share of UT's advanced tactics it keeps (map moves; not in a duel). */
+  advTactics: CurveRow;
 }
 
 export type CurveKey = keyof SkillCurve;
@@ -91,6 +90,11 @@ export const CURVE_PROPS: Readonly<Partial<Record<CurveKey, string>>> = {
   accGain: 'TAccGain',
   sightReact: 'TSightReact',
   fireDelay: 'TFireDelay',
+  dodgeLate: 'TDodgeLate',
+  dodgeErr: 'TDodgeErr',
+  leadOff: 'TLeadOff',
+  strafeDodge: 'TStrafeDodge',
+  advTactics: 'TAdvTactics',
 };
 
 /** Mod 0.14.0, curve v1 (TourneySkillCurve defaultproperties; a test compares them with the .uc file). */
@@ -98,7 +102,7 @@ export const CURRENT_CURVE: SkillCurve = {
   speed: [0.7, 0.76, 0.82, 0.88, 0.94, 1, 1, 1],
   yaw: [26000, 30000, 34000, 39000, 45000, 55000, 68000, 100000],
   fov: [100, 110, 120, 130, 140, 155, 180, 200],
-  acc: [-1.8, -1.35, -0.95, -0.6, -0.3, 0, 0.12, -0.2],
+  acc: [-2.0, -1.35, -0.95, -0.6, -0.2, 0, 0.12, -0.2],
   hear: [0.8, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.2],
   flinch: [0.5, 0.4, 0.3, 0.2, 0.15, 0.1, 0, 0],
   duck: [0.1, 0.15, 0.22, 0.3, 0.33, 0.55, 0.77, 0.95],
@@ -110,13 +114,14 @@ export const CURRENT_CURVE: SkillCurve = {
   lag: [0.1, 0.08, 0.07, 0.06, 0.04, 0.03, 0.02, 0.01],
   blind: [1.5, 1.3, 1.1, 1, 0.9, 0.8, 0.7, 0.6],
   blindSplash: [1, 1, 1, 1, 1.2, 1.2, 1.5, 1.5],
-  accGain: [0.532, 0.447, 0.39, 0.336, 0.364, 0.33, 0.308, 0.396],
+  accGain: [0.57, 0.447, 0.39, 0.336, 0.336, 0.33, 0.308, 0.396],
   sightReact: [0.6, 0.48, 0.37, 0.28, 0.2, 0.13, 0.07, 0.03],
   fireDelay: [0.4, 0.3, 0.2, 0.12, 0.05, 0, 0, 0],
-  dodgeLate: [0, 0, 0, 0, 0, 0, 0, 0],
-  dodgeErr: [0, 0, 0, 0, 0, 0, 0, 0],
-  leadOff: [0, 0, 0, 0, 0, 0, 0, 0],
-  strafeDodge: [0, 0, 0, 0, 0, 0, 0, 0],
+  dodgeLate: [0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.06, 0.03],
+  dodgeErr: [0.4, 0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.05],
+  leadOff: [0.5, 0.42, 0.35, 0.28, 0.2, 0.12, 0.06, 0],
+  strafeDodge: [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
+  advTactics: [0.2, 0.3, 0.4, 0.5, 0.7, 0.85, 1, 1],
 };
 
 export const LEVEL_NAMES = [
@@ -408,8 +413,6 @@ const DODGE_TIME = 0.6;
 const FLINCH_TIME = 0.4;
 /** UT NeedToTurn: it fires within 4000 units (22°). */
 const FIRE_CONE = 4000;
-/** WarnTarget: the shooter within dot 0.8 of the view. */
-const WARN_CONE = 6711;
 
 export function rngOf(seed: number): () => number {
   let a = seed >>> 0;
@@ -447,10 +450,10 @@ interface Fighter {
   strafeDir: number;
   /** Speed towards (-) or away from (+) the enemy. */
   vr: number;
-  /** Planned 0.15.0: a projectile dodge waiting for its reaction time. */
+  /** Mod 0.15.0: a projectile dodge waiting for its reaction time. */
   dodgeAt: number;
   dodgeDir: number;
-  /** Planned 0.15.0: no leading until leadAt (rolled every 2 s). */
+  /** Mod 0.15.0: no leading until leadAt (rolled every 2 s). */
   noLead: boolean;
   leadAt: number;
   airUntil: number;
@@ -461,8 +464,6 @@ interface Fighter {
   shotSeq: number;
   heardSeq: number;
   stillSince: number;
-  duckWindow: boolean;
-  duckRollAt: number;
   noise: number;
   goal: number;
   pickAt: number;
@@ -525,8 +526,6 @@ function fighter(
     shotSeq: 0,
     heardSeq: 0,
     stillSince: 0,
-    duckWindow: false,
-    duckRollAt: 0,
     noise: 0,
     goal: 0,
     pickAt: 0,
@@ -664,22 +663,17 @@ function play(
       x.off = x.off > goal ? Math.max(goal, x.off - turn) : Math.min(goal, x.off + turn);
       if (x.off === 0 && x.engagedAt === Infinity) x.engagedAt = t + 0.2;
     }
-    // Planned 0.15.0: the mod's own projectile dodge after its reaction time.
+    // Mod 0.15.0: the own projectile dodge after its reaction time.
     if (t >= x.dodgeAt) {
       x.dodgeAt = Infinity;
       if (t >= x.airUntil && t >= x.flinchUntil) dodge(x, t, x.dodgeDir);
     }
     if (t >= x.leadAt) {
       x.leadAt = t + 2;
-      x.noLead = rng() < c.leadOff[x.lv.aim]!;
+      // Only the stock classes (their AdjustAim reads bLeadTarget).
+      x.noLead = x.r.stock && rng() < c.leadOff[x.lv.aim]!;
     }
     move(x, t);
-    // Dodge window, rolled once a second (curve: bCanDuck).
-    if (t >= x.duckRollAt) {
-      x.duckRollAt = t + 1;
-      const P = 0.33 + 0.22 * internal(x.lv.dodge);
-      x.duckWindow = rng() * P < c.duck[x.lv.dodge]! * dodgeMul(x);
-    }
     // Fire.
     if (t >= x.engagedAt && x.off < FIRE_CONE && t >= x.nextShot && t >= x.flinchUntil) fire(i, t);
   }
@@ -745,7 +739,7 @@ function play(
     x.y += x.vy * STEP;
   }
 
-  /** Dodge chances ×: the trait edge and (planned 0.15.0) the strafing value. */
+  /** Dodge chances ×: the trait edge and (mod 0.15.0) the strafing value. */
   function dodgeMul(x: Fighter): number {
     return x.r.edge.dodge * Math.max(0, 1 + c.strafeDodge[x.lv.dodge]! * x.r.strafing);
   }
@@ -830,26 +824,25 @@ function play(
         : [],
     };
     flying.push(p);
-    // WarnTarget: a fighting bot facing the shooter (within ~37°) may dodge when the shot takes
-    // long enough (window, then 0.33 + 0.22 * skill).
+    // Mod 0.15.0 (ScanShots/ShotAt): a fighting bot that sees the shooter dodges a shot that
+    // takes at least 0.15 s with TDuck × edges, after TDodgeLate (× reaction edge), away from the
+    // path or (TDodgeErr) towards it; too late when the shot is there first.
     if (
       t >= e.engagedAt &&
-      e.off < WARN_CONE &&
+      e.dodgeAt === Infinity &&
+      sees(e, c) &&
       t >= e.airUntil &&
       t >= e.flinchUntil &&
-      e.duckWindow &&
-      tf >= 0.11 + 0.15 * rng()
+      tf >= 0.15 &&
+      rng() < Math.min(1, c.duck[e.lv.dodge]! * dodgeMul(e))
     ) {
-      if (rng() < 0.33 + 0.22 * internal(e.lv.dodge)) {
-        let side = e.y === p.aimY ? (rng() < 0.5 ? -1 : 1) : Math.sign(e.y - p.aimY);
-        // Planned 0.15.0: wrong side, reaction time (too late when the shot is there first).
-        if (rng() < c.dodgeErr[e.lv.dodge]!) side = -side;
-        const late = c.dodgeLate[e.lv.dodge]! * (0.8 + 0.4 * rng());
-        if (late <= 0) dodge(e, t, side);
-        else if (t + late < p.arrive - 0.05) {
-          e.dodgeAt = t + late;
-          e.dodgeDir = side;
-        }
+      let side = e.y === p.aimY ? (rng() < 0.5 ? -1 : 1) : Math.sign(e.y - p.aimY);
+      if (rng() < c.dodgeErr[e.lv.dodge]!) side = -side;
+      const late = c.dodgeLate[e.lv.dodge]! * e.r.edge.react * (0.8 + 0.4 * rng());
+      if (late <= 0) dodge(e, t, side);
+      else if (late <= tf - 0.05) {
+        e.dodgeAt = t + late;
+        e.dodgeDir = side;
       }
     }
   }

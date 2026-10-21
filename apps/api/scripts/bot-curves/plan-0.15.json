@@ -1,5 +1,5 @@
 {
-  "$comment": "Plan mod 0.15.0 (not in the mod yet): own projectile dodges with a reaction time and wrong sides, no leading now and then, strafing scales the dodge chances; base accuracy Novice -2.0 and Adept -0.2 (the simulator with combat style: Novice > Average was too close, Masterful > Adept too far). Compare: pnpm --filter @tourney/api bot:sim --curve scripts/bot-curves/plan-0.15.json",
+  "$comment": "Curve of mod 0.15.0 (decision 174; planned as decision 171): own projectile dodges with a reaction time and wrong sides, no leading now and then, strafing scales the dodge chances; base accuracy Novice -2.0 and Adept -0.2 (the simulator with combat style: Novice > Average was too close, Masterful > Adept too far). Compare: pnpm --filter @tourney/api bot:sim --curve scripts/bot-curves/plan-0.15.json",
   "acc": [-2.0, -1.35, -0.95, -0.6, -0.2, 0, 0.12, -0.2],
   "accGain": [0.57, 0.447, 0.39, 0.336, 0.336, 0.33, 0.308, 0.396],
   "dodgeLate": [0.35, 0.3, 0.25, 0.2, 0.15, 0.1, 0.06, 0.03],

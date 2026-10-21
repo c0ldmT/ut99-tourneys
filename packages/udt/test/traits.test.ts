@@ -141,7 +141,7 @@ describe('packs', () => {
         { code: 'revenant' },
         { code: 'bouncer' },
       ]),
-    ).toEqual(['px', 'wd', 'rg']);
+    ).toEqual(['px', 'wd', 'rg', 'bo']);
     expect(traitValueFactor(4, {}, [{ code: 'phoenix' }])).toBeCloseTo(1.2);
   });
 });

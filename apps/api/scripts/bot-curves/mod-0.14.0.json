@@ -1,0 +1,10 @@
+{
+  "$comment": "Mod 0.14.0 (curve v1, before the bot errors of 0.15.0), for comparisons: --curve scripts/bot-curves/mod-0.14.0.json. Projectile dodges follow the 0.15.0 rules in the simulator (own dodge, no reaction time).",
+  "acc": [-1.8, -1.35, -0.95, -0.6, -0.3, 0, 0.12, -0.2],
+  "accGain": [0.532, 0.447, 0.39, 0.336, 0.364, 0.33, 0.308, 0.396],
+  "dodgeLate": [0, 0, 0, 0, 0, 0, 0, 0],
+  "dodgeErr": [0, 0, 0, 0, 0, 0, 0, 0],
+  "leadOff": [0, 0, 0, 0, 0, 0, 0, 0],
+  "strafeDodge": [0, 0, 0, 0, 0, 0, 0, 0],
+  "advTactics": [1, 1, 1, 1, 1, 1, 1, 1]
+}
