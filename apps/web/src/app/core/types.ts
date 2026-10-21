@@ -1287,6 +1287,8 @@ export interface UdtBlueprint {
   rarity: UdtRarity;
   rule: {
     budget: number;
+    /** Points on top of a default starter. */
+    extra: number;
     skillCap: number;
     potentialUp: number;
     models: boolean;

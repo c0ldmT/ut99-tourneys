@@ -1231,18 +1231,12 @@ const en = {
   'udt.bp.rare': 'Blueprint',
   'udt.bp.epic': 'Signature blueprint',
   'udt.bp.legendary': 'Legendary signature',
-  'udt.bpE.common': 'Build an own bot: 1,500 points, up to skill 3',
-  'udt.bpE.uncommon': 'Build an own bot: 2,500 points, up to skill 4',
-  'udt.bpE.rare': 'Build an own bot: 4,000 points, up to skill 4, potential +3',
-  'udt.bpE.epic': 'Build an own bot: 7,500 points, up to skill 5, a rare start trait',
-  'udt.bpE.legendary': 'Build an own bot: 9,000 points, up to skill 5, an epic start trait',
   'udt.cat.blueprint': 'Blueprint',
   'udt.packs.blueprints': 'Blueprints',
   'udt.academy.blueprints': 'Blueprints',
   'udt.academy.blueprintText':
     'Blueprints come from packs. Build an own bot from one with a creation licence: skill and values within its points, like the starter bot.',
   'udt.academy.blueprint': 'Blueprint',
-  'udt.academy.bpRule': '{pts} points, up to skill {cap}, potential +{up}.',
   'udt.academy.bpTrait': 'Starts with a {r} trait.',
   'udt.academy.model': 'Model',
   'udt.academy.points2': 'Points',
@@ -1684,6 +1678,14 @@ const en = {
   'stats.playerMissing':
     'No games and no profile here: the player has not played in this season (choose another one) or does not exist.',
   'udt.packs.done': 'Done',
+  'udt.bpE.common': 'Build an own bot: 1,500 points (a default starter), up to skill 3',
+  'udt.bpE.uncommon': 'Build an own bot: a starter +150 points, up to skill 3',
+  'udt.bpE.rare': 'Build an own bot: a starter +300 points, up to skill 3, potential +3',
+  'udt.bpE.epic': 'Build an own bot: a starter +1,000 points, up to skill 4, a rare start trait',
+  'udt.bpE.legendary':
+    'Build an own bot: a starter +1,500 points, up to skill 4, an epic start trait',
+  'udt.academy.bpRule':
+    '{pts} points (a default starter +{extra}), up to skill {cap}, potential +{up}.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -2929,18 +2931,12 @@ const de: Record<TKey, string> = {
   'udt.bp.rare': 'Bauplan',
   'udt.bp.epic': 'Signature-Bauplan',
   'udt.bp.legendary': 'Legendäre Signatur',
-  'udt.bpE.common': 'Baue einen eigenen Bot: 1.500 Punkte, bis Skill 3',
-  'udt.bpE.uncommon': 'Baue einen eigenen Bot: 2.500 Punkte, bis Skill 4',
-  'udt.bpE.rare': 'Baue einen eigenen Bot: 4.000 Punkte, bis Skill 4, Potenzial +3',
-  'udt.bpE.epic': 'Baue einen eigenen Bot: 7.500 Punkte, bis Skill 5, seltener Start-Trait',
-  'udt.bpE.legendary': 'Baue einen eigenen Bot: 9.000 Punkte, bis Skill 5, epischer Start-Trait',
   'udt.cat.blueprint': 'Bauplan',
   'udt.packs.blueprints': 'Baupläne',
   'udt.academy.blueprints': 'Baupläne',
   'udt.academy.blueprintText':
     'Baupläne kommen aus Packs. Baue daraus mit einer Erschaffungs-Lizenz einen eigenen Bot: Skill und Werte im Punktebudget, wie beim Starter-Bot.',
   'udt.academy.blueprint': 'Bauplan',
-  'udt.academy.bpRule': '{pts} Punkte, bis Skill {cap}, Potenzial +{up}.',
   'udt.academy.bpTrait': 'Startet mit einem Trait ({r}).',
   'udt.academy.model': 'Modell',
   'udt.academy.points2': 'Punkte',
@@ -3384,6 +3380,15 @@ const de: Record<TKey, string> = {
   'stats.playerMissing':
     'Hier gibt es weder Spiele noch ein Profil: Der Spieler hat in dieser Season nicht gespielt (wähl eine andere) oder es gibt ihn nicht.',
   'udt.packs.done': 'Fertig',
+  'udt.bpE.common': 'Baue einen eigenen Bot: 1.500 Punkte (ein Standard-Starter), bis Skill 3',
+  'udt.bpE.uncommon': 'Baue einen eigenen Bot: Starter +150 Punkte, bis Skill 3',
+  'udt.bpE.rare': 'Baue einen eigenen Bot: Starter +300 Punkte, bis Skill 3, Potenzial +3',
+  'udt.bpE.epic':
+    'Baue einen eigenen Bot: Starter +1.000 Punkte, bis Skill 4, seltener Start-Trait',
+  'udt.bpE.legendary':
+    'Baue einen eigenen Bot: Starter +1.500 Punkte, bis Skill 4, epischer Start-Trait',
+  'udt.academy.bpRule':
+    '{pts} Punkte (Standard-Starter +{extra}), bis Skill {cap}, Potenzial +{up}.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

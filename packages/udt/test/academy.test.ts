@@ -70,12 +70,29 @@ describe('academy', () => {
 
 describe('blueprints', () => {
   it('limits skill and points by rarity', async () => {
-    const { cannotBuild, buildCost, BLUEPRINTS } = await import('../src/index.js');
+    const { cannotBuild, buildCost, BLUEPRINTS, blueprintRarity } = await import('../src/index.js');
     expect(cannotBuild('common', 3, {})).toBeNull();
     expect(cannotBuild('common', 4, {})).toBe('skill');
     expect(cannotBuild('common', 3, { accuracy: 1, alertness: 1, strafing: 1 })).toBe('budget');
-    expect(cannotBuild('epic', 5, {})).toBeNull();
-    expect(buildCost(5, {})).toBeLessThanOrEqual(BLUEPRINTS.epic.budget);
+    // A default starter plus 150 / 300 / 1,000 / 1,500 points.
+    expect(
+      [BLUEPRINTS.uncommon, BLUEPRINTS.rare, BLUEPRINTS.epic, BLUEPRINTS.legendary].map(
+        (b) => b.budget,
+      ),
+    ).toEqual([1650, 1800, 2500, 3000]);
+    // Rare: skill 3 with the best values; epic and legendary reach skill 4.
+    expect(cannotBuild('rare', 3, { accuracy: 1, alertness: 1, strafing: 1 })).toBeNull();
+    expect(cannotBuild('rare', 4, { accuracy: -1, alertness: -1, strafing: -1 })).toBe('skill');
+    expect(cannotBuild('epic', 4, { accuracy: -1, alertness: -1, strafing: -1 })).toBeNull();
+    expect(cannotBuild('epic', 4, {})).toBe('budget');
+    expect(buildCost(4, { accuracy: -0.4, alertness: -0.4, strafing: -0.4 })).toBeLessThanOrEqual(
+      BLUEPRINTS.legendary.budget,
+    );
+    expect(cannotBuild('legendary', 5, {})).toBe('skill');
     expect(BLUEPRINTS.legendary.startTrait).toBe('epic');
+    // Packs bring them one rarity above the draw.
+    expect(blueprintRarity('common')).toBe('uncommon');
+    expect(blueprintRarity('epic')).toBe('legendary');
+    expect(blueprintRarity('legendary')).toBe('legendary');
   });
 });

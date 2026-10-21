@@ -137,7 +137,13 @@ type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
                   <p class="muted small">
                     {{
                       'udt.academy.bpRule'
-                        | t: { pts: bp.rule.budget, cap: bp.rule.skillCap, up: bp.rule.potentialUp }
+                        | t
+                          : {
+                              pts: bp.rule.budget,
+                              extra: bp.rule.extra,
+                              cap: bp.rule.skillCap,
+                              up: bp.rule.potentialUp,
+                            }
                     }}
                     @if (bp.rule.startTrait) {
                       {{

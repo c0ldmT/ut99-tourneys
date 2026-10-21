@@ -166,6 +166,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team blueprints: one rarity above the pack draw; points = a default starter plus 150 / 300 / 1,000 / 1,500 (uncommon … legendary), skill up to 3 (uncommon, rare) or 4 (epic, legendary).
 - Dream Team packs: "Again" buys and opens the same box (or 10-pull) at once and shows its price.
 - Dream Team market: buy at once at a fixed price instead of hidden bids (market value plus 10/20/30 % for weak/middle/strong bots, calibrated with the season simulator); demand follows the purchases of the bracket; AI managers buy what is left at the market's closing; open bids are refunded.
 - Dream Team trades: every roster keeps at least one bot; the rules say which bots can be traded and why.

@@ -3,7 +3,14 @@
  * apprentices, developing a manager's own bots with points from their levels up to their
  * potential. Pure rules; the API stores the results.
  */
-import { baseValue, DEFAULT_ECONOMY, roundNeuro, valueScore, type Rarity } from './economy.js';
+import {
+  baseValue,
+  DEFAULT_ECONOMY,
+  RARITIES,
+  roundNeuro,
+  valueScore,
+  type Rarity,
+} from './economy.js';
 
 /** Play-style values of a talent (-1..1; camping 0..1). */
 export interface TalentValues {
@@ -224,6 +231,8 @@ export const developValue = (v: number | undefined): number => r3(clamp((v ?? 0)
 export interface BlueprintRule {
   /** Points for skill and values at index 1.0, as the starter budget (base value). */
   budget: number;
+  /** What the blueprint gives on top of a default starter (BLUEPRINT_BASE). */
+  extra: number;
   /** Highest skill the bot can be built with. */
   skillCap: number;
   /** Potential = skill + this (at most Godlike). */
@@ -234,17 +243,36 @@ export interface BlueprintRule {
   startTrait: 'rare' | 'epic' | null;
 }
 
-/** Common blank, uncommon blank+, rare blueprint, epic and legendary signature blueprints. */
+/** The points of a default starter bot (skill 3, average values): what blueprints add to. */
+export const BLUEPRINT_BASE = 1500;
+
+const rule = (extra: number, r: Omit<BlueprintRule, 'budget' | 'extra'>): BlueprintRule => ({
+  budget: BLUEPRINT_BASE + extra,
+  extra,
+  ...r,
+});
+
+/**
+ * Uncommon blank+, rare blueprint, epic and legendary signature blueprints (owner, 21.10.: a
+ * default starter plus 150 / 300; epic and legendary reach skill 4: 2,500 is skill 4 with the
+ * weakest values, 3,000 with values a bit below average). Packs bring blueprints one rarity above
+ * the draw, so a common one only remains from before.
+ */
 export const BLUEPRINTS: Readonly<Record<Rarity, BlueprintRule>> = {
-  common: { budget: 1500, skillCap: 3, potentialUp: 2, models: false, startTrait: null },
-  uncommon: { budget: 2500, skillCap: 4, potentialUp: 2, models: false, startTrait: null },
-  rare: { budget: 4000, skillCap: 4, potentialUp: 3, models: true, startTrait: null },
-  epic: { budget: 7500, skillCap: 5, potentialUp: 3, models: true, startTrait: 'rare' },
-  legendary: { budget: 9000, skillCap: 5, potentialUp: 4, models: true, startTrait: 'epic' },
+  common: rule(0, { skillCap: 3, potentialUp: 2, models: false, startTrait: null }),
+  uncommon: rule(150, { skillCap: 3, potentialUp: 2, models: false, startTrait: null }),
+  rare: rule(300, { skillCap: 3, potentialUp: 3, models: true, startTrait: null }),
+  epic: rule(1000, { skillCap: 4, potentialUp: 3, models: true, startTrait: 'rare' }),
+  legendary: rule(1500, { skillCap: 4, potentialUp: 4, models: true, startTrait: 'epic' }),
 };
 
-/** Share of pack draws that bring a blueprint of the rolled rarity instead of a trait. */
+/** Share of pack draws that bring a blueprint instead of a trait. */
 export const BLUEPRINT_CHANCE = 0.12;
+
+/** A blueprint drawn at a rarity is one rarity better (at most legendary). */
+export function blueprintRarity(drawn: Rarity): Rarity {
+  return RARITIES[Math.min(RARITIES.length - 1, RARITIES.indexOf(drawn) + 1)]!;
+}
 /** Unused blueprints a manager can keep per season; more turn into scrap. */
 export const BLUEPRINTS_MAX = 3;
 

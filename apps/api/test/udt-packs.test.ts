@@ -58,6 +58,9 @@ describe('Unreal Dream Team: packs and traits', () => {
     expect(cards).toHaveLength(10);
     // Premium 10-pull: an epic or better is certain.
     expect(cards.some((c) => c.rarity === 'epic' || c.rarity === 'legendary')).toBe(true);
+    // Blueprints come one rarity above the draw: never common.
+    for (const c of [...one.body.cards, ...cards] as Card[])
+      if (c.code === 'blueprint') expect(c.rarity).not.toBe('common');
     // One of each trait in the inventory, the rest is scrap.
     const kept = [...one.body.cards, ...cards].filter(
       (c: Card) => !c.duplicate && c.code !== 'blueprint',

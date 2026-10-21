@@ -9,6 +9,7 @@ import {
   levelOf,
   packPrice,
   BLUEPRINT_CHANCE,
+  blueprintRarity,
   BLUEPRINTS_MAX,
   rollBox,
   rollTen,
@@ -218,26 +219,27 @@ export class UdtPacksService {
     let scrap = 0;
     let blueprints = this.blueprints(season, user.id).length;
     for (const rarity of drawn.rarities) {
-      // Now and then a blueprint of the rarity instead of a trait.
+      // Now and then a blueprint instead of a trait, one rarity above the draw.
       if (rng() < BLUEPRINT_CHANCE) {
+        const bp = blueprintRarity(rarity);
         if (blueprints >= BLUEPRINTS_MAX) {
-          scrap += SCRAP[rarity];
+          scrap += SCRAP[bp];
           cards.push({
             id: null,
             code: 'blueprint',
-            rarity,
+            rarity: bp,
             duplicate: true,
-            scrap: SCRAP[rarity],
+            scrap: SCRAP[bp],
           });
           continue;
         }
         const bpId = `p${randomId(12)}`;
         this.db
           .insert(udtBlueprints)
-          .values({ id: bpId, season, userId: user.id, rarity, createdAt: this.now() })
+          .values({ id: bpId, season, userId: user.id, rarity: bp, createdAt: this.now() })
           .run();
         blueprints++;
-        cards.push({ id: bpId, code: 'blueprint', rarity, duplicate: false, scrap: 0 });
+        cards.push({ id: bpId, code: 'blueprint', rarity: bp, duplicate: false, scrap: 0 });
         continue;
       }
       const t = traitOfRarity(rarity, rng);

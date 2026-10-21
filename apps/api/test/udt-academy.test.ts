@@ -179,16 +179,28 @@ describe('Unreal Dream Team: academy', () => {
         })
       ).status,
     ).toBe(200); // the model is cosmetic: free for every blueprint
+    // Epic: 2,500 points, skill 4 with the weakest values (skill 5 is beyond it).
+    const weak = { accuracy: -1, alertness: -1, strafing: -1 };
+    expect(
+      (
+        await mario.post('/udt/academy/build', {
+          blueprintId: 'pE',
+          name: 'Signa',
+          skill: 5,
+          traits: weak,
+        })
+      ).status,
+    ).toBe(400);
     const ok = await mario.post('/udt/academy/build', {
       blueprintId: 'pE',
       name: 'Signa',
-      skill: 5,
-      traits: { accuracy: -0.2, alertness: 0, strafing: 0 },
+      skill: 4,
+      traits: weak,
     });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(ok.body.built.startTrait).toBeTruthy();
     const b = ok.body.own.find((x: { name: string }) => x.name === 'Signa');
-    expect(b).toMatchObject({ skill: 5, own: { origin: 'blueprint' } });
+    expect(b).toMatchObject({ skill: 4, own: { origin: 'blueprint' } });
     expect(b.udtTraits[0].code).toBe(ok.body.built.startTrait);
     expect(ok.body.blueprints).toHaveLength(0);
     const blank = ok.body.own.find((x: { name: string }) => x.name === 'Blank');
