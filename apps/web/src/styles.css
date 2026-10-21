@@ -676,12 +676,6 @@ button.icon.dng:hover:not(:disabled) {
       25px 65px;
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .confetti::before,
-  .confetti::after {
-    animation: none;
-  }
-}
 
 /* Form controls (tournament form): segmented buttons, switches, inputs with a unit */
 .seg {
@@ -1596,11 +1590,6 @@ udt-pack-stage .stage.lg .rays {
     box-shadow: 0 0 0 10px rgba(245, 184, 61, 0);
   }
 }
-@media (prefers-reduced-motion: reduce) {
-  .udt-plaque {
-    animation: none;
-  }
-}
 .udt-bar.xp {
   height: 3px;
 }
@@ -1715,71 +1704,97 @@ details.help ul {
   padding: 0;
 }
 
-/* --- A new page rises and fades in once its loading is done (decision 167; `Loading`, the
-   class is set in the app shell). */
+/* --- Motion (decisions 167-169; shown also when the system asks for reduced motion, owner's
+   choice). A new page appears once its loading is done (`Loading`, classes set in the app
+   shell): its blocks rise and fade in one after another. */
 :where(.page) {
   display: block;
 }
-/* Opacity and margin only: a transform or filter on the host would move fixed children. */
-.page {
-  transition:
-    opacity 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
-    margin-top 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.page.page-enter {
+/* Hidden while loading: the blocks of the page, not the Dream Team tabs (they stay put). */
+.page.page-enter > :not(udt-nav) {
   opacity: 0;
-  margin-top: 10px;
-  transition: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .page,
-  .page.page-enter {
-    transition: none;
-    margin-top: 0;
+.page.page-in > :not(udt-nav) {
+  animation: page-rise 0.62s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.page.page-in > :nth-child(2) {
+  animation-delay: 50ms;
+}
+.page.page-in > :nth-child(3) {
+  animation-delay: 100ms;
+}
+.page.page-in > :nth-child(4) {
+  animation-delay: 150ms;
+}
+.page.page-in > :nth-child(5) {
+  animation-delay: 200ms;
+}
+.page.page-in > :nth-child(n + 6) {
+  animation-delay: 250ms;
+}
+/* A transform would move fixed children (the phone action bar of the tournament form). */
+app-tournament-form.page-in > * {
+  animation-name: page-fade;
+}
+@keyframes page-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+@keyframes page-fade {
+  from {
+    opacity: 0;
   }
 }
 
-/* --- Page changes (decision 168): the old page fades out, a view transition of <main> only
-   (the header stays). */
+/* --- Page changes: a view transition of <main> only; the header and the Dream Team tabs keep
+   their place, the old page sinks back and fades out. */
 main.container {
   view-transition-name: page;
 }
 header.site {
   view-transition-name: site-header;
 }
+nav.udt-nav {
+  view-transition-name: udt-nav;
+}
 ::view-transition-old(root),
 ::view-transition-new(root),
 ::view-transition-old(site-header),
 ::view-transition-new(site-header),
-::view-transition-group(site-header) {
+::view-transition-group(site-header),
+::view-transition-group(udt-nav),
+::view-transition-new(udt-nav) {
   animation: none;
+}
+/* Tabs on both pages: only the new ones (the active tab changes at once). */
+::view-transition-old(udt-nav) {
+  animation: none;
+  opacity: 0;
+}
+/* Leaving or entering the Dream Team: the tabs go and come with the page. */
+::view-transition-old(udt-nav):only-child {
+  opacity: 1;
+  animation: page-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+::view-transition-new(udt-nav):only-child {
+  animation: page-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 /* No size morph between a tall and a short page: only the fade. */
 ::view-transition-group(page) {
   animation: none;
 }
 ::view-transition-old(page) {
-  animation: page-out 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+  animation: page-out 0.26s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 ::view-transition-new(page) {
-  animation: page-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: page-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 @keyframes page-out {
   to {
     opacity: 0;
-    transform: scale(0.985);
-    filter: blur(3px);
-  }
-}
-@keyframes page-in {
-  from {
-    opacity: 0;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none !important;
+    transform: translateY(-6px) scale(0.985);
+    filter: blur(4px);
   }
 }

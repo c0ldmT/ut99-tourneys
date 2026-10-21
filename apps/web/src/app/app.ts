@@ -159,7 +159,7 @@ import { Loader } from './components/loader';
     </header>
     <main class="container">
       @if (loading.spinner()) {
-        <na-loader />
+        <na-loader animate.leave="leaving" />
       }
       <router-outlet #outlet (activate)="entered()" />
     </main>
@@ -216,14 +216,6 @@ import { Loader } from './components/loader';
       }
       to {
         transform: translateX(260%);
-      }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .progress span,
-      .progress.on span {
-        animation: none;
-        width: 100%;
-        transform: none;
       }
     }
     header {
@@ -463,9 +455,14 @@ export class App {
     // The page shows (rising and fading in) once its loading is done.
     effect(() => {
       if (this.loading.hidden() || !this.page) return;
-      this.page.classList.remove('page-enter');
-      (this.page as HTMLElement).inert = false;
-      this.page.removeAttribute('aria-busy');
+      const el = this.page;
+      if (!el.classList.contains('page-enter')) return;
+      el.classList.remove('page-enter');
+      (el as HTMLElement).inert = false;
+      el.removeAttribute('aria-busy');
+      // The blocks rise one after another; later content (a tab, a list) just appears.
+      el.classList.add('page-in');
+      setTimeout(() => el.classList.remove('page-in'), 1200);
     });
   }
 

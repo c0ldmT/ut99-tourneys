@@ -25,9 +25,8 @@ function onViewTransition({ transition }: ViewTransitionInfo) {
       fragment: 'ignored',
       queryParams: 'ignored',
     })();
-  const still =
-    typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (sameQueryOnly || still) transition.skipTransition();
+  // Also with reduced motion asked by the system (decision 169: the owner wants the motion).
+  if (sameQueryOnly) transition.skipTransition();
 }
 
 export const appConfig: ApplicationConfig = {

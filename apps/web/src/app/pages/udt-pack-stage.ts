@@ -632,16 +632,6 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       justify-content: center;
       animation: udt-fade 0.5s ease both;
     }
-    @media (prefers-reduced-motion: reduce) {
-      .c-shake,
-      .boom,
-      .flash,
-      .fc.t-l.down,
-      .crate,
-      .rays svg {
-        animation: none;
-      }
-    }
   `,
 })
 export class UdtPackStage implements OnDestroy {

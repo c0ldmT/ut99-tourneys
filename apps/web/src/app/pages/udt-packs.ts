@@ -312,13 +312,6 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       flex: 1 1 160px;
       min-width: 0;
     }
-    @media (prefers-reduced-motion: reduce) {
-      .crate,
-      .box.r-legendary,
-      .holo {
-        animation: none;
-      }
-    }
   `,
 })
 export class UdtPacksPage {

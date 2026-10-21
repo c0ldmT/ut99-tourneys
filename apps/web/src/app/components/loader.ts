@@ -30,7 +30,7 @@ import { TPipe } from '../core/i18n';
       align-items: flex-start;
       padding-top: min(22vh, 180px);
       pointer-events: none;
-      animation: show 0.22s ease-out both;
+      animation: show 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
     }
     .box {
       display: flex;
@@ -98,22 +98,19 @@ import { TPipe } from '../core/i18n';
     @keyframes show {
       from {
         opacity: 0;
-        transform: scale(0.94);
+        transform: scale(0.9);
+        filter: blur(3px);
       }
     }
-    @media (prefers-reduced-motion: reduce) {
-      :host {
-        animation: none;
-      }
-      .trace {
-        animation: none;
-        stroke-dasharray: none;
-      }
-      .trace.b {
-        display: none;
-      }
-      .n {
-        animation: pulse 2.4s ease-in-out infinite;
+    /* Leaving (animate.leave in the app shell): it fades and grows a little, like a breath. */
+    :host(.leaving) {
+      animation: hide 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+    }
+    @keyframes hide {
+      to {
+        opacity: 0;
+        transform: scale(1.06);
+        filter: blur(2px);
       }
     }
   `,

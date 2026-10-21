@@ -232,11 +232,6 @@ function topModal(): HTMLDialogElement | null {
         transform: translateY(8px);
       }
     }
-    @media (prefers-reduced-motion: reduce) {
-      .toast {
-        animation: none;
-      }
-    }
   `,
 })
 export class ToastHost {
