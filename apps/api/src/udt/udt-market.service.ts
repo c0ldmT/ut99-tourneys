@@ -173,18 +173,21 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const unsoldDays = this.unsoldDays(last?.day);
     const owned = new Map(roster.map((r) => [r.botId, r]));
     const values = new Map<string, number>();
+    const demands = new Map<string, number>();
     const careers = this.career.careers();
     for (const b of library) {
       if (b.udtOwner && !owned.has(b.id)) continue;
       const p = players.get(`b:${b.id}`);
       const phase = careers.get(b.id)?.phase;
+      const demand = demandFactor(sales.get(bracketOf(b.skill)) ?? 0, unsoldDays.get(b.id) ?? 0);
       const v = marketValue(
         baseValue(b.skill, valueScore(b.traits)) * (phase ? PHASE_EFFECT[phase].value : 1),
         formFactor({ games: p?.games ?? 0, wins: p?.gamesWon ?? 0 }),
-        demandFactor(sales.get(bracketOf(b.skill)) ?? 0, unsoldDays.get(b.id) ?? 0),
+        demand,
         index,
       );
       values.set(b.id, v);
+      demands.set(b.id, demand);
       this.db
         .insert(udtValues)
         .values({ botId: b.id, day, value: v })
@@ -203,7 +206,12 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     for (const b of [...fresh, ...again].slice(0, n))
       this.db
         .insert(udtOffers)
-        .values({ day, botId: b.id, minPrice: buyPrice(values.get(b.id) ?? 10, b.skill) })
+        .values({
+          day,
+          botId: b.id,
+          minPrice: buyPrice(values.get(b.id) ?? 10, b.skill),
+          demand: demands.get(b.id) ?? 1,
+        })
         .onConflictDoNothing()
         .run();
     this.db
@@ -410,6 +418,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             face: b.face,
             traits: b.traits,
             price: o.minPrice,
+            /** The demand in the value: >1 in demand (bracket sold well), <1 unsold for days. */
+            demand: o.demand,
             value: h.at(-1)?.value ?? o.minPrice,
             history: h,
             sold: owner !== undefined,
@@ -424,11 +434,15 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
-  /** Market values of the last `days` market days per bot. */
+  /**
+   * Market values of the last `days` market days per bot, with the economy index of each day
+   * (value / index: the bot's own development without the economy).
+   */
   history(botIds: readonly string[], days: number) {
-    const out = new Map<string, { day: string; value: number }[]>();
+    const out = new Map<string, { day: string; value: number; index: number }[]>();
     if (!botIds.length) return out;
     const recent = this.db.select().from(udtDays).orderBy(desc(udtDays.day)).limit(days).all();
+    const indexOf = new Map(recent.map((d) => [d.day, d.economyIndex]));
     const from = recent.at(-1)?.day ?? '0000-00-00';
     for (const v of this.db
       .select()
@@ -436,7 +450,10 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .where(and(inArray(udtValues.botId, [...botIds]), gte(udtValues.day, from)))
       .orderBy(asc(udtValues.day))
       .all())
-      out.set(v.botId, [...(out.get(v.botId) ?? []), { day: v.day, value: v.value }]);
+      out.set(v.botId, [
+        ...(out.get(v.botId) ?? []),
+        { day: v.day, value: v.value, index: indexOf.get(v.day) ?? 1 },
+      ]);
     return out;
   }
 

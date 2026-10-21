@@ -995,7 +995,10 @@ export interface UdtOffer {
   /** What buying costs (fixed for the market day). */
   price: number;
   value: number;
-  history: { day: string; value: number }[];
+  /** Market value per market day with that day's economy index. */
+  history: { day: string; value: number; index: number }[];
+  /** Demand in the value: >1 in demand, <1 cheaper after unsold days. */
+  demand: number;
   sold: boolean;
   /** Tag of the team that bought it (sold). */
   buyer: string | null;

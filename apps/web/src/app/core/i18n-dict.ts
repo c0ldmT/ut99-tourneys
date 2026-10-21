@@ -1691,6 +1691,17 @@ const en = {
   'udt.form.title.normal': 'Form of the day: normal (random every day).',
   'udt.help.lineup.text':
     'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro. Each bot also has a form of the day (Form ▲ / ▼ on the card).',
+  'udt.market.legend':
+    "Line and % on the right: how the bot's market value moved over the last market days, without the economy index – so form and demand of this bot, not the whole economy.",
+  'udt.market.trendTitle':
+    'Market value without the economy index over the last market days (form and demand of the bot)',
+  'udt.market.days': '{n} d',
+  'udt.market.hot': 'in demand',
+  'udt.market.hotTitle':
+    'Bots of this class sold well on the last market day: the value carries a surcharge (up to +15 %).',
+  'udt.market.cheap': 'cheaper',
+  'udt.market.cheapTitle':
+    'On offer for days without a buyer: the value carries a discount (up to −15 %).',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3399,6 +3410,17 @@ const de: Record<TKey, string> = {
   'udt.form.title.normal': 'Tagesform: normal (jeden Tag neu ausgewürfelt).',
   'udt.help.lineup.text':
     'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro. Jeder Bot hat außerdem eine Tagesform (Form ▲ / ▼ auf der Karte).',
+  'udt.market.legend':
+    'Linie und % rechts: wie sich der Marktwert des Bots über die letzten Markttage entwickelt hat, ohne den Wirtschaftsindex – also Form und Nachfrage dieses Bots, nicht die ganze Wirtschaft.',
+  'udt.market.trendTitle':
+    'Marktwert ohne Wirtschaftsindex über die letzten Markttage (Form und Nachfrage des Bots)',
+  'udt.market.days': '{n} T',
+  'udt.market.hot': 'gefragt',
+  'udt.market.hotTitle':
+    'Bots dieser Klasse wurden am letzten Markttag oft gekauft: Der Wert hat einen Aufschlag (bis +15 %).',
+  'udt.market.cheap': 'günstiger',
+  'udt.market.cheapTitle':
+    'Seit Tagen ohne Käufer im Angebot: Der Wert hat einen Abschlag (bis −15 %).',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

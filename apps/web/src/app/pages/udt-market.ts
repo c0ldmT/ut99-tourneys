@@ -54,6 +54,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                 </button>
               }
             </div>
+            <p class="muted small legend">{{ 'udt.market.legend' | t }}</p>
             @for (o of shown(); track o.botId) {
               <button
                 type="button"
@@ -65,7 +66,16 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                   ><span>{{ o.skill }}</span></span
                 >
                 <span class="grow"
-                  ><b class="disp">{{ o.name }}</b>
+                  ><b class="disp name" [title]="o.name">{{ o.name }}</b>
+                  @if (o.demand > 1.001) {
+                    <span class="udt-mark hot" [title]="'udt.market.hotTitle' | t">{{
+                      'udt.market.hot' | t
+                    }}</span>
+                  } @else if (o.demand < 0.999) {
+                    <span class="udt-mark cheap" [title]="'udt.market.cheapTitle' | t">{{
+                      'udt.market.cheap' | t
+                    }}</span>
+                  }
                   @if (o.homegrown) {
                     <span
                       class="udt-mark star"
@@ -83,7 +93,15 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                     }}</span>
                   }
                 </span>
-                <svg width="96" height="30" viewBox="0 0 96 30" aria-hidden="true">
+                <svg
+                  class="spark"
+                  width="96"
+                  height="30"
+                  viewBox="0 0 96 30"
+                  role="img"
+                  [attr.aria-label]="'udt.market.trendTitle' | t"
+                >
+                  <title>{{ 'udt.market.trendTitle' | t }}</title>
                   <path
                     [attr.d]="spark(o)"
                     fill="none"
@@ -93,8 +111,15 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                 </svg>
                 <span class="price"
                   ><span class="neuro mono">{{ o.price | neuro }}</span
-                  ><span class="mono small" [class.up]="trend(o) >= 0" [class.down]="trend(o) < 0"
-                    >{{ trend(o) >= 0 ? '▲' : '▼' }} {{ abs(trend(o)) }} %</span
+                  ><span
+                    class="mono small"
+                    [class.up]="trend(o) > 0"
+                    [class.down]="trend(o) < 0"
+                    [title]="'udt.market.trendTitle' | t"
+                    >{{ trendText(o) }}
+                    <span class="muted">{{
+                      'udt.market.days' | t: { n: o.history.length }
+                    }}</span></span
                   ></span
                 >
               </button>
@@ -184,6 +209,39 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
     .grow {
       flex: 1;
       min-width: 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 6px;
+    }
+    .name {
+      display: block;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .spark {
+      flex: none;
+    }
+    .legend {
+      margin: 0;
+    }
+    .udt-mark.hot {
+      color: #fbbf5c;
+      border-color: rgba(251, 191, 92, 0.5);
+    }
+    .udt-mark.cheap {
+      color: var(--accent);
+      border-color: rgba(34, 211, 238, 0.45);
+    }
+    @media (max-width: 480px) {
+      .spark {
+        display: none;
+      }
+      .price {
+        width: auto;
+      }
     }
     .price {
       width: 110px;
@@ -218,7 +276,6 @@ export class UdtMarketPage {
   protected readonly filter = signal<Filter>('all');
   protected readonly filters: Filter[] = ['all', 'weak', 'mid', 'strong'];
   protected readonly selId = signal<string | null>(null);
-  protected readonly abs = Math.abs;
 
   protected readonly shown = computed(() =>
     (this.market()?.offers ?? []).filter(
@@ -267,19 +324,30 @@ export class UdtMarketPage {
     return formatNeuro(n, this.i18n.lang());
   }
 
+  /**
+   * Change of the value without the economy index over the shown days (value / index): what the
+   * bot's form and the demand did, not the economy.
+   */
   protected trend(o: UdtOffer): number {
-    const h = o.history;
+    const h = o.history.map(real);
     if (h.length < 2) return 0;
-    const a = h[0]!.value;
-    const b = h[h.length - 1]!.value;
+    const a = h[0]!;
+    const b = h[h.length - 1]!;
     return a ? Math.round(((b - a) / a) * 100) : 0;
   }
 
+  protected trendText(o: UdtOffer): string {
+    const t = this.trend(o);
+    return t === 0 ? '± 0 %' : `${t > 0 ? '▲' : '▼'} ${Math.abs(t)} %`;
+  }
+
   protected spark(o: UdtOffer): string {
-    const h = o.history.map((x) => x.value);
+    const h = o.history.map(real);
     if (h.length < 2) return 'M0 15 L96 15';
-    const lo = Math.min(...h);
-    const hi = Math.max(...h);
+    // At least ±5 % around the middle: rounding noise stays a flat line.
+    const mid = (Math.min(...h) + Math.max(...h)) / 2;
+    const lo = Math.min(...h, mid * 0.95);
+    const hi = Math.max(...h, mid * 1.05);
     return h
       .map(
         (v, i) =>
@@ -306,3 +374,6 @@ export class UdtMarketPage {
     }
   }
 }
+
+/** A market value without the economy index of its day. */
+const real = (x: { value: number; index: number }) => x.value / (x.index || 1);

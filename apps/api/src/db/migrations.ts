@@ -516,8 +516,13 @@ export const MIGRATIONS: string[] = [
   // 27: Dream Team: a manager's switch "enter automatically when possible".
   `
   ALTER TABLE udt_teams ADD COLUMN auto_enter INTEGER NOT NULL DEFAULT 0;
-  `, // 28: Dream Team: an own bot can be renamed once (free).
+  `,
+  // 28: Dream Team: an own bot can be renamed once (free).
   `
   ALTER TABLE udt_bots ADD COLUMN renamed INTEGER NOT NULL DEFAULT 0;
+  `,
+  // 29: Dream Team market: the demand factor of an offer (the list shows "in demand" / "cheap").
+  `
+  ALTER TABLE udt_offers ADD COLUMN demand REAL NOT NULL DEFAULT 1;
   `,
 ];

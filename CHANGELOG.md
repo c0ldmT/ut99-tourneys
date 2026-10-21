@@ -167,6 +167,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team market list: the value line and % without the economy index (the bot's own development), marks "in demand" / "cheaper", explained; better on phones.
 - Dream Team economy: weekly salaries 8 / 12 / 20 % of the value (were 3 / 5 / 8), rest with Neuro 7 per stamina point (was 2), starter extra points 50 by default (was 100); checked with the season simulator.
 - Dream Team blueprints: one rarity above the pack draw; points = a default starter plus 150 / 300 / 1,000 / 1,500 (uncommon … legendary), skill up to 3 (uncommon, rare) or 4 (epic, legendary).
 - Dream Team packs: "Again" buys and opens the same box (or 10-pull) at once and shows its price.

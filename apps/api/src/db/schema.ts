@@ -346,6 +346,8 @@ export const udtOffers = sqliteTable(
     day: text('day').notNull(),
     botId: text('bot_id').notNull(),
     minPrice: integer('min_price').notNull(),
+    /** Demand factor in the value (>1 in demand, <1 cheaper after unsold days). */
+    demand: real('demand').notNull().default(1),
   },
   (t) => [primaryKey({ columns: [t.day, t.botId] })],
 );

@@ -37,6 +37,8 @@ async function setup() {
 
 interface Offer {
   botId: string;
+  demand: number;
+  history: { day: string; value: number; index: number }[];
   name: string;
   skill: number;
   price: number;
@@ -61,6 +63,9 @@ describe('Unreal Dream Team: transfer market', () => {
     for (const o of offers) {
       expect(o.price).toBe(buyPrice(o.value, o.skill));
       expect(o.price).toBeGreaterThan(o.value);
+      // The first market day: no demand yet; the history carries the day's index.
+      expect(o.demand).toBe(1);
+      expect(o.history).toEqual([{ day: '2026-10-19', value: o.value, index: 0.3 }]);
     }
     const cheap = [...offers].sort((a, b) => a.price - b.price)[0]!;
     const marioId = (await mario.get('/me')).body.id as string;
