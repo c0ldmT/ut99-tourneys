@@ -1738,3 +1738,48 @@ details.help ul {
     margin-top: 0;
   }
 }
+
+/* --- Page changes (decision 168): the old page fades out, a view transition of <main> only
+   (the header stays). */
+main.container {
+  view-transition-name: page;
+}
+header.site {
+  view-transition-name: site-header;
+}
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(site-header),
+::view-transition-new(site-header),
+::view-transition-group(site-header) {
+  animation: none;
+}
+/* No size morph between a tall and a short page: only the fade. */
+::view-transition-group(page) {
+  animation: none;
+}
+::view-transition-old(page) {
+  animation: page-out 0.18s cubic-bezier(0.4, 0, 1, 1) both;
+}
+::view-transition-new(page) {
+  animation: page-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes page-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+    filter: blur(3px);
+  }
+}
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

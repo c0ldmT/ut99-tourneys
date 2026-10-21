@@ -15,6 +15,8 @@ export type { CallKind } from './load-tracker';
 @Injectable({ providedIn: 'root' })
 export class Loading extends LoadTracker {
   private bg = 0;
+  /** The last navigation went to another page (not only another query). */
+  pageChanged = true;
   private readonly destroy = inject(DestroyRef);
 
   constructor() {
@@ -30,7 +32,8 @@ export class Loading extends LoadTracker {
     const sub = router.events.subscribe((e) => {
       if (e instanceof NavigationStart) {
         // Only the query (e.g. a panel or a filter) changes: no page load.
-        if (path(e.url) !== path(router.url) || !router.navigated) this.navStart();
+        this.pageChanged = path(e.url) !== path(router.url) || !router.navigated;
+        if (this.pageChanged) this.navStart();
       } else if (
         e instanceof NavigationEnd ||
         e instanceof NavigationCancel ||

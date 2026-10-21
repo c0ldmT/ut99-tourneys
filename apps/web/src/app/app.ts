@@ -1,6 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  DestroyRef,
   effect,
   ElementRef,
   inject,
@@ -8,7 +9,8 @@ import {
   viewChild,
 } from '@angular/core';
 import { Avatar, NameTag } from './core/looks';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet, Scroll } from '@angular/router';
+import { ViewportScroller } from '@angular/common';
 import { NeuroPipe, NeuroStore } from './core/neuro';
 import { Coin, Icon, Logo, UdtMark, Wordmark } from './core/brand';
 import { version } from '../../../../package.json';
@@ -456,6 +458,7 @@ export class App {
 
   constructor() {
     this.loading.watch(this.router);
+    this.scrolling();
     void this.auth.ready();
     // The page shows (rising and fading in) once its loading is done.
     effect(() => {
@@ -463,6 +466,32 @@ export class App {
       this.page.classList.remove('page-enter');
       (this.page as HTMLElement).inert = false;
       this.page.removeAttribute('aria-busy');
+    });
+  }
+
+  /**
+   * A new page starts at the top; back and forward return to the old place once the page's
+   * data is there (the router restores before, when the page is still short). A change of the
+   * query only keeps the place.
+   */
+  private scrolling() {
+    if (typeof history !== 'undefined') history.scrollRestoration = 'manual';
+    const scroller = inject(ViewportScroller);
+    const back = signal<[number, number] | null>(null);
+    const sub = this.router.events.subscribe((e) => {
+      if (!(e instanceof Scroll) || !this.loading.pageChanged) return;
+      if (e.position) back.set(e.position);
+      else {
+        back.set(null);
+        scroller.scrollToPosition([0, 0]);
+      }
+    });
+    inject(DestroyRef).onDestroy(() => sub.unsubscribe());
+    effect(() => {
+      const p = back();
+      if (!p || this.loading.hidden()) return;
+      back.set(null);
+      scroller.scrollToPosition(p);
     });
   }
 
