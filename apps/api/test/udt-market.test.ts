@@ -115,6 +115,26 @@ describe('Unreal Dream Team: transfer market', () => {
     expect((m2.offers as Offer[]).some((o) => o.botId === cheap.botId)).toBe(false);
   });
 
+  it("shows library bots without their clan tag; in a roster they carry the manager's tag", async () => {
+    const { admin, mario, market } = await setup();
+    const clan = (await admin.post('/bot-clans', { name: 'Thunder Crash', tag: '[TC]' })).body;
+    const lib = (await admin.get('/bots')).body.bots as { id: string }[];
+    for (const b of lib)
+      expect((await admin.req('PATCH', `/bots/${b.id}`, { clanId: clan.id })).status).toBe(200);
+    const tagged = (await admin.get('/bots')).body.bots as { gameName: string }[];
+    expect(tagged.every((b) => b.gameName.startsWith('[TC]'))).toBe(true);
+    market.tick();
+    const offers = (await mario.get('/udt/market')).body.offers as Offer[];
+    expect(offers.length).toBeGreaterThan(0);
+    for (const o of offers) expect(o.name).not.toMatch(/\[TC\]/);
+    const o = offers.find((x) => x.price <= 900)!;
+    expect((await mario.post('/udt/market/buy', { botId: o.botId })).status).toBe(200);
+    const r = (await mario.get('/udt')).body.roster.find(
+      (x: { botId: string }) => x.botId === o.botId,
+    );
+    expect(r.gameName).toBe(`[NX]${o.name}`);
+  });
+
   it('pays salaries on Mondays (strike when it cannot be paid)', async () => {
     const { clock, mario, market, ledger } = await setup();
     market.tick();

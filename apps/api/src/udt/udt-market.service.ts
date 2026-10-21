@@ -401,7 +401,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
         return [
           {
             botId: b.id,
-            name: b.gameName,
+            // Library bots appear without their clan tag: in the Dream Team the manager's tag counts.
+            name: b.name,
             skill: b.skill,
             rarity: botRarity(b.skill),
             botClass: b.botClass,

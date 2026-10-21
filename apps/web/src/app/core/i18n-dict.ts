@@ -1680,6 +1680,9 @@ const en = {
   'ok.udt.autoOn': 'Automatic sign-up on: {n} tournament(s) entered right away.',
   'udt.kind.udt_purchase': 'Purchase',
   'udt.kind.udt_refund': 'Refund (old bid)',
+  'udt.academy.origin.blueprint': 'Blueprint',
+  'stats.playerMissing':
+    'No games and no profile here: the player has not played in this season (choose another one) or does not exist.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3376,6 +3379,9 @@ const de: Record<TKey, string> = {
   'ok.udt.autoOn': 'Automatische Anmeldung an: {n} Turnier(e) sofort angemeldet.',
   'udt.kind.udt_purchase': 'Kauf',
   'udt.kind.udt_refund': 'Erstattung (altes Gebot)',
+  'udt.academy.origin.blueprint': 'Bauplan',
+  'stats.playerMissing':
+    'Hier gibt es weder Spiele noch ein Profil: Der Spieler hat in dieser Season nicht gespielt (wähl eine andere) oder es gibt ihn nicht.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

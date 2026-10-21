@@ -42,6 +42,9 @@ describe('translations', () => {
     ])
       expect(DICT.en[`live.${p}`]).toBeDefined();
     for (let s = 0; s <= 7; s++) expect(DICT.en[`skill.${s}`]).toBeDefined();
+    // Origins of own Dream Team bots (badges on My team, squads, yearbook).
+    for (const o of ['starter', 'academy', 'apprentice', 'blueprint'])
+      expect(DICT.en[`udt.academy.origin.${o}`]).toBeDefined();
   });
 
   it('fills parameters and falls back to English', () => {

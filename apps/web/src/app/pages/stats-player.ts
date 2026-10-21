@@ -8,11 +8,13 @@ import {
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { Avatar, NameTag, Looks } from '../core/looks';
 import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
-import { Api } from '../core/api';
+import { Api, ApiError, errorText } from '../core/api';
+import { Toasts } from '../core/toast';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import { RatingChart } from '../components/rating-chart';
@@ -309,6 +311,9 @@ import type {
         }
       </div>
     }
+    @if (missing()) {
+      <p class="card muted">{{ 'stats.playerMissing' | t }}</p>
+    }
     @if (neuro(); as n) {
       @if (!d() && n.name) {
         <h1>{{ n.name }}</h1>
@@ -528,6 +533,9 @@ import type {
 })
 export class StatsPlayerPage {
   private readonly api = inject(Api);
+  private readonly toasts = inject(Toasts);
+  /** Only the newest load may set the page (season or route changed meanwhile). */
+  private loadSeq = 0;
   readonly key = input.required<string>();
   private readonly looks = inject(Looks);
   /** The website user of the page (players only). */
@@ -545,6 +553,8 @@ export class StatsPlayerPage {
   protected readonly scope = signal<StatScope>('lifetime');
   protected readonly seasons = computed(() => startedSeasons(this.overview()));
   protected readonly d = signal<StatsPlayerDetail | null>(null);
+  /** Neither games in this scope nor a website user: nothing to show. */
+  protected readonly missing = signal(false);
   protected readonly ratings = signal<PlayerRatings | null>(null);
   /** A bot of the control center: link to its profile. */
   protected readonly botId = signal<string | null>(null);
@@ -607,7 +617,8 @@ export class StatsPlayerPage {
     effect(() => {
       const key = this.key();
       const season = this.season();
-      void this.init(key, season);
+      // Only the route starts a load (init reads signals that it sets itself).
+      untracked(() => void this.init(key, season));
     });
     effect(() => {
       const key = this.key();
@@ -651,17 +662,28 @@ export class StatsPlayerPage {
         (r) => this.ratings.set(r),
         () => this.ratings.set(null),
       );
+    const run = ++this.loadSeq;
     this.neuro.set(null);
-    if (key.startsWith('u:'))
-      this.api.userBets(key.slice(2), scope === 'lifetime' ? undefined : scope, true).then(
-        (n) => this.neuro.set(n),
-        () => undefined,
-      );
+    this.missing.set(false);
+    const bets = key.startsWith('u:')
+      ? this.api.userBets(key.slice(2), scope === 'lifetime' ? undefined : scope, true).then(
+          (n) => {
+            if (run === this.loadSeq) this.neuro.set(n);
+          },
+          () => undefined,
+        )
+      : Promise.resolve();
+    // No games in this scope is normal (a user with Neuro only, another season): no toast for
+    // "not found", but for every other error.
+    let d: StatsPlayerDetail | null = null;
     try {
-      this.d.set(await this.api.statsPlayer(key, scope));
-    } catch {
-      // the toast shows the error
-      this.d.set(null);
+      d = await this.api.statsPlayer(key, scope, true);
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 404)) this.toasts.error(errorText(e));
     }
+    await bets;
+    if (run !== this.loadSeq) return;
+    this.d.set(d);
+    if (!d && !this.neuro()?.name) this.missing.set(true);
   }
 }

@@ -182,10 +182,12 @@ export class Api {
       'GET',
       `/stats/players?season=${scope}&${mode ? `mode=${mode}&` : ''}bots=${bots ? 1 : 0}`,
     );
-  statsPlayer = (key: string, scope: StatScope) =>
+  statsPlayer = (key: string, scope: StatScope, quiet = false) =>
     this.call<StatsPlayerDetail>(
       'GET',
       `/stats/players/${encodeURIComponent(key)}?season=${scope}`,
+      undefined,
+      { quiet },
     );
   statsRecords = (season: number, mode: StatMode | '') =>
     this.call<{ records: StatsRecord[]; maps: MapRecord[] }>(
