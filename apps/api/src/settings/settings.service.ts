@@ -93,7 +93,7 @@ export const UdtSettingsSchema = z.object({
   starterBudget: z.number().int().min(100).max(100_000).default(1500),
   /** Free points on top of the starter budget: the default starter (skill 3, average values)
    * costs the budget, these are left to allocate. */
-  starterExtra: z.number().int().min(0).max(100_000).default(100),
+  starterExtra: z.number().int().min(0).max(100_000).default(50),
   /** Trading between managers (phase 3) and its brakes against moving Neuro to a friend. */
   tradeEnabled: z.boolean().default(true),
   /** Fee in percent of what each side receives (bots' market value + Neuro). */

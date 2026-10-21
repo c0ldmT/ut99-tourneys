@@ -80,9 +80,9 @@ describe('market values', () => {
   });
 
   it('salaries rise with the bracket', () => {
-    expect(weeklySalary(22_000, 7)).toBe(1760);
-    expect(weeklySalary(7000, 5)).toBe(350);
-    expect(weeklySalary(1500, 3)).toBe(50);
+    expect(weeklySalary(22_000, 7)).toBe(4400);
+    expect(weeklySalary(7000, 5)).toBe(840);
+    expect(weeklySalary(1500, 3)).toBe(120);
   });
 });
 

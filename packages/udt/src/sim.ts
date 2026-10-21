@@ -69,6 +69,8 @@ export interface SimOptions {
   offersPerDay?: number;
   /** Strength of the starter bot (the creation budget reaches about this skill). */
   starterSkill?: number;
+  /** Daily Cups (1v1) per day; more make stamina (and rest) matter. Default 1. */
+  dailyCups?: number;
 }
 
 export interface ManagerDay {
@@ -108,6 +110,10 @@ export interface SimResult {
     salaries: number;
     bought: number;
     titles: number;
+    /** Neuro spent on rest (stamina bought before events). */
+    rested: number;
+    /** Bot-weeks on strike (salary not paid). */
+    strikes: number;
     finalNet: number;
     firstStrong: number | null;
     first5v5: number | null;
@@ -230,6 +236,8 @@ export function simulateSeason(o: SimOptions): SimResult {
       salaries: 0,
       bought: 0,
       titles: 0,
+      rested: 0,
+      strikes: 0,
       finalNet: 0,
       firstStrong: null,
       first5v5: null,
@@ -255,7 +263,10 @@ export function simulateSeason(o: SimOptions): SimResult {
               m.cash -= s;
               m.t.salaries += s;
               x.striking = false;
-            } else x.striking = true;
+            } else {
+              x.striking = true;
+              m.t.strikes++;
+            }
           }
         }
       }
@@ -302,7 +313,8 @@ export function simulateSeason(o: SimOptions): SimResult {
     // --- Events.
     for (const ev of EVENTS) {
       if (!ev.days.includes(weekday)) continue;
-      playEvent(ev, day);
+      const times = ev.teamSize === 1 ? Math.max(1, o.dailyCups ?? 1) : 1;
+      for (let i = 0; i < times; i++) playEvent(ev, day);
     }
 
     // --- Rest.
@@ -385,10 +397,25 @@ export function simulateSeason(o: SimOptions): SimResult {
     return team.length === ev.teamSize ? team : null;
   }
 
+  // Before an event: tired bots of the lineup are rested with Neuro when it is cheap for the
+  // manager (at most a tenth of the money above the reserve per bot); savers never pay for it.
+  function rest(m: Manager, team: readonly Owned[]) {
+    if (m.strategy === 'saver') return;
+    for (const x of team) {
+      if (x.stamina >= cfg.stamina.tiredBelow) continue;
+      const cost = (100 - x.stamina) * cfg.restPrice;
+      if (cost > (m.cash - floor) * 0.1) continue;
+      m.cash -= cost;
+      m.t.rested += cost;
+      x.stamina = 100;
+    }
+  }
+
   function playEvent(ev: (typeof EVENTS)[number], day: number) {
     const teams: Team[] = [];
     for (const m of managers) {
       const bots = lineup(m, ev);
+      if (bots) rest(m, bots);
       if (!bots) continue;
       teams.push({
         name: m.name,

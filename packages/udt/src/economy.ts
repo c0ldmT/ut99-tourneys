@@ -58,6 +58,8 @@ export interface EconomyConfig {
   /** Reward factor per team size (more bots invested). */
   formatFactor: Readonly<Record<number, number>>;
   stamina: { perGame: number; perDay: number; tiredBelow: number };
+  /** Rest with Neuro: Neuro per stamina point (not indexed). */
+  restPrice: number;
   packs: Readonly<Record<PackBox, PackConfig>>;
   /** A 10-pull costs this many boxes. */
   tenPullBoxes: number;
@@ -84,7 +86,10 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   formMin: 0.7,
   formMax: 1.4,
   demandMax: 0.15,
-  salaryRate: { weak: 3, mid: 5, strong: 8 },
+  // Raised on 21.10. (owner: clearly more; was 3/5/8): the simulator (40 seeds) had salaries at 4 %
+  // of the Dream Team rewards; with 8/12/20 they are 9 %, the season ends at index 2.0 instead of
+  // 2.5 (max 3.7), about half a bot-week on strike per manager and season, rosters stay full.
+  salaryRate: { weak: 8, mid: 12, strong: 20 },
   sellBack: 0.85,
   // Calibrated on 20.10. with the simulator (40 seeds): bidding ended the season at index 2.4
   // (max 3.7); instant buying without a surcharge at 2.75 (max 5, the cap), with 10/20/30 % at
@@ -107,6 +112,9 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   formatFactor: { 1: 1, 2: 1.5, 3: 2, 5: 3 },
   // 6 per game (was 15): a 4-team double elimination (up to 5 games) leaves a bot at 70.
   stamina: { perGame: 6, perDay: 30, tiredBelow: 40 },
+  // 7 since 21.10. (owner; was 2): in the simulator a sink of about 500 Neuro per manager and
+  // season with three Daily Cups a day, nothing with one; the index does not move.
+  restPrice: 7,
   packs: {
     standard: { price: 1500, rates: [60, 25, 10, 4, 1], pityEpic: 10, pityLegendary: 50 },
     premium: { price: 4000, rates: [35, 35, 20, 8, 2], pityEpic: 7, pityLegendary: 30 },

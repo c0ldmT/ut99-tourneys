@@ -562,7 +562,7 @@ export class SettingsPage {
   protected udtTime = '04:00';
   protected udtOffers = 8;
   protected udtBudget = 1500;
-  protected udtExtra = 100;
+  protected udtExtra = 50;
   /** Website reset: opened, ticked and the word typed before the button works. */
   protected readonly resetWord = 'RESET';
   protected readonly resetOpen = signal(false);
@@ -614,7 +614,7 @@ export class SettingsPage {
         this.udtTime = s.udt.marketTime;
         this.udtOffers = s.udt.offersPerDay;
         this.udtBudget = s.udt.starterBudget;
-        this.udtExtra = s.udt.starterExtra ?? 100;
+        this.udtExtra = s.udt.starterExtra ?? 50;
         this.trade = pickTrade(s.udt);
         this.ai = pickAi(s.udt);
       }

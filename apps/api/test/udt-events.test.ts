@@ -228,7 +228,7 @@ describe('Unreal Dream Team: events', () => {
     const rested = await mario.post(`/udt/roster/${bot}/rest`, { points: 50 });
     expect(rested.status, JSON.stringify(rested.body)).toBe(201);
     expect(rested.body.roster[0].stamina).toBe(100);
-    expect(before.wallet.spendable - rested.body.wallet.spendable).toBe(80); // 40 points
+    expect(before.wallet.spendable - rested.body.wallet.spendable).toBe(280); // 40 points × 7
     expect((await mario.post(`/udt/roster/${bot}/rest`, { points: 5 })).status).toBe(409);
   });
 

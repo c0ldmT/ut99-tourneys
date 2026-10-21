@@ -28,6 +28,7 @@ import {
   valueScore,
   type CardBot,
 } from '../core/udt';
+import { DEFAULT_ECONOMY } from '@tourney/udt';
 
 type Mode = 'dm' | 'mh';
 
@@ -232,7 +233,7 @@ type Mode = 'dm' | 'mh';
             <summary>{{ 'udt.staminaHelp.title' | t }}</summary>
             <ul>
               @for (k of ['loss', 'rest', 'tired', 'bench', 'traits', 'buy']; track k) {
-                <li>{{ 'udt.staminaHelp.' + k | t }}</li>
+                <li>{{ 'udt.staminaHelp.' + k | t: { n: restPrice } }}</li>
               }
             </ul>
           </details>
@@ -361,7 +362,7 @@ type Mode = 'dm' | 'mh';
                     type="button"
                     [disabled]="busy()"
                     (click)="openRest(b)"
-                    [title]="'udt.rest.hint' | t"
+                    [title]="'udt.rest.hint' | t: { n: restPrice }"
                   >
                     {{ 'udt.rest.button' | t }}
                   </button>
@@ -588,7 +589,8 @@ export class UdtTeamPage {
   // Rest with Neuro
   protected readonly restFor = signal<string | null>(null);
   protected readonly restPoints = signal(1);
-  protected readonly restPrice = 2;
+  /** Neuro per stamina point (rest with Neuro). */
+  protected readonly restPrice = DEFAULT_ECONOMY.restPrice;
   // Lineup draft (bot ids per slot) and whether it differs from the saved one
   private readonly draft = signal<{
     dm: (string | null)[];

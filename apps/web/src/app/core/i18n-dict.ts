@@ -1143,11 +1143,8 @@ const en = {
   'udt.bench': 'Bench',
   'udt.lineupHint': 'Strikers never play; tired bots (below 40) after the bench.',
   'udt.rest.button': 'Rest',
-  'udt.rest.hint': 'Buy stamina with Neuro: 2 per point',
   'udt.rest.points': 'Stamina points',
   'udt.rest.buy': 'Buy',
-  'udt.staminaHelp.buy':
-    'Rest with Neuro: in the roster, "Rest" buys stamina at 2 Neuro per point (up to 100).',
   'udt.kind.udt_rest': 'Rest with Neuro',
   'udt.events.auto': 'Enter automatically when possible',
   'udt.events.autoHint':
@@ -1686,6 +1683,9 @@ const en = {
     'Build an own bot: a starter +1,500 points, up to skill 4, an epic start trait',
   'udt.academy.bpRule':
     '{pts} points (a default starter +{extra}), up to skill {cap}, potential +{up}.',
+  'udt.rest.hint': 'Buy stamina with Neuro: {n} per point',
+  'udt.staminaHelp.buy':
+    'Rest with Neuro: in the roster, "Rest" buys stamina at {n} Neuro per point (up to 100).',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -2843,11 +2843,8 @@ const de: Record<TKey, string> = {
   'udt.bench': 'Bank',
   'udt.lineupHint': 'Streiker spielen nie; müde Bots (unter 40) erst nach der Bank.',
   'udt.rest.button': 'Erholen',
-  'udt.rest.hint': 'Ausdauer mit Neuro kaufen: 2 pro Punkt',
   'udt.rest.points': 'Ausdauerpunkte',
   'udt.rest.buy': 'Kaufen',
-  'udt.staminaHelp.buy':
-    'Erholen mit Neuro: Im Kader kauft „Erholen“ Ausdauer für 2 Neuro pro Punkt (bis 100).',
   'udt.kind.udt_rest': 'Erholung mit Neuro',
   'udt.events.auto': 'Automatisch anmelden, wenn möglich',
   'udt.events.autoHint':
@@ -3389,6 +3386,9 @@ const de: Record<TKey, string> = {
     'Baue einen eigenen Bot: Starter +1.500 Punkte, bis Skill 4, epischer Start-Trait',
   'udt.academy.bpRule':
     '{pts} Punkte (Standard-Starter +{extra}), bis Skill {cap}, Potenzial +{up}.',
+  'udt.rest.hint': 'Ausdauer mit Neuro kaufen: {n} pro Punkt',
+  'udt.staminaHelp.buy':
+    'Erholen mit Neuro: Im Kader kauft „Erholen“ Ausdauer für {n} Neuro pro Punkt (bis 100).',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

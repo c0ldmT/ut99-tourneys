@@ -4,6 +4,7 @@ import { BotTraitsSchema } from '@tourney/protocol';
 import {
   baseValue,
   botRarity,
+  DEFAULT_ECONOMY,
   economyIndex,
   effectiveValues,
   levelOf,
@@ -158,8 +159,8 @@ export interface UdtTeam {
   autoEnter: boolean;
 }
 
-/** Neuro per stamina point bought (rest with Neuro). */
-export const REST_PRICE = 2;
+/** Neuro per stamina point bought (rest with Neuro, not indexed). */
+export const REST_PRICE = DEFAULT_ECONOMY.restPrice;
 
 /**
  * Unreal Dream Team (add-on, settings "udt.enabled"): managers' teams and rosters of a season.

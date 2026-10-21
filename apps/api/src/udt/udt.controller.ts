@@ -176,7 +176,7 @@ export class UdtController {
     return { team, entered, events: this.events.events(user) };
   }
 
-  /** Rest with Neuro: stamina points for a roster bot (2 Neuro each). */
+  /** Rest with Neuro: stamina points for a roster bot (REST_PRICE Neuro each). */
   @Post('roster/:botId/rest')
   rest(
     @CurrentUser() user: User,

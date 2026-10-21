@@ -63,26 +63,26 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect(cc.some((b) => b.name === 'Mira')).toBe(false);
   });
 
-  it('leaves 100 extra points on top of the default starter (setting)', async () => {
+  it('leaves 50 extra points on top of the default starter (setting)', async () => {
     ({ api } = await startApi());
     const admin = await Client.login(api, 'Boss', true);
     const mario = await Client.login(api, 'Mario');
     await admin.req('PUT', '/settings/udt', { enabled: true });
     await startSeason(admin);
     const v = (await mario.get('/udt')).body;
-    expect(v).toMatchObject({ starterBudget: 1500, starterExtra: 100 });
-    // Skill 3 with accuracy 75 costs 1,568: within 1,500 + 100; accuracy 100 (1,635) is not.
+    expect(v).toMatchObject({ starterBudget: 1500, starterExtra: 50 });
+    // Skill 3 with accuracy 62.5 costs 1,534: within 1,500 + 50; accuracy 75 (1,568) is not.
     const over = await mario.post(
       '/udt/team',
       team({
-        starter: { name: 'Mira', skill: 3, traits: { accuracy: 1, alertness: 0, strafing: 0 } },
+        starter: { name: 'Mira', skill: 3, traits: { accuracy: 0.5, alertness: 0, strafing: 0 } },
       }),
     );
     expect(over.status).toBe(400);
     const ok = await mario.post(
       '/udt/team',
       team({
-        starter: { name: 'Mira', skill: 3, traits: { accuracy: 0.5, alertness: 0, strafing: 0 } },
+        starter: { name: 'Mira', skill: 3, traits: { accuracy: 0.25, alertness: 0, strafing: 0 } },
       }),
     );
     expect(ok.status, JSON.stringify(ok.body)).toBe(201);
