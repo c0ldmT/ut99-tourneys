@@ -9,7 +9,8 @@
  * of it); --curve gives the rows of a proposal (on top of Ist; without it the report shows Ist
  * only). `bot-curves/proposal-v1.json` is the curve of mod 0.14.0. Rows a file leaves out stay as
  * they are. The report compares both: guard rails, level matrix, accuracy heat map, what each
- * building block adds to a level, reaction from an ambush, hit rates, traits, a model check.
+ * building block adds to a level, reaction from an ambush, hit rates, the play-style values against
+ * each other (with weights for the market value), traits, a model check.
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -93,6 +94,43 @@ interface CurveRun {
   mario: DuelSeries;
   robust: { g1: number[]; g2: number[] };
   traits: { label: string; win: number; ambush: number }[];
+  values: ValueRow[];
+}
+
+// Play-style values: each at 100 against 0 (the rest 50) per level; camping does not act in a duel.
+type ValueKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'jumpy';
+const VALUE_KEYS: readonly ValueKey[] = [
+  'accuracy',
+  'alertness',
+  'strafing',
+  'combatStyle',
+  'jumpy',
+];
+const VALUE_NAMES: Record<ValueKey, string> = {
+  accuracy: 'Accuracy',
+  alertness: 'Alertness',
+  strafing: 'Strafing',
+  combatStyle: 'Kampfstil',
+  jumpy: 'Jumpy',
+};
+const VALUE_LEVELS = [1, 3, 5, 7];
+/** The Dream Team market value weights today (valueScore in packages/udt economy.ts). */
+const SCORE_WEIGHTS: Partial<Record<ValueKey, number>> = {
+  accuracy: 0.45,
+  alertness: 0.3,
+  strafing: 0.25,
+};
+interface ValueRow {
+  key: ValueKey;
+  level: number;
+  /** 100 against 0 in the open duel (share of the decided ones). */
+  full: number;
+  /** 75 against 50. */
+  quarter: number;
+  /** Ambush (an Adept aims already): survival with 100 minus with 0. */
+  ambush: number;
+  /** One level more at the same values (the yardstick). */
+  step: number;
 }
 
 const runs = curves.map(({ curve }) => {
@@ -150,7 +188,30 @@ const runs = curves.map(({ curve }) => {
   for (const ph of ['rookie', 'peak', 'decline'] as const) state(`Karriere: ${ph}`, { phase: ph });
   state('eigenes Modell (Skaarj, NaliCow …)', { stock: false });
   state('zum Vergleich: eine Stufe mehr', { level: 4 });
+  const withValue = (L: number, k: ValueKey, v: number): DuelBotSpec =>
+    k === 'accuracy'
+      ? bot(L, (v + 1) * 50)
+      : k === 'jumpy'
+        ? bot(L, 50, { jumpy: v > 0 })
+        : bot(L, 50, { [k]: v });
+  const values: ValueRow[] = [];
+  for (const L of VALUE_LEVELS) {
+    const step = g1[Math.min(L, 6)]!.winDecided;
+    for (const k of VALUE_KEYS) {
+      const hi = withValue(L, k, 1);
+      const lo = withValue(L, k, -1);
+      values.push({
+        key: k,
+        level: L,
+        full: win(hi, lo, o),
+        quarter: k === 'jumpy' ? NaN : win(withValue(L, k, 0.5), bot(L), o),
+        ambush: survives(hi) - survives(lo),
+        step,
+      });
+    }
+  }
   const run: CurveRun = {
+    values,
     g1,
     g2,
     equiv,
@@ -240,6 +301,32 @@ const weaponHtml = (r: CurveRun) =>
       `<tr><td>${LEVEL_NAMES[L]}</td>${WEAPONS.map((w) => `<td>${pct(r.weaponHits[L]![w.code]!, false, 1)}</td>`).join('')}</tr>`,
   ).join('')}</table>`;
 
+const valuesHtml = (r: CurveRun) => {
+  const head = VALUE_LEVELS.map((L) => `<th colspan="4">${LEVEL_NAMES[L]}</th>`).join('');
+  const sub = VALUE_LEVELS.map(
+    () => '<th>Duell</th><th>+25</th><th>Überfall</th><th>Stufen</th>',
+  ).join('');
+  const rows = VALUE_KEYS.map((k) => {
+    const cellsOf = VALUE_LEVELS.map((L) => {
+      const v = r.values.find((x) => x.key === k && x.level === L)!;
+      const lv = (v.full - 0.5) / Math.max(0.01, v.step - 0.5);
+      return `${cell(v.full, true)}<td>${pct(v.quarter - 0.5, true)}</td><td>${pct(v.ambush, true)}</td><td>${lv.toFixed(2)}</td>`;
+    }).join('');
+    return `<tr><td>${VALUE_NAMES[k]}</td>${cellsOf}</tr>`;
+  }).join('');
+  // Weights for the market value: duel and ambush advantage, averaged over the levels.
+  const worth = (k: ValueKey) => {
+    const l = r.values.filter((x) => x.key === k);
+    return Math.max(0, l.reduce((n, x) => n + (x.full - 0.5 + x.ambush) / 2, 0) / l.length);
+  };
+  const keys = Object.keys(SCORE_WEIGHTS) as ValueKey[];
+  const total = keys.reduce((n, k) => n + worth(k), 0) || 1;
+  const weights = keys
+    .map((k) => `${VALUE_NAMES[k]} ${pct(SCORE_WEIGHTS[k]!)} → <b>${pct(worth(k) / total)}</b>`)
+    .join(' · ');
+  return `<table><tr><th>Wert</th>${head}</tr><tr><th></th>${sub}</tr>${rows}</table><p class="muted">Marktwert-Gewichte (valueScore) heute → nach Wirkung im Duell: ${weights}</p>`;
+};
+
 const traitRows = runs[0]!.traits
   .map(
     (t, i) =>
@@ -308,6 +395,10 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${partsHtml(runs[i]!
 <h2>Trefferquote je Waffe (gegen Adept/50)</h2>
 <div class="two">${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${weaponHtml(runs[i]!)}</div>`).join('')}</div>
 
+<h2>Werte im Vergleich</h2>
+<p class="muted">Jeder Spielwert bei 100 gegen 0 (die anderen 50), offenes Duell; +25: 75 gegen 50; Überfall: Überleben mit 100 minus mit 0 (Wahrnehmung zählt); Stufen: Duell-Vorteil geteilt durch den Vorteil einer Stufe mehr. Camping wirkt im Duell nicht. Rauschen etwa ±3 Punkte.</p>
+${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${valuesHtml(runs[i]!)}</div>`).join('')}
+
 <h2>Traits und Zustände (Skilled/50 mit gegen ohne)</h2>
 <div class="card"><p class="muted">Werte-Traits über die Website-Regeln (effectiveValues), Körper-Traits wie im Mod. Nicht im Duell: Adrenaline (erst nach einem Kill), Verhaltens-Traits (Entscheidungen auf der Map), Lieblingswaffe. Phoenix wirkt im Spiel nur einmal pro Match, im Duell daher überschätzt. Werte-Traits wirken seit Mod 0.14.0 als Vorteile auf der Kurve (Zielfehler, Reaktion, Sicht, Drehen, Ausweichen). Spalten: Siegquote im offenen Duell gegen denselben Bot ohne Trait, und Punkte mehr Überleben beim Überfall (wo Wahrnehmung zählt).</p>
 <table><tr><th>Trait / Zustand</th>${curves.map((c) => `<th>Duell ${c.key}</th>`).join('')}${curves.map((c) => `<th>Überfall ${c.key}</th>`).join('')}</tr>${traitRows}</table></div>
@@ -328,6 +419,8 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${partsHtml(runs[i]!
 <li>Zielen nach AdjustAim/AimSpread: AimError × Relativbewegung (11 − 10·dot) × Hitscan (0,5 + 0,19·S) × (1,7 − 0,4·(S+½)) × 1,2 nach Treffer/in der Luft × 2 erster Schuss auf ein neues Ziel (nur bis Skill-intern 2) × (1 − Acc); Acc = TAcc + accGain × eigener Wert. Standardklassen driften (TDriftHz, TLag), eigene Modelle würfeln pro Schuss. Treffer: seitlicher Versatz &lt; 17 uu; Projektile fliegen mit Vorhalten 0,7–1,0; Rocket mit Splash an den Füßen, Flak 8 Splitter.</li>
 <li>Reaktion: Sicht im Sichtfeld (cos(Fov/2) − Wachsamkeit), Hören bei Schüssen (Annahme 30 % je Schuss × THear), Treffer von hinten: nach Treffer-Animation oder mit Chance S/3 sofort, sonst nach TReact (mit 1 − TRight erst falsch herum); nach Sicht/Gehör sightReact, Drehen mit TYaw, 0,2 s Tween; Feuern nur ≤ 22° zum Ziel; fireDelay verlängert die Pausen zwischen Schüssen.</li>
 <li>Bewegung: Kampfmanöver alle 0,8–1,6 s (Anteil 50 % + 40 % × Strafing), Tempo 400 × TSpeed in zufälliger Richtung, Ausweichsprung im Kampfmanöver (unter Masterful TTact, darüber und mit Jumpy UTs eigene 35 %-Regel – TTact ab Masterful wirkt im Mod nicht; nie mit Rocket), Projektil-Ausweichen (TDuck-Fenster, dann 0,33 + 0,22·S, Schütze im Blick ≤ 37°).</li>
+<li>Spielwerte: Strafing = Anteil seitlicher Kampfmanöver (Plan 0.15: auch Ausweich-Chancen × (1 + strafeDodge × Strafing)); Alertness = Sichtfeld und Gehör; Kampfstil = UTs Aggression (CombatStyle 0,1 + 0,7 × Wert): Ansturm auf den Gegner (Abstand schrumpft, kaum seitlich), vorsichtige Bots weichen zurück; Jumpy = 35 % Ausweichen im Kampfmanöver und Hüpfer (in der Luft). Camping wirkt im Duell nicht.</li>
+<li>Plan 0.15 (Zeilen dodgeLate, dodgeErr, leadOff, strafeDodge; heute 0): eigenes Projektil-Ausweichen mit Reaktionszeit und falscher Seite, zeitweise kein Vorhalten.</li>
 <li>Treffer-Animation nach Bot.PlayHit (0,4 s ohne Feuern), Anteil TFlinch für die optionalen.</li>
 <li>Absolute Zahlen (Trefferquoten, Zeit bis Kill) sind grob; zum Abstimmen zählen die Vergleiche. Abgleich mit echten Logs steht aus.</li>
 </ul></div>

@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Bot duel simulator: combat style, jumpy and strafing in the model, a comparison of all play-style values with weights for the market value, and the planned rows for mod 0.15.0 (`--curve scripts/bot-curves/plan-0.15.json`).
 - Page changes fade out and in (the header stays); a new page starts at the top, back and forward keep the place.
 - One loading display for the site: a page appears at once when its data is there (rising and fading in), the logo loader shows only for slow page loads, a thin line under the header for later loads and actions.
 - Dream Team My team: drag and drop (or tap and tap) for the lineup, the roster and the traits, saved at once with undo; a bot's details with experience, development points (gold plaque on the card), traits, rest, renaming and look.

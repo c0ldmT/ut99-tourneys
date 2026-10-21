@@ -53,6 +53,20 @@ export interface SkillCurve {
    * between shots (weapon rate × (1 + D)).
    */
   fireDelay: CurveRow;
+  /**
+   * Planned for mod 0.15.0 (0 = mod 0.14.0): the mod dodges projectiles itself; seconds from the
+   * shot to the dodge (too late when the shot is there first).
+   */
+  dodgeLate: CurveRow;
+  /** Planned for mod 0.15.0 (0 = mod 0.14.0): chance a dodge goes to the wrong side. */
+  dodgeErr: CurveRow;
+  /** Planned for mod 0.15.0 (0 = mod 0.14.0): chance it does not lead its target (per 2 s). */
+  leadOff: CurveRow;
+  /**
+   * Planned for mod 0.15.0 (0 = mod 0.14.0): the strafing value scales the dodge chances,
+   * × (1 + this × strafing) (strafing -1..1).
+   */
+  strafeDodge: CurveRow;
 }
 
 export type CurveKey = keyof SkillCurve;
@@ -99,6 +113,10 @@ export const CURRENT_CURVE: SkillCurve = {
   accGain: [0.532, 0.447, 0.39, 0.336, 0.364, 0.33, 0.308, 0.396],
   sightReact: [0.6, 0.48, 0.37, 0.28, 0.2, 0.13, 0.07, 0.03],
   fireDelay: [0.4, 0.3, 0.2, 0.12, 0.05, 0, 0, 0],
+  dodgeLate: [0, 0, 0, 0, 0, 0, 0, 0],
+  dodgeErr: [0, 0, 0, 0, 0, 0, 0, 0],
+  leadOff: [0, 0, 0, 0, 0, 0, 0, 0],
+  strafeDodge: [0, 0, 0, 0, 0, 0, 0, 0],
 };
 
 export const LEVEL_NAMES = [
@@ -254,6 +272,8 @@ export interface DuelBotSpec {
   accuracy?: number;
   alertness?: number;
   strafing?: number;
+  /** Combat style -1 (cautious) .. 1 (aggressive): charges and backs off. */
+  combatStyle?: number;
   jumpy?: boolean;
   /** Dream Team traits (values and body traits act in the duel). */
   traits?: readonly TraitOnBot[];
@@ -275,6 +295,8 @@ export interface ResolvedBot {
   accuracy: number;
   alertness: number;
   strafing: number;
+  /** The game's CombatStyle (default 0.1 + 0.7 × the value, as the mod sets it). */
+  combatStyle: number;
   jumpy: boolean;
   stock: boolean;
   body: { armour: boolean; thick: boolean; glass: boolean; vampire: boolean; phoenix: boolean };
@@ -290,6 +312,7 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
       accuracy: b.accuracy ?? 0,
       alertness: b.alertness ?? 0,
       strafing: b.strafing ?? 0,
+      combatStyle: b.combatStyle ?? 0,
       jumpy: !!b.jumpy,
     },
     b.traits ?? [],
@@ -304,6 +327,7 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
     accuracy: acc,
     alertness: e.values.alertness ?? 0,
     strafing: e.values.strafing ?? 0,
+    combatStyle: 0.1 + 0.7 * Math.max(-1, Math.min(1, e.values.combatStyle ?? 0)),
     jumpy: !!e.values.jumpy,
     stock: b.stock ?? true,
     body: {
@@ -421,6 +445,14 @@ interface Fighter {
   vy: number;
   moveUntil: number;
   strafeDir: number;
+  /** Speed towards (-) or away from (+) the enemy. */
+  vr: number;
+  /** Planned 0.15.0: a projectile dodge waiting for its reaction time. */
+  dodgeAt: number;
+  dodgeDir: number;
+  /** Planned 0.15.0: no leading until leadAt (rolled every 2 s). */
+  noLead: boolean;
+  leadAt: number;
   airUntil: number;
   flinchUntil: number;
   lastPain: number;
@@ -481,6 +513,11 @@ function fighter(
     vy: (2 * rng() - 1) * 0.7 * GROUND_SPEED * c.speed[lv.speed]!,
     moveUntil: 0.5 + rng(),
     strafeDir: rng() < 0.5 ? -1 : 1,
+    vr: 0,
+    dodgeAt: Infinity,
+    dodgeDir: 1,
+    noLead: false,
+    leadAt: 0,
     airUntil: -1,
     flinchUntil: -1,
     lastPain: -9,
@@ -542,7 +579,10 @@ function play(
 ): MeetingResult {
   const rng = rngOf(m.seed);
   const w = m.weapon;
-  const D = m.dist;
+  let D = m.dist;
+  // Charging and backing off change the distance, within the weapon's reach.
+  const dMin = Math.max(150, m.weapon.range[0] * 0.5);
+  const dMax = m.weapon.range[1] * 1.3;
   const f: [Fighter, Fighter] = [
     fighter(ra, neutral, m.offA, rng, c),
     fighter(rb, neutral, m.offB, rng, c),
@@ -565,6 +605,7 @@ function play(
       step(1, t);
       step(0, t);
     }
+    D = Math.min(dMax, Math.max(dMin, D + (f[0].vr + f[1].vr) * STEP));
     // Projectiles arriving.
     for (let k = flying.length - 1; k >= 0; k--) {
       const p = flying[k]!;
@@ -623,12 +664,21 @@ function play(
       x.off = x.off > goal ? Math.max(goal, x.off - turn) : Math.min(goal, x.off + turn);
       if (x.off === 0 && x.engagedAt === Infinity) x.engagedAt = t + 0.2;
     }
+    // Planned 0.15.0: the mod's own projectile dodge after its reaction time.
+    if (t >= x.dodgeAt) {
+      x.dodgeAt = Infinity;
+      if (t >= x.airUntil && t >= x.flinchUntil) dodge(x, t, x.dodgeDir);
+    }
+    if (t >= x.leadAt) {
+      x.leadAt = t + 2;
+      x.noLead = rng() < c.leadOff[x.lv.aim]!;
+    }
     move(x, t);
     // Dodge window, rolled once a second (curve: bCanDuck).
     if (t >= x.duckRollAt) {
       x.duckRollAt = t + 1;
       const P = 0.33 + 0.22 * internal(x.lv.dodge);
-      x.duckWindow = rng() * P < c.duck[x.lv.dodge]! * x.r.edge.dodge;
+      x.duckWindow = rng() * P < c.duck[x.lv.dodge]! * dodgeMul(x);
     }
     // Fire.
     if (t >= x.engagedAt && x.off < FIRE_CONE && t >= x.nextShot && t >= x.flinchUntil) fire(i, t);
@@ -638,14 +688,33 @@ function play(
     const spd = GROUND_SPEED * c.speed[x.lv.speed]!;
     if (t < x.flinchUntil) {
       x.vy = 0;
+      x.vr = 0;
     } else if (t < x.airUntil) {
       // dodging: keeps its speed
     } else if (x.aware && t < x.engagedAt) {
       x.vy = 0; // Acquisition: stands while it turns
+      x.vr = 0;
     } else if (x.aware) {
       if (t >= x.moveUntil) {
         const share = Math.min(0.9, Math.max(0.1, 0.5 + 0.4 * x.r.strafing));
-        if (rng() < share) {
+        const cs = x.r.combatStyle;
+        // Bot.Attacking: aggression 2 (CombatStyle + rand) - 1.1, +1 beyond 1000 uu; it charges
+        // when that beats 2 rand; cautious bots (style < 0) back off now and then.
+        const aggression = 2 * (cs + rng()) - 1.1 + (D > 1000 ? 1 : 0);
+        x.vr = 0;
+        if (aggression > 2 * rng()) {
+          // Charging: straight at the enemy; strafing bots keep more of a sideways part.
+          x.strafeDir = (rng() < 0.5 ? -1 : 1) * (0.15 + 0.35 * Math.max(0, x.r.strafing));
+          x.vy = x.strafeDir * spd;
+          x.vr = -0.9 * spd;
+          x.moveUntil = t + 1 + rng() * 0.5;
+          if (x.r.jumpy && rng() < 0.4) x.airUntil = t + 0.5; // jumpy bots hop
+        } else if (cs < 0 && rng() < -cs * 0.5) {
+          x.strafeDir = (rng() < 0.5 ? -1 : 1) * 0.3;
+          x.vy = x.strafeDir * spd;
+          x.vr = 0.8 * spd;
+          x.moveUntil = t + 0.8 + rng() * 0.6;
+        } else if (rng() < share) {
           // A fighting move in a random direction: its sideways part counts.
           x.strafeDir = (rng() < 0.5 ? -1 : 1) * (0.3 + 0.7 * Math.sin((rng() * Math.PI) / 2));
           x.vy = x.strafeDir * spd;
@@ -660,8 +729,9 @@ function play(
                 ? 0.35
                 : Sd >= 1
                   ? 0.35 * Math.max(0, 1 - 0.4 / Sd)
-                  : c.tact[x.lv.dodge]!) * x.r.edge.dodge;
+                  : c.tact[x.lv.dodge]!) * dodgeMul(x);
           if (rng() < pd) dodge(x, t, Math.sign(x.strafeDir));
+          else if (x.r.jumpy && rng() < 0.4) x.airUntil = t + 0.5; // jumpy bots hop
         } else {
           x.vy = 0;
           x.moveUntil = t + 0.6 + rng() * 0.6;
@@ -673,6 +743,11 @@ function play(
     }
     if (x.vy !== 0) x.stillSince = t + STEP;
     x.y += x.vy * STEP;
+  }
+
+  /** Dodge chances ×: the trait edge and (planned 0.15.0) the strafing value. */
+  function dodgeMul(x: Fighter): number {
+    return x.r.edge.dodge * Math.max(0, 1 + c.strafeDodge[x.lv.dodge]! * x.r.strafing);
   }
 
   function dodge(x: Fighter, t: number, dir: number) {
@@ -742,7 +817,7 @@ function play(
       return;
     }
     const tf = D / w.speed;
-    const lead = Math.min(1, 0.7 + 0.6 * rng()) * e.vy * tf;
+    const lead = x.noLead ? 0 : Math.min(1, 0.7 + 0.6 * rng()) * e.vy * tf;
     const S = internal(x.lv.aim);
     const feet = !!w.splash && S > 2.5 * rng() - 0.5;
     const p: Projectile = {
@@ -766,8 +841,15 @@ function play(
       tf >= 0.11 + 0.15 * rng()
     ) {
       if (rng() < 0.33 + 0.22 * internal(e.lv.dodge)) {
-        const side = e.y === p.aimY ? (rng() < 0.5 ? -1 : 1) : Math.sign(e.y - p.aimY);
-        dodge(e, t, side);
+        let side = e.y === p.aimY ? (rng() < 0.5 ? -1 : 1) : Math.sign(e.y - p.aimY);
+        // Planned 0.15.0: wrong side, reaction time (too late when the shot is there first).
+        if (rng() < c.dodgeErr[e.lv.dodge]!) side = -side;
+        const late = c.dodgeLate[e.lv.dodge]! * (0.8 + 0.4 * rng());
+        if (late <= 0) dodge(e, t, side);
+        else if (t + late < p.arrive - 0.05) {
+          e.dodgeAt = t + late;
+          e.dodgeDir = side;
+        }
       }
     }
   }

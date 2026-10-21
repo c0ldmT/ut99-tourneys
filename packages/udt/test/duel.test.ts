@@ -34,6 +34,15 @@ describe('skill curve data', () => {
     }
   });
 
+  it('reads the plan for mod 0.15.0 (rows the mod does not have yet)', () => {
+    const raw = JSON.parse(file('../../../apps/api/scripts/bot-curves/plan-0.15.json'));
+    const c = withCurve(CURRENT_CURVE, raw);
+    expect(c.dodgeErr[0]).toBeGreaterThan(0);
+    expect(CURRENT_CURVE.dodgeErr.every((v) => v === 0)).toBe(true);
+    const r = duelSeries(bot(3), bot(2), { duels: 40, seed: 2, curve: c });
+    expect(r.winDecided).toBeGreaterThan(0.3);
+  });
+
   it('reads the proposal file and checks curve rows', () => {
     const raw = JSON.parse(file('../../../apps/api/scripts/bot-curves/proposal-v1.json'));
     const c = withCurve(CURRENT_CURVE, raw);
@@ -51,6 +60,8 @@ describe('bots for the duel', () => {
     expect(resolveBot({ level: 3, traits: [{ code: 'claudius' }] }).level).toBe(4);
     expect(resolveBot({ level: 3, accuracy: 0.5, tired: true }).accuracy).toBeCloseTo(0.3);
     expect(resolveBot({ level: 3, phase: 'decline' }).accuracy).toBeCloseTo(-0.12);
+    expect(resolveBot({ level: 3, combatStyle: 1 }).combatStyle).toBeCloseTo(0.8);
+    expect(resolveBot({ level: 3, traits: [{ code: 'daredevil' }] }).combatStyle).toBeCloseTo(0.45);
     const b = resolveBot({ level: 2, traits: [{ code: 'glass-cannon' }] });
     expect(b.body.glass).toBe(true);
     expect(b.body.thick).toBe(false);
