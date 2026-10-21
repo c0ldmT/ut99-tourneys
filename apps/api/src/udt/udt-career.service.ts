@@ -334,7 +334,7 @@ export class UdtCareerService implements OnModuleInit {
 
   /**
    * Careers of all library bots: games and wins per season from the statistics (normal
-   * tournaments) plus their Dream Team games, age in seasons, phase, level, form.
+   * tournaments) plus their Dream Team games, age in seasons, phase, level, form of the day.
    */
   careers(): Map<string, Career> {
     const per = new Map<string, { season: number; games: number; wins: number }[]>();
@@ -353,9 +353,14 @@ export class UdtCareerService implements OnModuleInit {
     for (const r of this.db.select().from(udtRoster).all())
       if (r.games) add(r.botId, r.season, r.games, 0);
     const current = this.seasons.current()?.number;
+    // The form of the day: the Dream Team's day (season time zone).
+    const day = this.udt.today();
     const out = new Map<string, Career>();
     for (const b of this.bots.list())
-      out.set(b.id, career({ seasons: per.get(b.id) ?? [], ...(current ? { current } : {}) }));
+      out.set(
+        b.id,
+        career({ seasons: per.get(b.id) ?? [], id: b.id, day, ...(current ? { current } : {}) }),
+      );
     return out;
   }
 

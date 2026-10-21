@@ -1551,6 +1551,22 @@ udt-pack-stage .stage.lg .rays {
   vertical-align: 1px;
 }
 
+.udt-card .frm {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.udt-card .frm.f-hot {
+  color: var(--live);
+  background: rgba(74, 222, 128, 0.12);
+}
+.udt-card .frm.f-cold {
+  color: var(--danger);
+  background: rgba(255, 92, 108, 0.12);
+}
 .udt-card .car {
   letter-spacing: 0.08em;
   color: var(--muted);

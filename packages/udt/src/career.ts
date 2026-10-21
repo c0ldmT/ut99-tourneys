@@ -1,7 +1,7 @@
 /**
  * Careers of all bots (one model): age in seasons played, a career level from all their games,
- * the phase of the career (rookie, rising, peak, veteran, decline) and the form of the season.
- * The phase changes a bot's accuracy and market value in Dream Team games only.
+ * the phase of the career (rookie, rising, peak, veteran, decline) and the form of the day.
+ * Phase and form change a bot's accuracy in Dream Team games only, the phase also its value.
  */
 import { levelOf } from './traits.js';
 
@@ -30,20 +30,44 @@ export const PHASE_EFFECT: Readonly<Record<CareerPhase, { accuracy: number; valu
   decline: { accuracy: -6, value: 0.85 },
 };
 
-/** Form of the running season: wins against the share a bot of average luck would have. */
-export function careerForm(games: number, wins: number): CareerForm {
-  if (games < 5) return 'normal';
-  const r = wins / games;
-  if (r >= 0.65) return 'hot';
-  if (r <= 0.3) return 'cold';
+/** Share of the days a bot is in form, and out of form (the rest: normal). */
+export const FORM_CHANCE = { hot: 0.2, cold: 0.2 } as const;
+
+/**
+ * Effect of the form of the day in Dream Team games: accuracy on the 0..100 scale (owner,
+ * 22.10.). ±10 like tiredness: the duel simulation (curve v1) gives in form against out of form
+ * about 55 % at the same level, ±2 only about 51 % (the level decides far more).
+ */
+export const FORM_EFFECT: Readonly<Record<CareerForm, number>> = { hot: 10, normal: 0, cold: -10 };
+
+/**
+ * Form of the day: random but fixed per bot and day (`day` as YYYY-MM-DD in the season's time
+ * zone), the same for every page and the seeding of that day.
+ */
+export function dailyForm(botId: string, day: string): CareerForm {
+  let h = 0x811c9dc5;
+  for (const ch of `${botId}|${day}`) {
+    h ^= ch.charCodeAt(0);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  // A final mix so that neighbouring days are not alike.
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x45d9f3b) >>> 0;
+  h ^= h >>> 16;
+  const u = (h >>> 0) / 4294967296;
+  if (u < FORM_CHANCE.hot) return 'hot';
+  if (u >= 1 - FORM_CHANCE.cold) return 'cold';
   return 'normal';
 }
 
 export interface CareerInput {
   /** Games per season (all tournaments and Dream Team games), any order. */
   seasons: { season: number; games: number; wins: number }[];
-  /** The running season (its form). */
+  /** The running season. */
   current?: number;
+  /** Bot and day of the form (without: normal). */
+  id?: string;
+  day?: string;
 }
 
 export interface Career {
@@ -52,6 +76,7 @@ export interface Career {
   level: number;
   games: number;
   wins: number;
+  /** Form of the day (random per bot and day). */
   form: CareerForm;
   /** First and last season with games. */
   from: number | null;
@@ -65,7 +90,6 @@ export function career(input: CareerInput): Career {
   const age = played.length;
   const games = input.seasons.reduce((n, s) => n + s.games, 0);
   const wins = input.seasons.reduce((n, s) => n + s.wins, 0);
-  const cur = input.seasons.find((s) => s.season === input.current);
   const any = input.seasons.filter((s) => s.games > 0).map((s) => s.season);
   const phase = careerPhase(age);
   return {
@@ -74,7 +98,7 @@ export function career(input: CareerInput): Career {
     level: levelOf(games * 10 + wins * 15),
     games,
     wins,
-    form: cur ? careerForm(cur.games, cur.wins) : 'normal',
+    form: input.id && input.day ? dailyForm(input.id, input.day) : 'normal',
     from: any.length ? Math.min(...any) : null,
     to: any.length ? Math.max(...any) : null,
     retire: phase === 'decline' && age >= RETIRE_AGE,

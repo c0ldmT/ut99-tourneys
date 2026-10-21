@@ -6,7 +6,7 @@
  * to hits from out of view). It is an abstract encounter (no map, items, cover or height), so its
  * numbers are to be read relative to each other. Deterministic for a seed.
  */
-import { PHASE_EFFECT, type CareerPhase } from './career.js';
+import { FORM_EFFECT, PHASE_EFFECT, type CareerForm, type CareerPhase } from './career.js';
 import { effectiveValues, gameEdge, modCodes, type GameEdge, type TraitOnBot } from './traits.js';
 
 // ---------- the skill curve ----------
@@ -262,6 +262,8 @@ export interface DuelBotSpec {
   /** Stamina below the limit: one step worse in accuracy (Dream Team). */
   tired?: boolean;
   phase?: CareerPhase;
+  /** Form of the day (Dream Team). */
+  form?: CareerForm;
 }
 
 /** 0..100 (Dream Team pages) to the stored -1..1. */
@@ -280,7 +282,7 @@ export interface ResolvedBot {
   edge: GameEdge;
 }
 
-/** The values the game gets for a bot (traits, tiredness and career phase as the website sends). */
+/** The values the game gets for a bot (traits, tiredness, career phase and form as the website sends). */
 export function resolveBot(b: DuelBotSpec): ResolvedBot {
   const e = effectiveValues(
     Math.max(0, Math.min(7, Math.round(b.level))),
@@ -295,6 +297,7 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
   let acc = e.values.accuracy ?? 0;
   if (b.tired) acc = Math.max(-1, acc - 0.2);
   if (b.phase) acc = Math.max(-1, Math.min(1, acc + PHASE_EFFECT[b.phase].accuracy / 50));
+  if (b.form) acc = Math.max(-1, Math.min(1, acc + FORM_EFFECT[b.form] / 50));
   const codes = new Set(modCodes(b.traits ?? []));
   return {
     level: e.skill,

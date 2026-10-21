@@ -1206,10 +1206,6 @@ const en = {
   'udt.career.games': 'games',
   'udt.career.gamesLabel': 'Games',
   'udt.career.wins': 'won',
-  'udt.career.form': 'Form',
-  'udt.career.form.hot': 'In form',
-  'udt.career.form.normal': 'Normal',
-  'udt.career.form.cold': 'Out of form',
   'udt.career.effect.rookie': 'Dream Team: a little less accurate (−2).',
   'udt.career.effect.rising': 'Dream Team: no change.',
   'udt.career.effect.peak': 'Dream Team: more accurate (+5), market value +10 %.',
@@ -1658,8 +1654,6 @@ const en = {
   'udt.help.bots.roster':
     'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value.',
   'udt.help.lineup.title': 'Line up',
-  'udt.help.lineup.text':
-    'Under My team you decide who plays deathmatch and Monster Hunt. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro.',
   'udt.help.events.title': 'Play tournaments',
   'udt.help.events.text':
     'Under Events you enter your team (or let it enter automatically). Games, wins and places bring Neuro and experience; the table shows the best teams of the season.',
@@ -1686,6 +1680,17 @@ const en = {
   'udt.rest.hint': 'Buy stamina with Neuro: {n} per point',
   'udt.staminaHelp.buy':
     'Rest with Neuro: in the roster, "Rest" buys stamina at {n} Neuro per point (up to 100).',
+  'udt.career.form': 'Form of the day',
+  'udt.career.form.hot': 'In form (+10 accuracy in Dream Team games)',
+  'udt.career.form.normal': 'Normal',
+  'udt.career.form.cold': 'Out of form (−10 accuracy in Dream Team games)',
+  'udt.form.title.hot':
+    'Form of the day: in form, +10 accuracy in Dream Team games. Random every day; it counts for the tournaments drawn today.',
+  'udt.form.title.cold':
+    'Form of the day: out of form, −10 accuracy in Dream Team games. Random every day; it counts for the tournaments drawn today.',
+  'udt.form.title.normal': 'Form of the day: normal (random every day).',
+  'udt.help.lineup.text':
+    'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro. Each bot also has a form of the day (Form ▲ / ▼ on the card).',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -2906,10 +2911,6 @@ const de: Record<TKey, string> = {
   'udt.career.games': 'Spiele',
   'udt.career.gamesLabel': 'Spiele',
   'udt.career.wins': 'gewonnen',
-  'udt.career.form': 'Form',
-  'udt.career.form.hot': 'In Form',
-  'udt.career.form.normal': 'Normal',
-  'udt.career.form.cold': 'Formtief',
   'udt.career.effect.rookie': 'Dream Team: Accuracy −2.',
   'udt.career.effect.rising': 'Dream Team: keine Änderung.',
   'udt.career.effect.peak': 'Dream Team: Accuracy +5, Marktwert +10 %.',
@@ -3360,8 +3361,6 @@ const de: Record<TKey, string> = {
   'udt.help.bots.roster':
     'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts.',
   'udt.help.lineup.title': 'Aufstellen',
-  'udt.help.lineup.text':
-    'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro.',
   'udt.help.events.title': 'Turniere spielen',
   'udt.help.events.text':
     'Unter Events meldest du dein Team an (oder lässt es automatisch anmelden). Spiele, Siege und Platzierungen bringen Neuro und Erfahrung; die Tabelle zeigt die besten Teams der Season.',
@@ -3389,6 +3388,17 @@ const de: Record<TKey, string> = {
   'udt.rest.hint': 'Ausdauer mit Neuro kaufen: {n} pro Punkt',
   'udt.staminaHelp.buy':
     'Erholen mit Neuro: Im Kader kauft „Erholen“ Ausdauer für {n} Neuro pro Punkt (bis 100).',
+  'udt.career.form': 'Tagesform',
+  'udt.career.form.hot': 'In Form (+10 Treffsicherheit in Dream-Team-Spielen)',
+  'udt.career.form.normal': 'Normal',
+  'udt.career.form.cold': 'Formtief (−10 Treffsicherheit in Dream-Team-Spielen)',
+  'udt.form.title.hot':
+    'Tagesform: in Form, +10 Treffsicherheit in Dream-Team-Spielen. Jeden Tag neu ausgewürfelt; gilt für die Turniere, die heute ausgelost werden.',
+  'udt.form.title.cold':
+    'Tagesform: Formtief, −10 Treffsicherheit in Dream-Team-Spielen. Jeden Tag neu ausgewürfelt; gilt für die Turniere, die heute ausgelost werden.',
+  'udt.form.title.normal': 'Tagesform: normal (jeden Tag neu ausgewürfelt).',
+  'udt.help.lineup.text':
+    'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro. Jeder Bot hat außerdem eine Tagesform (Form ▲ / ▼ auf der Karte).',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

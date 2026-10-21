@@ -13,6 +13,7 @@ import {
   bracketOf,
   effectiveValues,
   modCodes,
+  FORM_EFFECT,
   PHASE_EFFECT,
   roundNeuro,
   tiredPenalty,
@@ -554,10 +555,13 @@ export class UdtEventsService implements OnModuleInit {
   }
 }
 
-/** The career phase's accuracy change (0..100 scale) on the values sent to the game. */
+/**
+ * The accuracy change (0..100 scale) of the career phase and the form of the day (the day of
+ * the seeding) on the values sent to the game.
+ */
 function withCareer(traits: { accuracy?: number }, c: Career | undefined): void {
   if (!c) return;
-  const d = PHASE_EFFECT[c.phase].accuracy / 50;
+  const d = (PHASE_EFFECT[c.phase].accuracy + FORM_EFFECT[c.form]) / 50;
   if (d)
     traits.accuracy = Math.max(
       -1,

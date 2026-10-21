@@ -74,7 +74,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
             <dt>{{ 'udt.career.gamesLabel' | t }}</dt>
             <dd>{{ c.games }} ({{ c.wins }} {{ 'udt.career.wins' | t }})</dd>
             <dt>{{ 'udt.career.form' | t }}</dt>
-            <dd>{{ 'udt.career.form.' + c.form | t }}</dd>
+            <dd [title]="'udt.form.title.' + c.form | t">{{ 'udt.career.form.' + c.form | t }}</dd>
           </dl>
           <p class="muted small">{{ 'udt.career.effect.' + c.phase | t }}</p>
         </section>

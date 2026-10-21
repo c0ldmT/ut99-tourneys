@@ -111,13 +111,16 @@ export function rosterCard(
               <span
                 [class]="'car ph-' + b.career.phase"
                 [title]="'udt.career.age' | t: { n: b.career.age }"
-                >{{ 'udt.career.' + b.career.phase | t }}
-                @if (b.career.form === 'hot') {
-                  ▲
-                } @else if (b.career.form === 'cold') {
-                  ▼
-                }
-              </span>
+                >{{ 'udt.career.' + b.career.phase | t }}</span
+              >
+              @if (b.career.form !== 'normal') {
+                <span
+                  class="frm f-{{ b.career.form }}"
+                  [title]="'udt.form.title.' + b.career.form | t"
+                  [attr.aria-label]="'udt.form.title.' + b.career.form | t"
+                  >Form {{ b.career.form === 'hot' ? '▲' : '▼' }}</span
+                >
+              }
             }
           </div>
         </div>

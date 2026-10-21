@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team form of the day: every bot is in form, normal or out of form, new every day (±10 accuracy in Dream Team games), shown on the cards as "Form ▲ / ▼".
 - Mod 0.14.0: skill curve v1 - the level is the main strength, the bot's own accuracy counts less; low levels turn slower, take a moment to react to a new enemy and pause firing. Dream Team values traits (steady hand, watchdog, side-stepper, patient hunter, eagle eye, all-rounder) now improve aim, reaction, view or dodging in the game instead of raising accuracy.
 - Bot duel simulator (`pnpm --filter @tourney/api bot:sim`, HTML report): skill levels against accuracy and Dream Team traits in 1v1 meetings, guard rails, what each part of a level adds, reaction from an ambush, A/B against a curve file (proposal v1 included).
 - Messages as toasts in the page's language: every error of the website is translated (German for every server message) and every action of users and admins confirms itself; the red error lines on the pages are gone.
