@@ -171,6 +171,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Tournaments: an overview (live, coming up by day, series as cards, last results) and an archive of all finished and aborted tournaments (by day, in pages), with search and filters.
 - Softer page changes: the old page sinks back and fades, the new one's blocks rise one after another, the Dream Team tabs stay in place, the loader comes and goes softly; shown also when the system asks for reduced motion.
 - Dream Team market list: the value line and % without the economy index (the bot's own development), marks "in demand" / "cheaper", explained; better on phones.
 - Dream Team economy: weekly salaries 8 / 12 / 20 % of the value (were 3 / 5 / 8), rest with Neuro 7 per stamina point (was 2), starter extra points 50 by default (was 100); checked with the season simulator.

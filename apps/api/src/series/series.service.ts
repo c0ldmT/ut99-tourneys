@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { TournamentSettingsSchema } from '@tourney/protocol';
 import { UsersService } from '../auth/users.service.js';
@@ -13,10 +13,12 @@ import { SeasonsService } from '../seasons/seasons.service.js';
 import { today } from '../seasons/season-time.js';
 import {
   CreateTournamentBody,
+  DONE_PHASES,
   TournamentsService,
   type CreateTournament,
 } from '../tournaments/tournaments.service.js';
 import {
+  baseName,
   createTime,
   dayTimes,
   nextStarts,
@@ -197,6 +199,72 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       .from(series)
       .all()
       .map((r) => this.view(r));
+  }
+
+  /**
+   * The series for everyone (the tournament overview): schedule, the next tournament, the last
+   * results and counts. Active series, and paused ones with a tournament still to come; the next
+   * start first.
+   */
+  overview() {
+    const all = this.db.select().from(tournaments).where(isNotNull(tournaments.seriesId)).all();
+    const at = (t: (typeof all)[number]) => t.scheduledAt ?? t.createdAt;
+    const names = this.tournaments.botNames();
+    const out = this.db
+      .select()
+      .from(series)
+      .all()
+      .map((r) => {
+        const own = all.filter((t) => t.seriesId === r.id);
+        const done = own
+          .filter((t) => DONE_PHASES.includes(t.phase))
+          .sort((a, b) => (at(a) < at(b) ? 1 : -1));
+        const coming = own
+          .filter((t) => !DONE_PHASES.includes(t.phase))
+          .sort((a, b) => (at(a) < at(b) ? -1 : 1));
+        if (!r.active && !coming.length) return null;
+        const tpl = JSON.parse(r.templateJson) as Template;
+        const set = TournamentSettingsSchema.parse(tpl.settings);
+        const s = this.schedule(r);
+        const n = this.next(r);
+        const first = coming[0];
+        const result = (t: (typeof all)[number]) => ({
+          id: t.id,
+          name: t.name,
+          at: at(t),
+          phase: t.phase,
+          champion: this.tournaments.championName(t, names) ?? null,
+        });
+        return {
+          id: r.id,
+          name: baseName(r.name),
+          active: r.active,
+          days: s.days,
+          times: s.times,
+          every: s.every,
+          everyWeeks: r.everyWeeks,
+          kind: tpl.kind ?? 'standard',
+          seasonal: tpl.kind === 'udt' || !!tpl.seasonal,
+          game: set.game.adapter === 'ut99-mh' ? ('mh' as const) : ('dm' as const),
+          teamSize: set.teamSize,
+          size: set.size,
+          finished: done.filter((t) => t.phase === 'finished').length,
+          aborted: done.filter((t) => t.phase === 'aborted').length,
+          /** The next tournament: created already (with its id), or the next start planned. */
+          next: first
+            ? { id: first.id, name: first.name, at: at(first) }
+            : r.active && Number.isFinite(n.start)
+              ? {
+                  id: null,
+                  name: seriesName(r.name, r.nextNumber, n.start, this.tz),
+                  at: new Date(n.start).toISOString(),
+                }
+              : null,
+          recent: done.slice(0, 5).map(result),
+        };
+      })
+      .filter((x) => x !== null);
+    return out.sort((a, b) => (a.next?.at ?? '~').localeCompare(b.next?.at ?? '~'));
   }
 
   /** The next starts of a schedule (the form shows them before saving). */

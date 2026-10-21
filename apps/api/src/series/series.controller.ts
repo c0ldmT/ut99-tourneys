@@ -20,6 +20,17 @@ import {
   UpdateSeriesBody,
 } from './series.service.js';
 
+/** The series for every player (the tournament overview). */
+@Controller('series')
+export class SeriesOverviewController {
+  constructor(@Inject(SeriesService) private readonly series: SeriesService) {}
+
+  @Get('overview')
+  overview() {
+    return this.series.overview();
+  }
+}
+
 /** Tournament series (admins): templates that create tournaments by themselves. */
 @AdminOnly()
 @Controller('series')

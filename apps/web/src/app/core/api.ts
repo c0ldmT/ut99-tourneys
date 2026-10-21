@@ -71,6 +71,9 @@ import type {
   TournamentEventView,
   TournamentBets,
   TournamentSummary,
+  TournamentArchive,
+  TournamentFilter,
+  SeriesOverview,
   UserBets,
   WebsiteSettings,
 } from './types';
@@ -486,7 +489,16 @@ export class Api {
   deleteSeason = (n: number) =>
     this.call<void>('DELETE', `/seasons/${n}`, undefined, { ok: 'ok.season.deleted' });
 
-  tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments');
+  /** The tournaments not finished or aborted (the overview). */
+  tournaments = () => this.call<TournamentSummary[]>('GET', '/tournaments?scope=active');
+  /** Finished and aborted tournaments, newest first, in pages (`before`: the last `next`). */
+  archive = (f: TournamentFilter, limit = 20, before?: string | null) => {
+    const q = new URLSearchParams({ scope: 'done', limit: String(limit) });
+    for (const [k, v] of Object.entries(f)) if (v !== undefined && v !== '') q.set(k, String(v));
+    if (before) q.set('before', before);
+    return this.call<TournamentArchive>('GET', `/tournaments?${q.toString()}`);
+  };
+  seriesOverview = () => this.call<SeriesOverview[]>('GET', '/series/overview');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);
   killFeed = (id: string) => this.call<KillFeedEntry[]>('GET', `/tournaments/${id}/feed`);
   /** Decoration only (names in the looks of their owners): never an error toast. */

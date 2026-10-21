@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { buildSlots, createRng, fillEmptySlots, shuffle, type Rng } from '@tourney/bracket';
 import {
   BotSpecSchema,
@@ -81,6 +81,38 @@ const STOCK_BOTS: BotSpec[] = [
 export const ACTIVE_PHASES = ['checkIn', 'running', 'paused'];
 /** The mod's access list holds 64 entries. */
 export const MAX_ACCESS = 64;
+
+/** Phases of a tournament that is over (the archive). */
+export const DONE_PHASES = ['finished', 'aborted'];
+
+/** Filters and page of the archive (`GET /tournaments?scope=done`). */
+export const ArchiveQuerySchema = z.object({
+  q: z.string().max(80).optional(),
+  /** classic: not Dream Team; season: counts for the season; udt: Dream Team. */
+  kind: z.enum(['classic', 'udt', 'season']).optional(),
+  mode: z.enum(['1v1', 'team', 'mh']).optional(),
+  status: z.enum(['finished', 'aborted']).optional(),
+  series: z.string().max(64).optional(),
+  mine: z
+    .enum(['true', 'false'])
+    .transform((v) => v === 'true')
+    .optional(),
+  before: z.string().max(200).optional(),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+export type ArchiveQuery = z.infer<typeof ArchiveQuerySchema>;
+
+function kindMatches(t: TournamentRow, kind: NonNullable<ArchiveQuery['kind']>): boolean {
+  if (kind === 'udt') return t.kind === 'udt';
+  if (kind === 'season') return t.seasonal;
+  return t.kind !== 'udt';
+}
+
+function modeMatches(s: TournamentSettings, mode: NonNullable<ArchiveQuery['mode']>): boolean {
+  const mh = s.game.adapter === 'ut99-mh';
+  if (mode === 'mh') return mh;
+  return !mh && (mode === 'team' ? s.teamSize > 1 : s.teamSize === 1);
+}
 
 /**
  * Rules of a Dream Team tournament: the lineup's market value at most `valueCap` reference
@@ -630,6 +662,11 @@ export class TournamentsService {
   }
 
   private readonly signupProviders = new Map<string, SignupProvider>();
+  /** Winner names of finished tournaments by log head (the list and the archive search). */
+  private readonly champions = new Map<
+    string,
+    { head: number; id: string | undefined; entrant: Entrant | undefined }
+  >();
   registerSignupProvider(kind: TournamentKind, provider: SignupProvider): void {
     this.signupProviders.set(kind, provider);
   }
@@ -1699,8 +1736,9 @@ export class TournamentsService {
   // Views
   // ------------------------------------------------------------------------------------------
 
-  list(user: User) {
-    const rows = this.db
+  /** The rows of the list with their registration counts (and the user's own registration). */
+  private listRows(user: User, where?: ReturnType<typeof inArray>) {
+    const q = this.db
       .select({
         t: tournaments,
         registered: sql<number>`(select count(*) from registrations r where r.tournament_id = ${tournaments.id})`,
@@ -1708,66 +1746,160 @@ export class TournamentsService {
         // Unqualified "id" would bind to teams.id inside the subquery, so name the outer table.
         teamCount: sql<number>`(select count(*) from teams x where x.tournament_id = "tournaments"."id")`,
       })
-      .from(tournaments)
-      .orderBy(desc(tournaments.createdAt))
-      .all();
-    return rows.map(({ t, registered, mine, teamCount }) => {
-      const s = this.settings(t);
-      const provider = this.signupProviders.get(t.kind);
-      if (provider) {
-        const entries = provider.entries(t.id);
-        registered = entries.length;
-        mine = entries.some((e) => e.userId === user.id) ? 1 : 0;
-        teamCount = 0;
-      }
-      const live = t.phase === 'running' || t.phase === 'paused';
-      const loaded = t.phase === 'finished' || live ? this.log.projection(t.id) : undefined;
-      const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
-      const cm = live ? proj?.currentMatch : undefined;
-      const name = (id: string) => proj?.entrants[id]?.displayName ?? id;
-      const tele = cm ? (this.hub.latestLive(t.id) as { matchId?: string } | undefined) : undefined;
-      const liveNow = tele && tele.matchId === cm?.matchId ? tele : undefined;
-      const wins = (id: string) =>
-        (cm ? (proj?.games[cm.matchId] ?? []) : []).filter((g) => g.winnerId === id).length;
-      return {
-        id: t.id,
-        name: t.name,
-        phase: t.phase,
-        format: s.format,
-        size: s.size,
-        teamSize: s.teamSize,
-        game: s.game.adapter === 'ut99-mh' ? ('mh' as const) : ('dm' as const),
-        teams: teamCount,
-        registered,
-        registeredMe: mine > 0,
-        registrationOpen: t.registrationOpen,
-        autoStart: t.autoStart,
-        scheduledAt: t.scheduledAt,
-        createdAt: t.createdAt,
-        champion: proj?.championId ? proj.entrants[proj.championId]?.displayName : undefined,
-        seasonal: t.seasonal,
-        kind: t.kind,
-        /** The match being played now (running tournaments): names and series score. */
-        ...(cm
-          ? {
-              now: {
-                matchId: cm.matchId,
-                game: cm.game,
-                ...(cm.map ? { map: cm.map } : {}),
-                status: cm.status,
-                entrants: cm.entrants,
-                names: [name(cm.entrants[0]), name(cm.entrants[1])],
-                wins: [wins(cm.entrants[0]), wins(cm.entrants[1])],
-                bestOf: proj?.bracket?.byId[cm.matchId]?.bestOf ?? 1,
-                /** Monster Hunt: finished runs of the game. */
-                ...(cm.runs?.length ? { runs: cm.runs } : {}),
-                /** Telemetry of the game in progress (frags, run clock), if any. */
-                ...(liveNow ? { live: liveNow } : {}),
-              },
-            }
-          : {}),
-      };
-    });
+      .from(tournaments);
+    return (where ? q.where(where) : q).orderBy(desc(tournaments.createdAt)).all();
+  }
+
+  /**
+   * The tournaments (newest first); `active`: only those not finished or aborted (the overview;
+   * the rest is in the archive).
+   */
+  list(user: User, scope?: 'active') {
+    const rows = this.listRows(
+      user,
+      scope === 'active' ? notInArray(tournaments.phase, DONE_PHASES) : undefined,
+    );
+    return rows.map((r) => this.summary(r, user));
+  }
+
+  /**
+   * Finished and aborted tournaments, newest first (by start, else creation), filtered and in
+   * pages: `before` is the `next` of the previous page.
+   */
+  archive(user: User, f: ArchiveQuery) {
+    const rows = this.listRows(user, inArray(tournaments.phase, DONE_PHASES));
+    const at = (t: TournamentRow) => t.scheduledAt ?? t.createdAt;
+    const key = (t: TournamentRow) => `${at(t)}|${t.id}`;
+    const q = f.q?.trim().toLowerCase();
+    const names = q ? this.bots.gameNames() : undefined;
+    const hit = rows
+      .filter((r) => {
+        const t = r.t;
+        if (f.status && t.phase !== f.status) return false;
+        if (f.series && t.seriesId !== f.series) return false;
+        if (f.kind && !kindMatches(t, f.kind)) return false;
+        if (f.mode && !modeMatches(this.settings(t), f.mode)) return false;
+        if (f.mine && !this.isMine(r, user)) return false;
+        if (q && !t.name.toLowerCase().includes(q)) {
+          const champ = this.championName(t, names);
+          if (!champ?.toLowerCase().includes(q)) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => (key(a.t) < key(b.t) ? 1 : key(a.t) > key(b.t) ? -1 : 0));
+    const from = f.before ? hit.findIndex((r) => key(r.t) < f.before!) : 0;
+    const page = from < 0 ? [] : hit.slice(from, from + f.limit);
+    const more = from >= 0 && from + f.limit < hit.length;
+    return {
+      items: page.map((r) => this.summary(r, user)),
+      total: hit.length,
+      aborted: hit.filter((r) => r.t.phase === 'aborted').length,
+      next: more ? key(page[page.length - 1]!.t) : null,
+    };
+  }
+
+  /** Whether the user plays in the tournament (registration, or a Dream Team entry). */
+  private isMine(r: { t: TournamentRow; mine: number }, user: User): boolean {
+    const provider = this.signupProviders.get(r.t.kind);
+    return provider ? provider.entries(r.t.id).some((e) => e.userId === user.id) : r.mine > 0;
+  }
+
+  /** The current in-game names of the website bots (for `championName`). */
+  botNames(): Map<string, string> {
+    return this.bots.gameNames();
+  }
+
+  /**
+   * The winner's name, with the current names of website bots (a rename shows at once). The
+   * winner is cached until the tournament's log grows; `names`: `BotsService.gameNames()`, passed
+   * in when asking for many tournaments.
+   */
+  championName(t: TournamentRow, names?: Map<string, string>): string | undefined {
+    let hit = this.champions.get(t.id);
+    if (!hit || hit.head !== t.headSeq) {
+      const proj = t.phase === 'finished' ? this.log.projection(t.id) : undefined;
+      const id = proj?.championId;
+      hit = { head: t.headSeq, id, entrant: id ? proj.entrants[id] : undefined };
+      this.champions.set(t.id, hit);
+    }
+    const e = hit.entrant;
+    if (!e || !hit.id) return undefined;
+    // Dream Team lineups play under their manager's tag and team name.
+    if (e.kind !== 'bot' || !e.bot.id || udtManagerOf(hit.id)) return e.displayName;
+    return (names ?? this.bots.gameNames()).get(e.bot.id) ?? e.displayName;
+  }
+
+  /** A tournament in the list (with the match being played, for running ones). */
+  private summary(
+    {
+      t,
+      registered,
+      mine,
+      teamCount,
+    }: {
+      t: TournamentRow;
+      registered: number;
+      mine: number;
+      teamCount: number;
+    },
+    user: User,
+  ) {
+    const s = this.settings(t);
+    const provider = this.signupProviders.get(t.kind);
+    if (provider) {
+      const entries = provider.entries(t.id);
+      registered = entries.length;
+      mine = entries.some((e) => e.userId === user.id) ? 1 : 0;
+      teamCount = 0;
+    }
+    const live = t.phase === 'running' || t.phase === 'paused';
+    const loaded = live ? this.log.projection(t.id) : undefined;
+    const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
+    const cm = live ? proj?.currentMatch : undefined;
+    const name = (id: string) => proj?.entrants[id]?.displayName ?? id;
+    const tele = cm ? (this.hub.latestLive(t.id) as { matchId?: string } | undefined) : undefined;
+    const liveNow = tele && tele.matchId === cm?.matchId ? tele : undefined;
+    const wins = (id: string) =>
+      (cm ? (proj?.games[cm.matchId] ?? []) : []).filter((g) => g.winnerId === id).length;
+    return {
+      id: t.id,
+      name: t.name,
+      phase: t.phase,
+      format: s.format,
+      size: s.size,
+      teamSize: s.teamSize,
+      game: s.game.adapter === 'ut99-mh' ? ('mh' as const) : ('dm' as const),
+      teams: teamCount,
+      registered,
+      registeredMe: mine > 0,
+      registrationOpen: t.registrationOpen,
+      autoStart: t.autoStart,
+      scheduledAt: t.scheduledAt,
+      createdAt: t.createdAt,
+      champion: t.phase === 'finished' ? this.championName(t) : undefined,
+      seriesId: t.seriesId,
+      seasonal: t.seasonal,
+      kind: t.kind,
+      /** The match being played now (running tournaments): names and series score. */
+      ...(cm
+        ? {
+            now: {
+              matchId: cm.matchId,
+              game: cm.game,
+              ...(cm.map ? { map: cm.map } : {}),
+              status: cm.status,
+              entrants: cm.entrants,
+              names: [name(cm.entrants[0]), name(cm.entrants[1])],
+              wins: [wins(cm.entrants[0]), wins(cm.entrants[1])],
+              bestOf: proj?.bracket?.byId[cm.matchId]?.bestOf ?? 1,
+              /** Monster Hunt: finished runs of the game. */
+              ...(cm.runs?.length ? { runs: cm.runs } : {}),
+              /** Telemetry of the game in progress (frags, run clock), if any. */
+              ...(liveNow ? { live: liveNow } : {}),
+            },
+          }
+        : {}),
+    };
   }
 
   connectAddress(t: TournamentRow): string | null {

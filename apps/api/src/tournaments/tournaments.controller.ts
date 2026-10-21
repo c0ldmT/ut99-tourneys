@@ -9,15 +9,18 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   Req,
   Res,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import { ZodPipe } from '../common/http.js';
 import { AdminOnly, CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { LiveHub, type HubMessage } from './hub.js';
 import {
+  ArchiveQuerySchema,
   CommandBody,
   CreateTeamBody,
   CreateTournamentBody,
@@ -39,6 +42,10 @@ import {
   type UpdateTournament,
 } from './tournaments.service.js';
 
+const ListQuerySchema = ArchiveQuerySchema.extend({
+  scope: z.enum(['active', 'done']).optional(),
+});
+
 @Controller('tournaments')
 export class TournamentsController {
   constructor(
@@ -46,9 +53,17 @@ export class TournamentsController {
     @Inject(LiveHub) private readonly hub: LiveHub,
   ) {}
 
+  /**
+   * The tournaments: all (no scope), `active` (not finished or aborted: the overview) or `done`
+   * (the archive: `{ items, total, aborted, next }`, filtered and in pages, see ArchiveQuery).
+   */
   @Get()
-  list(@CurrentUser() user: User) {
-    return this.svc.list(user);
+  list(
+    @CurrentUser() user: User,
+    @Query(new ZodPipe(ListQuerySchema)) query: z.infer<typeof ListQuerySchema>,
+  ) {
+    if (query.scope === 'done') return this.svc.archive(user, query);
+    return this.svc.list(user, query.scope);
   }
 
   @AdminOnly()

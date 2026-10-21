@@ -73,6 +73,8 @@ export interface TournamentSummary {
   seasonal?: boolean;
   /** "udt": a Dream Team tournament. */
   kind?: string;
+  /** Created by this series. */
+  seriesId?: string | null;
   /** The match being played now (running tournaments). */
   now?: {
     matchId: string;
@@ -92,6 +94,53 @@ export interface TournamentSummary {
     }[];
     live?: LiveInfo;
   };
+}
+
+/** A page of the archive (finished and aborted tournaments), see `Api.archive`. */
+export interface TournamentArchive {
+  items: TournamentSummary[];
+  /** All that match the filters; `aborted` of them were aborted. */
+  total: number;
+  aborted: number;
+  /** For the next page (`before`), null: none. */
+  next: string | null;
+}
+
+/** Filters of the archive (and of the overview, in the browser). */
+export interface TournamentFilter {
+  q?: string;
+  kind?: 'classic' | 'udt' | 'season';
+  mode?: '1v1' | 'team' | 'mh';
+  status?: 'finished' | 'aborted';
+  series?: string;
+  mine?: boolean;
+}
+
+/** A series in the overview (`GET /series/overview`). */
+export interface SeriesOverview {
+  id: string;
+  name: string;
+  active: boolean;
+  days: number[];
+  times: string[];
+  every: { hours: number; from: string; to: string } | null;
+  everyWeeks: number;
+  kind: string;
+  seasonal: boolean;
+  game: 'dm' | 'mh';
+  teamSize: number;
+  size: number;
+  finished: number;
+  aborted: number;
+  /** id null: not created yet (the planned start). */
+  next: { id: string | null; name: string; at: string } | null;
+  recent: {
+    id: string;
+    name: string;
+    at: string;
+    phase: string;
+    champion: string | null;
+  }[];
 }
 
 export interface LiveInfo {

@@ -36,7 +36,7 @@ import { SeasonsController } from './seasons/seasons.controller.js';
 import { SeasonsService } from './seasons/seasons.service.js';
 import { BotsController } from './bots/bots.controller.js';
 import { BotsService } from './bots/bots.service.js';
-import { SeriesController } from './series/series.controller.js';
+import { SeriesController, SeriesOverviewController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { NeuroHub } from './ledger/neuro-hub.js';
@@ -91,6 +91,7 @@ class AppModule {
         SeasonsController,
         BotsController,
         BetsController,
+        SeriesOverviewController,
         SeriesController,
         ShopController,
         UdtController,

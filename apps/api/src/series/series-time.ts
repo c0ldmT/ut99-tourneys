@@ -130,3 +130,15 @@ export function seriesName(pattern: string, n: number, startMs: number, timeZone
     .replace(/\{time\}/g, part({ hour: '2-digit', minute: '2-digit', hour12: false }));
   return /\{n\}|\{date\}/.test(pattern) ? name : `${name} #${n}`;
 }
+
+/** The series' name without its placeholders ("Friday Cup #{n}" -> "Friday Cup"). */
+export function baseName(pattern: string): string {
+  return (
+    pattern
+      .replace(/\s*(?:#|\b(?:Nr|No)\.?)?\s*\{n\}/gi, '')
+      .replace(/\{date\}|\{time\}/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/[\s·:,–-]+$/u, '')
+      .trim() || pattern
+  );
+}

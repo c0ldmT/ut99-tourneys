@@ -3,158 +3,488 @@ import {
   Component,
   computed,
   DestroyRef,
+  effect,
   inject,
+  input,
   signal,
+  untracked,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { finalMs, raceTime } from '../core/race';
-import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Loading } from '../core/loading';
 import { Auth } from '../core/auth';
 import { UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
-import type { TournamentSummary } from '../core/types';
+import { scheduleText } from '../core/series-text';
+import type {
+  SeriesOverview,
+  TournamentArchive,
+  TournamentFilter,
+  TournamentSummary,
+} from '../core/types';
 
+/** The filters are kept per browser (not the series: that one is a jump from its card). */
+const STORE = 'tourney.listFilter';
+const RUNNING = ['running', 'paused'];
+
+function storedFilter(): TournamentFilter {
+  try {
+    const f = JSON.parse(localStorage.getItem(STORE) ?? '{}') as TournamentFilter;
+    return { kind: f.kind, mode: f.mode, mine: f.mine, status: f.status };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * The tournaments (decision 170). Overview: what runs now, what comes next (by day), the series
+ * as one card each and the last results. Archive: every finished and aborted tournament, by
+ * day, in pages. The filters (search, kind, mode, mine) hold for both.
+ */
 @Component({
   selector: 'app-tournament-list',
-  imports: [RouterLink, TPipe, UdtMark],
+  imports: [RouterLink, TPipe, UdtMark, FormsModule, NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
       <h1>{{ 'list.title' | t }}</h1>
       @if (auth.me()?.isAdmin) {
         <div class="row">
-          <a class="btn" routerLink="/admin/series">{{ 'series.title' | t }}</a>
+          <a class="btn hide-sm" routerLink="/admin/series">{{ 'series.title' | t }}</a>
           <a class="btn primary" routerLink="/new">+ {{ 'list.new' | t }}</a>
         </div>
       }
     </div>
-    @if (items(); as list) {
-      @for (t of live(); track t.id) {
-        <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
-          <div class="hero-l">
-            <div class="row">
-              <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
-              @if (t.kind === 'udt') {
-                <span class="badge udt"><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span>
-              }
-              @if (t.seasonal) {
-                <span class="badge season">Season</span>
-              }
-            </div>
-            <div class="hero-name">{{ t.name }}</div>
-            <div class="muted small">{{ meta(t) }}</div>
-          </div>
-          @if (t.now; as n) {
-            <div class="hero-r">
-              <div class="kpi">
-                {{ 'list.now' | t }} · {{ n.matchId }} · {{ 'list.game' | t: { n: n.game } }}
-                @if (n.live?.map ?? n.map; as map) {
-                  · {{ map }}
-                }
-              </div>
-              <div class="vs">
-                <span class="nm a">{{ n.names[0] }}</span>
-                @if (t.game === 'mh') {
-                  <span class="sc race"
-                    ><b class="sa">{{ runText(n, 0) }}</b
-                    ><i>:</i><b class="sb">{{ runText(n, 1) }}</b></span
-                  >
-                } @else {
-                  <span class="sc"
-                    ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b
-                    ><i>:</i><b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
-                  >
-                }
-                <span class="nm b">{{ n.names[1] }}</span>
-              </div>
-              <div class="state small">
-                @if (n.live?.phase === 'live' || n.live?.phase === 'overtime') {
-                  <span class="lv"><span class="dot on"></span> {{ 'list.liveNow' | t }}</span>
-                } @else {
-                  <span class="muted">{{ 'list.phase.' + (n.live?.phase ?? 'waiting') | t }}</span>
-                }
-                @if (n.bestOf > 1) {
-                  <span class="muted"
-                    >· {{ 'list.series' | t }} {{ n.wins[0] }}:{{ n.wins[1] }} (Bo{{
-                      n.bestOf
-                    }})</span
-                  >
-                }
-              </div>
-            </div>
-          }
-        </a>
-      }
-      <div class="tabs" role="tablist">
-        @for (f of filters; track f) {
+
+    <nav class="views">
+      <a
+        routerLink="/"
+        [queryParams]="{ view: null }"
+        queryParamsHandling="merge"
+        [class.on]="tab() === 'now'"
+        [attr.aria-current]="tab() === 'now' ? 'page' : null"
+        >{{ 'list.view.now' | t }}</a
+      >
+      <a
+        routerLink="/"
+        [queryParams]="{ view: 'archive' }"
+        [class.on]="tab() === 'archive'"
+        [attr.aria-current]="tab() === 'archive' ? 'page' : null"
+        >{{ 'list.view.archive' | t }}
+        @if (doneTotal() !== null) {
+          <span class="count">{{ doneTotal() }}</span>
+        }
+      </a>
+    </nav>
+
+    <div class="filters">
+      <input
+        class="search"
+        type="search"
+        [ngModel]="qInput()"
+        (ngModelChange)="typed($event)"
+        [placeholder]="'list.search' | t"
+        [attr.aria-label]="'list.search' | t"
+      />
+      <div class="pills" role="group" [attr.aria-label]="'list.kind.label' | t">
+        @for (k of kinds; track k) {
           <button
             type="button"
-            role="tab"
-            [class.active]="filter() === f"
-            [attr.aria-selected]="filter() === f"
-            (click)="filter.set(f)"
+            [class.on]="(filter().kind ?? 'all') === k"
+            [attr.aria-pressed]="(filter().kind ?? 'all') === k"
+            (click)="set({ kind: k === 'all' ? undefined : k })"
           >
-            {{ 'list.filter.' + f | t }} <span class="count">{{ count(f) }}</span>
+            {{ 'list.kind.' + k | t }}
           </button>
         }
       </div>
-      @if (!shown().length) {
-        <p class="muted">{{ 'list.empty' | t }}</p>
-      }
-      <div class="cards">
-        @for (t of shown(); track t.id) {
-          <a
-            class="item tcard"
-            [class.udt]="t.kind === 'udt'"
-            [class.done]="t.phase === 'finished' || t.phase === 'aborted'"
-            [class.aborted]="t.phase === 'aborted'"
-            [routerLink]="['/t', t.id]"
+      <div class="pills" role="group" [attr.aria-label]="'list.mode.label' | t">
+        @for (m of modes; track m) {
+          <button
+            type="button"
+            [class.on]="(filter().mode ?? 'all') === m"
+            [attr.aria-pressed]="(filter().mode ?? 'all') === m"
+            (click)="set({ mode: m === 'all' ? undefined : m })"
           >
-            <div class="row">
-              <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
-              @if (t.kind === 'udt') {
-                <span class="badge udt"><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span>
-              }
-              @if (t.seasonal) {
-                <span class="badge season">Season</span>
-              }
-              @if (t.registeredMe) {
-                <span class="me">{{
-                  (t.kind === 'udt' ? 'list.youEntered' : 'list.youPlay') | t
-                }}</span>
-              }
-            </div>
-            <div class="name">{{ t.name }}</div>
-            <div class="muted small">{{ meta(t) }}</div>
-            <div class="foot">
-              @if (t.champion) {
-                <span class="champ"
-                  ><svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true">
-                    <path
-                      d="M7 4h10v5a5 5 0 0 1-10 0zM5 5H3v2a4 4 0 0 0 4 4M19 5h2v2a4 4 0 0 1-4 4M12 14v4M8 21h8"
-                      fill="none"
-                      stroke="var(--neuro)"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                    /></svg
-                  >{{ t.champion }}</span
-                >
-              } @else if (t.scheduledAt) {
-                <span>{{ i18n.date(t.scheduledAt) }}</span>
-              } @else if (t.phase === 'draft' && t.registrationOpen) {
-                <span class="open">{{ 'list.open' | t }}</span>
-              } @else {
-                <span></span>
-              }
-              <span class="mono muted">{{ fill(t) }}</span>
-            </div>
-            @if (t.phase === 'draft') {
-              <div class="bar"><div [style.width.%]="fillPct(t)"></div></div>
-            }
-          </a>
+            {{ 'list.mode.' + m | t }}
+          </button>
         }
       </div>
+      @if (tab() === 'archive') {
+        <div class="pills" role="group" [attr.aria-label]="'list.status.label' | t">
+          @for (st of statuses; track st) {
+            <button
+              type="button"
+              [class.on]="(filter().status ?? 'all') === st"
+              [attr.aria-pressed]="(filter().status ?? 'all') === st"
+              (click)="set({ status: st === 'all' ? undefined : st })"
+            >
+              {{ 'list.status.' + st | t }}
+            </button>
+          }
+        </div>
+      }
+      <label class="mine">
+        <input
+          type="checkbox"
+          [checked]="!!filter().mine"
+          (change)="set({ mine: $any($event.target).checked || undefined })"
+        />
+        <i aria-hidden="true"></i>{{ 'list.mine' | t }}
+      </label>
+    </div>
+
+    <ng-template #badges let-t>
+      @if (t.kind === 'udt') {
+        <span class="badge udt"><na-udt-mark [size]="14" />DT</span>
+      }
+      @if (t.seasonal && t.kind !== 'udt') {
+        <span class="badge season">Season</span>
+      }
+      @if (t.game === 'mh') {
+        <span class="badge mh">MH</span>
+      }
+    </ng-template>
+
+    <ng-template #result let-t>
+      <a
+        class="trow done"
+        [class.udt]="t.kind === 'udt'"
+        [class.aborted]="t.phase === 'aborted'"
+        [routerLink]="['/t', t.id]"
+      >
+        <span class="when"
+          >{{ time(at(t)) }}<small>{{ shortDate(at(t)) }}</small></span
+        >
+        <span class="what">
+          <span class="ttl"
+            ><span class="nm">{{ t.name }}</span
+            ><ng-container *ngTemplateOutlet="badges; context: { $implicit: t }"
+          /></span>
+          <span class="meta"
+            >{{ meta(t) }}
+            @if (t.registeredMe) {
+              · <span class="was">{{ 'list.wasIn' | t }}</span>
+            }
+          </span>
+        </span>
+        <span class="st">
+          @if (t.phase === 'aborted') {
+            <span class="badge aborted">{{ 'phase.aborted' | t }}</span>
+          } @else if (t.champion) {
+            <span class="champ"><ng-container *ngTemplateOutlet="trophy" />{{ t.champion }}</span>
+          }
+        </span>
+      </a>
+    </ng-template>
+
+    <ng-template #trophy>
+      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M7 4h10v5a5 5 0 0 1-10 0zM5 5H3v2a4 4 0 0 0 4 4M19 5h2v2a4 4 0 0 1-4 4M12 14v4M8 21h8"
+          fill="none"
+          stroke="var(--neuro)"
+          stroke-width="2"
+          stroke-linecap="round"
+        />
+      </svg>
+    </ng-template>
+
+    @if (tab() === 'now') {
+      @if (live().length) {
+        <section>
+          <h2 class="sec"><span class="badge running">Live</span> {{ 'list.liveTitle' | t }}</h2>
+          @for (t of live(); track t.id; let first = $first) {
+            @if (!first) {
+              <a class="liverow" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
+                <span class="badge running">{{ 'phase.running' | t }}</span>
+                <span class="lt"
+                  >{{ t.name }}
+                  @if (t.now; as n) {
+                    <span class="muted small">· {{ n.names[0] }} – {{ n.names[1] }}</span>
+                  }
+                </span>
+                @if (t.now; as n) {
+                  @if (t.game === 'mh') {
+                    <span class="ls"
+                      ><b class="sa">{{ runText(n, 0) }}</b> <i>:</i>
+                      <b class="sb">{{ runText(n, 1) }}</b></span
+                    >
+                  } @else {
+                    <span class="ls"
+                      ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b> <i>:</i>
+                      <b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
+                    >
+                  }
+                }
+              </a>
+            } @else {
+              <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
+                <div class="hero-l">
+                  <div class="row">
+                    <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+                    @if (t.kind === 'udt') {
+                      <span class="badge udt"
+                        ><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span
+                      >
+                    }
+                    @if (t.seasonal) {
+                      <span class="badge season">Season</span>
+                    }
+                  </div>
+                  <div class="hero-name">{{ t.name }}</div>
+                  <div class="muted small">{{ meta(t) }}</div>
+                </div>
+                @if (t.now; as n) {
+                  <div class="hero-r">
+                    <div class="kpi">
+                      {{ 'list.now' | t }} · {{ n.matchId }} · {{ 'list.game' | t: { n: n.game } }}
+                      @if (n.live?.map ?? n.map; as map) {
+                        · {{ map }}
+                      }
+                    </div>
+                    <div class="vs">
+                      <span class="nm a">{{ n.names[0] }}</span>
+                      @if (t.game === 'mh') {
+                        <span class="sc race"
+                          ><b class="sa">{{ runText(n, 0) }}</b
+                          ><i>:</i><b class="sb">{{ runText(n, 1) }}</b></span
+                        >
+                      } @else {
+                        <span class="sc"
+                          ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b
+                          ><i>:</i
+                          ><b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
+                        >
+                      }
+                      <span class="nm b">{{ n.names[1] }}</span>
+                    </div>
+                    <div class="state small">
+                      @if (n.live?.phase === 'live' || n.live?.phase === 'overtime') {
+                        <span class="lv"
+                          ><span class="dot on"></span> {{ 'list.liveNow' | t }}</span
+                        >
+                      } @else {
+                        <span class="muted">{{
+                          'list.phase.' + (n.live?.phase ?? 'waiting') | t
+                        }}</span>
+                      }
+                      @if (n.bestOf > 1) {
+                        <span class="muted"
+                          >· {{ 'list.series' | t }} {{ n.wins[0] }}:{{ n.wins[1] }} (Bo{{
+                            n.bestOf
+                          }})</span
+                        >
+                      }
+                    </div>
+                  </div>
+                }
+              </a>
+            }
+          }
+        </section>
+      }
+
+      <section>
+        <div class="sechead">
+          <h2 class="sec">
+            {{ 'list.next' | t }} <span class="n">{{ upcoming().length }}</span>
+          </h2>
+        </div>
+        <div class="tlist">
+          @for (g of upcomingGroups(); track g.label) {
+            <div class="gttl">{{ g.label }}</div>
+            @for (t of g.items; track t.id) {
+              <a class="trow" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
+                <span class="when">{{ t.scheduledAt ? time(t.scheduledAt) : '–' }}</span>
+                <span class="what">
+                  <span class="ttl"
+                    ><span class="nm">{{ t.name }}</span
+                    ><ng-container *ngTemplateOutlet="badges; context: { $implicit: t }"
+                  /></span>
+                  <span class="meta">{{ meta(t) }}</span>
+                </span>
+                <span class="fill">
+                  <span class="mono">{{ fill(t) }}</span>
+                  <span class="meter"><span [style.width.%]="fillPct(t)"></span></span>
+                </span>
+                <span class="st {{ state(t).cls }}">{{ state(t).text }}</span>
+              </a>
+            }
+          } @empty {
+            <p class="empty">{{ 'list.nothingNext' | t }}</p>
+          }
+        </div>
+      </section>
+
+      @if (seriesShown().length) {
+        <section>
+          <h2 class="sec">
+            {{ 'series.title' | t }} <span class="n">{{ seriesShown().length }}</span>
+          </h2>
+          <div class="series">
+            @for (s of seriesShown(); track s.id) {
+              <div class="scard" [class.udt]="s.kind === 'udt'" [class.open]="isOpen(s.id)">
+                <div class="stop">
+                  <div class="row">
+                    <ng-container
+                      *ngTemplateOutlet="
+                        badges;
+                        context: {
+                          $implicit: { kind: s.kind, seasonal: s.seasonal, game: s.game },
+                        }
+                      "
+                    />
+                    @if (s.kind !== 'udt' && !s.seasonal && s.game !== 'mh') {
+                      <span class="badge">{{ 'list.seriesTag' | t }}</span>
+                    }
+                  </div>
+                  <div class="sname">{{ s.name }}</div>
+                  <dl>
+                    <dt>{{ 'list.seriesWhen' | t }}</dt>
+                    <dd>{{ schedule(s) }}</dd>
+                    <dt>{{ 'list.seriesNext' | t }}</dt>
+                    <dd>
+                      @if (s.next; as n) {
+                        @if (n.id) {
+                          <a [routerLink]="['/t', n.id]">{{ dayTime(n.at) }}</a>
+                          @if (activeById().get(n.id); as t) {
+                            · {{ fill(t) }}
+                          }
+                        } @else {
+                          {{ dayTime(n.at) }}
+                        }
+                      } @else {
+                        –
+                      }
+                    </dd>
+                    <dt>{{ 'list.seriesLast' | t }}</dt>
+                    <dd>
+                      @if (s.recent[0]; as r) {
+                        @if (r.phase === 'aborted') {
+                          <span class="badge aborted">{{ 'phase.aborted' | t }}</span>
+                        } @else if (r.champion) {
+                          <span class="champ"
+                            ><ng-container *ngTemplateOutlet="trophy" />{{ r.champion }}</span
+                          >
+                        } @else {
+                          <span class="muted">–</span>
+                        }
+                      } @else {
+                        –
+                      }
+                    </dd>
+                  </dl>
+                </div>
+                <div class="sfoot">
+                  <span class="muted">{{ 'list.seriesPlayed' | t: { n: s.finished } }}</span>
+                  @if (s.recent.length) {
+                    <button
+                      type="button"
+                      [attr.aria-expanded]="isOpen(s.id)"
+                      [attr.aria-controls]="'hist-' + s.id"
+                      (click)="toggle(s.id)"
+                    >
+                      {{ 'list.seriesHistory' | t }}
+                      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                        <path
+                          d="m6 9 6 6 6-6"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                        />
+                      </svg>
+                    </button>
+                  }
+                </div>
+                <div class="hist" [id]="'hist-' + s.id" [attr.inert]="isOpen(s.id) ? null : ''">
+                  <div>
+                    @for (r of s.recent; track r.id) {
+                      <a class="h" [routerLink]="['/t', r.id]"
+                        ><span
+                          ><span class="d">{{ shortDate(r.at) }}</span>
+                          {{ short(r.name, s.name) }}</span
+                        >
+                        @if (r.phase === 'aborted') {
+                          <span class="badge aborted">{{ 'phase.aborted' | t }}</span>
+                        } @else if (r.champion) {
+                          <span class="champ"
+                            ><ng-container *ngTemplateOutlet="trophy" />{{ r.champion }}</span
+                          >
+                        } @else {
+                          <span class="muted">–</span>
+                        }
+                      </a>
+                    }
+                    <a
+                      class="all"
+                      routerLink="/"
+                      [queryParams]="{ view: 'archive' }"
+                      (click)="seriesFilter(s)"
+                      >{{ 'list.seriesAll' | t: { n: s.finished + s.aborted } }} →</a
+                    >
+                  </div>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
+      }
+
+      <section>
+        <div class="sechead">
+          <h2 class="sec">{{ 'list.recent' | t }}</h2>
+          <a routerLink="/" [queryParams]="{ view: 'archive' }" class="small"
+            >{{ 'list.toArchive' | t }} →</a
+          >
+        </div>
+        <div class="tlist">
+          @for (t of recent(); track t.id) {
+            <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
+          } @empty {
+            <p class="empty">{{ 'list.nothingDone' | t }}</p>
+          }
+        </div>
+      </section>
+    } @else {
+      <section>
+        <div class="sechead">
+          <h2 class="sec">
+            {{ 'list.view.archive' | t }}
+            @if (archive(); as a) {
+              <span class="n">{{ 'list.archiveCount' | t: { n: a.total, a: a.aborted } }}</span>
+            }
+          </h2>
+          @if (filter().series) {
+            <button type="button" class="chip-x" (click)="set({ series: undefined })">
+              {{ 'list.seriesFilter' | t: { name: seriesName() } }} ×
+            </button>
+          }
+        </div>
+        <div class="tlist">
+          @for (g of archiveGroups(); track g.label) {
+            <div class="gttl">{{ g.label }}</div>
+            @for (t of g.items; track t.id) {
+              <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
+            }
+          } @empty {
+            @if (archive()) {
+              <p class="empty">{{ 'list.nothingFound' | t }}</p>
+            }
+          }
+          @if (archive()?.next) {
+            <div class="more">
+              <button type="button" [disabled]="moreBusy()" (click)="more()">
+                {{ 'list.more' | t: { n: archive()!.total - archiveItems().length } }}
+              </button>
+            </div>
+          }
+        </div>
+      </section>
     }
   `,
   styles: `
@@ -164,11 +494,131 @@ import type { TournamentSummary } from '../core/types';
       align-items: flex-end;
       gap: 12px;
       flex-wrap: wrap;
-      margin-bottom: 22px;
+      margin-bottom: 14px;
     }
     .head h1 {
       font-size: 3.2rem;
       margin: 0;
+    }
+    section {
+      margin-top: 28px;
+    }
+    .sechead {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .sechead h2.sec {
+      margin: 0;
+    }
+    h2.sec {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-style: normal;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-size: 1.15rem;
+      color: var(--text-2);
+      margin: 0 0 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .n {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--faint);
+      letter-spacing: 0;
+      text-transform: none;
+    }
+    .views {
+      display: flex;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .views a {
+      padding: 10px 14px;
+      font-weight: 600;
+      color: var(--text-2);
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .views a.on {
+      color: var(--text);
+      border-color: var(--accent);
+    }
+    .count {
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+      color: var(--muted);
+      margin-left: 4px;
+    }
+    .filters {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .search {
+      flex: 1 1 220px;
+      min-width: 0;
+      width: auto;
+    }
+    .mine {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      color: var(--text-2);
+      cursor: pointer;
+      white-space: nowrap;
+      margin: 0;
+    }
+    .mine input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+    }
+    .mine i {
+      width: 34px;
+      height: 20px;
+      border-radius: 999px;
+      background: var(--panel-3);
+      border: 1px solid var(--line);
+      position: relative;
+      transition: background 0.2s;
+    }
+    .mine i::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--text-2);
+      transition: transform 0.2s;
+    }
+    .mine input:checked + i {
+      background: var(--accent-dim);
+    }
+    .mine input:checked + i::after {
+      transform: translateX(14px);
+      background: var(--accent);
+    }
+    .mine input:focus-visible + i {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .badge.mh {
+      color: #ffb36b;
+      border-color: rgba(255, 160, 80, 0.4);
+      background: rgba(255, 160, 80, 0.08);
     }
     .hero {
       display: flex;
@@ -265,82 +715,189 @@ import type { TournamentSummary } from '../core/types';
     .sb {
       color: var(--side-b);
     }
-    .count {
-      font-family: var(--font-mono);
-      font-size: 0.8em;
-      color: var(--muted);
-      margin-left: 4px;
-    }
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 16px;
-    }
-    .item {
+
+    .liverow {
+      margin-top: 10px;
       display: flex;
-      flex-direction: column;
-      gap: 10px;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border: 1px solid #1f4a55;
+      border-radius: var(--radius);
+      background: #0c1219;
       color: var(--text);
-      background: var(--panel);
+    }
+    .liverow.udt {
+      border-color: rgba(178, 107, 255, 0.45);
+    }
+    .liverow:hover {
+      color: var(--text);
+      border-color: var(--accent-dim);
+    }
+    .lt {
+      font-weight: 700;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .ls {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.3rem;
+      white-space: nowrap;
+    }
+    .ls i {
+      color: var(--muted);
+      font-style: normal;
+    }
+    .empty {
+      margin: 0;
+      padding: 22px;
+      text-align: center;
+      color: var(--muted);
+    }
+    .more {
+      display: flex;
+      justify-content: center;
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .chip-x {
+      min-height: 0;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+    }
+    .series {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+    .scard {
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 18px 20px;
-      transition:
-        border-color 0.12s,
-        transform 0.12s;
+      background: var(--panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
-    .item:hover {
-      color: var(--text);
-      border-color: #2f3a4f;
-      transform: translateY(-1px);
+    .scard.udt {
+      border-color: rgba(178, 107, 255, 0.45);
     }
-    .name {
+    .stop {
+      padding: 16px 18px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sname {
       font-family: var(--font-display);
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.03em;
-      font-size: 1.65rem;
+      font-size: 1.45rem;
       line-height: 1.05;
     }
-    .me {
-      margin-left: auto;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--accent);
+    dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 4px 12px;
+      font-size: 0.86rem;
+      margin: 4px 0 0;
     }
-    .foot {
+    dt {
+      color: var(--muted);
+    }
+    dd {
+      margin: 0;
+    }
+    .sfoot {
       margin-top: auto;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      gap: 8px;
       border-top: 1px solid var(--border);
-      padding-top: 12px;
-      font-size: 0.92rem;
+      padding: 6px 10px 6px 18px;
+      font-size: 0.86rem;
     }
-    .champ {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-weight: 600;
-    }
-    .open {
+    .sfoot button {
+      background: none;
+      border: 0;
+      min-height: 32px;
       color: var(--accent);
       font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 6px;
     }
-    .bar {
-      height: 6px;
-      border-radius: 3px;
-      background: var(--panel-2);
+    .sfoot svg {
+      transition: transform 0.25s;
+    }
+    .scard.open .sfoot svg {
+      transform: rotate(180deg);
+    }
+    .hist {
+      display: grid;
+      grid-template-rows: 0fr;
+      transition: grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .scard.open .hist {
+      grid-template-rows: 1fr;
+    }
+    .hist > div {
       overflow: hidden;
     }
-    .bar div {
-      height: 100%;
-      background: var(--accent);
+    .hist .h {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 18px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text);
     }
+    .hist .h:hover {
+      background: var(--panel-2);
+    }
+    .hist .d {
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+    }
+    .hist .all {
+      display: block;
+      padding: 8px 18px 12px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    /* Phones: every filter group a full row; the rows in two columns, the state below. */
     @media (max-width: 640px) {
       .head h1 {
         font-size: 2.4rem;
+      }
+      .hide-sm {
+        display: none;
+      }
+      .filters {
+        gap: 8px;
+      }
+      .search,
+      .pills {
+        flex: 1 1 100%;
+      }
+      .pills button {
+        flex: 1 1 auto;
+        padding: 5px 6px;
+        font-size: 0.8rem;
+      }
+      .mine {
+        margin-left: auto;
       }
       .hero-r {
         border-left: 0;
@@ -348,6 +905,9 @@ import type { TournamentSummary } from '../core/types';
       }
       .hero-name {
         font-size: 2rem;
+      }
+      .series {
+        grid-template-columns: 1fr;
       }
     }
   `,
@@ -357,7 +917,274 @@ export class TournamentListPage {
   protected readonly i18n = inject(I18n);
   private readonly api = inject(Api);
   private readonly loading = inject(Loading);
-  protected readonly items = signal<TournamentSummary[] | null>(null);
+  private readonly router = inject(Router);
+
+  /** The query parameter `view` (archive), bound by the router. */
+  readonly view = input<string | undefined>(undefined);
+  protected readonly tab = computed(() => (this.view() === 'archive' ? 'archive' : 'now'));
+
+  protected readonly kinds = ['all', 'classic', 'udt', 'season'] as const;
+  protected readonly modes = ['all', '1v1', 'team', 'mh'] as const;
+  protected readonly statuses = ['all', 'finished', 'aborted'] as const;
+
+  protected readonly filter = signal<TournamentFilter>(storedFilter());
+  /** The search as typed (the filter follows after a short pause). */
+  protected readonly qInput = signal('');
+  private typing?: ReturnType<typeof setTimeout>;
+
+  protected readonly active = signal<TournamentSummary[] | null>(null);
+  protected readonly series = signal<SeriesOverview[]>([]);
+  protected readonly recent = signal<TournamentSummary[]>([]);
+  protected readonly doneTotal = signal<number | null>(null);
+  protected readonly archive = signal<TournamentArchive | null>(null);
+  protected readonly archiveItems = signal<TournamentSummary[]>([]);
+  protected readonly moreBusy = signal(false);
+  private readonly opened = signal<ReadonlySet<string>>(new Set());
+  /** Answers of older requests are dropped. */
+  private req = 0;
+
+  protected readonly activeById = computed(
+    () => new Map((this.active() ?? []).map((t) => [t.id, t])),
+  );
+  private readonly shownActive = computed(() =>
+    (this.active() ?? []).filter((t) => this.matches(t, this.filter())),
+  );
+  /** Running tournaments: big on top. */
+  protected readonly live = computed(() =>
+    this.shownActive().filter((t) => RUNNING.includes(t.phase)),
+  );
+  /** Everything else not over yet, by start (without one: last). */
+  protected readonly upcoming = computed(() =>
+    this.shownActive()
+      .filter((t) => !RUNNING.includes(t.phase))
+      .sort((a, b) =>
+        (a.scheduledAt ?? '~' + a.createdAt).localeCompare(b.scheduledAt ?? '~' + b.createdAt),
+      ),
+  );
+  protected readonly upcomingGroups = computed(() =>
+    this.groups(this.upcoming(), (t) => t.scheduledAt, this.i18n.t('list.noDate')),
+  );
+  protected readonly archiveGroups = computed(() =>
+    this.groups(this.archiveItems(), (t) => this.at(t), ''),
+  );
+  protected readonly seriesShown = computed(() => {
+    const f = this.filter();
+    const q = f.q?.toLowerCase();
+    return this.series().filter((s) => {
+      if (f.kind === 'udt' && s.kind !== 'udt') return false;
+      if (f.kind === 'classic' && s.kind === 'udt') return false;
+      if (f.kind === 'season' && !s.seasonal) return false;
+      if (f.mode && f.mode !== this.modeOf(s.game, s.teamSize)) return false;
+      if (q && !s.name.toLowerCase().includes(q)) return false;
+      if (f.mine && !(s.next?.id && this.activeById().get(s.next.id)?.registeredMe)) return false;
+      return true;
+    });
+  });
+  protected readonly seriesName = computed(
+    () => this.series().find((s) => s.id === this.filter().series)?.name ?? '…',
+  );
+
+  constructor() {
+    void this.loadActive();
+    void this.loadSeries();
+    // The server-side part: the last results (overview) or the archive's first page.
+    effect(() => {
+      const f = this.filter();
+      const tab = this.tab();
+      untracked(() => void (tab === 'archive' ? this.loadArchive(f) : this.loadRecent(f)));
+    });
+    effect(() => {
+      const { kind, mode, mine, status } = this.filter();
+      try {
+        localStorage.setItem(STORE, JSON.stringify({ kind, mode, mine, status }));
+      } catch {
+        // storage unavailable: the filters are not kept
+      }
+    });
+    // While a tournament runs, its score is shown: refresh every few seconds.
+    const timer = setInterval(() => {
+      if (this.live().length) this.loading.background(() => void this.loadActive());
+    }, 4000);
+    const destroy = inject(DestroyRef);
+    destroy.onDestroy(() => {
+      clearInterval(timer);
+      clearTimeout(this.typing);
+    });
+  }
+
+  protected set(change: Partial<TournamentFilter>) {
+    this.filter.update((f) => ({ ...f, ...change }));
+  }
+
+  protected typed(q: string) {
+    this.qInput.set(q);
+    clearTimeout(this.typing);
+    this.typing = setTimeout(() => this.set({ q: q.trim() || undefined }), 250);
+  }
+
+  protected seriesFilter(s: SeriesOverview) {
+    // All of the series, as the link says (not only the player's own).
+    this.set({ series: s.id, status: undefined, mine: undefined });
+  }
+
+  protected isOpen(id: string) {
+    return this.opened().has(id);
+  }
+
+  protected toggle(id: string) {
+    this.opened.update((o) => {
+      const n = new Set(o);
+      if (!n.delete(id)) n.add(id);
+      return n;
+    });
+  }
+
+  protected async more() {
+    const a = this.archive();
+    if (!a?.next || this.moreBusy()) return;
+    this.moreBusy.set(true);
+    const req = this.req;
+    try {
+      const page = await this.api.archive(this.filter(), 20, a.next);
+      // Filters changed meanwhile (a new first page): this page belongs to the old list.
+      if (req !== this.req || this.archive() !== a) return;
+      this.archive.set(page);
+      this.archiveItems.update((l) => [...l, ...page.items]);
+    } catch {
+      // the toast shows the error
+    } finally {
+      this.moreBusy.set(false);
+    }
+  }
+
+  private async loadActive() {
+    try {
+      this.active.set(await this.api.tournaments());
+    } catch {
+      // the toast shows the error
+    }
+  }
+
+  private async loadSeries() {
+    try {
+      this.series.set(await this.api.seriesOverview());
+    } catch {
+      // the toast shows the error
+    }
+  }
+
+  private async loadRecent(f: TournamentFilter) {
+    const req = ++this.req;
+    try {
+      const page = await this.api.archive({ ...f, status: undefined, series: undefined }, 5);
+      if (req !== this.req) return;
+      this.recent.set(page.items);
+      this.doneTotal.set(page.total);
+    } catch {
+      // the toast shows the error
+    }
+  }
+
+  private async loadArchive(f: TournamentFilter) {
+    const req = ++this.req;
+    try {
+      const page = await this.api.archive(f, 20);
+      if (req !== this.req) return;
+      this.archive.set(page);
+      this.archiveItems.set(page.items);
+      this.doneTotal.set(page.total);
+    } catch {
+      // the toast shows the error
+    }
+  }
+
+  private modeOf(game: string | undefined, teamSize: number): '1v1' | 'team' | 'mh' {
+    return game === 'mh' ? 'mh' : teamSize > 1 ? 'team' : '1v1';
+  }
+
+  /** The filters in the browser (the overview: its lists are complete). */
+  private matches(t: TournamentSummary, f: TournamentFilter): boolean {
+    if (f.kind === 'udt' && t.kind !== 'udt') return false;
+    if (f.kind === 'classic' && t.kind === 'udt') return false;
+    if (f.kind === 'season' && !t.seasonal) return false;
+    if (f.mode && f.mode !== this.modeOf(t.game, t.teamSize)) return false;
+    if (f.mine && !t.registeredMe) return false;
+    if (f.q && !t.name.toLowerCase().includes(f.q.toLowerCase())) return false;
+    return true;
+  }
+
+  /** When a tournament was (or is) played: its start, else its creation. */
+  protected at(t: TournamentSummary): string {
+    return t.scheduledAt ?? t.createdAt;
+  }
+
+  private groups(
+    list: TournamentSummary[],
+    when: (t: TournamentSummary) => string | null,
+    none: string,
+  ): { label: string; items: TournamentSummary[] }[] {
+    const out: { label: string; items: TournamentSummary[] }[] = [];
+    for (const t of list) {
+      const w = when(t);
+      const label = w ? this.dayLabel(w) : none;
+      const last = out[out.length - 1];
+      if (last?.label === label) last.items.push(t);
+      else out.push({ label, items: [t] });
+    }
+    return out;
+  }
+
+  private locale() {
+    return this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
+  }
+
+  /** "Today", "Tomorrow", "Yesterday", a weekday within a week, else the date. */
+  protected dayLabel(iso: string): string {
+    const d = new Date(iso);
+    const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const n = Math.round((day(d) - day(new Date())) / 86_400_000);
+    if (n === 0) return this.i18n.t('list.today');
+    if (n === 1) return this.i18n.t('list.tomorrow');
+    if (n === -1) return this.i18n.t('list.yesterday');
+    const loc = this.locale();
+    if (n > 1 && n < 7)
+      return d.toLocaleDateString(loc, { weekday: 'long', day: '2-digit', month: '2-digit' });
+    if (n < 0 && n > -7) return d.toLocaleDateString(loc, { weekday: 'long' });
+    const year = d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined;
+    return d.toLocaleDateString(loc, { weekday: 'short', day: '2-digit', month: 'long', year });
+  }
+
+  protected time(iso: string): string {
+    return new Date(iso).toLocaleTimeString(this.locale(), { hour: '2-digit', minute: '2-digit' });
+  }
+
+  protected shortDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(this.locale(), { day: '2-digit', month: '2-digit' });
+  }
+
+  protected dayTime(iso: string): string {
+    return `${this.dayLabel(iso)}, ${this.time(iso)}`;
+  }
+
+  protected schedule(s: SeriesOverview): string {
+    return scheduleText(this.i18n, s);
+  }
+
+  /** A tournament of the series without the series' name ("Friday Cup #12" -> "#12"). */
+  protected short(name: string, series: string): string {
+    return name.startsWith(series) ? name.slice(series.length).trim() || name : name;
+  }
+
+  /** What the player can do or is: check-in, registered, registration open or closed. */
+  protected state(t: TournamentSummary): { cls: string; text: string } {
+    const tr = (k: string) => this.i18n.t(k);
+    if (t.phase === 'checkIn') return { cls: 'ci', text: tr('list.stateCheckIn') };
+    if (t.registeredMe)
+      return { cls: 'me', text: '✓ ' + tr(t.kind === 'udt' ? 'list.youEntered' : 'list.youPlay') };
+    if (t.phase === 'seeded') return { cls: 'closed', text: tr('phase.seeded') };
+    if (t.registrationOpen) return { cls: '', text: tr('list.open') };
+    return { cls: 'closed', text: tr('list.closed') };
+  }
 
   /** Monster Hunt: a side's finished run (final time), the running clock, or a dash. */
   protected runText(n: NonNullable<TournamentSummary['now']>, i: 0 | 1): string {
@@ -371,27 +1198,6 @@ export class TournamentListPage {
     return r && r.runner === id ? raceTime(r.timeMs + r.penaltyMs, false) : '–';
   }
 
-  protected readonly filters = ['all', 'live', 'open', 'done'] as const;
-  protected readonly filter = signal<(typeof this.filters)[number]>('all');
-  /** Running tournaments: shown big on top. */
-  protected readonly live = computed(() =>
-    (this.items() ?? []).filter((t) => t.phase === 'running' || t.phase === 'paused'),
-  );
-  protected readonly shown = computed(() =>
-    (this.items() ?? []).filter((t) => this.matches(t, this.filter())),
-  );
-
-  private matches(t: TournamentSummary, f: (typeof this.filters)[number]): boolean {
-    if (f === 'live') return ['seeded', 'checkIn', 'running', 'paused'].includes(t.phase);
-    if (f === 'open') return t.phase === 'draft';
-    if (f === 'done') return t.phase === 'finished' || t.phase === 'aborted';
-    return true;
-  }
-
-  protected count(f: (typeof this.filters)[number]): number {
-    return (this.items() ?? []).filter((t) => this.matches(t, f)).length;
-  }
-
   protected meta(t: TournamentSummary): string {
     const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
     const mode =
@@ -401,7 +1207,9 @@ export class TournamentListPage {
           ? tr('team.mode', { k: t.teamSize })
           : '1v1';
     const size = `${t.size} ${tr(t.teamSize > 1 ? 'list.teams' : 'list.slots')}`;
-    return `${mode} · ${tr('format.' + t.format)} · ${size}`;
+    const parts = [mode, tr('format.' + t.format), size];
+    if (t.seriesId) parts.push(tr('list.seriesTag'));
+    return parts.join(' · ');
   }
 
   /** "9 / 16" registered (teams in team tournaments). */
@@ -411,22 +1219,5 @@ export class TournamentListPage {
 
   protected fillPct(t: TournamentSummary): number {
     return Math.min(100, (100 * (t.teamSize > 1 ? t.teams : t.registered)) / Math.max(1, t.size));
-  }
-
-  constructor() {
-    void this.load();
-    // While a tournament runs the banner shows the live score: refresh every few seconds.
-    const timer = setInterval(() => {
-      if (this.live().length) this.loading.background(() => void this.load());
-    }, 4000);
-    inject(DestroyRef).onDestroy(() => clearInterval(timer));
-  }
-
-  private async load() {
-    try {
-      this.items.set(await this.api.tournaments());
-    } catch {
-      // the Api shows the error as a toast
-    }
   }
 }
