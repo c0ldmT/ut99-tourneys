@@ -29,3 +29,35 @@ export function uniqueName(base: string, taken: (key: string) => boolean): strin
   }
   throw new Error('no free name');
 }
+
+/**
+ * Team names from the admin's list (Settings › team names) in random order, none twice and none
+ * that `taken` holds (lower case; the picked ones are added). When the list runs out,
+ * `fallback(i)` names the rest (also unique).
+ */
+export function pickTeamNames(
+  list: readonly string[],
+  count: number,
+  taken: Set<string>,
+  rng: () => number,
+  fallback: (i: number) => string,
+): string[] {
+  const pool = list.filter((n) => !taken.has(n.toLowerCase()));
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [pool[i], pool[j]] = [pool[j]!, pool[i]!];
+  }
+  const out: string[] = [];
+  let f = 0;
+  for (let n = 0; n < count; n++) {
+    let name = pool.shift();
+    while (name !== undefined && taken.has(name.toLowerCase())) name = pool.shift();
+    if (name === undefined) {
+      do name = fallback(f++);
+      while (taken.has(name.toLowerCase()));
+    }
+    taken.add(name.toLowerCase());
+    out.push(name);
+  }
+  return out;
+}

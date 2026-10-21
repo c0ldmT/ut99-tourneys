@@ -18,6 +18,7 @@ import { ROSTER_MAX, UdtMarketService } from './udt-market.service.js';
 import { UdtPacksService } from './udt-packs.service.js';
 import { UdtTradesService } from './udt-trades.service.js';
 import { UdtService, type RosterBot } from './udt.service.js';
+import { pickTeamNames } from '../common/names.js';
 
 export type AiPersonality = 'saver' | 'gambler' | 'tactician' | 'breeder';
 const PERSONALITIES: AiPersonality[] = ['tactician', 'gambler', 'saver', 'breeder'];
@@ -151,10 +152,13 @@ export class UdtAiService implements OnModuleInit {
     for (const m of all) {
       if (this.udt.team(m.user.id, season)) continue;
       const taken = new Set(this.udt.teams(season).map((t) => t.name.toLowerCase()));
-      const name = names.find((x) => !taken.has(x.toLowerCase())) ?? `AI Team ${m.n}`;
-      const tags = new Set(this.udt.teams(season).map((t) => t.tag.toLowerCase()));
-      const tag = this.tagFor(name, tags, m.n);
       const rng = createRng(`ai-starter-${season}-${m.n}`);
+      // A random free name of the list (not the first one).
+      // Own rng for the name: the starter below stays the same whatever the list holds.
+      const nameRng = createRng(`ai-name-${season}-${m.n}`);
+      const [name] = pickTeamNames(names, 1, taken, nameRng, (i) => `AI Team ${m.n}${i || ''}`);
+      const tags = new Set(this.udt.teams(season).map((t) => t.tag.toLowerCase()));
+      const tag = this.tagFor(name!, tags, m.n);
       const library = new Set(this.bots.list().map((b) => b.name.toLowerCase()));
       const botName =
         [...TALENT_NAMES].find((x) => !library.has(x.toLowerCase())) ?? `Unit${m.n}${season}`;
@@ -165,8 +169,12 @@ export class UdtAiService implements OnModuleInit {
       if (buildCost(skill, traits) > cfg.starterBudget)
         traits = { accuracy: 0, alertness: 0, strafing: 0 };
       try {
-        this.udt.createTeam(m.user, { name, tag, starter: { name: botName, skill, traits } });
-        made.push(name);
+        this.udt.createTeam(m.user, {
+          name: name!,
+          tag,
+          starter: { name: botName, skill, traits },
+        });
+        made.push(name!);
       } catch (e) {
         this.log.warn(`AI manager ${m.n}: ${e instanceof Error ? e.message : String(e)}`);
       }

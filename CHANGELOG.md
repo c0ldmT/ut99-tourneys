@@ -144,6 +144,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Team names of the list are drawn at random; a bot team that fills a Dream Team bracket never has the name of an AI team (or another team).
 - Player pages: no more "player not found" toast for players without games in the season; the Dream Team badge "Blueprint" is translated; market offers without the library clan tag.
 - Mod 0.12.1: bots cut off from their opponents (DM-SpaceNoxx: upper ring, kicker) are moved to a start spot with a path to one; bouncing on a kicker counts as staying in place; repeated stuck spots get a detour; no more `Accessed None` in StakeOut after the AI help cleared an enemy.
 - Bets: the expert tip showed an internal id for Dream Team sides; a Dream Team bracket full of AI teams looked closed for humans.

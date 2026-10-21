@@ -34,6 +34,7 @@ import {
 } from '../tournaments/tournaments.service.js';
 import { UdtCareerService } from './udt-career.service.js';
 import { gameName, UdtService, type RosterBot } from './udt.service.js';
+import { pickTeamNames } from '../common/names.js';
 
 /** Bots below this stamina are tired: they play worse and the bench comes first. */
 const TIRED = 40;
@@ -368,7 +369,16 @@ export class UdtEventsService implements OnModuleInit {
       .map((x) => x.b);
     const need = Math.max(0, settings.size - main.length);
     const fill: Entrant[] = [];
-    const names = this.settings.get().teamNames;
+    // Bot teams get random names of the list, never one of a Dream Team (AI teams take theirs
+    // from the same list) or of another entrant.
+    const taken = new Set([
+      ...this.udt.teams(season).map((x) => x.name.toLowerCase()),
+      ...main.map((e) => e.displayName.toLowerCase()),
+    ]);
+    const names =
+      settings.teamSize > 1
+        ? pickTeamNames(this.settings.get().teamNames, need, taken, rng, (i) => `Bots ${i + 1}`)
+        : [];
     const spec = (b: LibraryBot): BotSpec => {
       const s = this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill });
       const traits = { ...(s.traits ?? b.traits ?? {}) };
@@ -382,7 +392,7 @@ export class UdtEventsService implements OnModuleInit {
         fill.push({
           id: `udtbots-${n + 1}`,
           kind: 'team',
-          displayName: names[n % names.length] ?? `Bots ${n + 1}`,
+          displayName: names[n] ?? `Bots ${n + 1}`,
           members: [],
           bots: group.map(spec),
         });

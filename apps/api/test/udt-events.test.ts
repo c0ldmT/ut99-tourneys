@@ -164,6 +164,44 @@ describe('Unreal Dream Team: events', () => {
     expect(ids.filter((k) => k.startsWith('udt-'))).toHaveLength(3); // Mario and two AI teams
   });
 
+  it('bot teams that fill the bracket never take the name of an AI team', async () => {
+    const { admin, mario } = await setup();
+    await admin.req('PUT', '/settings/team-names', { names: ['Kack', 'Bratz', 'Zeta'] });
+    await admin.req('PUT', '/settings/udt', { aiEnabled: true, aiCount: 2 });
+    await admin.post('/udt/ai/ensure');
+    const aiNames = ((await admin.get('/udt/ai')).body as { team: { name: string } }[]).map(
+      (a) => a.team.name,
+    );
+    expect(aiNames).toHaveLength(2);
+    // Mario gets a second bot for a 2v2 cup; the AI teams (starter only) cannot play it.
+    const marioId = (await mario.get('/me')).body.id as string;
+    const lib = (await admin.get('/bots')).body.bots as { id: string; name: string }[];
+    api!.app
+      .get<Db>(DB)
+      .insert(udtRoster)
+      .values({
+        season: 1,
+        botId: lib.find((b) => b.name === 'Lib0')!.id,
+        userId: marioId,
+        price: 100,
+        acquiredAt: new Date().toISOString(),
+      })
+      .run();
+    const roster = (await mario.get('/udt')).body.roster as { botId: string }[];
+    await mario.req('PUT', '/udt/lineup', { dm: roster.map((r) => r.botId) });
+    const id = (await admin.post('/tournaments', udtCup(2))).body.id as string;
+    const entered = await mario.post(`/udt/events/${id}/enter`);
+    expect(entered.status, JSON.stringify(entered.body)).toBe(200);
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    const fill = Object.values(seeded.body.projection.entrants as Record<string, any>)
+      .filter((e) => !e.id.startsWith('udt-'))
+      .map((e) => e.displayName as string);
+    expect(fill.length).toBeGreaterThan(0);
+    expect(new Set(fill).size).toBe(fill.length);
+    for (const n of fill) expect(aiNames).not.toContain(n);
+  });
+
   it('enters automatically where possible; rests bots with Neuro', async () => {
     const { admin, mario, tim } = await setup();
     const cup1 = (await admin.post('/tournaments', udtCup(1))).body.id as string;

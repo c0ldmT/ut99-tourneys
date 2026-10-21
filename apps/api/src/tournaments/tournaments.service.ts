@@ -61,6 +61,7 @@ import {
 } from './rating-seed.js';
 import { assignBots, fits, formTeams, joinRole, type TeamShape } from './teams.js';
 import { shapeOf, TeamsService, type TeamView } from './teams.service.js';
+import { pickTeamNames } from '../common/names.js';
 
 export type TournamentRow = typeof tournaments.$inferSelect;
 
@@ -1252,28 +1253,27 @@ export class TournamentsService {
     const ordered = slots.map((id) => entrants.find((e) => e.id === id) as TeamEntrant);
     const need = ordered.map((e) => Math.max(0, teamSize - e.members.length - e.bots.length));
     const pool = this.fillPool(this.botPool(t), ordered, Math.max(0, ...need));
-    return this.nameBotTeams(ordered, assignBots(need, pool, rng));
+    return this.nameBotTeams(ordered, assignBots(need, pool, rng), rng);
   }
 
   /** Adds the bots to the teams and names the teams made of bots only. */
-  private nameBotTeams(teams: TeamEntrant[], fills: BotSpec[][]): TeamEntrant[] {
+  private nameBotTeams(teams: TeamEntrant[], fills: BotSpec[][], rng: Rng): TeamEntrant[] {
     const taken = new Set(
       teams.filter((e) => e.members.length).map((e) => e.displayName.toLowerCase()),
     );
     for (const e of teams) if (e.bots.length) taken.add(e.displayName.toLowerCase());
-    const names = this.settingsSvc.get().teamNames;
-    let next = 0;
-    const nameAt = (i: number) => names[i] ?? botTeamName(i);
-    const botName = () => {
-      let name = nameAt(next++);
-      while (taken.has(name.toLowerCase())) name = nameAt(next++);
-      taken.add(name.toLowerCase());
-      return name;
-    };
+    // Clan teams keep their name; other teams of bots get one from the list, in random order.
+    const unnamed = teams.filter((e) => !e.members.length && !e.bots.length);
+    const names = pickTeamNames(
+      this.settingsSvc.get().teamNames,
+      unnamed.length,
+      taken,
+      rng,
+      botTeamName,
+    );
     return teams.map((e, i) => ({
       ...e,
-      // Clan teams keep their name; other teams of bots get one from the list.
-      ...(e.members.length || e.bots.length ? {} : { displayName: botName() }),
+      ...(unnamed.includes(e) ? { displayName: names[unnamed.indexOf(e)]! } : {}),
       bots: [...e.bots, ...(fills[i] ?? [])],
     }));
   }
@@ -1355,7 +1355,7 @@ export class TournamentsService {
         settings.teamSize,
         rng,
       );
-      entrants = this.nameBotTeams(teams, fills);
+      entrants = this.nameBotTeams(teams, fills, rng);
       botIds = entrants.slice(humans.length).map((e) => e.id);
     } else {
       const picked = pickBotsNear(

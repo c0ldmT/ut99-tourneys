@@ -126,7 +126,9 @@ describe('team tournaments', () => {
     const solo = entrants.find((e) => e.displayName.startsWith('Team '));
     expect(solo.bots).toHaveLength(1);
     const bots = entrants.find((e) => e.members.length === 0);
-    expect(bots.displayName).toBe('Thunder Crash');
+    // A random name of the list (default team names), not one of the other teams.
+    const list = (await admin.get('/settings')).body.teamNames as string[];
+    expect(list).toContain(bots.displayName);
     expect(bots.bots).toHaveLength(2);
     expect(seeded.body.me).toBeDefined();
     expect((await mario!.get(`/tournaments/${id}`)).body.me).toMatchObject({
