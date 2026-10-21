@@ -1769,7 +1769,7 @@ const en = {
   'list.closed': 'Registration closed',
   'bots.defaultIs': 'Default ({name})',
   'bots.unknownModel':
-    "The website does not know this model's skins yet (they come with the next mod version); the default skin is used.",
+    "The website does not know this model's skins yet: the game server reports them when it runs next (mod 0.14.1 or later). Until then the default skin is used.",
   'bots.lookHint':
     "As in UT's player setup: the skins of the model, the faces of the skin, the voices of the model (from the stock game and the synced servers: Servers → Sync maps, models and skins). The tournament server offers custom packages to the players for download.",
 } as const;
@@ -3559,7 +3559,7 @@ const de: Record<TKey, string> = {
   'list.closed': 'Anmeldung zu',
   'bots.defaultIs': 'Standard ({name})',
   'bots.unknownModel':
-    'Die Skins dieses Modells kennt die Website noch nicht (kommen mit dem nächsten Mod-Stand); es gilt der Standard-Skin.',
+    'Die Skins dieses Modells kennt die Website noch nicht: Der Spielserver meldet sie beim nächsten Start (ab Mod 0.14.1). Bis dahin gilt der Standard-Skin.',
   'bots.lookHint':
     'Wie im Player-Setup von UT: die Skins des Modells, die Gesichter des Skins, die Stimmen des Modells (aus dem Standardspiel und den synchronisierten Servern: Server → Maps, Models und Skins synchronisieren). Eigene Pakete bietet der Turnierserver den Spielern zum Download an.',
 };

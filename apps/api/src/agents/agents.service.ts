@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
-import type { AgentProfile } from '@tourney/protocol';
+import type { AgentProfile, ClassDefaults } from '@tourney/protocol';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { agents, inventories } from '../db/schema.js';
@@ -111,6 +111,22 @@ export class AgentsService {
         set: { dataJson: JSON.stringify(data), scannedAt },
       })
       .run();
+  }
+
+  /**
+   * Bot class defaults the mod reported after the last scan go into the stored inventory (the
+   * next scan carries them anyway). Without a scan yet there is nothing to add them to.
+   */
+  saveClassDefaults(agentId: string, profileId: string, classDefaults: ClassDefaults[]): void {
+    const row = this.db
+      .select()
+      .from(inventories)
+      .where(and(eq(inventories.agentId, agentId), eq(inventories.profileId, profileId)))
+      .get();
+    if (!row) return;
+    const data = JSON.parse(row.dataJson) as { assets?: Record<string, unknown> };
+    data.assets = { ...(data.assets ?? {}), classDefaults };
+    this.saveInventory(agentId, profileId, data, row.scannedAt);
   }
 
   inventory(agentId: string, profileId: string): unknown {

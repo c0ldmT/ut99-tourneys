@@ -2005,6 +2005,7 @@ export class MatchDirector extends EventEmitter {
       case 'pse':
         return this.onStatsEnd(msg);
       case 'hb':
+      case 'model': // bot class defaults: the website agent's ModelCatalog
         return;
       case 'err':
         this.o.log.warn(`mod error: ${msg.msg}`);

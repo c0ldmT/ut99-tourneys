@@ -25,6 +25,7 @@ import {
   changedLookProblems,
   lookProblem,
   modelChoices,
+  profilesWith,
   STOCK_TEXTURES,
   STOCK_VOICE_ENTRIES,
   type Look,
@@ -432,6 +433,7 @@ export class BotsService {
       voices: STOCK_VOICE_ENTRIES.map((v) => ({ ...v })),
       weapons: STOCK_WEAPONS.map((w) => ({ name: w, label: w.split('.').pop() ?? w })),
       skinPackages: [],
+      classDefaults: [],
     };
     const add = <T extends { name: string; label: string }>(list: T[], items: readonly T[]) => {
       for (const i of items) {
@@ -451,6 +453,10 @@ export class BotsService {
       add(out.voices, inv.assets.voices ?? []);
       add(out.weapons, inv.assets.weapons ?? []);
       packs.push(...(inv.assets.skinPackages ?? []));
+      // One entry per class (servers report the same stock classes).
+      for (const d of inv.assets.classDefaults ?? [])
+        if (!out.classDefaults.some((x) => x.name.toLowerCase() === d.name.toLowerCase()))
+          out.classDefaults.push(d);
     }
     const pkg = (n: string) => n.split('.')[0]!.toLowerCase();
     const withInt = new Set(out.textures.map((t) => pkg(t.name)));
@@ -470,7 +476,12 @@ export class BotsService {
         textures.push({ name: `${sp.pkg}.${n}`, label });
       }
     }
-    const models = modelChoices(out.botClasses, textures, out.voices as VoiceEntry[]);
+    const models = modelChoices(
+      out.botClasses,
+      textures,
+      out.voices as VoiceEntry[],
+      profilesWith(out.classDefaults),
+    );
     const skins = new Map<string, { name: string; label: string }>();
     const faces = new Map<string, { name: string; label: string; pkg: string }>();
     for (const sk of allSkins(textures)) {

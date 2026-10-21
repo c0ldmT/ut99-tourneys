@@ -3,6 +3,7 @@ import {
   changedLookProblems,
   lookProblem,
   modelChoices,
+  profilesWith,
   STOCK_TEXTURES,
   STOCK_VOICE_ENTRIES,
   type TextureEntry,
@@ -137,6 +138,35 @@ describe("models as UT's player setup offers them", () => {
     expect(lookProblem(models, { skin: 'SGirlSkins.army' })).toMatchObject({ field: 'skin' });
     expect(lookProblem(models, { botClass: 'Custom.ZombieBot', skin: 'Any.thing' })).toBeNull();
     expect(lookProblem(models, { botClass: 'Nope.NopeBot' })).toMatchObject({ field: 'botClass' });
+  });
+
+  it("the mod's reported defaults make a model known and win over the table", () => {
+    const reported = profilesWith([
+      {
+        name: 'Custom.ZombieBot',
+        mesh: 'TSkM',
+        multi: true,
+        voiceMeta: 'BotPack.VoiceMale',
+        voice: 'MultiMesh.NaliVoice',
+        skin: '',
+      },
+      {
+        name: 'MultiMesh.TCowBot',
+        mesh: 'TCowMesh',
+        multi: false,
+        voiceMeta: 'BotPack.VoiceMale',
+        voice: 'MultiMesh.CowVoice',
+        skin: 'TCowMeshSkins.WarCow',
+      },
+    ]);
+    const ms = modelChoices(CLASSES, [...STOCK_TEXTURES, ...BONUS], VOICES, reported);
+    const zombie = ms.find((m) => m.name === 'Custom.ZombieBot')!;
+    expect(zombie.known).toBe(true);
+    expect(labels(zombie.skins)).toEqual(['Arena Warrior', 'Cyborg Trooper', 'Pit Fighter']);
+    expect(zombie.defaults).toEqual({ skin: '', face: '', voice: 'MultiMesh.NaliVoice' });
+    expect(ms.find((m) => m.name === 'MultiMesh.TCowBot')!.defaults.skin).toBe(
+      'TCowMeshSkins.WarCow',
+    );
   });
 
   it('a change is checked where it changes (an older look stays)', () => {

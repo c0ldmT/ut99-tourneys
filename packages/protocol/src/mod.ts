@@ -201,6 +201,20 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
   z.object({ t: z.literal('cmd'), pid, c: str(16) }),
   z.object({ t: z.literal('hb'), up: int.nonnegative() }), // heartbeat, uptime in seconds
   z.object({ t: z.literal('err'), msg: str(200) }),
+  /**
+   * Answer to `describe` (mod 0.14.1+): the bot class's defaults that UT's setup menu works with.
+   * ok=false: the class does not load or is no bot (or its values do not fit on one line).
+   */
+  z.object({
+    t: z.literal('model'),
+    i: int.nonnegative(), // the request's number
+    ok: z.boolean(),
+    m: str(64).optional(), // mesh name without package (skins start with it), e.g. "TSkM"
+    ms: z.boolean().optional(), // bIsMultiSkinned: skins with faces
+    vm: str(64).optional(), // VoicePackMetaClass, e.g. "BotPack.VoiceMale"
+    v: str(64).optional(), // VoiceType (the class's own voice)
+    s: str(64).optional(), // DefaultSkinName
+  }),
 ]);
 export type ModToBridge = z.infer<typeof ModToBridgeSchema>;
 
@@ -397,6 +411,8 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     r: z.enum(['a', 'b', 's']),
   }),
   z.object({ t: z.literal('acldel'), tk: str(64) }),
+  /** Asks for a bot class's defaults (mod 0.14.1+, answered with `model`). */
+  z.object({ t: z.literal('describe'), i: int.nonnegative(), c: str(64) }),
   /** Map vote: header, one line per option, closed by vclose. */
   z.object({ t: z.literal('vopen'), mid: str(16), n: int.positive(), sec: int.positive() }),
   z.object({ t: z.literal('vmap'), i: int.positive(), map: str(64), title: str(64) }),

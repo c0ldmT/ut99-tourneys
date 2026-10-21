@@ -18,12 +18,13 @@ import type {
   MapInfo,
   WebsiteToBridge,
 } from '@tourney/protocol';
-import type { Clock } from '../clock.js';
+import type { Clock, TimerHandle } from '../clock.js';
 import type { BridgeConfig } from '../config.js';
 import { MatchDirector, type DirectorTiming, type LiveInfo } from '../director.js';
 import type { Logger } from '../log.js';
 import type { ModHello, ModServer } from '../mod-server.js';
-import { scanInventory } from '../ut99/inventory.js';
+import { readAssets, scanInventory } from '../ut99/inventory.js';
+import { ModelCatalog, modDescribes } from '../ut99/model-catalog.js';
 import { botPackages, prepareServer } from '../ut99/prepare.js';
 import { ServerProcess } from '../ut99/server-process.js';
 import { WebsiteLink } from './link.js';
@@ -71,9 +72,20 @@ export class WebsiteAgent {
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
   private maps: MapInfo[] = [];
+  /** Bot class defaults from the mod (only with a server profile). */
+  private readonly models?: ModelCatalog;
+  private modelsTimer?: TimerHandle;
+  /** New answers the website has not got yet (it was offline). */
+  private modelsUnsent = false;
 
   constructor(private readonly o: WebsiteAgentOptions) {
     const { config, log } = o;
+    if (config.server)
+      this.models = new ModelCatalog({
+        installDir: config.server.installDir,
+        file: o.memoryOnly ? undefined : path.resolve(o.baseDir, config.dataDir, 'models.json'),
+        log,
+      });
     this.link = new WebsiteLink({
       url: config.website.url,
       token: config.website.token,
@@ -95,10 +107,19 @@ export class WebsiteAgent {
       o.memoryOnly ? undefined : path.resolve(o.baseDir, config.dataDir, 'website'),
     );
     this.link.on('message', (m: WebsiteToBridge) => void this.onMessage(m));
-    this.link.on('connected', () => this.sendStatus());
+    this.link.on('connected', () => {
+      this.sendStatus();
+      if (this.modelsUnsent) this.sendModels();
+    });
     o.mod.on('hello', (h: ModHello) => {
       this.level = h.lvl;
       this.sendStatus();
+      // Outside a game the mod may load the bot classes it was not asked about yet (after the
+      // director has handled the hello).
+      if (!h.gm && modDescribes(h.mv)) setImmediate(() => this.describeModels());
+    });
+    o.mod.on('message', (m) => {
+      if (m.t === 'model' && this.models?.answer(m)) this.queueModels();
     });
     o.mod.on('close', () => this.sendStatus());
   }
@@ -119,6 +140,7 @@ export class WebsiteAgent {
 
   async stop(): Promise<void> {
     clearInterval(this.statusTimer);
+    if (this.modelsTimer) this.o.clock.clearTimeout(this.modelsTimer);
     await this.dispose();
     this.link.stop();
   }
@@ -268,6 +290,42 @@ export class WebsiteAgent {
     return s;
   }
 
+  /** Asks the mod about the bot classes without a current answer. */
+  private describeModels(): void {
+    const s = this.o.config.server;
+    if (!s || !this.models) return;
+    try {
+      const lines = this.models.requests(readAssets(s.installDir).botClasses.map((c) => c.name));
+      if (lines.length) this.o.mod.send(lines);
+    } catch (e) {
+      this.o.log.warn(`cannot ask the mod about bot classes: ${(e as Error).message}`);
+    }
+  }
+
+  /** New answers reach the website together, a moment after the last one. */
+  private queueModels(): void {
+    this.modelsUnsent = true;
+    if (this.modelsTimer) this.o.clock.clearTimeout(this.modelsTimer);
+    this.modelsTimer = this.o.clock.setTimeout(() => {
+      this.modelsTimer = undefined;
+      this.sendModels();
+    }, 1000);
+  }
+
+  private sendModels(): void {
+    const s = this.o.config.server;
+    if (!s || !this.models) return;
+    try {
+      this.link.send('agent.classDefaults', {
+        profileId: s.id,
+        classDefaults: this.models.models(),
+      });
+      this.modelsUnsent = false;
+    } catch {
+      // offline: sent when the link is back (or with the next inventory scan)
+    }
+  }
+
   private async rescan(profileId: string): Promise<void> {
     const profile = this.profileConfig(profileId);
     const inv = scanInventory(profile, { readMeta: true });
@@ -278,10 +336,11 @@ export class WebsiteAgent {
       maps: inv.maps,
       bots: inv.bots,
       packages: inv.packages,
-      assets: inv.assets,
+      assets: { ...inv.assets, classDefaults: this.models?.models() ?? [] },
       scannedAt: new Date(this.o.clock.now()).toISOString(),
       warnings: inv.warnings,
     });
+    this.modelsUnsent = false;
   }
 
   private async run(tournamentId: string, profileId: string, botPool: BotSpec[]): Promise<void> {

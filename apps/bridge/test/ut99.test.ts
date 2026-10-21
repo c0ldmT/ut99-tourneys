@@ -10,6 +10,7 @@ import { memoryLogger } from '../src/log.js';
 import { importBots, importBotsIntoInstallation } from '../src/ut99/import-bots.js';
 import { IniFile } from '../src/ut99/ini.js';
 import { scanInventory } from '../src/ut99/inventory.js';
+import { ModelCatalog, modDescribes } from '../src/ut99/model-catalog.js';
 import {
   botPackages,
   prepareServer,
@@ -309,6 +310,7 @@ describe('inventory', () => {
         { name: 'CommandoSkins.cmdo2', label: '' },
       ],
       skinPackages: [],
+      classDefaults: [],
     });
   });
 
@@ -406,6 +408,66 @@ describe('inventory', () => {
     const inv = scanInventory({ installDir: tmp() });
     expect(inv.maps).toEqual([]);
     expect(inv.warnings.join(' ')).toMatch(/no Maps folder.*no bots configured/);
+  });
+});
+
+describe('bot class defaults from the mod', () => {
+  it('asks once per class, again when its package changes, and keeps the answers', () => {
+    const root = tmp();
+    fs.mkdirSync(path.join(root, 'System'));
+    const pkg = path.join(root, 'System', 'MultiMesh.u');
+    fs.writeFileSync(pkg, 'v1');
+    const file = path.join(root, 'data', 'models.json');
+    const log = memoryLogger();
+    const cat = new ModelCatalog({ installDir: root, file, log });
+    const asks = cat.requests(['MultiMesh.TSkaarjBot', 'SkeletalChars.XanMk2Bot', 'bad name']);
+    expect(asks).toEqual([
+      { t: 'describe', i: 1, c: 'MultiMesh.TSkaarjBot' },
+      { t: 'describe', i: 2, c: 'SkeletalChars.XanMk2Bot' },
+    ]);
+    const skaarj = {
+      t: 'model' as const,
+      i: 1,
+      ok: true,
+      m: 'TSkM',
+      ms: true,
+      vm: 'BotPack.VoiceMale',
+      v: 'MultiMesh.SkaarjVoice',
+      s: 'tskmskins.Warr',
+    };
+    expect(cat.answer(skaarj)).toBe(true);
+    expect(cat.answer(skaarj)).toBe(false); // answered already
+    expect(cat.answer({ t: 'model', i: 2, ok: false })).toBe(false);
+    expect(cat.models()).toEqual([
+      {
+        name: 'MultiMesh.TSkaarjBot',
+        mesh: 'TSkM',
+        multi: true,
+        voiceMeta: 'BotPack.VoiceMale',
+        voice: 'MultiMesh.SkaarjVoice',
+        skin: 'tskmskins.Warr',
+      },
+    ]);
+    // Kept on disk: a new bridge asks about nothing it knows.
+    const again = new ModelCatalog({ installDir: root, file, log });
+    expect(again.models()).toHaveLength(1);
+    expect(again.requests(['MultiMesh.TSkaarjBot', 'SkeletalChars.XanMk2Bot'])).toEqual([]);
+    // A new version of the package: asked again.
+    fs.writeFileSync(pkg, 'version 2');
+    expect(again.requests(['MultiMesh.TSkaarjBot']).map((x) => x.t)).toEqual(['describe']);
+    // A class that is gone is dropped; at most 16 questions per connection.
+    expect(again.requests([]).length).toBe(0);
+    expect(again.models()).toEqual([]);
+    const many = Array.from({ length: 20 }, (_, i) => `Pack.Bot${i}`);
+    expect(again.requests(many)).toHaveLength(16);
+  });
+
+  it('only mods from 0.14.1 on are asked', () => {
+    expect(modDescribes('0.14.0')).toBe(false);
+    expect(modDescribes('0.14.1')).toBe(true);
+    expect(modDescribes('0.15.0')).toBe(true);
+    expect(modDescribes('1.0.0')).toBe(true);
+    expect(modDescribes('0.9.9')).toBe(false);
   });
 });
 

@@ -257,6 +257,31 @@ describe('bot control center', () => {
       label: 'Blake',
       pkg: 'CommandoSkins',
     });
+    // Unknown until the mod reports the class's defaults (decision 173).
+    const ninja = () =>
+      admin
+        .get('/bots/assets')
+        .then((r) => r.body.models.find((m: { name: string }) => m.name === 'MyPkg.NinjaBot'));
+    expect(await ninja()).toMatchObject({ known: false, skins: [] });
+    agents.saveClassDefaults('pi', 'local', [
+      {
+        name: 'MyPkg.NinjaBot',
+        mesh: 'Ninja',
+        multi: true,
+        voiceMeta: 'BotPack.VoiceMale',
+        voice: 'BotPack.VoiceMaleTwo',
+        skin: 'NinjaSkins.ninj',
+      },
+    ]);
+    expect(await ninja()).toMatchObject({
+      known: true,
+      skins: [{ name: 'NinjaSkins.ninj', label: 'Ninja', faces: [{ name: 'NinjaSkins.Kenji' }] }],
+      voices: [{ name: 'BotPack.VoiceMaleOne' }, { name: 'BotPack.VoiceMaleTwo' }],
+      defaults: { skin: 'NinjaSkins.ninj', voice: 'BotPack.VoiceMaleTwo' },
+    });
+    // Without a scan there is nothing to add the defaults to.
+    agents.saveClassDefaults('pi', 'nothing', []);
+    expect(agents.inventory('pi', 'nothing')).toBeUndefined();
   });
 
   it('uses library bots in the pool, the team names and clan teams', async () => {

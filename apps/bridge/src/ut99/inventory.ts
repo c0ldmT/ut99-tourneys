@@ -115,7 +115,7 @@ function listPackages(installDir: string): string[] {
   }
 }
 
-function findDir(root: string, name: string): string | undefined {
+export function findDir(root: string, name: string): string | undefined {
   try {
     const hit = fs
       .readdirSync(root, { withFileTypes: true })
@@ -251,6 +251,8 @@ export function readAssets(installDir: string): GameAssets {
     voices: [],
     weapons: [],
     skinPackages: [],
+    // Bot class defaults come from the mod (ModelCatalog), not from the files.
+    classDefaults: [],
   };
   const files: string[] = [];
   for (const dir of intDirs(installDir)) {
@@ -349,7 +351,8 @@ export function readBotClasses(installDir: string): string[] {
   }
   for (const f of files.sort()) {
     const pkg = f.slice(0, -2);
-    if (STOCK_PACKAGES.has(pkg.toLowerCase())) continue;
+    // UT's own packages and the tournament mod's (its bot classes are internal).
+    if (STOCK_PACKAGES.has(pkg.toLowerCase()) || /^uttourney/i.test(pkg)) continue;
     let buf: Buffer;
     try {
       buf = fs.readFileSync(path.join(system, f));

@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.14.1: the game server reports its bot classes' defaults (mesh, skin format, voices, default skin), so every model on the server - War Boss, Xan Mark II, custom packs - gets its skins, faces and voices in the look picker without maintenance; the bridge asks once per class and keeps the answers.
 - Bot duel simulator: combat style, jumpy and strafing in the model, a comparison of all play-style values with weights for the market value, and the planned rows for mod 0.15.0 (`--curve scripts/bot-curves/plan-0.15.json`).
 - Page changes fade out and in (the header stays); a new page starts at the top, back and forward keep the place.
 - One loading display for the site: a page appears at once when its data is there (rising and fading in), the logo loader shows only for slow page loads, a thin line under the header for later loads and actions.
@@ -149,6 +150,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- The bridge no longer offers the tournament mod's internal bot classes (`TourneyMale1Bot` etc.) as models.
 - Server sync: the bridge also reads the .int files in SystemLocalized/int (UT 469) and keeps all voice packs (with their meta class) and texture entries; skins named with 4 letters only (Cyborg Trooper) were missing.
 - Pages that load in an effect (tournament page with its live connection, the names' looks) loaded twice since the loading display; the Dream Team market no longer marks sold bots as in demand or cheaper.
 - Team names of the list are drawn at random; a bot team that fills a Dream Team bracket never has the name of an AI team (or another team).

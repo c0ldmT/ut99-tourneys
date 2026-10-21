@@ -182,6 +182,20 @@ const AssetSchema = z.object({
   meta: z.string().max(128).optional(),
 });
 /**
+ * A bot class's defaults as UT's setup menu uses them (reported by the mod, decision 173): mesh
+ * name (skins start with it), multi-skin flag, voice meta class, own voice and default skin.
+ */
+export const ClassDefaultsSchema = z.object({
+  name: z.string().min(1).max(128),
+  mesh: z.string().max(64),
+  multi: z.boolean(),
+  voiceMeta: z.string().max(64),
+  voice: z.string().max(64),
+  skin: z.string().max(64),
+});
+export type ClassDefaults = z.infer<typeof ClassDefaultsSchema>;
+
+/**
  * What the game installation offers for bots (UT99: `Object=` lines of the .int files in
  * System/ and SystemLocalized/int/): bot classes, texture entries (skins and faces, with or
  * without a description), voice packs with their meta class, weapons.
@@ -196,6 +210,8 @@ export const GameAssetsSchema = z.object({
     .array(z.object({ pkg: z.string().max(64), textures: z.array(z.string().max(64)).max(300) }))
     .max(200)
     .default([]),
+  /** Bot class defaults the mod reported (classes it could not load are left out). */
+  classDefaults: z.array(ClassDefaultsSchema).max(500).default([]),
 });
 export type GameAssets = z.infer<typeof GameAssetsSchema>;
 
@@ -213,6 +229,12 @@ export const AgentInventory = envelope(
     scannedAt: z.iso.datetime(),
     warnings: z.array(z.string()).default([]),
   }),
+);
+
+/** New bot class defaults from the mod, between two inventory scans (the full list). */
+export const AgentClassDefaults = envelope(
+  'agent.classDefaults',
+  z.object({ profileId: Id, classDefaults: z.array(ClassDefaultsSchema).max(500) }),
 );
 
 export const AgentServerStatus = envelope(
@@ -441,6 +463,7 @@ export const MatchFeed = envelope('match.feed', KillFeedEntrySchema);
 export const BridgeToWebsiteSchema = z.discriminatedUnion('type', [
   AgentHello,
   AgentInventory,
+  AgentClassDefaults,
   AgentServerStatus,
   EventsAppend,
   CommandAck,

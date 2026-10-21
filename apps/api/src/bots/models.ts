@@ -12,8 +12,11 @@
  * - voices: the voice packs of the class's voice meta class (`BotPack.VoiceMale`, ...).
  *
  * The mesh name, the multi-skin flag and the voice meta class are class defaults (in the .u):
- * known classes are listed here (decision 172), others come from the game server later.
+ * known classes are listed here (decision 172); the mod reports them for the server's classes
+ * (decision 173, `profilesWith`).
  */
+
+import type { ClassDefaults } from '@tourney/protocol';
 
 /** A texture entry of a `.int` file; label '' = no description. */
 export interface TextureEntry {
@@ -38,8 +41,28 @@ export interface ClassProfile {
   voiceMeta: string | null;
   /** The class's own voice (preselected). */
   voice: string | null;
-  /** The class's own skin (preselected). */
+  /** The class's default skin (UT's DefaultSkinName: what an empty skin means). */
   skin: string | null;
+}
+
+/**
+ * The known profiles plus what the mod reported about the server's classes (decision 173): the
+ * game's own values win over the table, and new models need no maintenance.
+ */
+export function profilesWith(
+  reported: readonly ClassDefaults[],
+  known: Record<string, ClassProfile> = KNOWN_PROFILES,
+): Record<string, ClassProfile> {
+  const out = { ...known };
+  for (const d of reported)
+    out[d.name.toLowerCase()] = {
+      mesh: d.mesh || null,
+      multi: d.multi,
+      voiceMeta: d.voiceMeta || null,
+      voice: d.voice || null,
+      skin: d.skin || null,
+    };
+  return out;
 }
 
 export interface Choice {

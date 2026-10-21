@@ -186,6 +186,11 @@ export class AgentGateway {
         this.agents.saveInventory(agentId, p.profileId, p, p.scannedAt);
         return;
       }
+      case 'agent.classDefaults': {
+        const p = msg.payload;
+        this.agents.saveClassDefaults(agentId, p.profileId, p.classDefaults);
+        return;
+      }
       case 'match.live': {
         const t = this.tournaments.get(msg.payload.tournamentId);
         if (t && t.agentId === agentId) this.hub.publish(t.id, { type: 'live', data: msg.payload });

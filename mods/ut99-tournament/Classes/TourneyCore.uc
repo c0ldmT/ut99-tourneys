@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.14.0";
+const MOD_VERSION = "0.14.1";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -314,6 +314,45 @@ function Send()
 		Link.SendLine(OutMsg.Finish());
 }
 
+// Mod 0.14.1: a bot class's defaults as UT's setup menu reads them (UMenuPlayerSetupClient,
+// UTIndivBotSetupClient): mesh name (its skins start with it), multi-skin flag, voice meta
+// class, own voice, default skin. The bridge asks once per class (outside a game) and keeps
+// the answer; ok=false: the class does not load, is no bot or has no mesh.
+function DescribeModel(int Req, string CName)
+{
+	local class<Bot> BC;
+	local string Reply, MeshName;
+
+	BC = None;
+	if (CName != "")
+		BC = class<Bot>(DynamicLoadObject(CName, class'Class', true));
+	if (BC != None && BC.default.Mesh != None)
+	{
+		MeshName = GetItemName(string(BC.default.Mesh));
+		OutMsg.Begin("model");
+		OutMsg.AddInt("i", Req);
+		OutMsg.AddBool("ok", true);
+		OutMsg.AddStr("m", MeshName);
+		OutMsg.AddBool("ms", BC.default.bIsMultiSkinned);
+		OutMsg.AddStr("vm", BC.default.VoicePackMetaClass);
+		OutMsg.AddStr("v", BC.default.VoiceType);
+		OutMsg.AddStr("s", BC.default.DefaultSkinName);
+		Reply = OutMsg.Finish();
+		// Each value fits the protocol (64 bytes), the whole line too.
+		if (Len(Reply) <= 250 && Len(MeshName) <= 64 && Len(BC.default.VoicePackMetaClass) <= 64
+			&& Len(BC.default.VoiceType) <= 64 && Len(BC.default.DefaultSkinName) <= 64)
+		{
+			if (Link != None)
+				Link.SendLine(Reply);
+			return;
+		}
+	}
+	OutMsg.Begin("model");
+	OutMsg.AddInt("i", Req);
+	OutMsg.AddBool("ok", false);
+	Send();
+}
+
 function BridgeTick()
 {
 	if (Link == None && Level.TimeSeconds >= NextConnectTime)
@@ -518,6 +557,9 @@ function HandleBridgeMessage(TourneyMsg M)
 		case "acladd":
 			// Saved at sync end or before travel; no ini write per entry.
 			SetAcl(M.Get("tk"), M.Get("name"), M.Get("r"));
+			break;
+		case "describe":
+			DescribeModel(M.GetInt("i"), M.Get("c"));
 			break;
 		case "acldel":
 			i = FindAcl(M.Get("tk"));
