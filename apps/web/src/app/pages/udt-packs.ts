@@ -128,7 +128,13 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
         }
       </div>
 
-      <udt-pack-stage #stage [catalog]="v.catalog" />
+      <udt-pack-stage
+        #stage
+        [catalog]="v.catalog"
+        [againPrice]="againPrice()"
+        [canAgain]="againPrice() !== null && canBuy(againPrice()!)"
+        (again)="open($event.box, $event.ten)"
+      />
 
       <div class="lower">
         <section class="card">
@@ -318,6 +324,14 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
 export class UdtPacksPage {
   private readonly api = inject(Api);
   protected readonly view = signal<UdtPacks | null>(null);
+  /** The last box opened (for "again"). */
+  private readonly last = signal<{ box: UdtBox; ten: boolean } | null>(null);
+  /** Today's price of the last box again (the index may have moved). */
+  protected readonly againPrice = computed(() => {
+    const l = this.last();
+    const b = l ? this.view()?.boxes.find((x) => x.box === l.box) : undefined;
+    return b ? (l!.ten ? b.tenPrice : b.price) : null;
+  });
   /** The shared Neuro state (the same as in the navbar). */
   protected readonly spendable = inject(NeuroStore).spendable;
   protected readonly busy = signal(false);
@@ -367,6 +381,7 @@ export class UdtPacksPage {
   protected async open(box: UdtBox, ten: boolean) {
     await this.act(async () => {
       const p = await this.api.udtOpen(box, ten);
+      this.last.set({ box, ten });
       this.view.set(p.view);
       this.stage()?.play(p);
     });

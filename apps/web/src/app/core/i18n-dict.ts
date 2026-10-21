@@ -1683,6 +1683,7 @@ const en = {
   'udt.academy.origin.blueprint': 'Blueprint',
   'stats.playerMissing':
     'No games and no profile here: the player has not played in this season (choose another one) or does not exist.',
+  'udt.packs.done': 'Done',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3382,6 +3383,7 @@ const de: Record<TKey, string> = {
   'udt.academy.origin.blueprint': 'Bauplan',
   'stats.playerMissing':
     'Hier gibt es weder Spiele noch ein Profil: Der Spieler hat in dieser Season nicht gespielt (wähl eine andere) oder es gibt ihn nicht.',
+  'udt.packs.done': 'Fertig',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

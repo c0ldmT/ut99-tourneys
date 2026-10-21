@@ -5,11 +5,13 @@ import {
   ElementRef,
   inject,
   input,
+  output,
   signal,
   type OnDestroy,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { I18n, TPipe } from '../core/i18n';
+import { NeuroPipe } from '../core/neuro';
 import type { UdtBox, UdtCatalogTrait, UdtPull, UdtPullCard, UdtRarity } from '../core/types';
 import { RARITIES } from '../core/udt';
 
@@ -67,7 +69,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
  */
 @Component({
   selector: 'udt-pack-stage',
-  imports: [RouterLink, TPipe],
+  imports: [RouterLink, TPipe, NeuroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="stage" [class.lg]="dark()" aria-live="polite">
@@ -259,7 +261,18 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
               } @else {
                 <div class="res">
                   <span class="muted">{{ summary() }}</span>
-                  <button type="button" (click)="reset()">{{ 'udt.packs.again' | t }}</button>
+                  <button
+                    type="button"
+                    class="primary"
+                    [disabled]="againPrice() === null || !canAgain()"
+                    (click)="buyAgain()"
+                  >
+                    {{ 'udt.packs.again' | t }}
+                    @if (againPrice() !== null) {
+                      · {{ againPrice() | neuro }}
+                    }
+                  </button>
+                  <button type="button" (click)="reset()">{{ 'udt.packs.done' | t }}</button>
                   <a class="btn primary" routerLink="/udt">{{ 'udt.packs.toTeam' | t }}</a>
                 </div>
               }
@@ -635,6 +648,12 @@ export class UdtPackStage implements OnDestroy {
   private readonly i18n = inject(I18n);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly catalog = input<UdtCatalogTrait[]>([]);
+  /** Price of the same box (or 10-pull) again; null: unknown. */
+  readonly againPrice = input<number | null>(null);
+  /** The manager can pay it now. */
+  readonly canAgain = input(false);
+  /** "Again": buy and open the same box (or 10-pull) at once. */
+  readonly again = output<{ box: UdtBox; ten: boolean }>();
   protected readonly phase = signal<Phase>('idle');
   protected readonly pull = signal<UdtPull | null>(null);
   /** Flipped cards: index -> flip delay. */
@@ -764,6 +783,11 @@ export class UdtPackStage implements OnDestroy {
       Array.from({ length: n }, (_, i) => i).filter((i) => !this.isUp(i)),
       0.22,
     );
+  }
+
+  protected buyAgain() {
+    const p = this.pull();
+    if (p) this.again.emit({ box: p.box, ten: p.ten });
   }
 
   protected reset() {
