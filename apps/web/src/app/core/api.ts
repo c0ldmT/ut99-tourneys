@@ -3,6 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { I18n } from './i18n';
 import { errorMessage, type ErrorBody } from './i18n-errors';
+import { Loading } from './loading';
 import type { NeuroWallet } from './neuro';
 import { Toasts } from './toast';
 import type { UdtLooks } from '../components/udt-bot-look';
@@ -106,6 +107,8 @@ export interface CallOptions<T> {
   quiet?: boolean;
   /** A POST that changes nothing (previews): no Neuro reload. */
   read?: boolean;
+  /** Decoration or a refresh the page does not wait for: no loading display. */
+  background?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -113,6 +116,7 @@ export class Api {
   private http = inject(HttpClient);
   private i18n = inject(I18n);
   private toasts = inject(Toasts);
+  private loading = inject(Loading);
   /** Counts successful changes (POST/PUT/PATCH/DELETE): the Neuro store reloads on it. */
   readonly changes = signal(0);
 
@@ -123,6 +127,10 @@ export class Api {
     opts: CallOptions<T> = {},
   ): Promise<T> {
     let res: T;
+    const done = this.loading.track({
+      get: method === 'GET',
+      background: !!(opts.read || opts.background) || this.loading.inBackground,
+    });
     try {
       res = await firstValueFrom(
         this.http.request<T>(method, `/api${url}`, {
@@ -135,6 +143,8 @@ export class Api {
       const err = this.toApiError(e);
       if (!opts.quiet) this.toasts.error(err.text);
       throw err;
+    } finally {
+      done();
     }
     if (method !== 'GET' && !opts.read) this.changes.update((n) => n + 1);
     if (opts.ok) {
@@ -163,7 +173,8 @@ export class Api {
 
   config = () => this.call<SiteConfig>('GET', '/config', undefined, { quiet: true });
   me = () => this.call<Me>('GET', '/me', undefined, { quiet: true });
-  myNeuro = () => this.call<NeuroWallet>('GET', '/me/neuro', undefined, { quiet: true });
+  myNeuro = () =>
+    this.call<NeuroWallet>('GET', '/me/neuro', undefined, { quiet: true, background: true });
   devLogin = (name: string, admin: boolean) =>
     this.call<Me>('POST', '/auth/dev-login', { name, admin });
   logout = () => this.call<void>('POST', '/auth/logout');
@@ -482,6 +493,7 @@ export class Api {
   looks = () =>
     this.call<{ userId: string; name: string; look: LookView }[]>('GET', '/shop/looks', undefined, {
       quiet: true,
+      background: true,
     });
   shop = () => this.call<ShopView>('GET', '/shop');
   buy = (item: string, dedication?: Pick<ShopDedication, 'kill' | 'death'>) =>

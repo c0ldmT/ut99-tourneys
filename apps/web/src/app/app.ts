@@ -1,4 +1,12 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  effect,
+  ElementRef,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Avatar, NameTag } from './core/looks';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { NeuroPipe, NeuroStore } from './core/neuro';
@@ -8,6 +16,8 @@ import { Auth } from './core/auth';
 import { I18n, TPipe } from './core/i18n';
 import type { Lang } from './core/i18n-dict';
 import { ToastHost } from './core/toast';
+import { Loading } from './core/loading';
+import { Loader } from './components/loader';
 
 @Component({
   selector: 'app-root',
@@ -25,10 +35,11 @@ import { ToastHost } from './core/toast';
     NameTag,
     Icon,
     ToastHost,
+    Loader,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <header>
+    <header class="site">
       <div class="bar">
         <a routerLink="/" class="brand" (click)="menu.set(false)">
           <na-logo [size]="30" />
@@ -142,9 +153,13 @@ import { ToastHost } from './core/toast';
           </select>
         }
       </div>
+      <div class="progress" [class.on]="loading.bar()" aria-hidden="true"><span></span></div>
     </header>
     <main class="container">
-      <router-outlet />
+      @if (loading.spinner()) {
+        <na-loader />
+      }
+      <router-outlet #outlet (activate)="entered()" />
     </main>
     <footer>
       <div class="foot">
@@ -165,6 +180,49 @@ import { ToastHost } from './core/toast';
     main {
       flex: 1;
       width: 100%;
+      position: relative;
+    }
+    /* Calls after a page loaded (filters, tabs, actions): a thin running line under the bar. */
+    .progress {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: -1px;
+      height: 2px;
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+    }
+    .progress.on {
+      opacity: 1;
+    }
+    .progress span {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, var(--accent), var(--udt), transparent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+    .progress.on span {
+      animation: run 1.1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+    @keyframes run {
+      from {
+        transform: translateX(-100%);
+      }
+      to {
+        transform: translateX(260%);
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .progress span,
+      .progress.on span {
+        animation: none;
+        width: 100%;
+        transform: none;
+      }
     }
     header {
       background: rgba(11, 13, 19, 0.92);
@@ -390,8 +448,37 @@ export class App {
   /** Platform version (root package.json). */
   protected readonly version = version;
 
+  /** Page loads and calls: the loader, the thin bar, the content fading in. */
+  protected readonly loading = inject(Loading);
+  private readonly outlet = viewChild.required('outlet', { read: ElementRef });
+  /** The page component in place, hidden until its loading is done. */
+  private page: Element | null = null;
+
   constructor() {
+    this.loading.watch(this.router);
     void this.auth.ready();
+    // The page shows (rising and fading in) once its loading is done.
+    effect(() => {
+      if (this.loading.hidden() || !this.page) return;
+      this.page.classList.remove('page-enter');
+      (this.page as HTMLElement).inert = false;
+      this.page.removeAttribute('aria-busy');
+    });
+  }
+
+  /** A new page component is in place: hidden until its loading is done. */
+  protected entered() {
+    const el = (this.outlet().nativeElement as Element).nextElementSibling;
+    if (!el) return;
+    this.page = el;
+    el.classList.add('page');
+    // Hidden content can be neither seen nor reached (keyboard, screen readers).
+    if (this.loading.hidden()) {
+      el.classList.add('page-enter');
+      (el as HTMLElement).inert = true;
+      el.setAttribute('aria-busy', 'true');
+    }
+    this.loading.activated();
   }
 
   protected setLang(ev: Event) {

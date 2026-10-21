@@ -13,6 +13,7 @@ import { TournamentStream } from '../core/stream';
 import { KillFeed } from '../components/kill-feed';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
+import { Loading } from '../core/loading';
 import { I18n, TPipe } from '../core/i18n';
 import { MH_ADAPTER, raceTime } from '../core/race';
 import { playTime } from '../core/stats-format';
@@ -525,6 +526,7 @@ export class MatchPage {
   );
 
   private readonly title = inject(PageTitle);
+  private readonly loading = inject(Loading);
   private readonly stream = inject(TournamentStream);
   /** Kills of the game in progress (live only). */
   protected readonly feed = signal<KillFeedEntry[]>([]);
@@ -571,7 +573,8 @@ export class MatchPage {
     });
     // While the match is not decided, refresh now and then (games end, stats arrive).
     const timer = setInterval(() => {
-      if (this.d() && this.state() !== 'done') void this.load(this.id(), this.matchId(), false);
+      if (this.d() && this.state() !== 'done')
+        this.loading.background(() => void this.load(this.id(), this.matchId(), false));
     }, 15_000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }

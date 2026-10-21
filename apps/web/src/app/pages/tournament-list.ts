@@ -9,6 +9,7 @@ import {
 import { finalMs, raceTime } from '../core/race';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
+import { Loading } from '../core/loading';
 import { Auth } from '../core/auth';
 import { UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
@@ -154,8 +155,6 @@ import type { TournamentSummary } from '../core/types';
           </a>
         }
       </div>
-    } @else {
-      <p class="muted">{{ 'common.loading' | t }}</p>
     }
   `,
   styles: `
@@ -357,6 +356,7 @@ export class TournamentListPage {
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
   private readonly api = inject(Api);
+  private readonly loading = inject(Loading);
   protected readonly items = signal<TournamentSummary[] | null>(null);
 
   /** Monster Hunt: a side's finished run (final time), the running clock, or a dash. */
@@ -417,7 +417,7 @@ export class TournamentListPage {
     void this.load();
     // While a tournament runs the banner shows the live score: refresh every few seconds.
     const timer = setInterval(() => {
-      if (this.live().length) void this.load();
+      if (this.live().length) this.loading.background(() => void this.load());
     }, 4000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }

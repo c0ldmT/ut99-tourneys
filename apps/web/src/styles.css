@@ -1714,3 +1714,27 @@ details.help ul {
 .restslider input {
   padding: 0;
 }
+
+/* --- A new page rises and fades in once its loading is done (decision 167; `Loading`, the
+   class is set in the app shell). */
+:where(.page) {
+  display: block;
+}
+/* Opacity and margin only: a transform or filter on the host would move fixed children. */
+.page {
+  transition:
+    opacity 0.3s cubic-bezier(0.2, 0.8, 0.2, 1),
+    margin-top 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.page.page-enter {
+  opacity: 0;
+  margin-top: 10px;
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page,
+  .page.page-enter {
+    transition: none;
+    margin-top: 0;
+  }
+}

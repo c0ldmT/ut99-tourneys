@@ -1,4 +1,5 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { Loading } from './loading';
 import type { KillFeedEntry, LiveInfo } from './types';
 
 /**
@@ -13,6 +14,7 @@ export class TournamentStream {
   readonly connected = signal(false);
   private source?: EventSource;
   private onChange: () => void = () => {};
+  private readonly loading = inject(Loading);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.close());
@@ -27,8 +29,9 @@ export class TournamentStream {
     this.source = es;
     es.onopen = () => this.connected.set(true);
     es.onerror = () => this.connected.set(false);
-    es.addEventListener('change', () => this.onChange());
-    es.addEventListener('agent', () => this.onChange());
+    // Live updates load in the background (no loading display).
+    es.addEventListener('change', () => this.loading.background(this.onChange));
+    es.addEventListener('agent', () => this.loading.background(this.onChange));
     es.addEventListener('feed', (ev) => {
       try {
         this.kill.set(JSON.parse((ev as MessageEvent<string>).data) as KillFeedEntry);

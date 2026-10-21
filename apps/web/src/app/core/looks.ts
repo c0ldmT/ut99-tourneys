@@ -9,6 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { Api } from './api';
+import { Loading } from './loading';
 import { Auth } from './auth';
 import { Icon } from './brand';
 import type { LookView } from './types';
@@ -21,6 +22,7 @@ import type { LookView } from './types';
 export class Looks {
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
+  private readonly loading = inject(Loading);
   private readonly list = signal<{ userId: string; name: string; look: LookView }[]>([]);
   readonly byId = computed(() => new Map(this.list().map((x) => [x.userId, x.look])));
   readonly byName = computed(() => new Map(this.list().map((x) => [x.name.toLowerCase(), x.look])));
@@ -31,7 +33,7 @@ export class Looks {
       else this.list.set([]);
     });
     setInterval(() => {
-      if (this.auth.me()) void this.reload();
+      if (this.auth.me()) this.loading.background(() => void this.reload());
     }, 60_000);
   }
 

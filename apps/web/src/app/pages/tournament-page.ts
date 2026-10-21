@@ -20,6 +20,7 @@ import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
 import { TeamRoster } from '../components/team-roster';
 import { Api } from '../core/api';
+import { Loading } from '../core/loading';
 import { copyText, selectText } from '../core/clipboard';
 import { isLocalAddress, joinUrl, linuxStartCommand } from '../core/connect';
 import { Auth } from '../core/auth';
@@ -823,8 +824,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           }
         </div>
       }
-    } @else if (!failed()) {
-      <p class="muted">{{ 'common.loading' | t }}</p>
     }
   `,
   styles: `
@@ -1055,8 +1054,6 @@ export class TournamentPage {
   protected readonly router = inject(Router);
 
   protected readonly t = signal<TournamentDetail | null>(null);
-  /** Loading the tournament failed (the toast says why): no "loading" placeholder. */
-  protected readonly failed = signal(false);
   protected readonly busy = signal(false);
   protected readonly copied = signal<{ which: string; state: '' | 'ok' | 'manual' }>({
     which: '',
@@ -1198,6 +1195,7 @@ export class TournamentPage {
   private again = false;
 
   private readonly title = inject(PageTitle);
+  private readonly loadState = inject(Loading);
 
   constructor() {
     effect(() => this.title.set(this.t()?.name));
@@ -1205,34 +1203,38 @@ export class TournamentPage {
     effect(() => {
       const id = this.id();
       void this.load(id);
-      this.stream.open(id, () => void this.load(id));
+      this.stream.open(id, () => void this.load(id, true));
     });
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }
 
-  /** Coalesces bursts of change notifications into sequential reloads. */
-  private async load(id: string) {
+  /**
+   * Coalesces bursts of change notifications into sequential reloads. Live updates
+   * (`background`) and the reloads after the first show no loading display.
+   */
+  private async load(id: string, background = false) {
     if (this.loading) {
       this.again = true;
       return;
     }
     this.loading = true;
+    let quiet = background;
+    const call = <T>(f: () => Promise<T>) => (quiet ? this.loadState.background(f) : f());
     try {
       do {
         this.again = false;
-        const t = await this.api.tournament(id);
+        const t = await call(() => this.api.tournament(id));
         this.t.set(t);
-        this.failed.set(false);
         if (t.seasonal && t.headSeq !== this.ratingsHead) {
           this.ratingsHead = t.headSeq;
-          this.ratings.set(await this.api.tournamentRatings(id));
+          this.ratings.set(await call(() => this.api.tournamentRatings(id)));
         }
-        if (this.tab() === 'events') this.events.set(await this.api.events(id));
+        if (this.tab() === 'events') this.events.set(await call(() => this.api.events(id)));
+        quiet = true;
       } while (this.again);
     } catch {
       // the Api shows the error as a toast
-      this.failed.set(true);
     } finally {
       this.loading = false;
     }
