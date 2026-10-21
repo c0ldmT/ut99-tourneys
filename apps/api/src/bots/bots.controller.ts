@@ -69,6 +69,7 @@ export class BotsController {
       /** Display names of the look (stock material and scanned servers). */
       labels: {
         botClass: label(assets.botClasses, b.botClass),
+        skin: label(assets.skins, b.skin),
         face: label(assets.faces, b.face),
         voice: label(assets.voices, b.traits.voice),
         weapon: label(assets.weapons, b.traits.favoriteWeapon),

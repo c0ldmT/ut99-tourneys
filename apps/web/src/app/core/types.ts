@@ -556,12 +556,31 @@ export interface BotAssets {
   faces: (AssetItem & { pkg: string })[];
   /** Skin package per stock bot class. */
   packages: Record<string, string>;
+  /** Per model its skins (with faces) and voices, as UT's setup menu offers them. */
+  models?: ModelChoice[];
+}
+
+export interface SkinChoice extends AssetItem {
+  faces: AssetItem[];
+}
+
+/** A model for the look editors (API: models.ts, decision 172). */
+export interface ModelChoice extends AssetItem {
+  /** Its skins are known (else only the default, or typed by an admin). */
+  known: boolean;
+  /** New skin format: skins with faces. */
+  multi: boolean;
+  skins: SkinChoice[];
+  voices: AssetItem[];
+  /** What UT takes when nothing is set. */
+  defaults: { skin: string; face: string; voice: string };
 }
 
 export interface BotProfile extends LibraryBot {
   statsKey: string;
   labels: {
     botClass: string | null;
+    skin?: string | null;
     face: string | null;
     voice: string | null;
     weapon: string | null;

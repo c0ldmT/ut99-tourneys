@@ -221,8 +221,28 @@ export function parseIntObject(line: string): Record<string, string> | undefined
 }
 
 /**
- * What the installation offers for bots, from the `Object=` lines of System/*.int: bot classes
- * (MetaClass ...Bot), voice packs, weapons, and textures with a description (skins and faces).
+ * The folders with `.int` files: System/, and SystemLocalized/int/ where UT 469 keeps them
+ * (the game reads both).
+ */
+export function intDirs(installDir: string): string[] {
+  const out: string[] = [];
+  const system = findDir(installDir, 'System');
+  const localized = findDir(installDir, 'SystemLocalized');
+  const int = localized ? findDir(localized, 'int') : undefined;
+  if (system) out.push(system);
+  if (int) out.push(int);
+  return out;
+}
+
+/** Voice packs: the meta class is a voice pack class (`BotPack.VoiceMale`, `…ChallengeVoicePack`). */
+function isVoiceMeta(meta: string): boolean {
+  return meta.endsWith('voicepack') || /\.voice[a-z]*$/.test(meta);
+}
+
+/**
+ * What the installation offers for bots, from the `Object=` lines of the .int files (System/ and
+ * SystemLocalized/int/): bot classes (MetaClass ...Bot), voice packs with their meta class,
+ * weapons, and the texture entries (skins and faces; with or without a description).
  */
 export function readAssets(installDir: string): GameAssets {
   const assets: GameAssets = {
@@ -232,23 +252,32 @@ export function readAssets(installDir: string): GameAssets {
     weapons: [],
     skinPackages: [],
   };
-  const system = findDir(installDir, 'System');
-  if (!system) return assets;
-  let files: string[];
-  try {
-    files = fs.readdirSync(system).filter((f) => f.toLowerCase().endsWith('.int'));
-  } catch {
-    return assets;
+  const files: string[] = [];
+  for (const dir of intDirs(installDir)) {
+    try {
+      for (const f of fs.readdirSync(dir).sort())
+        if (f.toLowerCase().endsWith('.int')) files.push(path.join(dir, f));
+    } catch {
+      // unreadable folder: skip
+    }
   }
-  const add = (list: GameAssets['botClasses'], name: string, label: string, max: number) => {
+  const add = (
+    list: GameAssets['botClasses'],
+    name: string,
+    label: string,
+    max: number,
+    extra: { meta?: string; bare?: boolean } = {},
+  ) => {
     if (list.length >= max || !name || name.length > 128) return;
+    // Textures keep an empty label (no description: no skin or face in UT's menu).
+    const shown = label || (extra.bare ? '' : (name.split('.').pop() ?? name));
     if (!list.some((x) => x.name.toLowerCase() === name.toLowerCase()))
-      list.push({ name, label: (label || name.split('.').pop() || name).slice(0, 64) });
+      list.push({ name, label: shown.slice(0, 64), ...(extra.meta ? { meta: extra.meta } : {}) });
   };
   for (const f of files) {
     let text: string;
     try {
-      text = fs.readFileSync(path.join(system, f), 'latin1');
+      text = fs.readFileSync(f, 'latin1');
     } catch {
       continue;
     }
@@ -259,16 +288,19 @@ export function readAssets(installDir: string): GameAssets {
       const meta = (o.metaclass ?? '').toLowerCase();
       const desc = o.description ?? '';
       if (cls === 'class' && /\.bot$/.test(meta)) add(assets.botClasses, o.name, desc, 500);
-      else if (cls === 'class' && meta.endsWith('voicepack')) add(assets.voices, o.name, desc, 500);
+      else if (cls === 'class' && isVoiceMeta(meta))
+        add(assets.voices, o.name, desc, 500, { meta: (o.metaclass ?? '').slice(0, 128) });
       else if (cls === 'class' && meta.endsWith('tournamentweapon'))
         add(assets.weapons, o.name, desc, 500);
-      else if (cls === 'texture' && desc) add(assets.textures, o.name, desc, 5000);
+      // Texture entries: UT's menu tells skins and faces apart by name and description (the
+      // unnamed T_* and team textures are never offered, so they are not sent).
+      else if (cls === 'texture' && (desc || !/(^|\.)t_|\dt_\d+$/i.test(o.name)))
+        add(assets.textures, o.name, desc, 5000, { bare: true });
     }
   }
   assets.skinPackages = readSkinPackages(installDir);
   // Bot classes of custom model packages that only declare their player class in the .int.
-  for (const c of readBotClasses(installDir))
-    add(assets.botClasses, c, c.split('.').pop() ?? c, 500);
+  for (const c of readBotClasses(installDir)) add(assets.botClasses, c, '', 500);
   return assets;
 }
 

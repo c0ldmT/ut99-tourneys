@@ -159,6 +159,7 @@ describe('Unreal Dream Team: looks, chat lines and squads', () => {
         starter: {
           name: 'Mira',
           skill: 3,
+          botClass: 'BotPack.TFemale2Bot',
           skin: 'SGirlSkins.army',
           traits: { voice: 'BotPack.VoiceFemaleOne' },
           personality: { talk: 60, lines: [{ kind: 'kill', text: 'Gotcha, {victim}!' }] },
@@ -175,17 +176,32 @@ describe('Unreal Dream Team: looks, chat lines and squads', () => {
     expect(looks.skins.length).toBeGreaterThan(0);
     // Later: new lines, face and voice; the values stay.
     const edited = await mario.req('PUT', `/udt/bots/${miraId}`, {
-      face: 'SGirlSkins.Lilith',
+      face: 'SGirlSkins.Lauren',
       voice: 'BotPack.VoiceFemaleTwo',
       personality: { lines: [{ kind: 'death', text: 'Not again' }] },
     });
     expect(edited.status, JSON.stringify(edited.body)).toBe(200);
     expect(edited.body).toMatchObject({
-      face: 'SGirlSkins.Lilith',
+      face: 'SGirlSkins.Lauren',
       skill: 3,
       traits: { voice: 'BotPack.VoiceFemaleTwo' },
       personality: { talk: 60, lines: [{ kind: 'death', text: 'Not again' }] },
     });
+    // Skin, face and voice must fit the model (as in UT's setup menu).
+    const wrong = await mario.req('PUT', `/udt/bots/${miraId}`, { skin: 'CommandoSkins.cmdo' });
+    expect((wrong.body as { key: string }).key).toBe('the skin {value} does not fit the model');
+    expect(
+      (await mario.req('PUT', `/udt/bots/${miraId}`, { face: 'SGirlSkins.Lilith' })).status,
+    ).toBe(400);
+    expect(
+      (await mario.req('PUT', `/udt/bots/${miraId}`, { voice: 'BotPack.VoiceMaleOne' })).status,
+    ).toBe(400);
+    // An older look that does not fit stays: lines can still be saved.
+    api.app.get(BotsService).update(miraId, { face: 'Old.Face' });
+    const lines = await mario.req('PUT', `/udt/bots/${miraId}`, {
+      personality: { lines: [{ kind: 'death', text: 'Again?' }] },
+    });
+    expect(lines.status, JSON.stringify(lines.body)).toBe(200);
     // Only the owner.
     expect((await tim.req('PUT', `/udt/bots/${miraId}`, { skin: 'X.y' })).status).toBe(403);
     // Squads: everybody sees every team and its roster.

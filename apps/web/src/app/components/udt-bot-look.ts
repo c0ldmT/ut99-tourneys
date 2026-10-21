@@ -1,8 +1,8 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { skinPackage } from '../core/bots';
 import { TPipe } from '../core/i18n';
-import type { AssetItem, BotAssets, LibraryBot } from '../core/types';
+import { LookPicker } from './look-picker';
+import type { BotAssets, LibraryBot } from '../core/types';
 
 /** The occasions a manager writes lines for (no rivals, no bets in the Dream Team). */
 export const UDT_LINE_KINDS = ['start', 'kill', 'death', 'win', 'loss'] as const;
@@ -18,7 +18,10 @@ export interface LookDraft {
   lines: Record<UdtLineKind, string[]>;
 }
 
-export type UdtLooks = Pick<BotAssets, 'botClasses' | 'skins' | 'faces' | 'voices' | 'packages'>;
+export type UdtLooks = Pick<
+  BotAssets,
+  'botClasses' | 'skins' | 'faces' | 'voices' | 'packages' | 'models'
+>;
 
 export function emptyLook(): LookDraft {
   return {
@@ -68,69 +71,13 @@ let nextId = 0;
 /** Look (model, skin, face, voice) and chat lines of a manager's own bot. */
 @Component({
   selector: 'app-udt-bot-look',
-  imports: [FormsModule, TPipe],
+  imports: [FormsModule, TPipe, LookPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let d = draft();
     <fieldset>
       <legend>{{ 'bots.sec.look' | t }}</legend>
-      <div class="fields">
-        <div class="field">
-          <label [for]="id + 'c'">{{ 'bots.class' | t }}</label>
-          <input
-            [id]="id + 'c'"
-            [name]="id + 'c'"
-            [attr.list]="id + 'cl'"
-            [placeholder]="'bots.default' | t"
-            [ngModel]="d.botClass"
-            (change)="setClass($any($event.target).value.trim())"
-          />
-          <datalist [id]="id + 'cl'">
-            @for (c of looks()?.botClasses ?? []; track c.name) {
-              <option [value]="c.name">{{ c.label }}</option>
-            }
-          </datalist>
-        </div>
-        <div class="field">
-          <label [for]="id + 's'">{{ 'bots.skin' | t }}</label>
-          <input
-            [id]="id + 's'"
-            [name]="id + 's'"
-            [attr.list]="id + 'sl'"
-            [placeholder]="'bots.default' | t"
-            [(ngModel)]="d.skin"
-          />
-          <datalist [id]="id + 'sl'">
-            @for (s of skins(); track s.name) {
-              <option [value]="s.name">{{ s.label }}</option>
-            }
-          </datalist>
-        </div>
-        <div class="field">
-          <label [for]="id + 'f'">{{ 'bots.face' | t }}</label>
-          <input
-            [id]="id + 'f'"
-            [name]="id + 'f'"
-            [attr.list]="id + 'fl'"
-            [placeholder]="'bots.default' | t"
-            [(ngModel)]="d.face"
-          />
-          <datalist [id]="id + 'fl'">
-            @for (f of faces(); track f.name) {
-              <option [value]="f.name">{{ f.label }}</option>
-            }
-          </datalist>
-        </div>
-        <div class="field">
-          <label [for]="id + 'v'">{{ 'bots.voice' | t }}</label>
-          <select [id]="id + 'v'" [name]="id + 'v'" [(ngModel)]="d.voice">
-            <option value="">{{ 'bots.default' | t }}</option>
-            @for (v of looks()?.voices ?? []; track v.name) {
-              <option [value]="v.name">{{ v.label }}</option>
-            }
-          </select>
-        </div>
-      </div>
+      <app-look-picker [draft]="d" [models]="looks()?.models ?? []" />
       <p class="muted small hint">{{ 'bots.lookHint' | t }}</p>
     </fieldset>
     <fieldset>
@@ -220,35 +167,5 @@ export class UdtBotLook {
   protected count(): number {
     const d = this.draft();
     return UDT_LINE_KINDS.reduce((n, k) => n + d.lines[k].length, 0);
-  }
-
-  protected setClass(cls: string) {
-    const d = this.draft();
-    d.botClass = cls;
-    const pkg = skinPackage(this.assets(), { botClass: cls || null, skin: null });
-    if (pkg && d.skin && !d.skin.toLowerCase().startsWith(pkg.toLowerCase() + '.')) {
-      d.skin = '';
-      d.face = '';
-    }
-  }
-
-  protected skins(): AssetItem[] {
-    const d = this.draft();
-    const all = this.looks()?.skins ?? [];
-    const pkg = skinPackage(this.assets(), { botClass: d.botClass || null, skin: null });
-    const list = pkg
-      ? all.filter((s) => s.name.toLowerCase().startsWith(pkg.toLowerCase() + '.'))
-      : all;
-    return list.length ? list : all;
-  }
-
-  protected faces(): AssetItem[] {
-    const pkg = (this.draft().skin.split('.')[0] ?? '').toLowerCase();
-    return (this.looks()?.faces ?? []).filter((f) => !pkg || f.pkg.toLowerCase() === pkg);
-  }
-
-  private assets(): BotAssets | null {
-    const l = this.looks();
-    return l ? { ...l, textures: [], weapons: [] } : null;
   }
 }

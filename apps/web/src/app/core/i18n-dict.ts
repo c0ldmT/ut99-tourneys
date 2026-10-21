@@ -845,8 +845,6 @@ const en = {
   'bots.skin': 'Skin',
   'bots.face': 'Face',
   'bots.voice': 'Voice',
-  'bots.lookHint':
-    'Suggestions come from the stock game and the synced servers (Servers → Sync maps, models and skins); any other name can be typed. Model and skin must exist on the server; the tournament server offers custom packages to the players for download.',
   'bots.weapon': 'Favourite weapon',
   'bots.trait.accuracy': 'Accuracy',
   'bots.trait.alertness': 'Alertness',
@@ -1769,6 +1767,11 @@ const en = {
   'list.wasIn': 'you played',
   'list.stateCheckIn': 'Check-in running',
   'list.closed': 'Registration closed',
+  'bots.defaultIs': 'Default ({name})',
+  'bots.unknownModel':
+    "The website does not know this model's skins yet (they come with the next mod version); the default skin is used.",
+  'bots.lookHint':
+    "As in UT's player setup: the skins of the model, the faces of the skin, the voices of the model (from the stock game and the synced servers: Servers → Sync maps, models and skins). The tournament server offers custom packages to the players for download.",
 } as const;
 
 export type TKey = keyof typeof en;
@@ -2626,8 +2629,6 @@ const de: Record<TKey, string> = {
   'bots.skin': 'Skin',
   'bots.face': 'Gesicht',
   'bots.voice': 'Stimme',
-  'bots.lookHint':
-    'Die Vorschläge stammen aus dem Standardspiel und den synchronisierten Servern (Server → Maps, Models und Skins synchronisieren); jeder andere Name lässt sich eintippen. Model und Skin müssen auf dem Server vorhanden sein; eigene Pakete bietet der Turnierserver den Spielern zum Download an.',
   'bots.weapon': 'Lieblingswaffe',
   'bots.trait.accuracy': 'Accuracy',
   'bots.trait.alertness': 'Alertness',
@@ -3556,6 +3557,11 @@ const de: Record<TKey, string> = {
   'list.wasIn': 'du warst dabei',
   'list.stateCheckIn': 'Check-in läuft',
   'list.closed': 'Anmeldung zu',
+  'bots.defaultIs': 'Standard ({name})',
+  'bots.unknownModel':
+    'Die Skins dieses Modells kennt die Website noch nicht (kommen mit dem nächsten Mod-Stand); es gilt der Standard-Skin.',
+  'bots.lookHint':
+    'Wie im Player-Setup von UT: die Skins des Modells, die Gesichter des Skins, die Stimmen des Modells (aus dem Standardspiel und den synchronisierten Servern: Server → Maps, Models und Skins synchronisieren). Eigene Pakete bietet der Turnierserver den Spielern zum Download an.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

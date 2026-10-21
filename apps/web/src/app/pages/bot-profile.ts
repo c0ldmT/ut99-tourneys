@@ -87,7 +87,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
             <dt>{{ 'bots.class' | t }}</dt>
             <dd>{{ b.labels.botClass || name(b.botClass) || ('bots.default' | t) }}</dd>
             <dt>{{ 'bots.skin' | t }}</dt>
-            <dd>{{ name(b.skin) || ('bots.default' | t) }}</dd>
+            <dd>{{ b.labels.skin || name(b.skin) || ('bots.default' | t) }}</dd>
             <dt>{{ 'bots.face' | t }}</dt>
             <dd>{{ b.labels.face || name(b.face) || ('bots.default' | t) }}</dd>
             <dt>{{ 'bots.voice' | t }}</dt>

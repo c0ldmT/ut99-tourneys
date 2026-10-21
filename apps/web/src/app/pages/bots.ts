@@ -3,7 +3,8 @@ import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
-import { assetLabel, COMBAT_STYLES, combatStyleKey, skinPackage } from '../core/bots';
+import { LookPicker } from '../components/look-picker';
+import { assetLabel, COMBAT_STYLES, combatStyleKey } from '../core/bots';
 import { I18n, TPipe } from '../core/i18n';
 import {
   BOT_LINE_KINDS,
@@ -63,7 +64,7 @@ const emptyLines = () =>
 /** Bot control center (admins): the website's bots, clans and team names. */
 @Component({
   selector: 'app-bots',
-  imports: [TPipe, FormsModule, RouterLink, Icon],
+  imports: [TPipe, FormsModule, RouterLink, Icon, LookPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'bots.title' | t }}</h1>
@@ -147,63 +148,7 @@ const emptyLines = () =>
 
             <fieldset>
               <legend>{{ 'bots.sec.look' | t }}</legend>
-              <div class="fields">
-                <div class="field">
-                  <label for="bcls">{{ 'bots.class' | t }}</label>
-                  <input
-                    id="bcls"
-                    name="cls"
-                    list="bcls-list"
-                    [placeholder]="'bots.default' | t"
-                    [ngModel]="d.botClass"
-                    (change)="setClass(d, $any($event.target).value.trim())"
-                  />
-                  <datalist id="bcls-list">
-                    @for (c of withCurrent(assets()?.botClasses, d.botClass); track c.name) {
-                      <option [value]="c.name">{{ c.label }}</option>
-                    }
-                  </datalist>
-                </div>
-                <div class="field">
-                  <label for="bskin">{{ 'bots.skin' | t }}</label>
-                  <input
-                    id="bskin"
-                    name="skin"
-                    list="bskin-list"
-                    [placeholder]="'bots.default' | t"
-                    [(ngModel)]="d.skin"
-                  />
-                  <datalist id="bskin-list">
-                    @for (s of skinsFor(d); track s.name) {
-                      <option [value]="s.name">{{ s.label }}</option>
-                    }
-                  </datalist>
-                </div>
-                <div class="field">
-                  <label for="bface">{{ 'bots.face' | t }}</label>
-                  <input
-                    id="bface"
-                    name="face"
-                    list="bface-list"
-                    [placeholder]="'bots.default' | t"
-                    [(ngModel)]="d.face"
-                  />
-                  <datalist id="bface-list">
-                    @for (f of facesFor(d); track f.name) {
-                      <option [value]="f.name">{{ f.label }}</option>
-                    }
-                  </datalist>
-                </div>
-                <div class="field">
-                  <label for="bvoice">{{ 'bots.voice' | t }}</label>
-                  <select id="bvoice" name="voice" [(ngModel)]="d.voice">
-                    <option value="">{{ 'bots.default' | t }}</option>
-                    @for (v of withCurrent(assets()?.voices, d.voice); track v.name) {
-                      <option [value]="v.name">{{ v.label }}</option>
-                    }
-                  </select>
-                </div>
-              </div>
+              <app-look-picker [draft]="d" [models]="assets()?.models ?? []" [free]="true" />
               <p class="muted small">{{ 'bots.lookHint' | t }}</p>
             </fieldset>
 
@@ -1033,32 +978,6 @@ export class BotsPage {
     if (cur && !l.some((x) => x.name.toLowerCase() === cur.toLowerCase()))
       l.push({ name: cur, label: cur.split('.').pop() ?? cur });
     return l;
-  }
-
-  protected setClass(d: Draft, cls: string) {
-    d.botClass = cls;
-    // Another body: skin and face of the old one do not fit.
-    const pkg = skinPackage(this.assets(), { botClass: cls, skin: null });
-    if (pkg && d.skin && !d.skin.toLowerCase().startsWith(pkg.toLowerCase() + '.')) {
-      d.skin = this.skinsFor(d)[0]?.name ?? '';
-      d.face = '';
-    }
-  }
-
-  protected skinsFor(d: Draft) {
-    const pkg = skinPackage(this.assets(), { botClass: d.botClass || null, skin: null });
-    const all = this.assets()?.skins ?? [];
-    const list = pkg
-      ? all.filter((s) => s.name.toLowerCase().startsWith(pkg.toLowerCase() + '.'))
-      : all;
-    return this.withCurrent(list.length ? list : all, d.skin);
-  }
-
-  protected facesFor(d: Draft) {
-    const pkg = (d.skin.split('.')[0] ?? '').toLowerCase();
-    const all = this.assets()?.faces ?? [];
-    const list = pkg ? all.filter((f) => f.pkg.toLowerCase() === pkg) : [];
-    return this.withCurrent(list, d.face);
   }
 
   protected trait(d: Draft, k: TraitKey): number {

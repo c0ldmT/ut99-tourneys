@@ -175,10 +175,16 @@ export const AgentWelcome = envelope(
   z.object({ agentId: Id, serverTime: z.number().int() }),
 );
 
-const AssetSchema = z.object({ name: z.string().min(1).max(128), label: z.string().max(64) });
+/** label: the description ('' if none); meta: a voice pack's meta class (`BotPack.VoiceMale`). */
+const AssetSchema = z.object({
+  name: z.string().min(1).max(128),
+  label: z.string().max(64),
+  meta: z.string().max(128).optional(),
+});
 /**
- * What the game installation offers for bots (UT99: `Object=` lines of the System/*.int files):
- * bot classes, textures with a description (skins and faces), voice packs, weapons.
+ * What the game installation offers for bots (UT99: `Object=` lines of the .int files in
+ * System/ and SystemLocalized/int/): bot classes, texture entries (skins and faces, with or
+ * without a description), voice packs with their meta class, weapons.
  */
 export const GameAssetsSchema = z.object({
   botClasses: z.array(AssetSchema).max(500).default([]),

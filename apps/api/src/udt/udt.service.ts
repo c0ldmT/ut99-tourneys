@@ -536,6 +536,8 @@ export class UdtService {
       faces: a.faces,
       voices: a.voices,
       packages: a.packages,
+      /** Per model its skins, faces and voices (UT's setup rules, decision 172). */
+      models: a.models,
     };
   }
 
@@ -545,6 +547,16 @@ export class UdtService {
     const b = this.bots.get(botId);
     if (!b || b.udtOwner !== user.id)
       throw forbidden('only your own bots (starter, academy, blueprint) can be changed');
+    // What changes must fit the model; an older look that does not fit stays until it is changed.
+    this.bots.assertLook(
+      {
+        botClass: body.botClass ?? b.botClass,
+        skin: body.skin ?? b.skin,
+        face: body.face ?? b.face,
+        voice: body.voice ?? b.traits.voice,
+      },
+      { botClass: b.botClass, skin: b.skin, face: b.face, voice: b.traits.voice },
+    );
     const traits = body.voice !== undefined ? { traits: { ...b.traits, voice: body.voice } } : {};
     return this.bots.update(b.id, { ...lookFields(body), ...traits });
   }
@@ -626,6 +638,12 @@ export class UdtService {
         cost,
         budget,
       });
+    this.bots.assertLook({
+      botClass: body.starter.botClass,
+      skin: body.starter.skin,
+      face: body.starter.face,
+      voice: body.starter.traits?.voice,
+    });
     const bot = this.bots.create({
       name: body.starter.name,
       skill: body.starter.skill,

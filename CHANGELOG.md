@@ -149,6 +149,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Server sync: the bridge also reads the .int files in SystemLocalized/int (UT 469) and keeps all voice packs (with their meta class) and texture entries; skins named with 4 letters only (Cyborg Trooper) were missing.
 - Pages that load in an effect (tournament page with its live connection, the names' looks) loaded twice since the loading display; the Dream Team market no longer marks sold bots as in demand or cheaper.
 - Team names of the list are drawn at random; a bot team that fills a Dream Team bracket never has the name of an AI team (or another team).
 - Player pages: no more "player not found" toast for players without games in the season; the Dream Team badge "Blueprint" is translated; market offers without the library clan tag.
@@ -172,6 +173,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Bot looks as in UT's player setup: the model's skins, the skin's faces and the model's voices with their readable names, as dropdowns that work on phones; unfitting looks are refused for Dream Team managers.
 - Tournaments: an overview (live, coming up by day, series as cards, last results) and an archive of all finished and aborted tournaments (by day, in pages), with search and filters.
 - Softer page changes: the old page sinks back and fades, the new one's blocks rise one after another, the Dream Team tabs stay in place, the loader comes and goes softly; shown also when the system asks for reduced motion.
 - Dream Team market list: the value line and % without the economy index (the bot's own development), marks "in demand" / "cheaper", explained; better on phones.

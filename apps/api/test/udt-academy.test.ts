@@ -175,7 +175,10 @@ describe('Unreal Dream Team: academy', () => {
           skill: 3,
           traits: avg,
           botClass: 'BotPack.TFemale1Bot',
-          look: { skin: 'SGirlSkins.army', personality: { lines: [{ kind: 'kill', text: 'Hi' }] } },
+          look: {
+            skin: 'FCommandoSkins.daco',
+            personality: { lines: [{ kind: 'kill', text: 'Hi' }] },
+          },
         })
       ).status,
     ).toBe(200); // the model is cosmetic: free for every blueprint
@@ -204,7 +207,7 @@ describe('Unreal Dream Team: academy', () => {
     expect(b.udtTraits[0].code).toBe(ok.body.built.startTrait);
     expect(ok.body.blueprints).toHaveLength(0);
     const blank = ok.body.own.find((x: { name: string }) => x.name === 'Blank');
-    expect(blank).toMatchObject({ botClass: 'BotPack.TFemale1Bot', skin: 'SGirlSkins.army' });
+    expect(blank).toMatchObject({ botClass: 'BotPack.TFemale1Bot', skin: 'FCommandoSkins.daco' });
   });
 
   it('careers: every bot has one; admins retire bots into the hall of fame', async () => {

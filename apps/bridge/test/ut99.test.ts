@@ -300,11 +300,49 @@ describe('inventory', () => {
     });
     expect(inv.assets).toEqual({
       botClasses: [{ name: 'Botpack.TMale1Bot', label: 'Male Commando' }],
-      voices: [{ name: 'Botpack.VoiceMaleOne', label: 'Male 1' }],
+      voices: [
+        { name: 'Botpack.VoiceMaleOne', label: 'Male 1', meta: 'Botpack.ChallengeVoicePack' },
+      ],
       weapons: [{ name: 'Botpack.ShockRifle', label: 'ShockRifle' }],
-      textures: [{ name: 'CommandoSkins.cmdo4Blake', label: 'Blake' }],
+      textures: [
+        { name: 'CommandoSkins.cmdo4Blake', label: 'Blake' },
+        { name: 'CommandoSkins.cmdo2', label: '' },
+      ],
       skinPackages: [],
     });
+  });
+
+  it('reads the .int files where UT 469 keeps them (SystemLocalized/int), voices with their meta class', () => {
+    const root = tmp();
+    fs.mkdirSync(path.join(root, 'System'));
+    fs.mkdirSync(path.join(root, 'SystemLocalized', 'int'), { recursive: true });
+    fs.writeFileSync(
+      path.join(root, 'SystemLocalized', 'int', 'multimesh.int'),
+      [
+        '[Public]',
+        'Object=(Name=MultiMesh.TSkaarjBot,Class=Class,MetaClass=BotPack.Bot,Description="Skaarj Hybrid")',
+        'Object=(Name=MultiMesh.SkaarjVoice,Class=Class,MetaClass=BotPack.VoiceMale,Description="Skaarj Hybrid")',
+        'Object=(Name=MultiMesh.TSkaarj,Class=Class,MetaClass=Botpack.TournamentPlayer,Description="Skaarj Hybrid")',
+      ].join('\r\n'),
+    );
+    fs.writeFileSync(
+      path.join(root, 'SystemLocalized', 'int', 'tskmskins.int'),
+      [
+        '[Public]',
+        'Object=(Name=tskmskins.MekS,Class=Texture,Description="Cyborg Trooper")',
+        // Unnamed team textures are never offered by UT's menu.
+        'Object=(Name=tskmskins.T_Skaarj_0,Class=Texture)',
+        'Object=(Name=tskmskins.Warr3T_0,Class=Texture)',
+      ].join('\r\n'),
+    );
+    const inv = scanInventory({ installDir: root });
+    expect(inv.assets.botClasses).toEqual([
+      { name: 'MultiMesh.TSkaarjBot', label: 'Skaarj Hybrid' },
+    ]);
+    expect(inv.assets.voices).toEqual([
+      { name: 'MultiMesh.SkaarjVoice', label: 'Skaarj Hybrid', meta: 'BotPack.VoiceMale' },
+    ]);
+    expect(inv.assets.textures).toEqual([{ name: 'tskmskins.MekS', label: 'Cyborg Trooper' }]);
   });
 
   it('reads skins from the texture packages and bot classes of custom model packages', () => {

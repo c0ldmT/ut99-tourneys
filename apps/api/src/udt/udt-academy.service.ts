@@ -76,6 +76,11 @@ const MENTOR_LEVEL = 3;
  * mentors (bought bots of level 3+, one apprentice each per season), developing own bots with
  * points from their levels up to their potential.
  */
+/** The model a new bot gets: the look's (even empty: the default) before the blueprint's. */
+function modelOf(botClass: string | undefined, look: BotLook | undefined): string | undefined {
+  return look?.botClass !== undefined ? look.botClass : botClass;
+}
+
 @Injectable()
 export class UdtAcademyService {
   constructor(
@@ -206,6 +211,17 @@ export class UdtAcademyService {
       });
   }
 
+  /** Model, skin, face and voice must fit (checked before the licence is paid). */
+  private checkLook(botClass: string | undefined, look: BotLook | undefined): void {
+    if (!botClass && !look) return;
+    this.bots.assertLook({
+      botClass: modelOf(botClass, look),
+      skin: look?.skin,
+      face: look?.face,
+      voice: look?.voice,
+    });
+  }
+
   /** Makes the bot in the library (the manager's, inactive) and puts it into the roster. */
   private create(
     user: User,
@@ -217,11 +233,12 @@ export class UdtAcademyService {
     botClass?: string,
     look?: BotLook,
   ): string {
+    const cls = modelOf(botClass, look);
     const bot = this.bots.create({
       name,
       skill: t.skill,
-      ...(botClass ? { botClass } : {}),
       ...lookFields(look),
+      ...(cls ? { botClass: cls } : {}),
       traits: {
         accuracy: t.values.accuracy,
         alertness: t.values.alertness,
@@ -267,6 +284,7 @@ export class UdtAcademyService {
     if (!talent) throw notFound('talent');
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict('a bot is called {name} already', { name: body.name });
+    this.checkLook(undefined, body.look);
     this.licence(user, season, body.name);
     this.create(user, season, talent, body.name, 'academy', null, undefined, body.look);
     this.db
@@ -289,6 +307,7 @@ export class UdtAcademyService {
       throw conflict('{name} has an apprentice this season', { name: m.name });
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict('a bot is called {name} already', { name: body.name });
+    this.checkLook(undefined, body.look);
     this.licence(user, season, body.name);
     const t = apprentice(
       {
@@ -353,6 +372,7 @@ export class UdtAcademyService {
       });
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict('a bot is called {name} already', { name: body.name });
+    this.checkLook(body.botClass, body.look);
     this.licence(user, season, body.name);
     const id = this.create(
       user,

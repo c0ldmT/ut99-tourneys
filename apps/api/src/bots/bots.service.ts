@@ -21,12 +21,17 @@ import { DB, type Db } from '../db/database.js';
 import { botClans, bots } from '../db/schema.js';
 import { randomBot } from './bot-random.js';
 import {
-  NORMAL_TRAITS,
-  STOCK_CLASSES,
-  STOCK_FACES,
-  STOCK_VOICES,
-  STOCK_WEAPONS,
-} from './bot-stock.js';
+  allSkins,
+  changedLookProblems,
+  lookProblem,
+  modelChoices,
+  STOCK_TEXTURES,
+  STOCK_VOICE_ENTRIES,
+  type Look,
+  type ModelChoice,
+  type VoiceEntry,
+} from './models.js';
+import { NORMAL_TRAITS, STOCK_CLASSES, STOCK_WEAPONS } from './bot-stock.js';
 
 /** UT cuts player names to 24 characters: clan tag plus name must fit. */
 export const GAME_NAME_CHARS = 24;
@@ -411,29 +416,33 @@ export class BotsService {
   }
 
   /**
-   * Choices for the editor: stock material plus what the servers report. Skins and faces come
-   * from texture names: `Pkg.base1` is the skin `Pkg.base`, `Pkg.base<digit>Face` the face
-   * `Pkg.Face` (UT's naming, see TournamentPlayer.SetMultiSkin).
+   * Choices for the editors: stock material plus what the servers report (their .int entries,
+   * decision 172). `models` has per bot class the skins, faces and voices UT's own setup menu
+   * offers (see models.ts); `skins`/`faces` are all of them (for labels).
    */
   assets(): GameAssets & {
     skins: { name: string; label: string }[];
     faces: { name: string; label: string; pkg: string }[];
     packages: Record<string, string>;
+    models: ModelChoice[];
   } {
     const out: GameAssets = {
       botClasses: STOCK_CLASSES.map((c) => ({ name: c.botClass, label: c.label })),
       textures: [],
-      voices: STOCK_VOICES.map((v) => ({ name: v, label: v.split('.').pop() ?? v })),
+      voices: STOCK_VOICE_ENTRIES.map((v) => ({ ...v })),
       weapons: STOCK_WEAPONS.map((w) => ({ name: w, label: w.split('.').pop() ?? w })),
       skinPackages: [],
     };
-    const add = (
-      list: { name: string; label: string }[],
-      items: readonly { name: string; label: string }[],
-    ) => {
-      for (const i of items)
-        if (!list.some((x) => x.name.toLowerCase() === i.name.toLowerCase())) list.push(i);
+    const add = <T extends { name: string; label: string }>(list: T[], items: readonly T[]) => {
+      for (const i of items) {
+        const hit = list.find((x) => x.name.toLowerCase() === i.name.toLowerCase());
+        if (!hit) list.push(i);
+        // A server's description is better than a name.
+        else if (i.label && (!hit.label || hit.label === hit.name.split('.').pop()))
+          hit.label = i.label;
+      }
     };
+    const packs: GameAssets['skinPackages'] = [];
     for (const raw of this.agents.allInventories()) {
       const inv = raw as { assets?: GameAssets } | undefined;
       if (!inv?.assets) continue;
@@ -441,51 +450,56 @@ export class BotsService {
       add(out.textures, inv.assets.textures ?? []);
       add(out.voices, inv.assets.voices ?? []);
       add(out.weapons, inv.assets.weapons ?? []);
+      packs.push(...(inv.assets.skinPackages ?? []));
     }
-    const skins: { name: string; label: string }[] = STOCK_CLASSES.map((c) => ({
-      name: c.defaultSkin,
-      label: c.label,
-    }));
-    const faces: { name: string; label: string; pkg: string }[] = [];
-    for (const [pkg, names] of Object.entries(STOCK_FACES))
-      for (const n of names) faces.push({ name: `${pkg}.${n}`, label: n, pkg });
-    for (const t of out.textures) {
-      const skin = /^(\w+)\.([A-Za-z]+)1$/.exec(t.name);
-      if (skin) add(skins, [{ name: `${skin[1]}.${skin[2]}`, label: t.label }]);
-      const face = /^(\w+)\.[A-Za-z]+\d([A-Za-z]\w*)$/.exec(t.name);
-      if (
-        face &&
-        !faces.some((f) => f.name.toLowerCase() === `${face[1]}.${face[2]}`.toLowerCase())
-      )
-        faces.push({ name: `${face[1]}.${face[2]}`, label: t.label || face[2]!, pkg: face[1]! });
-    }
-    // Skin packages read from the texture files (also skins without a description in the .int).
-    for (const raw of this.agents.allInventories()) {
-      const inv = raw as { assets?: GameAssets } | undefined;
-      for (const sp of inv?.assets?.skinPackages ?? []) {
-        const multi = sp.textures.some((n) => /^[A-Za-z]+[1-4]$/.test(n));
-        for (const n of sp.textures) {
-          if (!multi) {
-            if (!/^t_/i.test(n)) add(skins, [{ name: `${sp.pkg}.${n}`, label: n }]);
-            continue;
-          }
-          const base = /^([A-Za-z]+)1$/.exec(n);
-          if (base) add(skins, [{ name: `${sp.pkg}.${base[1]}`, label: base[1]! }]);
-          const face = /^[A-Za-z]+\d([A-Za-z]\w*)$/.exec(n);
-          if (
-            face &&
-            !faces.some((f) => f.name.toLowerCase() === `${sp.pkg}.${face[1]}`.toLowerCase())
-          )
-            faces.push({ name: `${sp.pkg}.${face[1]}`, label: face[1]!, pkg: sp.pkg });
-        }
+    const pkg = (n: string) => n.split('.')[0]!.toLowerCase();
+    const withInt = new Set(out.textures.map((t) => pkg(t.name)));
+    // The stock skins when no server reported their package.
+    const textures = [...out.textures, ...STOCK_TEXTURES.filter((t) => !withInt.has(pkg(t.name)))];
+    // Skin packages without any .int entry (decision 133): their textures as UT names them.
+    for (const sp of packs) {
+      if (withInt.has(sp.pkg.toLowerCase())) continue;
+      withInt.add(sp.pkg.toLowerCase());
+      for (const n of sp.textures) {
+        const face = /^[A-Za-z]{4}\d([A-Za-z]\w*)$/.exec(n);
+        const label = /^[A-Za-z]{4}1$/.test(n)
+          ? n.slice(0, 4)
+          : face && !/^t_/i.test(face[1]!)
+            ? face[1]!
+            : '';
+        textures.push({ name: `${sp.pkg}.${n}`, label });
       }
+    }
+    const models = modelChoices(out.botClasses, textures, out.voices as VoiceEntry[]);
+    const skins = new Map<string, { name: string; label: string }>();
+    const faces = new Map<string, { name: string; label: string; pkg: string }>();
+    for (const sk of allSkins(textures)) {
+      skins.set(sk.name.toLowerCase(), { name: sk.name, label: sk.label });
+      for (const f of sk.faces)
+        faces.set(f.name.toLowerCase(), { ...f, pkg: f.name.split('.')[0]! });
     }
     return {
       ...out,
-      skins,
-      faces,
+      textures,
+      skins: [...skins.values()],
+      faces: [...faces.values()],
       packages: Object.fromEntries(STOCK_CLASSES.map((c) => [c.botClass, c.pkg])),
+      models,
     };
+  }
+
+  /**
+   * A model, skin, face and voice that fit together as in UT's setup menu (decision 172); empty
+   * values are the defaults. Models whose profile is unknown are not checked.
+   */
+  assertLook(look: Look, before?: Look): void {
+    const models = this.assets().models;
+    const p = before ? changedLookProblems(models, before, look)[0] : lookProblem(models, look);
+    if (!p) return;
+    if (p.field === 'botClass') throw badRequest('the model {value} is not known', p);
+    if (p.field === 'skin') throw badRequest('the skin {value} does not fit the model', p);
+    if (p.field === 'face') throw badRequest('the face {value} does not fit the skin', p);
+    throw badRequest('the voice {value} does not fit the model', p);
   }
 
   // --- tournaments ----------------------------------------------------------------------------

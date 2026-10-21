@@ -1,4 +1,4 @@
-import type { AssetItem, BotAssets, LibraryBot } from './types';
+import type { AssetItem } from './types';
 
 /** UT's combat styles (UTIndivBotSetupClient): value and translation key. */
 export const COMBAT_STYLES: { value: number; key: string }[] = [
@@ -25,16 +25,6 @@ export function assetLabel(
   if (!name) return '';
   const hit = list?.find((x) => x.name.toLowerCase() === name.toLowerCase());
   return hit?.label || name.split('.').pop() || name;
-}
-
-/** Skin package of a bot class (stock classes from the assets, else the default skin's). */
-export function skinPackage(assets: BotAssets | null, bot: Pick<LibraryBot, 'botClass' | 'skin'>) {
-  const byClass = bot.botClass
-    ? Object.entries(assets?.packages ?? {}).find(
-        ([c]) => c.toLowerCase() === bot.botClass!.toLowerCase(),
-      )?.[1]
-    : undefined;
-  return byClass ?? bot.skin?.split('.')[0] ?? '';
 }
 
 /** A trait value -1..1 (or 0..1) as a bar width in percent. */
