@@ -1,4 +1,4 @@
-import { computed, signal } from '@angular/core';
+import { computed, signal, untracked } from '@angular/core';
 
 /** The loader shows only when a page, once in place, loads longer than this (ms). */
 export const LOADER_DELAY = 150;
@@ -97,6 +97,12 @@ export class LoadTracker {
 
   /** A call starts; the returned function ends it. */
   track(kind: CallKind): () => void {
+    // Calls often start inside an effect or computed: reading the loading state there must not
+    // make it depend on it (it would run again when the page has loaded, loading twice).
+    return untracked(() => this.start(kind));
+  }
+
+  private start(kind: CallKind): () => void {
     if (kind.background) return () => undefined;
     if (this.settling() && kind.get) {
       const nav = this.nav;

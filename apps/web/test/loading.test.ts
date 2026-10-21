@@ -1,3 +1,4 @@
+import { computed } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BAR_DELAY,
@@ -167,6 +168,24 @@ describe('loading display', () => {
     t.navEnd();
     vi.advanceTimersByTime(LOAD_CAP + LOADER_MIN);
     expect(t.hidden()).toBe(false);
+  });
+
+  it('a call started in a computed or effect does not make it depend on the loading state', () => {
+    const t = loaded();
+    t.navStart();
+    t.activated();
+    let runs = 0;
+    const c = computed(() => {
+      runs++;
+      return t.track(get);
+    });
+    const done = c();
+    t.navEnd();
+    done();
+    vi.advanceTimersByTime(SETTLE_GRACE);
+    expect(t.settling()).toBe(false);
+    c();
+    expect(runs).toBe(1);
   });
 
   it('a reused page (no new component) keeps its content and shows the bar', () => {

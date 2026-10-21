@@ -67,11 +67,12 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                 >
                 <span class="grow"
                   ><b class="disp name" [title]="o.name">{{ o.name }}</b>
-                  @if (o.demand > 1.001) {
+                  <!-- Demand marks only while the bot can be bought. -->
+                  @if (!o.sold && o.demand > 1.001) {
                     <span class="udt-mark hot" [title]="'udt.market.hotTitle' | t">{{
                       'udt.market.hot' | t
                     }}</span>
-                  } @else if (o.demand < 0.999) {
+                  } @else if (!o.sold && o.demand < 0.999) {
                     <span class="udt-mark cheap" [title]="'udt.market.cheapTitle' | t">{{
                       'udt.market.cheap' | t
                     }}</span>
