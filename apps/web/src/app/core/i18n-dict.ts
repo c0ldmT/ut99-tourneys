@@ -1709,7 +1709,7 @@ const en = {
   'udt.market.price': 'Price',
   'udt.market.value': 'Market value',
   'udt.market.surcharge':
-    'The price is the market value plus 10 % (weak), 20 % (middle) or 30 % (strong bots). Selling back pays 85 % of the value.',
+    'The price is the market value plus 10 % (weak), 20 % (middle) or 30 % (strong bots). Selling back pays 85 % of the value (not while the bot plays in a drawn or running Dream Team tournament).',
   'udt.market.buy': 'Buy · {price}',
   'udt.market.buyConfirm':
     'Buy {name} for {price}? The bot joins your roster at once; from the next Monday it draws a salary.',
@@ -1752,7 +1752,7 @@ const en = {
   'udt.help.way.trades.text':
     'Swap bought bots and Neuro with other managers. Your starter and the bots you made stay with your team.',
   'udt.help.bots.roster':
-    'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value.',
+    'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value (not while it plays in a drawn or running Dream Team tournament).',
   'udt.help.lineup.title': 'Line up',
   'udt.help.events.title': 'Play tournaments',
   'udt.help.events.text':
@@ -3633,7 +3633,7 @@ const de: Record<TKey, string> = {
   'udt.market.price': 'Preis',
   'udt.market.value': 'Marktwert',
   'udt.market.surcharge':
-    'Der Preis ist der Marktwert plus 10 % (schwache), 20 % (mittlere) oder 30 % (starke Bots). Zurückverkaufen bringt 85 % des Werts.',
+    'Der Preis ist der Marktwert plus 10 % (schwache), 20 % (mittlere) oder 30 % (starke Bots). Zurückverkaufen bringt 85 % des Werts (nicht, solange der Bot in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
   'udt.market.buy': 'Kaufen · {price}',
   'udt.market.buyConfirm':
     '{name} für {price} kaufen? Der Bot kommt sofort in deinen Kader; ab dem nächsten Montag bekommt er Gehalt.',
@@ -3676,7 +3676,7 @@ const de: Record<TKey, string> = {
   'udt.help.way.trades.text':
     'Tausche gekaufte Bots und Neuro mit anderen Managern. Dein Starter und selbst gemachte Bots bleiben in deinem Team.',
   'udt.help.bots.roster':
-    'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts.',
+    'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts (nicht, solange er in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
   'udt.help.lineup.title': 'Aufstellen',
   'udt.help.events.title': 'Turniere spielen',
   'udt.help.events.text':

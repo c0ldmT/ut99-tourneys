@@ -32,7 +32,9 @@ import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { botKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
+import { EventLogService } from '../tournaments/event-log.service.js';
 import { UdtCareerService } from './udt-career.service.js';
+import { playingBots } from './udt-playing.js';
 import { UdtService, withTraits } from './udt.service.js';
 
 /** At most this many bots per manager (5 + 2 on the bench). */
@@ -66,6 +68,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
+    @Inject(EventLogService) private readonly events: EventLogService,
   ) {}
 
   onModuleInit(): void {
@@ -500,7 +503,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     return this.view(user);
   }
 
-  /** Sells a bot back to the market for 85 % of its value (not the starter bot). */
+  /** Sells a bot back to the market for 85 % of its value (not the starter, not while it plays). */
   sell(user: User, botId: string) {
     this.udt.assertOn();
     const season = this.udt.season();
@@ -520,6 +523,11 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     if (this.udt.isOwnBot(season.number, botId))
       throw conflict('a bot you made stays with your team this season');
     const bot = this.bots.list().find((b) => b.id === botId);
+    // Its lineup is fixed in a seeded or running tournament: it plays that one out first.
+    if (playingBots(this.db, this.events, user.id).has(botId))
+      throw conflict('{name} plays in a running Dream Team tournament', {
+        name: bot?.name ?? botId,
+      });
     const price = sellPrice(bot ? this.udt.value(bot, season.number) : r.price);
     this.db
       .delete(udtRoster)

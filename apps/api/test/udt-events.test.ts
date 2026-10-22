@@ -96,6 +96,33 @@ describe('Unreal Dream Team: events', () => {
     expect((await mario.req('DELETE', `/udt/events/${id}/enter`)).status).toBe(409);
   });
 
+  it('a bot in a seeded or running Dream Team tournament cannot be sold until it ends', async () => {
+    const { admin, mario, tim } = await setup();
+    const marioId = (await mario.get('/me')).body.id as string;
+    const lib = (await admin.get('/bots')).body.bots as { id: string; name: string }[];
+    const bought = lib.find((b) => b.name === 'Lib5')!.id;
+    const db = api!.app.get<Db>(DB);
+    const mira = (await mario.get('/udt')).body.roster[0].botId as string;
+    db.update(udtRoster).set({ dmSlot: null }).where(eq(udtRoster.botId, mira)).run();
+    db.insert(udtRoster)
+      .values({ season: 1, botId: bought, userId: marioId, price: 500, acquiredAt: 'x', dmSlot: 1 })
+      .run();
+    const id = (await admin.post('/tournaments', udtCup(1))).body.id as string;
+    expect((await mario.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    expect((await tim.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    const nx = seeded.body.projection.entrants[`udt-${marioId}`];
+    expect(nx.bot.id).toBe(bought);
+    const sell = await mario.post(`/udt/roster/${bought}/sell`);
+    expect(sell.status).toBe(409);
+    expect(JSON.stringify(sell.body)).toMatch(/plays in a running Dream Team tournament/);
+    // Called off: the bot is free again.
+    const off = await admin.post(`/tournaments/${id}/command`, { kind: 'abort', reason: 'test' });
+    expect(off.status, JSON.stringify(off.body)).toBe(204);
+    expect((await mario.post(`/udt/roster/${bought}/sell`)).status).toBe(200);
+  });
+
   it('the tournament page signs up through the Dream Team: one count, one season', async () => {
     const { admin, mario, tim, anna } = await setup();
     // No season switch of its own: a Dream Team tournament always belongs to the season.

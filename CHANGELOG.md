@@ -159,6 +159,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Dream Team: a bot playing in a seeded or running Dream Team tournament (also a paused one or the finale) can no longer be sold or traded until the tournament ends; before, the seller kept the rewards of its games and a later buyer got their stamina and experience.
 - Dream Team trades: when accepting failed on the fee, a second accept took the bots without paying the asked Neuro (the partner still got them); payment, fee and bots are now booked together or not at all.
 - Dream Team careers counted no wins in Dream Team games and missed bots' games in normal tournaments (also in the market's form); live frag and time limits show when the tournament keeps the defaults.
 - Monster Hunt: the kill feed of the match page vanished after the first run of a game; it goes on in run 2 and shows each run with its own times.

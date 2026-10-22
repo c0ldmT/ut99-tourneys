@@ -159,10 +159,17 @@ export class UdtRewardsService implements OnModuleInit {
       });
       if (!first) continue; // booked before: stamina and experience too
       if (!ids.length) continue;
+      // Only while the bot is still this manager's (never another roster's row of the same bot).
       for (const r of this.db
         .select()
         .from(udtRoster)
-        .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, ids)))
+        .where(
+          and(
+            eq(udtRoster.season, season),
+            eq(udtRoster.userId, userId),
+            inArray(udtRoster.botId, ids),
+          ),
+        )
         .all()) {
         const fx = managerEffects(onBots.get(r.botId) ?? []);
         const lost = Math.round(games * DEFAULT_ECONOMY.stamina.perGame * fx.fatigue);

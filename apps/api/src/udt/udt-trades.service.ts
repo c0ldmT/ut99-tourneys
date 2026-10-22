@@ -1,6 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, desc, eq, inArray, or } from 'drizzle-orm';
-import { udtEntrantId } from '@tourney/protocol';
 import { roundNeuro } from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
@@ -11,11 +10,12 @@ import { randomId } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { tournaments, udtEntries, udtRoster, udtTrades, udtTraits } from '../db/schema.js';
+import { udtRoster, udtTrades, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { ROSTER_MAX } from './udt-market.service.js';
+import { playingBots } from './udt-playing.js';
 import { UdtService, type RosterBot } from './udt.service.js';
 
 const DAY = 86_400_000;
@@ -71,25 +71,7 @@ export class UdtTradesService {
 
   /** Bots playing in a seeded or running Dream Team tournament of their manager. */
   private playing(userId: string): Set<string> {
-    const out = new Set<string>();
-    const ids = this.db
-      .select({ id: tournaments.id })
-      .from(tournaments)
-      .innerJoin(udtEntries, eq(udtEntries.tournamentId, tournaments.id))
-      .where(
-        and(
-          eq(tournaments.kind, 'udt'),
-          eq(udtEntries.userId, userId),
-          inArray(tournaments.phase, ['seeded', 'checkIn', 'running']),
-        ),
-      )
-      .all();
-    for (const { id } of ids) {
-      const e = this.events.projection(id)?.entrants[udtEntrantId(userId)];
-      if (e?.kind === 'bot' && e.bot.id) out.add(e.bot.id);
-      if (e?.kind === 'team') for (const b of e.bots) if (b.id) out.add(b.id);
-    }
-    return out;
+    return playingBots(this.db, this.events, userId);
   }
 
   /** Why a roster bot cannot be traded now (null: it can). */
