@@ -789,7 +789,8 @@ export class MatchPage {
       fragLimit?: number;
       timeLimitMin?: number;
     };
-    return { frags: r.fragLimit ?? 0, timeSec: (r.timeLimitMin ?? 0) * 60 };
+    // Missing values are the rules' defaults (20 frags, 10 minutes; 0 = none).
+    return { frags: r.fragLimit ?? 20, timeSec: (r.timeLimitMin ?? 10) * 60 };
   });
   protected readonly limits = computed(() => {
     const r = this.rules();

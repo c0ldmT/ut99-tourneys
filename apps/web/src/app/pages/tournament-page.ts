@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { BetPanel } from '../components/bet-panel';
 import { BetColumns } from '../components/bet-columns';
+import { LiveMini, type MiniSide } from '../components/live-mini';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
@@ -27,7 +28,14 @@ import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
 import { finalMs, isRace, raceTime, type RunView } from '../core/race';
-import type { BetMatchView, RatedGame, TournamentDetail, TournamentEventView } from '../core/types';
+import { mmss } from '../core/live';
+import type {
+  BetMatchView,
+  LiveSnapshot,
+  RatedGame,
+  TournamentDetail,
+  TournamentEventView,
+} from '../core/types';
 
 const ACTIVE = ['checkIn', 'running', 'paused'];
 
@@ -43,6 +51,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     TeamRoster,
     BetPanel,
     BetColumns,
+    LiveMini,
     Icon,
     NameTag,
     UdtMark,
@@ -284,63 +293,21 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
 
         <!-- Live -->
         @if (current(); as cm) {
-          <div class="card live">
-            <h2>
-              {{ 'tp.now' | t }} · {{ cm.matchId }}
-              @if (bestOfCurrent() > 1) {
-                <span class="muted small"
-                  >({{ 'tp.game' | t: { n: cm.game, of: bestOfCurrent() } }})</span
-                >
-              }
-            </h2>
-            @if (race()) {
-              <div class="versus">
-                @for (id of cm.entrants; track id; let i = $index) {
-                  @if (i === 1) {
-                    <div class="vs">vs</div>
-                  }
-                  <div class="side">
-                    <div class="name">
-                      {{ name(id) }}
-                      @if (runnerNow() === id) {
-                        <span class="badge running">{{ 'race.running' | t }}</span>
-                      }
-                    </div>
-                    <div class="score">{{ raceScore(id) }}</div>
-                    <div class="muted small">{{ raceDetail(id) }}</div>
-                  </div>
-                }
-              </div>
-            } @else {
-              <div class="versus">
-                <div class="side">
-                  <div class="name">{{ name(cm.entrants[0]) }}</div>
-                  <div class="score">{{ liveScore(cm.entrants[0]) }}</div>
-                </div>
-                <div class="vs">vs</div>
-                <div class="side">
-                  <div class="name">{{ name(cm.entrants[1]) }}</div>
-                  <div class="score">{{ liveScore(cm.entrants[1]) }}</div>
-                </div>
-              </div>
-            }
-            <p class="small">
-              @if (liveNow(); as l) {
-                <b>{{ 'live.' + l.phase | t }}</b>
-                @if (l.map || cm.map) {
-                  · {{ l.map || cm.map }}
-                }
-                @if (race() && runnerNow(); as r) {
-                  · {{ 'race.runOf' | t: { n: (cm.runs?.length ?? 0) + 1, team: name(r) } }}
-                }
-                @if (secondsLeft() !== null) {
-                  · {{ 'tp.secondsLeft' | t: { s: secondsLeft()! } }}
-                }
-              } @else {
-                {{ (cm.map ? 'tp.mapSelected' : 'tp.called') | t: { map: cm.map ?? '' } }}
-              }
-            </p>
-          </div>
+          <app-live-mini
+            [link]="['/t', t.id, 'm', cm.matchId]"
+            [matchId]="cm.matchId"
+            [gameText]="
+              bestOfCurrent() > 1 ? ('tp.game' | t: { n: cm.game, of: bestOfCurrent() }) : ''
+            "
+            [sides]="miniSides()"
+            [status]="liveStatus()"
+            [clock]="liveClock()"
+            [limits]="race() ? '' : liveLimits()"
+            [players]="liveState()?.players ?? null"
+            [race]="race()"
+            [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
+            [delayed]="liveDelay()"
+          />
         } @else if (t.phase === 'checkIn') {
           <div class="card">
             <h2>{{ 'tp.checkIn' | t }}</h2>
@@ -966,33 +933,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       width: 100%;
       margin-top: 4px;
     }
-    .versus {
-      display: grid;
-      grid-template-columns: 1fr auto 1fr;
-      align-items: center;
-      text-align: center;
-      margin: 8px 0;
-    }
-    .versus .name {
-      font-weight: 700;
-    }
-    .versus .score {
-      font-family: var(--font-display);
-      font-size: 2.4rem;
-      font-weight: 800;
-      font-variant-numeric: tabular-nums;
-      color: var(--accent);
-    }
-    .vs {
-      color: var(--muted);
-      padding: 0 12px;
-    }
-    .live {
-      border-color: var(--live);
-    }
-    .badge.running {
-      margin-left: 6px;
-    }
     .scroll {
       overflow-x: auto;
     }
@@ -1074,6 +1014,75 @@ export class TournamentPage {
   protected readonly secondsLeft = computed(() => {
     const d = this.liveNow()?.deadline;
     return d ? Math.max(0, Math.round((d - this.now()) / 1000)) : null;
+  });
+  /** State and delay when the live game was first seen (the stream brings the next ones). */
+  private readonly snapshot = signal<LiveSnapshot | null>(null);
+  private snapKey = '';
+  /** Players of the game in progress (mod 0.16.0), newest of stream and snapshot. */
+  protected readonly liveState = computed(() => {
+    const cm = this.current();
+    const l = this.liveNow();
+    if (!cm || !l) return null;
+    const a = this.stream.state();
+    const b = this.snapshot()?.state ?? null;
+    const s = !a ? b : !b ? a : a.at >= b.at ? a : b;
+    if (!s || s.tournamentId !== this.id() || s.matchId !== cm.matchId || s.game !== l.game)
+      return null;
+    if (l.race && s.run !== l.race.run) return null;
+    return s;
+  });
+  /** The state is held back while a human plays (setting). */
+  protected readonly liveDelay = computed(() =>
+    this.liveState()?.humans ? (this.snapshot()?.delaySec ?? 0) : 0,
+  );
+  /** Game time: the state's time plus its delay (deathmatch; a race shows its run time). */
+  protected readonly liveClock = computed(() => {
+    const s = this.liveState();
+    return s && !this.race() ? mmss(s.sec + this.liveDelay()) : null;
+  });
+  protected readonly liveLimits = computed(() => {
+    const r = (this.t()?.settings.game.rules ?? {}) as {
+      fragLimit?: number;
+      timeLimitMin?: number;
+    };
+    // Missing values are the rules' defaults (20 frags, 10 minutes; 0 = none).
+    const frags = r.fragLimit ?? 20;
+    const min = r.timeLimitMin ?? 10;
+    const parts: string[] = [];
+    if (frags) parts.push(this.i18n.t('live.fragLimit', { n: frags }));
+    if (min) parts.push(this.i18n.t('live.timeLimit', { t: mmss(min * 60) }));
+    return parts.join(' · ');
+  });
+  /** Both sides for the live panel: frags, or a race's times. */
+  protected readonly miniSides = computed<MiniSide[]>(() => {
+    const cm = this.current();
+    if (!cm) return [];
+    return cm.entrants.map((id) =>
+      this.race()
+        ? {
+            id,
+            name: this.name(id),
+            score: this.raceScore(id),
+            detail: this.raceDetail(id),
+            running: this.runnerNow() === id,
+          }
+        : { id, name: this.name(id), score: this.liveScore(id) },
+    );
+  });
+  /** Phase, map, the run and the countdown – or the call before the game. */
+  protected readonly liveStatus = computed(() => {
+    const cm = this.current();
+    if (!cm) return '';
+    const l = this.liveNow();
+    if (!l) return this.i18n.t(cm.map ? 'tp.mapSelected' : 'tp.called', { map: cm.map ?? '' });
+    const parts = [this.i18n.t(`live.${l.phase}`)];
+    if (l.map || cm.map) parts.push(l.map || cm.map || '');
+    const r = this.runnerNow();
+    if (this.race() && r)
+      parts.push(this.i18n.t('race.runOf', { n: (cm.runs?.length ?? 0) + 1, team: this.name(r) }));
+    const left = this.secondsLeft();
+    if (left !== null) parts.push(this.i18n.t('tp.secondsLeft', { s: left }));
+    return parts.join(' · ');
   });
   protected readonly bestOfCurrent = computed(() => {
     const cm = this.current();
@@ -1204,6 +1213,22 @@ export class TournamentPage {
       const id = this.id();
       void this.load(id);
       this.stream.open(id, () => void this.load(id, true));
+    });
+    // A game (run) went live: its state so far and the delay (the stream brings the rest).
+    effect(() => {
+      const l = this.liveNow();
+      const id = this.id();
+      const key = l ? `${id}/${l.matchId}/${l.game}/${l.race?.run ?? 0}` : '';
+      if (key === this.snapKey) return;
+      this.snapKey = key;
+      this.snapshot.set(null);
+      if (!key) return;
+      this.api.liveState(id).then(
+        (s) => {
+          if (this.snapKey === key) this.snapshot.set(s);
+        },
+        () => undefined,
+      );
     });
     const timer = setInterval(() => this.now.set(Date.now()), 1000);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
