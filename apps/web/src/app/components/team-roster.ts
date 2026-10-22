@@ -1,3 +1,4 @@
+import { botRoute } from '../core/bots';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -68,7 +69,7 @@ type Team = Extract<Entrant, { kind: 'team' }>;
               <li class="muted">
                 <span class="nmb">
                   @if (b.id) {
-                    <a [routerLink]="['/bots', b.id]">{{ b.name }}</a>
+                    <a [routerLink]="botRoute(b.id, tournament().kind === 'udt')">{{ b.name }}</a>
                   } @else {
                     <span>{{ b.name }}</span>
                   }
@@ -142,6 +143,7 @@ type Team = Extract<Entrant, { kind: 'team' }>;
 })
 export class TeamRoster {
   readonly tournament = input.required<TournamentDetail>();
+  protected readonly botRoute = botRoute;
   readonly isAdmin = input(false);
   readonly myUserId = input<string | null>(null);
   readonly changed = output<void>();

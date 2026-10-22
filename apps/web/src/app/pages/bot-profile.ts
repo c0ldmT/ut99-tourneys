@@ -9,7 +9,7 @@ import {
   signal,
 } from '@angular/core';
 import { PageTitle } from '../core/page-title';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { assetLabel, combatStyleKey, traitPercent } from '../core/bots';
@@ -77,6 +77,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
             <dd [title]="'udt.form.title.' + c.form | t">{{ 'udt.career.form.' + c.form | t }}</dd>
           </dl>
           <p class="muted small">{{ 'udt.career.effect.' + c.phase | t }}</p>
+          <a class="small" [routerLink]="['/udt/bot', b.id]">{{ 'udt.bot.dtView' | t }}</a>
         </section>
       }
 
@@ -350,6 +351,7 @@ export class BotProfilePage {
   });
 
   private readonly title = inject(PageTitle);
+  private readonly router = inject(Router);
 
   constructor() {
     effect(() => this.title.set(this.b()?.gameName));
@@ -362,7 +364,13 @@ export class BotProfilePage {
 
   private async load(id: string) {
     try {
-      this.b.set(await this.api.botProfile(id));
+      const b = await this.api.botProfile(id);
+      // A bot a manager made only plays Dream Team: its page there has the right numbers.
+      if (b.udtOwner && this.auth.config().udt) {
+        void this.router.navigate(['/udt/bot', b.id], { replaceUrl: true });
+        return;
+      }
+      this.b.set(b);
       if (this.auth.config().udt)
         this.api.udtCareer(id, true).then(
           (c) => this.career.set(c),

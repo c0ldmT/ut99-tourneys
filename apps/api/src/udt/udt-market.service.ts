@@ -30,6 +30,7 @@ import { LedgerService } from '../ledger/ledger.service.js';
 import { nextDay, zonedMs } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { botKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
 import { UdtCareerService } from './udt-career.service.js';
 import { UdtService, withTraits } from './udt.service.js';
@@ -177,7 +178,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const careers = this.career.careers();
     for (const b of library) {
       if (b.udtOwner && !owned.has(b.id)) continue;
-      const p = players.get(`b:${b.id}`);
+      const p = players.get(botKey(b.id));
       const phase = careers.get(b.id)?.phase;
       const demand = demandFactor(sales.get(bracketOf(b.skill)) ?? 0, unsoldDays.get(b.id) ?? 0);
       const v = marketValue(

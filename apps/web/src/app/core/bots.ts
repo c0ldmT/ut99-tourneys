@@ -32,3 +32,8 @@ export function traitPercent(v: number | undefined, min = -1): number {
   const x = v ?? 0;
   return Math.round(((x - min) / (1 - min)) * 100);
 }
+
+/** Where a bot's name links: its Dream Team page in Dream Team tournaments, else its profile. */
+export function botRoute(id: string, udt: boolean): string[] {
+  return udt ? ['/udt/bot', id] : ['/bots', id];
+}

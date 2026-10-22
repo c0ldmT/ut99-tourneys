@@ -12,6 +12,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { cannotDevelop, DEFAULT_ECONOMY, DEVELOP_COST } from '@tourney/udt';
 import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
@@ -38,7 +39,16 @@ const SHORT: Readonly<Record<Stat, string>> = {
  */
 @Component({
   selector: 'udt-bot-panel',
-  imports: [FormsModule, TPipe, NeuroPipe, UdtCard, UdtBotLook, UdtRename, UdtPotential],
+  imports: [
+    FormsModule,
+    RouterLink,
+    TPipe,
+    NeuroPipe,
+    UdtCard,
+    UdtBotLook,
+    UdtRename,
+    UdtPotential,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <dialog #dlg class="panel" aria-labelledby="udt-panel-title" (close)="closed.emit()">
@@ -61,6 +71,9 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 {{ 'udt.paid' | t }} {{ b.price | neuro }}
               }
             </span>
+            <a class="small" [routerLink]="['/udt/bot', b.botId]" (click)="close()">{{
+              'udt.bot.statsLink' | t
+            }}</a>
           </div>
           <div class="right">
             <section>

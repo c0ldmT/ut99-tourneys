@@ -201,6 +201,23 @@ describe('website + bridge + simulated UT server', () => {
     // Dream Team games stay out of the statistics.
     const stats = (await mario!.get('/stats/players?mode=dm&bots=1')).body as any[];
     expect(stats.some((r) => /Mira|Tox|Lib/.test(r.name))).toBe(false);
+    // ... but count on the bots' Dream Team pages: games, wins (also in the career), matches.
+    const pages = [];
+    for (const c of [mario!, tim!]) {
+      const botId = (await c.get('/udt')).body.roster[0].botId as string;
+      const page = await c.get(`/udt/bots/${botId}`);
+      expect(page.status).toBe(200);
+      pages.push(page.body);
+    }
+    for (const p of pages) {
+      expect(p.team.mine).toBe(true);
+      expect(p.made.origin).toBe('starter');
+      expect(p.stats.games).toBeGreaterThan(0);
+      expect(p.recent.length).toBeGreaterThan(0);
+      expect(p.career.wins).toBe(p.stats.gamesWon);
+      expect(p.normalGames).toBe(0);
+    }
+    expect(pages.some((p) => p.stats.gamesWon > 0)).toBe(true);
   });
 
   it('runs a 2on2 team tournament with a line-up change during a game', async () => {

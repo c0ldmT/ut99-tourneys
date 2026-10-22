@@ -28,6 +28,7 @@ import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { TournamentStream } from '../core/stream';
 import { finalMs, isRace, raceTime, type RunView } from '../core/race';
+import { botRoute } from '../core/bots';
 import { mmss } from '../core/live';
 import type {
   BetMatchView,
@@ -445,7 +446,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                         <td>
                           <span class="who">
                             @if (libraryBotId(s.entrantId); as bid) {
-                              <a [routerLink]="['/bots', bid]">{{ name(s.entrantId) }}</a>
+                              <a [routerLink]="botRoute(bid, udtMode())">{{ name(s.entrantId) }}</a>
                             } @else if (humanUserId(s.entrantId); as uid) {
                               <a [routerLink]="['/stats/p', 'u:' + uid]"
                                 ><na-name [name]="name(s.entrantId)" [id]="uid"
@@ -1091,6 +1092,7 @@ export class TournamentPage {
   protected readonly teamMode = computed(() => (this.t()?.settings.teamSize ?? 1) > 1);
   /** Dream Team: managers enter their teams, the lineups play. */
   protected readonly udtMode = computed(() => this.t()?.kind === 'udt');
+  protected readonly botRoute = botRoute;
 
   protected humanTeams(t: TournamentDetail): number {
     return t.registrations.filter((r) => !r.ai).length;

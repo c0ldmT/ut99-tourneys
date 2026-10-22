@@ -13,6 +13,7 @@ import { DB, type Db } from '../db/database.js';
 import { bots, neuroLedger, udtBots, udtHall, udtRoster, udtTeams } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
+import { botKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { UdtService } from './udt.service.js';
@@ -330,11 +331,77 @@ export class UdtCareerService implements OnModuleInit {
     );
   }
 
+  // ---------- a bot's Dream Team page ----------
+
+  /**
+   * A bot as Dream Team sees it: its team this season (card data as on the squads page), its
+   * career, its statistics from the Dream Team tournaments (season and all seasons, the latest
+   * matches) and whether it also plays the website's normal tournaments (then the profile there).
+   */
+  botPage(botId: string, viewer: User) {
+    this.udt.assertOn();
+    const b = this.bots.get(botId);
+    if (!b) throw notFound('bot');
+    // Between seasons (yearbook, hall of fame) the page shows the bot without a team.
+    const season = this.udt.seasonNumber();
+    const owner = season !== null ? (this.udt.owners(season).get(b.id) ?? null) : null;
+    const team = owner && season !== null ? this.udt.team(owner, season) : null;
+    const roster =
+      owner && season !== null
+        ? (this.udt.roster(owner, season).find((r) => r.botId === b.id) ?? null)
+        : null;
+    const key = botKey(b.id);
+    const now =
+      season !== null ? this.stats.udtPlayers(season).find((p) => p.key === key) : undefined;
+    const all = this.stats.udtPlayer(key, 'lifetime');
+    const normal = this.stats.players('lifetime', undefined, true).find((p) => p.key === key);
+    const made = this.db.select().from(udtBots).where(eq(udtBots.botId, b.id)).get();
+    return {
+      bot: {
+        id: b.id,
+        name: b.name,
+        gameName: roster?.gameName ?? b.gameName,
+        skill: b.skill,
+        traits: b.traits,
+        active: b.active,
+        value: roster ? roster.value : season !== null ? this.udt.value(b, season, []) : null,
+      },
+      team: team
+        ? {
+            userId: team.userId,
+            name: team.name,
+            tag: team.tag,
+            manager: this.users.byId(team.userId)?.displayName ?? '?',
+            ai: this.udt.aiIds().has(team.userId),
+            mine: team.userId === viewer.id,
+          }
+        : null,
+      roster,
+      career: this.careerOf(b.id),
+      /** Made by a manager (talent, apprentice, blueprint, starter): origin, season, breeder. */
+      made: made
+        ? {
+            origin: made.origin,
+            season: made.season,
+            status: made.status,
+            breeder: this.users.byId(made.userId)?.displayName ?? '?',
+          }
+        : null,
+      season,
+      stats: now ?? null,
+      lifetime: all ? all.row : null,
+      recent: (all?.recent ?? []).slice(0, 10),
+      /** Games in the website's normal tournaments: the bot profile there has more. */
+      normalGames: normal?.games ?? 0,
+    };
+  }
+
   // ---------- careers of all bots ----------
 
   /**
    * Careers of all library bots: games and wins per season from the statistics (normal
-   * tournaments) plus their Dream Team games, age in seasons, phase, level, form of the day.
+   * tournaments) plus their Dream Team games and wins, age in seasons, phase, level, form of the
+   * day.
    */
   careers(): Map<string, Career> {
     const per = new Map<string, { season: number; games: number; wins: number }[]>();
@@ -347,11 +414,20 @@ export class UdtCareerService implements OnModuleInit {
       } else l.push({ season, games, wins });
       per.set(id, l);
     };
+    // Statistics keys carry the bot id in lower case (`b:<id>`): the careers go by that, too.
     for (const s of this.seasons.list())
       for (const p of this.stats.players(s.number, undefined, true))
         if (p.key.startsWith('b:')) add(p.key.slice(2), s.number, p.games, p.gamesWon);
+    // Dream Team games from the rosters, their wins from the Dream Team tournaments' statistics.
+    const udtWins = this.stats.udtWins();
     for (const r of this.db.select().from(udtRoster).all())
-      if (r.games) add(r.botId, r.season, r.games, 0);
+      if (r.games)
+        add(
+          r.botId.toLowerCase(),
+          r.season,
+          r.games,
+          Math.min(r.games, udtWins.get(`${r.season}|${botKey(r.botId)}`) ?? 0),
+        );
     const current = this.seasons.current()?.number;
     // The form of the day: the Dream Team's day (season time zone).
     const day = this.udt.today();
@@ -359,7 +435,12 @@ export class UdtCareerService implements OnModuleInit {
     for (const b of this.bots.list())
       out.set(
         b.id,
-        career({ seasons: per.get(b.id) ?? [], id: b.id, day, ...(current ? { current } : {}) }),
+        career({
+          seasons: per.get(b.id.toLowerCase()) ?? [],
+          id: b.id,
+          day,
+          ...(current ? { current } : {}),
+        }),
       );
     return out;
   }

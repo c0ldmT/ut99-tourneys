@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
@@ -19,7 +20,7 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
  */
 @Component({
   selector: 'app-udt-yearbook',
-  imports: [FormsModule, TPipe, NeuroPipe, UdtCard, UdtNav],
+  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, UdtCard, UdtNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -92,6 +93,9 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
               <div class="muted small">
                 {{ 'udt.level' | t }} {{ b.level }} · {{ b.games }} {{ 'udt.academy.games' | t }}
               </div>
+              <a class="small" [routerLink]="['/udt/bot', b.botId]">{{
+                'udt.squads.profile' | t
+              }}</a>
             </figcaption>
           </figure>
         } @empty {
@@ -121,6 +125,9 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
                     {{ 'udt.career.wins' | t }}
                   </div>
                 }
+                <a class="small" [routerLink]="['/udt/bot', r.botId]">{{
+                  'udt.squads.profile' | t
+                }}</a>
               </figcaption>
             </figure>
           } @empty {

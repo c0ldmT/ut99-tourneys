@@ -590,6 +590,8 @@ export interface ModelChoice extends AssetItem {
 
 export interface BotProfile extends LibraryBot {
   statsKey: string;
+  /** Unreal Dream Team: made by this manager (only plays Dream Team). */
+  udtOwner?: string | null;
   labels: {
     botClass: string | null;
     skin?: string | null;
@@ -1521,6 +1523,37 @@ export interface UdtSquad {
   manager: string;
   ai: boolean;
   roster: UdtRosterBot[];
+}
+
+/** A bot as Dream Team sees it (`GET /udt/bots/:id`). */
+export interface UdtBotPage {
+  bot: {
+    id: string;
+    name: string;
+    gameName: string;
+    skill: number;
+    traits: BotTraitsView;
+    active: boolean;
+    /** Market value (null between seasons). */
+    value: number | null;
+  };
+  team: {
+    userId: string;
+    name: string;
+    tag: string;
+    manager: string;
+    ai: boolean;
+    mine: boolean;
+  } | null;
+  roster: UdtRosterBot | null;
+  career: UdtCareer | null;
+  made: { origin: string; season: number; status: string; breeder: string } | null;
+  /** The running season (null between seasons: no team, no season row). */
+  season: number | null;
+  stats: StatsPlayerRow | null;
+  lifetime: StatsPlayerRow | null;
+  recent: StatsPlayerDetail['recent'];
+  normalGames: number;
 }
 
 /** The textures a look puts on the model's skin slots (3D preview, decision 176). */

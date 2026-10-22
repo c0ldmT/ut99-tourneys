@@ -11,6 +11,7 @@ import type {
   UdtBotLookBody,
   UdtTeam,
   UdtSquad,
+  UdtBotPage,
   UdtSquadRow,
   UdtEvent,
   UdtLedgerEntry,
@@ -384,6 +385,8 @@ export class Api {
   udtYearbook = (season?: number) =>
     this.call<UdtYearbook>('GET', `/udt/yearbook${season ? `?season=${season}` : ''}`);
   udtBreeders = () => this.call<UdtBreeder[]>('GET', '/udt/breeders');
+  udtBot = (botId: string) =>
+    this.call<UdtBotPage>('GET', `/udt/bots/${encodeURIComponent(botId)}`);
   udtCareer = (botId: string, quiet = false) =>
     this.call<UdtCareer | null>('GET', `/udt/career/${encodeURIComponent(botId)}`, undefined, {
       quiet,

@@ -20,6 +20,7 @@ import { mmss, sideSum, withKills } from '../core/live';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
+import { botRoute } from '../core/bots';
 import { Loading } from '../core/loading';
 import { I18n, TPipe } from '../core/i18n';
 import { MH_ADAPTER, raceTime } from '../core/race';
@@ -123,7 +124,7 @@ const SUM_KEYS = [
               }
               @for (b of s.bots; track b.name) {
                 @if (b.id) {
-                  <a [routerLink]="['/bots', b.id]">{{ b.name }}</a>
+                  <a [routerLink]="botRoute(b.id, udt())">{{ b.name }}</a>
                 } @else {
                   <span>{{ b.name }}</span>
                 }
@@ -253,7 +254,7 @@ const SUM_KEYS = [
                       <div class="spread">
                         <span class="nm">
                           @if (p.botId) {
-                            <a [routerLink]="['/bots', p.botId]">{{ p.name }}</a>
+                            <a [routerLink]="botRoute(p.botId, udt())">{{ p.name }}</a>
                           } @else if (p.userId) {
                             <a [routerLink]="['/stats/p', 'u:' + p.userId]">{{ p.name }}</a>
                           } @else {
@@ -698,6 +699,9 @@ export class MatchPage {
 
   private readonly title = inject(PageTitle);
   private readonly loading = inject(Loading);
+  /** Dream Team tournament: bot names lead to their Dream Team page. */
+  protected readonly udt = computed(() => this.t()?.kind === 'udt');
+  protected readonly botRoute = botRoute;
   private readonly stream = inject(TournamentStream);
   /** Kills of the game in progress (live only). */
   protected readonly feed = signal<KillFeedEntry[]>([]);

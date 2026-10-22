@@ -60,6 +60,7 @@ interface Loaded {
 export class StatsService {
   private cache = new Map<string, { sig: string; facts: TournamentFacts }>();
   private ratingCache = new Map<number, { sig: string; ratings: Ratings }>();
+  private udtWinsCache: { sig: string; wins: Map<string, number> } | null = null;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -74,6 +75,7 @@ export class StatsService {
   clearCache(): void {
     this.cache.clear();
     this.ratingCache.clear();
+    this.udtWinsCache = null;
   }
 
   /** Facts of the tournaments in a scope, oldest first. */
@@ -81,12 +83,51 @@ export class StatsService {
     return this.scoped(scope).map((x) => x.facts);
   }
 
-  private scoped(scope: StatScope): Loaded[] {
-    const all = this.load();
+  private scoped(scope: StatScope, udt = false): Loaded[] {
+    const all = this.load(udt);
     return scope === 'lifetime' ? all : all.filter((x) => x.season === scope);
   }
 
-  private load(): Loaded[] {
+  /**
+   * Facts of the Dream Team tournaments (managers' bots with traits), kept apart from the
+   * website's statistics; their season is the one of their first game.
+   */
+  udtFacts(scope: StatScope = 'lifetime'): TournamentFacts[] {
+    return this.scoped(scope, true).map((x) => x.facts);
+  }
+
+  /** Players of the Dream Team tournaments in a scope (bots included). */
+  udtPlayers(scope: StatScope): PlayerRow[] {
+    return playerTable(this.udtFacts(scope), { bots: true, names: this.names() });
+  }
+
+  /**
+   * Games won in Dream Team tournaments per season and player (`<season>|<key>`), for the
+   * careers (cached until a Dream Team log or the seasons change).
+   */
+  udtWins(): Map<string, number> {
+    const all = this.load(true);
+    const sig = `${JSON.stringify(this.seasons.list())}|${all.map((x) => `${x.facts.tournamentId}:${x.head}`).join(',')}`;
+    if (this.udtWinsCache?.sig === sig) return this.udtWinsCache.wins;
+    const wins = new Map<string, number>();
+    const seasons = [...new Set(all.map((x) => x.season).filter((s) => s !== undefined))];
+    for (const s of seasons)
+      for (const p of playerTable(
+        all.filter((x) => x.season === s).map((x) => x.facts),
+        { bots: true },
+      ))
+        wins.set(`${s}|${p.key}`, p.gamesWon);
+    this.udtWinsCache = { sig, wins };
+    return wins;
+  }
+
+  /** A player's Dream Team statistics (no records: those belong to the website's statistics). */
+  udtPlayer(key: string, scope: StatScope): PlayerDetail | undefined {
+    const d = playerDetail(this.udtFacts(scope), key, this.names());
+    return d && { ...d, records: [], mapRecords: [] };
+  }
+
+  private load(udt = false): Loaded[] {
     const rows = this.db
       .select({
         id: tournaments.id,
@@ -100,8 +141,8 @@ export class StatsService {
       })
       .from(tournaments)
       .all()
-      // Dream Team tournaments (managers' bots with traits) have their own table.
-      .filter((r) => r.headSeq > 0 && r.kind !== 'udt')
+      // Dream Team tournaments (managers' bots with traits) count apart (`udtFacts`).
+      .filter((r) => r.headSeq > 0 && (r.kind === 'udt') === udt)
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     const seasons = this.seasons.list();
     const out: Loaded[] = [];
@@ -124,7 +165,8 @@ export class StatsService {
         this.cache.set(r.id, { sig, facts });
       }
       const first = firstGameAt(facts);
-      const season = r.seasonal && first !== undefined ? this.seasonOf(seasons, first) : undefined;
+      const season =
+        (r.seasonal || udt) && first !== undefined ? this.seasonOf(seasons, first) : undefined;
       out.push({
         facts,
         seasonal: r.seasonal,

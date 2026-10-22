@@ -72,6 +72,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/udt-squads').then((m) => m.UdtSquadPage),
       },
       {
+        path: 'udt/bot/:id',
+        title: 'udt.title',
+        loadComponent: () => import('./pages/udt-bot').then((m) => m.UdtBotProfilePage),
+      },
+      {
         path: 'udt/table',
         title: 'udt.nav.table',
         loadComponent: () => import('./pages/udt-events').then((m) => m.UdtTablePage),

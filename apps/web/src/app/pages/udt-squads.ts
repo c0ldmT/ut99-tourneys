@@ -129,7 +129,7 @@ export class UdtSquadsPage {
               } @else if (b.own) {
                 <span class="udt-mark own">{{ 'udt.academy.origin.' + b.own.origin | t }}</span>
               }
-              <a [routerLink]="['/bots', b.botId]">{{ 'udt.squads.profile' | t }}</a>
+              <a [routerLink]="['/udt/bot', b.botId]">{{ 'udt.squads.profile' | t }}</a>
             </div>
           </div>
         }

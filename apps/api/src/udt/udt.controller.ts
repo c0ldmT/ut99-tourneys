@@ -420,6 +420,12 @@ export class UdtController {
     return this.career.breeders();
   }
 
+  /** A bot's Dream Team page: team, card, career and its Dream Team statistics. */
+  @Get('bots/:id')
+  botPage(@Param('id') id: string, @CurrentUser() user: User) {
+    return this.career.botPage(id, user);
+  }
+
   /** A bot's career (all bots: age, phase, level, form). */
   @Get('career/:botId')
   careerOf(@Param('botId') botId: string) {
