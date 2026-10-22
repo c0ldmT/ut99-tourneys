@@ -43,6 +43,7 @@ import {
   type Ut99DmRules,
 } from '@tourney/adapter-ut99';
 import { botEntrant } from './bootstrap.js';
+import { blankFeed, LiveBoard, type LiveContext } from './live-board.js';
 import type { Clock, TimerHandle } from './clock.js';
 import type { EventStore } from './event-store.js';
 import type { Logger } from './log.js';
@@ -311,6 +312,12 @@ export class MatchDirector extends EventEmitter {
     this.betWindowMs = Math.max(0, (o.betWindowSec ?? 0) * 1000);
     this.antiIdle = clampAi(o.antiIdle);
     this.skillCurve = o.skillCurve ?? true;
+    this.board = new LiveBoard(
+      o.clock,
+      (state) => this.emit('state', state),
+      (entry) => this.emit('feed', entry),
+      (thought) => this.emit('thought', thought),
+    );
   }
 
   // -------------------------------------------------------------------------------------------
@@ -324,6 +331,10 @@ export class MatchDirector extends EventEmitter {
   /** Player statistics lines of the current game/run (ps, px, pw), until `pse` completes them. */
   private statLines = new Map<string, StatLine>();
   private reminder?: TimerHandle;
+  /** When the game (Monster Hunt: run) in progress went live (feed times). */
+  private liveSince?: number;
+  /** Live data of the game in progress (mod 0.16.0): `state`, items and thoughts in the feed. */
+  private readonly board: LiveBoard;
 
   start(): Promise<void> {
     this.o.mod.on('hello', this.onHelloListener);
@@ -963,6 +974,40 @@ export class MatchDirector extends EventEmitter {
     this.startLineups = undefined;
     if (this.captainTimer) this.o.clock.clearTimeout(this.captainTimer);
     this.captainTimer = undefined;
+    this.board.reset();
+    this.liveSince = undefined;
+  }
+
+  /** The game (run) in progress for the live data and the feed. */
+  private liveCtx(s: { matchId: string; game: number }): LiveContext {
+    const cm = this.proj.currentMatch;
+    const runner = this.raceMode ? (this.runner() ?? null) : null;
+    const since = this.liveSince;
+    return {
+      tournamentId: this.o.tournamentId,
+      matchId: s.matchId,
+      game: s.game,
+      ...(this.raceMode ? { run: this.raceRun() } : {}),
+      // Race mode: the running team plays alone, its side is the runner.
+      sideEntrant: (n) => (n > 1 ? null : this.raceMode ? runner : (cm?.entrants[n] ?? null)),
+      player: (token) => {
+        const { entry } = this.entrantFor(token);
+        return entry
+          ? { ...(entry.userId ? { userId: entry.userId } : {}), name: entry.displayName }
+          : undefined;
+      },
+      sec: () =>
+        since === undefined
+          ? undefined
+          : Math.max(0, Math.floor((this.o.clock.now() - since) / 1000)),
+    };
+  }
+
+  /** Live lines belong to the game (run) on the server right now. */
+  private isLiveGame(mid: string, g: number, n: number): boolean {
+    const s = this.stage;
+    if (s.kind !== 'live' || s.matchId !== mid || s.game !== g) return false;
+    return this.raceMode ? n === this.raceRun() : n === 0;
   }
 
   private current(): { matchId: string; entrants: [string, string] } {
@@ -1873,6 +1918,8 @@ export class MatchDirector extends EventEmitter {
         const s = this.stage;
         if (s.kind !== 'countdown' || s.matchId !== msg.mid) return;
         this.stage = { kind: 'live', matchId: s.matchId, game: s.game, map: s.map, scores: [0, 0] };
+        this.board.reset();
+        this.liveSince = this.o.clock.now();
         const lineups = this.startLineups;
         const runner = this.raceMode ? this.runner() : undefined;
         if (
@@ -1902,20 +1949,16 @@ export class MatchDirector extends EventEmitter {
       case 'kf': {
         const s = this.stage;
         if (s.kind !== 'live' || s.matchId !== msg.mid) return;
-        const cm = this.proj.currentMatch;
-        if (!cm) return;
-        // Race mode: the running team plays alone, its side is the runner.
-        const sideOf = (n: number): string | null =>
-          n === 2 ? null : this.raceMode ? (this.runner() ?? null) : (cm.entrants[n] ?? null);
+        if (!this.proj.currentMatch) return;
+        const ctx = this.liveCtx(s);
         this.emit('feed', {
-          tournamentId: this.o.tournamentId,
-          matchId: msg.mid,
-          game: msg.g,
-          at: this.o.clock.now(),
+          ...blankFeed({ ...ctx, game: msg.g }, this.o.clock.now()),
+          kind: 'kill',
+          humans: this.board.humans,
           killer: msg.k,
-          killerSide: msg.k ? sideOf(msg.ks) : null,
+          killerSide: msg.k ? ctx.sideEntrant(msg.ks) : null,
           victim: msg.v,
-          victimSide: sideOf(msg.vs),
+          victimSide: ctx.sideEntrant(msg.vs),
           weapon: msg.w,
           headshot: (msg.f & 1) !== 0,
           firstBlood: (msg.f & 2) !== 0,
@@ -1924,39 +1967,35 @@ export class MatchDirector extends EventEmitter {
           monster: (msg.f & 16) !== 0,
           spree: msg.sp,
           multi: msg.mk,
+          ...(msg.kh !== undefined && msg.kh >= 0 ? { killerHealth: msg.kh } : {}),
+          ...(msg.kd !== undefined && msg.k ? { distance: msg.kd } : {}),
+          ...((msg.f & 32) !== 0 ? { amp: true } : {}),
         } satisfies KillFeedEntry);
         return;
       }
       case 'bs': {
         const s = this.stage;
         if (s.kind !== 'live' || s.matchId !== msg.mid) return;
-        const cm = this.proj.currentMatch;
-        if (!cm) return;
-        const side =
-          msg.sd === 2
-            ? null
-            : this.raceMode
-              ? (this.runner() ?? null)
-              : (cm.entrants[msg.sd] ?? null);
+        if (!this.proj.currentMatch) return;
+        const ctx = this.liveCtx(s);
         this.emit('feed', {
-          tournamentId: this.o.tournamentId,
-          matchId: msg.mid,
-          game: msg.g,
-          at: this.o.clock.now(),
+          ...blankFeed({ ...ctx, game: msg.g }, this.o.clock.now()),
+          kind: 'chat',
+          humans: this.board.humans,
           killer: msg.n,
-          killerSide: side,
-          victim: '',
-          victimSide: null,
-          weapon: '',
-          headshot: false,
-          firstBlood: false,
-          suicide: false,
-          teamKill: false,
-          monster: false,
-          spree: 0,
-          multi: 0,
+          killerSide: ctx.sideEntrant(msg.sd),
           chat: msg.x,
         } satisfies KillFeedEntry);
+        return;
+      }
+      case 'lr':
+      case 'st':
+      case 'sx':
+      case 'pk':
+      case 'bt': {
+        if (!this.isLiveGame(msg.mid, msg.g, msg.n)) return;
+        const s = this.stage;
+        if (s.kind === 'live') this.board.handle(msg, this.liveCtx(s));
         return;
       }
       case 'lost': {
@@ -1983,6 +2022,8 @@ export class MatchDirector extends EventEmitter {
           d: msg.d,
           pts: msg.pts,
         };
+        if (msg.ml !== undefined)
+          this.board.monsters(msg.ml, msg.mt ?? msg.ml, msg.bl ?? 0, msg.n, this.liveCtx(s));
         this.telemetry('live', {
           race: {
             runner,
@@ -2088,6 +2129,10 @@ export class MatchDirector extends EventEmitter {
         monsters: x?.mk ?? 0,
         monsterPoints: x?.mp ?? 0,
         weapons: l.weapons,
+        ...(x?.dd !== undefined ? { damageDealt: x.dd, damageTaken: x.dt ?? 0 } : {}),
+        ...(x?.ua !== undefined
+          ? { items: { amp: x.ua, belt: x.ub ?? 0, armor: x.ur ?? 0, keg: x.uk ?? 0 } }
+          : {}),
       });
     }
     await this.append({

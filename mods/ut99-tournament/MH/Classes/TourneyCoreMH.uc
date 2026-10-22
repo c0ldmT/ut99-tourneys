@@ -21,6 +21,8 @@ var float RunSec;           // game seconds of this run, pauses excluded
 var int RunDeaths;
 var bool bRunReported;
 var int LastRpDeaths, RpTicks;
+var int MonStart;           // mod 0.16.0: most monsters seen alive in this run (usually at its start)
+var int MonAlive, BossAlive;
 // Monster Hunt settings from the bridge (race line), applied when a level starts. MonsterHunt
 // reads its own config from MonsterHunt.ini, so the tournament sets them in code instead.
 var int HuntLives;          // 0 = unlimited, -1 = not known (Monster Hunt's own setting)
@@ -231,6 +233,7 @@ function LiveTick()
 	if (!RunActive())
 		return;
 	StatTick();
+	LiveDataTick();
 	CaptainTick();
 	RpTicks++;
 	if (RpTicks >= 3 || RunDeaths != LastRpDeaths)
@@ -328,7 +331,40 @@ function SendProgress()
 	OutMsg.AddInt("ms", int(RunSec * 1000));
 	OutMsg.AddInt("d", RunDeaths);
 	OutMsg.AddInt("pts", HunterPoints());
+	CountMonsters();
+	OutMsg.AddInt("ml", MonAlive);
+	OutMsg.AddInt("mt", MonStart);
+	OutMsg.AddInt("bl", BossAlive);
 	Send();
+}
+
+// Mod 0.16.0: the live lines carry the run.
+function int LiveRun()
+{
+	return Max(1, RaceRun);
+}
+
+// Mod 0.16.0: monsters alive (Nali, cows and other friendly or following creatures not counted)
+// and bosses.
+function CountMonsters()
+{
+	local Pawn P;
+	local ScriptedPawn M;
+
+	MonAlive = 0;
+	BossAlive = 0;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		M = ScriptedPawn(P);
+		if (M == None || M.bDeleteMe || M.Health <= 0 || M.IsA('Nali') || M.IsA('Cow'))
+			continue;
+		if (int(M.AttitudeToPlayer) >= 5) // ATTITUDE_Friendly, ATTITUDE_Follow
+			continue;
+		MonAlive++;
+		if (M.bIsBoss)
+			BossAlive++;
+	}
+	MonStart = Max(MonStart, MonAlive);
 }
 
 // Monster points of the running team: the hunters' scores plus those of players who left.

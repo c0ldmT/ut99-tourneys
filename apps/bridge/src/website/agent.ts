@@ -17,12 +17,15 @@ import type {
   BotSpec,
   BridgeToWebsite,
   KillFeedEntry,
+  LiveState,
   MapInfo,
   WebsiteToBridge,
 } from '@tourney/protocol';
+import { BotLog } from '../bot-log.js';
 import type { Clock, TimerHandle } from '../clock.js';
 import type { BridgeConfig } from '../config.js';
 import { MatchDirector, type DirectorTiming, type LiveInfo } from '../director.js';
+import type { BotThought } from '../live-board.js';
 import type { Logger } from '../log.js';
 import type { ModHello, ModServer } from '../mod-server.js';
 import { readAssets, scanInventory } from '../ut99/inventory.js';
@@ -87,10 +90,14 @@ export class WebsiteAgent {
   /** Look preview requests run one after the other (each reads a package). */
   private assetQueue: Promise<void> = Promise.resolve();
   private assetsWaiting = 0;
+  /** What the bots were up to in live games (mod 0.16.0), for calibrating the skill curve. */
+  private readonly botLog?: BotLog;
 
   constructor(private readonly o: WebsiteAgentOptions) {
     const { config, log } = o;
     if (config.server) this.lookAssets = new LookAssets(config.server.installDir);
+    if (!o.memoryOnly)
+      this.botLog = new BotLog(path.resolve(o.baseDir, config.dataDir, 'bot-logs'), log);
     if (config.server)
       this.models = new ModelCatalog({
         installDir: config.server.installDir,
@@ -484,6 +491,14 @@ export class WebsiteAgent {
         // the kill feed is best effort
       }
     });
+    director.on('state', (state: LiveState) => {
+      try {
+        this.link.send('match.state', state);
+      } catch {
+        // live data is best effort
+      }
+    });
+    director.on('thought', (t: BotThought) => this.botLog?.add(t));
     director.on('finished', (champion: string) =>
       this.o.log.info(`tournament finished, champion ${champion}`),
     );

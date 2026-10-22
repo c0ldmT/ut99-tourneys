@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.15.0";
+const MOD_VERSION = "0.16.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -119,6 +119,21 @@ var int StCount;
 var int StGameSec;
 var bool bFirstBlood;
 var int FeedFlags, FeedSpree, FeedMulti; // kill feed of the kill being counted (kf line)
+// Live data (mod 0.16.0) per statistics slot: damage, items taken, what went to the bridge.
+var int StDmgOut[32], StDmgIn[32];  // damage dealt to opponents (and monsters), damage taken
+var int StAmp[32], StBelt[32], StArmor[32], StKeg[32];
+var string StLastSt[32];           // last st line sent (sent again only when it changed or after 5 s)
+var float StStAt[32];
+var byte StListed[32];             // 1 = its lr line went out
+var string StBState[32], StBTarget[32]; // bots: last bt line (state code, target)
+var float StBAt[32];
+var Pawn PkPawn[8];                // pickup queries of this second, checked in the next tick
+var Inventory PkItem[8];
+var string PkCode[8];
+var int PkHealth[8];
+var float PkAt[8];
+var int PkCount;
+var int CounterTicks;              // sx lines every 5 s
 
 // Website bots (bridge lines bcfg/btr/bpers/bsay/brv, sent before their "bot" line): look, play
 // style, chat lines and rivals by name in the game. Bots without these lines use the ini.
@@ -304,6 +319,7 @@ function OnBridgeOpened()
 	// gm: a game was started on this level (running or just ended); the bridge keeps its state.
 	OutMsg.AddBool("gm", bGameLive);
 	Send();
+	ResetLiveSent();
 	if (PendingEnd != "")
 	{
 		// result reported while the bridge was unreachable: statistics first, then the end
@@ -1532,6 +1548,7 @@ function LiveTick()
 	if (Game.bGameEnded)
 		return;
 	StatTick();
+	LiveDataTick();
 	A = SideScore(0);
 	B = SideScore(1);
 	ScoreTicks++;
@@ -1775,6 +1792,8 @@ function SendFeed(Pawn Killer, Pawn Other, name DamageType)
 	// Monsters killing monsters are no news.
 	if (Other.PlayerReplicationInfo == None && (K == None || K.PlayerReplicationInfo == None))
 		return;
+	if (K != None && K.FindInventoryType(class'Botpack.UDamage') != None)
+		FeedFlags = FeedFlags | 32;
 	OutMsg.Begin("kf");
 	OutMsg.AddStr("mid", MatchId);
 	OutMsg.AddInt("g", GameNo);
@@ -1789,6 +1808,13 @@ function SendFeed(Pawn Killer, Pawn Other, name DamageType)
 	OutMsg.AddInt("f", FeedFlags);
 	OutMsg.AddInt("sp", FeedSpree);
 	OutMsg.AddInt("mk", FeedMulti);
+	if (K != None)
+	{
+		OutMsg.AddInt("kh", Max(K.Health, 0));
+		OutMsg.AddInt("kd", int(VSize(K.Location - Other.Location)));
+	}
+	else
+		OutMsg.AddInt("kh", -1);
 	Send();
 }
 
@@ -1867,6 +1893,12 @@ function SendStats(int N, int Sec)
 		OutMsg.AddInt("m5", StM5[i]);
 		OutMsg.AddInt("mk", StMon[i]);
 		OutMsg.AddInt("mp", StatPoints(i));
+		OutMsg.AddInt("dd", StDmgOut[i]);
+		OutMsg.AddInt("dt", StDmgIn[i]);
+		OutMsg.AddInt("ua", StAmp[i]);
+		OutMsg.AddInt("ub", StBelt[i]);
+		OutMsg.AddInt("ur", StArmor[i]);
+		OutMsg.AddInt("uk", StKeg[i]);
 		SendStat();
 		for (j = 0; j < MAXW; j++)
 		{
@@ -1910,6 +1942,336 @@ function SendStat()
 function int StatPoints(int i)
 {
 	return 0;
+}
+
+//-----------------------------------------------------------------------------
+// Live data (mod 0.16.0): roster (lr), state (st), counters (sx), items (pk), bots (bt)
+
+// The run for the live lines: 0 in deathmatch (Monster Hunt: the run).
+function int LiveRun()
+{
+	return 0;
+}
+
+// Once a second while the game is live, after StatTick.
+function LiveDataTick()
+{
+	local Pawn P;
+	local int i;
+	local bool bCounters;
+
+	if (!bGameLive || bEndReported || bTourneyPaused || Game.bGameEnded)
+		return;
+	CounterTicks++;
+	bCounters = CounterTicks >= 5;
+	if (bCounters)
+		CounterTicks = 0;
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+	{
+		i = StatIndex(P, true);
+		if (i < 0)
+			continue;
+		if (StListed[i] == 0)
+			SendRoster(i, P);
+		SendLiveState(i, P);
+		if (Bot(P) != None)
+			SendThought(i, Bot(P));
+	}
+	CheckPickups(); // after the roster: a pk line never comes before its lr line
+	if (bCounters)
+		for (i = 0; i < StCount; i++)
+			if (StListed[i] != 0 && StPawn[i] != None && !StPawn[i].bDeleteMe)
+				SendCounters(i);
+}
+
+// After a reconnect to the bridge: roster and state go out again.
+function ResetLiveSent()
+{
+	local int i;
+	for (i = 0; i < StCount; i++)
+	{
+		StListed[i] = 0;
+		StLastSt[i] = "";
+	}
+}
+
+function LiveHead(string T, int i)
+{
+	OutMsg.Begin(T);
+	OutMsg.AddStr("mid", MatchId);
+	OutMsg.AddInt("g", GameNo);
+	OutMsg.AddInt("n", LiveRun());
+	OutMsg.AddInt("i", i);
+}
+
+function SendRoster(int i, Pawn P)
+{
+	StListed[i] = 1;
+	LiveHead("lr", i);
+	OutMsg.AddStr("nm", OutMsg.FitWire(P.PlayerReplicationInfo.PlayerName, 32));
+	OutMsg.AddInt("sd", StSide[i]);
+	OutMsg.AddBool("b", StKey[i] == "");
+	OutMsg.AddStr("tk", StKey[i]);
+	Send();
+}
+
+// Alive, health, armour (all armour charges, as the HUD adds them), weapon, powerups.
+function SendLiveState(int i, Pawn P)
+{
+	local Inventory Inv;
+	local int ArmorSum, Pu, Ut, n;
+	local bool bAlive;
+	local string Line, W;
+
+	bAlive = P.Health > 0 && !P.IsInState('Dying');
+	if (bAlive)
+	{
+		for (Inv = P.Inventory; Inv != None && n < 100; Inv = Inv.Inventory)
+		{
+			n++;
+			if (Inv.bIsAnArmor)
+				ArmorSum += Inv.Charge;
+			if (UDamage(Inv) != None)
+			{
+				// what is left: the running timer, then its final count of seconds
+				Pu = Pu | 1;
+				Ut = Max(0, int(Inv.TimerRate - Inv.TimerCounter + 0.5) + UDamage(Inv).FinalCount);
+			}
+			else if (UT_ShieldBelt(Inv) != None && Inv.Charge > 0)
+				Pu = Pu | 2;
+			else if (UT_Invisibility(Inv) != None && Inv.bActive)
+				Pu = Pu | 4;
+			else if (UT_JumpBoots(Inv) != None)
+				Pu = Pu | 8;
+		}
+		if (P.Weapon != None)
+		{
+			W = P.Weapon.ItemName;
+			if (W == "")
+				W = string(P.Weapon.Class.Name);
+		}
+	}
+	LiveHead("st", i);
+	OutMsg.AddBool("al", bAlive);
+	if (bAlive)
+		OutMsg.AddInt("h", P.Health);
+	else
+		OutMsg.AddInt("h", 0);
+	OutMsg.AddInt("a", Max(ArmorSum, 0));
+	OutMsg.AddStr("w", OutMsg.FitWire(W, 24));
+	OutMsg.AddInt("pu", Pu);
+	OutMsg.AddInt("ut", Ut);
+	Line = OutMsg.Finish();
+	if (Line == StLastSt[i] && Level.TimeSeconds - StStAt[i] < 5)
+		return;
+	StLastSt[i] = Line;
+	StStAt[i] = Level.TimeSeconds;
+	if (Link != None)
+		Link.SendLine(Line);
+}
+
+// Every 5 s: counters since the start of the game (run), ping and packet loss of players.
+function SendCounters(int i)
+{
+	local Pawn P;
+	local int Pg, Pl;
+
+	P = StPawn[i];
+	if (PlayerPawn(P) != None && !P.bDeleteMe && P.PlayerReplicationInfo != None)
+	{
+		Pg = P.PlayerReplicationInfo.Ping;
+		Pl = P.PlayerReplicationInfo.PacketLoss;
+	}
+	LiveHead("sx", i);
+	OutMsg.AddInt("k", StKills[i]);
+	OutMsg.AddInt("d", StDeaths[i]);
+	OutMsg.AddInt("su", StSuicides[i]);
+	OutMsg.AddInt("dd", StDmgOut[i]);
+	OutMsg.AddInt("dt", StDmgIn[i]);
+	OutMsg.AddInt("pg", Max(Pg, 0));
+	OutMsg.AddInt("pl", Max(Pl, 0));
+	Send();
+}
+
+// What a bot is up to (its state and target), when it changed and at most every 5 s.
+function SendThought(int i, Bot B)
+{
+	local name St;
+	local string S, Tg;
+	local Inventory Itm;
+
+	if (B.Health <= 0)
+		return;
+	St = B.GetStateName();
+	if (St == 'Attacking' || St == 'RangedAttack' || St == 'Acquisition')
+		S = "atk";
+	else if (St == 'Charging')
+		S = "chg";
+	else if (St == 'TacticalMove')
+		S = "tac";
+	else if (St == 'Retreating' || St == 'Fallback')
+		S = "ret";
+	else if (St == 'Hunting')
+		S = "hunt";
+	else if (St == 'StakeOut' || St == 'Hold' || St == 'Holding')
+		S = "camp";
+	else if (St == 'Roaming' || St == 'Wandering')
+		S = "roam";
+	else
+		return; // falling, hit, jumping, dying: nothing new
+	// the item it walks to: the item itself when close, else the marked item of the path node
+	Itm = Inventory(B.MoveTarget);
+	if (Itm == None && InventorySpot(B.MoveTarget) != None)
+		Itm = InventorySpot(B.MoveTarget).markedItem;
+	if ((S == "roam" || S == "ret") && Itm != None)
+	{
+		if (S == "roam")
+			S = "item";
+		Tg = Itm.ItemName;
+		if (Tg == "")
+			Tg = string(Itm.Class.Name);
+	}
+	else if (S != "roam" && S != "ret" && B.Enemy != None)
+		Tg = FeedName(B.Enemy);
+	if (S == StBState[i] && Tg == StBTarget[i])
+		return;
+	if (Level.TimeSeconds - StBAt[i] < 5)
+		return;
+	StBState[i] = S;
+	StBTarget[i] = Tg;
+	StBAt[i] = Level.TimeSeconds;
+	LiveHead("bt", i);
+	OutMsg.AddStr("s", S);
+	OutMsg.AddStr("tg", OutMsg.FitWire(Tg, 32));
+	Send();
+}
+
+// From the mutator's HandlePickupQuery: a pawn touches an item; whether it took it is checked
+// in the next tick (the query comes before the item decides, health packs check health).
+function OnPickupQuery(Pawn P, Inventory Item)
+{
+	local int j;
+	local string Code;
+
+	if (!bGameLive || bTourneyPaused || P == None || Item == None || PkCount >= 8)
+		return;
+	Code = PickupCode(Item);
+	if (Code == "")
+		return;
+	for (j = 0; j < PkCount; j++)
+		if (PkPawn[j] == P && PkItem[j] == Item)
+			return;
+	PkPawn[PkCount] = P;
+	PkItem[PkCount] = Item;
+	PkCode[PkCount] = Code;
+	PkHealth[PkCount] = P.Health;
+	PkAt[PkCount] = Level.TimeSeconds;
+	PkCount++;
+}
+
+function string PickupCode(Inventory Item)
+{
+	if (UDamage(Item) != None)
+		return "amp";
+	if (UT_ShieldBelt(Item) != None)
+		return "belt";
+	if (Armor2(Item) != None)
+		return "armor";
+	if (HealthPack(Item) != None)
+		return "keg";
+	if (UT_Invisibility(Item) != None)
+		return "invis";
+	if (UT_JumpBoots(Item) != None)
+		return "boots";
+	if (WarheadLauncher(Item) != None)
+		return "redeemer";
+	return "";
+}
+
+// Taken = the item is gone, owned by the pawn or sleeps until its respawn, and the pawn has it
+// (a keg: it was below the keg's limit; a pawn that died since: the item went). Queries from
+// before a pause are dropped.
+function CheckPickups()
+{
+	local int j, i;
+	local Pawn P;
+	local Inventory Itm;
+	local bool bTaken;
+
+	for (j = 0; j < PkCount; j++)
+	{
+		P = PkPawn[j];
+		Itm = PkItem[j];
+		PkPawn[j] = None;
+		PkItem[j] = None;
+		if (P == None || P.bDeleteMe || Level.TimeSeconds - PkAt[j] > 2.5)
+			continue;
+		bTaken = Itm == None || Itm.bDeleteMe || Itm.Owner == P || Itm.IsInState('Sleeping');
+		if (!bTaken || (P.Health > 0 && !HasPickup(P, PkCode[j], PkHealth[j])))
+			continue;
+		i = StatIndex(P, true);
+		if (i < 0)
+			continue;
+		CountPickup(i, PkCode[j]);
+		LiveHead("pk", i);
+		OutMsg.AddStr("it", PkCode[j]);
+		Send();
+	}
+	PkCount = 0;
+}
+
+function bool HasPickup(Pawn P, string Code, int HealthBefore)
+{
+	if (Code == "keg")
+		return HealthBefore < Min(199, 2 * P.default.Health); // HealthPack (super heal) takes it then
+	if (Code == "amp")
+		return P.FindInventoryType(class'Botpack.UDamage') != None;
+	if (Code == "belt")
+		return P.FindInventoryType(class'Botpack.UT_ShieldBelt') != None;
+	if (Code == "armor")
+		return P.FindInventoryType(class'Botpack.Armor2') != None;
+	if (Code == "invis")
+		return P.FindInventoryType(class'Botpack.UT_Invisibility') != None;
+	if (Code == "boots")
+		return P.FindInventoryType(class'Botpack.UT_JumpBoots') != None;
+	return P.FindInventoryType(class'Botpack.WarheadLauncher') != None;
+}
+
+function CountPickup(int i, string Code)
+{
+	if (Code == "amp")
+		StAmp[i]++;
+	else if (Code == "belt")
+		StBelt[i]++;
+	else if (Code == "armor")
+		StArmor[i]++;
+	else if (Code == "keg")
+		StKeg[i]++;
+}
+
+// From the mutator's MutatorTakeDamage after the other damage mutators: damage as it reaches the
+// health (armour already took its part), at most
+// the health left. Team damage is no damage dealt.
+function CountDamage(int Dmg, Pawn Victim, Pawn InstigatedBy)
+{
+	local int v, k;
+
+	if (!bGameLive || bEndReported || bTourneyPaused || Game.bGameEnded || Victim == None)
+		return;
+	Dmg = Min(Dmg, Max(Victim.Health, 0));
+	if (Dmg <= 0)
+		return;
+	v = StatIndex(Victim, true);
+	if (v >= 0)
+		StDmgIn[v] += Dmg;
+	if (InstigatedBy == None || InstigatedBy == Victim)
+		return;
+	k = StatIndex(InstigatedBy, true);
+	if (k < 0)
+		return;
+	if (v >= 0 && TeamSize > 1 && StSide[v] == StSide[k])
+		return;
+	StDmgOut[k] += Dmg;
 }
 
 // Called by the game's EndGame (after Super.EndGame).

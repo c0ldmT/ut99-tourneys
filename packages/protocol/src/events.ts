@@ -58,6 +58,11 @@ export const PlayerGameStatsSchema = z.object({
   monsterPoints: z.number().int(),
   /** Kills per weapon (weapon name -> kills). */
   weapons: z.record(z.string().min(1).max(32), z.number().int().positive()),
+  /** Mod 0.16.0: damage dealt to opponents (Monster Hunt: monsters) and damage taken. */
+  damageDealt: count.optional(),
+  damageTaken: count.optional(),
+  /** Mod 0.16.0: items taken (damage amplifier, shield belt, body armour, keg o' health). */
+  items: z.object({ amp: count, belt: count, armor: count, keg: count }).optional(),
 });
 export type PlayerGameStats = z.infer<typeof PlayerGameStatsSchema>;
 

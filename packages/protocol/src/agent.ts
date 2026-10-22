@@ -502,13 +502,25 @@ export const AgentLog = envelope(
   z.object({ level: z.enum(['debug', 'info', 'warn', 'error']), message: z.string().max(2000) }),
 );
 
-/** Kill feed of the game in progress (live only, not persisted). */
+/**
+ * Feed of the game in progress: kills, the website bots' chat lines and (mod 0.16.0) items taken
+ * and what bots are up to. The website keeps the last ones for viewers who come later and stores
+ * the whole feed of a game (run) with its replay.
+ */
 export const KillFeedEntrySchema = z.object({
   tournamentId: Id,
   matchId: Id,
   game: z.number().int().positive(),
+  /** Monster Hunt: the run (1 or 2) of the game. */
+  run: z.number().int().min(1).max(2).optional(),
   /** Unix ms. */
   at: z.number().int(),
+  /** Seconds since the game (Monster Hunt: run) went live. */
+  sec: z.number().int().nonnegative().optional(),
+  /** What the entry is; missing: a kill, or a chat line when `chat` is set (older bridges). */
+  kind: z.enum(['kill', 'chat', 'item', 'thought']).optional(),
+  /** A human plays in the game: the website shows items and thoughts with a delay. */
+  humans: z.boolean().optional(),
   killer: z.string().max(64),
   /** Entrant id of the killer's side; null: a monster or the world (suicide). */
   killerSide: Id.nullable(),
@@ -524,9 +536,84 @@ export const KillFeedEntrySchema = z.object({
   multi: z.number().int().nonnegative(),
   /** A bot's chat line instead of a kill: `killer` is the bot, `killerSide` its side. */
   chat: z.string().max(160).optional(),
+  /** Kills (mod 0.16.0): the killer's health after the kill, distance in Unreal units, amplified. */
+  killerHealth: z.number().int().optional(),
+  distance: z.number().int().nonnegative().optional(),
+  amp: z.boolean().optional(),
+  /** kind "item": `killer` took this item. */
+  item: z.enum(['amp', 'belt', 'armor', 'keg', 'invis', 'boots', 'redeemer']).optional(),
+  /** kind "thought": what the bot `killer` is doing now and its target. */
+  thought: z
+    .object({
+      state: z.enum(['atk', 'chg', 'tac', 'ret', 'hunt', 'roam', 'item', 'camp']),
+      target: z.string().max(64),
+    })
+    .optional(),
 });
 export type KillFeedEntry = z.infer<typeof KillFeedEntrySchema>;
 export const MatchFeed = envelope('match.feed', KillFeedEntrySchema);
+
+/** Powerup bits of a live player: damage amplifier, shield belt, invisibility, jump boots. */
+export const POWERUP_AMP = 1;
+export const POWERUP_BELT = 2;
+export const POWERUP_INVIS = 4;
+export const POWERUP_BOOTS = 8;
+
+export const LivePlayerSchema = z.object({
+  name: z.string().max(64),
+  /** Entrant id of the player's side. */
+  side: Id.nullable(),
+  bot: z.boolean(),
+  userId: Id.optional(),
+  alive: z.boolean(),
+  health: z.number().int(),
+  armor: z.number().int().nonnegative(),
+  weapon: z.string().max(32),
+  powerups: z.number().int().nonnegative(),
+  /** Seconds of damage amplifier left. */
+  ampSec: z.number().int().nonnegative(),
+  kills: z.number().int().nonnegative(),
+  deaths: z.number().int().nonnegative(),
+  suicides: z.number().int().nonnegative(),
+  damageDealt: z.number().int().nonnegative(),
+  damageTaken: z.number().int().nonnegative(),
+  /** Players only: ping in ms and packet loss in percent. */
+  ping: z.number().int().nonnegative().optional(),
+  loss: z.number().int().nonnegative().optional(),
+  items: z.object({
+    amp: z.number().int().nonnegative(),
+    belt: z.number().int().nonnegative(),
+    armor: z.number().int().nonnegative(),
+    keg: z.number().int().nonnegative(),
+  }),
+});
+export type LivePlayer = z.infer<typeof LivePlayerSchema>;
+
+/**
+ * Live state of the game in progress (mod 0.16.0, at most once a second, not persisted): every
+ * player and bot with health, armour, weapon, powerups and counters; Monster Hunt: the monsters.
+ */
+export const LiveStateSchema = z.object({
+  tournamentId: Id,
+  matchId: Id,
+  game: z.number().int().positive(),
+  run: z.number().int().min(1).max(2).optional(),
+  /** Unix ms and seconds since the game (run) went live. */
+  at: z.number().int(),
+  sec: z.number().int().nonnegative(),
+  /** A human plays in the game: the website shows the state with a delay. */
+  humans: z.boolean(),
+  players: z.array(LivePlayerSchema).max(64),
+  monsters: z
+    .object({
+      alive: z.number().int().nonnegative(),
+      total: z.number().int().nonnegative(),
+      bosses: z.number().int().nonnegative(),
+    })
+    .optional(),
+});
+export type LiveState = z.infer<typeof LiveStateSchema>;
+export const MatchState = envelope('match.state', LiveStateSchema);
 
 export const BridgeToWebsiteSchema = z.discriminatedUnion('type', [
   AgentHello,
@@ -537,6 +624,7 @@ export const BridgeToWebsiteSchema = z.discriminatedUnion('type', [
   CommandAck,
   MatchLive,
   MatchFeed,
+  MatchState,
   AgentLog,
   AssetData,
 ]);

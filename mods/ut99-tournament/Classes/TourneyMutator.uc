@@ -1,7 +1,8 @@
 //=============================================================================
 // TourneyMutator
 // Console commands: mutate tourney ready | vote 3 1 5 | bracket | standings
-// Also the damage mutator and ModifyPlayer for the Dream Team game traits.
+// Also the damage mutator and ModifyPlayer for the Dream Team game traits, and the pickup
+// query for the live data.
 // (bindable to a key). Chat commands (!ready, !vote ...) arrive via TourneyChatListener.
 //=============================================================================
 class TourneyMutator extends Mutator;
@@ -26,6 +27,19 @@ function MutatorTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy,
 		Game.OnTakeDamage(ActualDamage, Victim, InstigatedBy, DamageType);
 	if (NextDamageMutator != None)
 		NextDamageMutator.MutatorTakeDamage(ActualDamage, Victim, InstigatedBy, HitLocation, Momentum, DamageType);
+	// mod 0.16.0: damage counters with the damage after all damage mutators
+	if (Game != None)
+		Game.CountDamage(ActualDamage, Victim, InstigatedBy);
+}
+
+// Mod 0.16.0: items taken (live data); the decision stays with the next mutators and the game.
+function bool HandlePickupQuery(Pawn Other, Inventory Item, out byte bAllowPickup)
+{
+	if (Game != None)
+		Game.OnPickupQuery(Other, Item);
+	if (NextMutator != None)
+		return NextMutator.HandlePickupQuery(Other, Item, bAllowPickup);
+	return false;
 }
 
 // Every spawn: start armour of website bots with that trait.

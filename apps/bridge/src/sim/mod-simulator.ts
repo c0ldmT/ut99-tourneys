@@ -104,6 +104,8 @@ export class ModSimulator {
   private stopped = false;
   /** Bots of the current match (from the `bot` lines), for the statistics lines. */
   private matchBots: { name: string; s: 'a' | 'b' }[] = [];
+  /** Live data ticks of the game (run) on this level (mod 0.16.0 lines). */
+  private liveTicks = 0;
   /** Statistics lines sent so far (tests look at them). */
   readonly statsSent: ModToBridge[] = [];
   /** Every line received from the bridge (tests inspect it). */
@@ -317,7 +319,84 @@ export class ModSimulator {
       f: w === 'Sniper Rifle' && this.rng() < 0.5 ? 1 : 0,
       sp: 0,
       mk: 0,
+      kh: 1 + Math.floor(this.rng() * 100),
+      kd: Math.floor(this.rng() * 2000),
     });
+  }
+
+  /** Who plays the game (run): match players and the match's bots, a race: the running side. */
+  private gamePlayers(
+    runSide: 'a' | 'b' | undefined,
+  ): { tk: string; bn: string; nm: string; s: 'a' | 'b' }[] {
+    const who: { tk: string; bn: string; nm: string; s: 'a' | 'b' }[] = [];
+    for (const j of this.matchPlayers()) {
+      const s = j.role === 'b' ? 'b' : 'a';
+      const nm = this.o.players.find((p) => p.token === j.token)?.name ?? j.token;
+      if (!runSide || s === runSide) who.push({ tk: j.token, bn: '', nm, s });
+    }
+    for (const b of this.matchBots)
+      if (!runSide || b.s === runSide) who.push({ tk: '', bn: b.name, nm: b.name, s: b.s });
+    return who;
+  }
+
+  /**
+   * Live data like mod 0.16.0 sends it each score interval: the roster first, then state and
+   * counters of everybody; the first player takes the damage amplifier, bots report a state; a
+   * race: a monster kill by the first hunter.
+   */
+  private sendLive(m: { mid: string; g: number }, n: number, runSide: 'a' | 'b' | undefined): void {
+    const tick = ++this.liveTicks;
+    const who = this.gamePlayers(runSide);
+    who.forEach((p, i) => {
+      const base = { mid: m.mid, g: m.g, n, i };
+      if (tick === 1)
+        this.send({ t: 'lr', ...base, nm: p.nm, sd: p.s === 'a' ? 0 : 1, b: !p.tk, tk: p.tk });
+      if (tick === 1 && i === 0) this.send({ t: 'pk', ...base, it: 'amp' });
+      this.send({
+        t: 'st',
+        ...base,
+        al: true,
+        h: 40 + Math.floor(this.rng() * 60),
+        a: i === 0 ? 150 : 0,
+        w: 'Shock Rifle',
+        pu: i === 0 && tick < 3 ? 1 : 0,
+        ut: i === 0 && tick < 3 ? 30 - tick * 3 : 0,
+      });
+      this.send({
+        t: 'sx',
+        ...base,
+        k: tick + i,
+        d: tick,
+        su: 0,
+        dd: tick * 100 + i,
+        dt: tick * 90,
+        pg: p.tk ? 40 : 0,
+        pl: 0,
+      });
+      if (!p.tk)
+        this.send({
+          t: 'bt',
+          ...base,
+          s: tick % 2 ? 'atk' : 'item',
+          tg: tick % 2 ? who[0]!.nm : 'Shield Belt',
+        });
+    });
+    if (runSide && who[0])
+      this.send({
+        t: 'kf',
+        mid: m.mid,
+        g: m.g,
+        k: who[0].nm,
+        ks: runSide === 'a' ? 0 : 1,
+        v: 'Krall',
+        vs: 2,
+        w: 'Flak Cannon',
+        f: 16,
+        sp: 0,
+        mk: 0,
+        kh: 80,
+        kd: 400,
+      });
   }
 
   private matchPlayers(): Joined[] {
@@ -359,6 +438,7 @@ export class ModSimulator {
     const m = this.match;
     if (!m) return;
     this.inGame = true;
+    this.liveTicks = 0;
     this.send({ t: 'live', mid: m.mid, g: m.g });
     if (this.race) return this.startRun(m, this.race);
     let sa = 0;
@@ -372,6 +452,7 @@ export class ModSimulator {
         sb += db;
         if (da && sa <= 19) this.sendKill(m, 'a');
         if (db && sb <= 19) this.sendKill(m, 'b');
+        this.sendLive(m, 0, undefined);
         this.send({
           t: 'score',
           mid: m.mid,
@@ -401,7 +482,20 @@ export class ModSimulator {
       if (!this.inGame) return;
       const elapsed = Math.min(ms, this.o.clock.now() - started);
       const d = Math.floor((deaths * elapsed) / ms);
-      this.send({ t: 'rp', mid: m.mid, g: m.g, n: race.n, ms: elapsed, d, pts: 0 });
+      this.sendLive(m, race.n, race.rs);
+      const left = Math.max(0, 40 - this.liveTicks * 3);
+      this.send({
+        t: 'rp',
+        mid: m.mid,
+        g: m.g,
+        n: race.n,
+        ms: elapsed,
+        d,
+        pts: 0,
+        ml: left,
+        mt: 40,
+        bl: left > 10 ? 1 : 0,
+      });
       this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
     };
     this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
@@ -531,6 +625,12 @@ export class ModSimulator {
           m5: 0,
           mk: runSide ? 10 + i : 0,
           mp: runSide ? 100 + i : 0,
+          dd: 1000 + i,
+          dt: 900 + i,
+          ua: i === 0 ? 1 : 0,
+          ub: 1,
+          ur: 0,
+          uk: 2,
         },
       ];
       if (k > 0) lines.push({ t: 'pw', mid: m.mid, g: m.g, n, i, w: 'Shock Rifle', c: k });

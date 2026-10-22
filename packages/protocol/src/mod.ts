@@ -92,8 +92,10 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
   /**
    * Mod 0.7.3, kill feed: one line per kill of a player or by a player. `ks`/`vs` side of
    * killer and victim (0 = a, 1 = b, 2 = none: monster, world). `f` flags: 1 headshot, 2 first
-   * blood, 4 suicide, 8 team kill, 16 monster killed. `sp` the killer's spree after the kill,
-   * `mk` multi kill (2 = double, 3 = multi, ...; 0 = none).
+   * blood, 4 suicide, 8 team kill, 16 monster killed, 32 (mod 0.16.0) the killer had the damage
+   * amplifier. `sp` the killer's spree after the kill, `mk` multi kill (2 = double, 3 = multi,
+   * ...; 0 = none). Mod 0.16.0: `kh` the killer's health after the kill (-1: no killer), `kd`
+   * the distance between killer and victim in Unreal units.
    */
   z.object({
     t: z.literal('kf'),
@@ -107,6 +109,8 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     f: int.nonnegative(),
     sp: int.nonnegative(),
     mk: int.nonnegative(),
+    kh: int.min(-1).optional(),
+    kd: int.nonnegative().optional(),
   }),
   /** A match player disconnected during a live game (the mod paused the game). 1v1 only. */
   z.object({ t: z.literal('lost'), mid: str(16), s: side }),
@@ -131,6 +135,9 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     ms: int.nonnegative(), // run time so far, pauses excluded
     d: int.nonnegative(), // deaths in the team, bots included
     pts: int, // monster points of the team
+    ml: int.nonnegative().optional(), // mod 0.16.0: monsters alive (friendly creatures excluded)
+    mt: int.nonnegative().optional(), // mod 0.16.0: monsters at the start of the run
+    bl: int.nonnegative().optional(), // mod 0.16.0: bosses alive
   }),
   /** Monster Hunt race: the run is over (exit reached, time limit, or no hunters left). */
   z.object({
@@ -179,6 +186,12 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     m5: int.nonnegative(), // monster kills (multi kill level)
     mk: int.nonnegative(), // Monster Hunt: monsters killed
     mp: int, // Monster Hunt: monster points
+    dd: int.nonnegative().optional(), // mod 0.16.0: damage dealt to opponents (and monsters)
+    dt: int.nonnegative().optional(), // mod 0.16.0: damage taken
+    ua: int.nonnegative().optional(), // mod 0.16.0: damage amplifiers taken
+    ub: int.nonnegative().optional(), // mod 0.16.0: shield belts taken
+    ur: int.nonnegative().optional(), // mod 0.16.0: body armour taken
+    uk: int.nonnegative().optional(), // mod 0.16.0: kegs o' health taken
   }),
   z.object({
     t: z.literal('pw'),
@@ -196,6 +209,80 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     n: int.min(0).max(2),
     c: int.nonnegative(), // number of players sent
     sec: int.nonnegative(), // game (run) duration in seconds, pauses excluded
+  }),
+  // Live data (mod 0.16.0), only while a game (Monster Hunt: run) is live. `n` is the run (0 in
+  // deathmatch), `i` the statistics slot of the player or bot (as in `ps`).
+  /** Live roster: a player or bot of the game got a slot (also again after a reconnect). */
+  z.object({
+    t: z.literal('lr'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    nm: str(MAX_NAME_CHARS), // name in the game
+    sd: int.min(0).max(1), // side 0 = a, 1 = b
+    b: z.boolean(), // a bot
+    tk: str(64), // the player's join token ('' for bots)
+  }),
+  /**
+   * State of a player or bot, once a second when it changed (else every 5 s): alive, health,
+   * armour (sum of the armour charges), weapon, powerups (bits 1 damage amplifier, 2 shield belt,
+   * 4 invisibility, 8 jump boots), seconds of damage amplifier left.
+   */
+  z.object({
+    t: z.literal('st'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    al: z.boolean(),
+    h: int,
+    a: int.nonnegative(),
+    w: str(24),
+    pu: int.nonnegative(),
+    ut: int.nonnegative(),
+  }),
+  /**
+   * Counters of a player or bot every 5 s, all since the start of the game (run): kills, deaths,
+   * suicides, damage dealt to opponents (and monsters), damage taken, ping and packet loss
+   * (players; 0 for bots).
+   */
+  z.object({
+    t: z.literal('sx'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    k: int.nonnegative(),
+    d: int.nonnegative(),
+    su: int.nonnegative(),
+    dd: int.nonnegative(),
+    dt: int.nonnegative(),
+    pg: int.nonnegative(),
+    pl: int.nonnegative(),
+  }),
+  /** A player or bot took an item. */
+  z.object({
+    t: z.literal('pk'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    it: z.enum(['amp', 'belt', 'armor', 'keg', 'invis', 'boots', 'redeemer']),
+  }),
+  /**
+   * A bot changed what it is doing (at most every 5 s per bot): `s` state code (atk attack, chg
+   * charge, tac tactical move, ret retreat, hunt, roam, item going for an item, camp), `tg` its
+   * target (enemy name, item name, '' none).
+   */
+  z.object({
+    t: z.literal('bt'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    s: z.enum(['atk', 'chg', 'tac', 'ret', 'hunt', 'roam', 'item', 'camp']),
+    tg: str(32),
   }),
   /** A chat command the bridge decides on, e.g. "start" (team captain starts with bots). */
   z.object({ t: z.literal('cmd'), pid, c: str(16) }),
