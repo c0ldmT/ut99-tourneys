@@ -21,6 +21,7 @@ import { CLOCK, CONFIG, ShiftClock, systemClock, type ApiClock, type ApiConfig }
 import { DB, openDatabase, type Db } from './db/database.js';
 import { EventLogService } from './tournaments/event-log.service.js';
 import { LiveHub } from './tournaments/hub.js';
+import { LiveRecorder } from './tournaments/live-recorder.js';
 import { TournamentsController } from './tournaments/tournaments.controller.js';
 import { TournamentsService } from './tournaments/tournaments.service.js';
 import { TeamsService } from './tournaments/teams.service.js';
@@ -125,6 +126,7 @@ class AppModule {
         UsersService,
         SessionsService,
         LiveHub,
+        LiveRecorder,
         NeuroHub,
         EventLogService,
         AgentConnections,

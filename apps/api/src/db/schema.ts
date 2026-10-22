@@ -1,4 +1,4 @@
-import { integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { blob, integer, primaryKey, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -502,3 +502,17 @@ export const udtAi = sqliteTable('udt_ai', {
   personality: text('personality').notNull(),
   createdAt: text('created_at').notNull(),
 });
+
+/** Replays of games (Monster Hunt: runs, else run 0): feed and timeline as deflated JSON. */
+export const gameReplays = sqliteTable(
+  'game_replays',
+  {
+    tournamentId: text('tournament_id').notNull(),
+    matchId: text('match_id').notNull(),
+    game: integer('game').notNull(),
+    run: integer('run').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+    data: blob('data', { mode: 'buffer' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.tournamentId, t.matchId, t.game, t.run] })],
+);

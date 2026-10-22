@@ -1,11 +1,17 @@
 import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
 import { Inject, Injectable } from '@nestjs/common';
-import { BridgeToWebsiteSchema, type BridgeToWebsite } from '@tourney/protocol';
+import {
+  BridgeToWebsiteSchema,
+  type BridgeToWebsite,
+  type TournamentEvent,
+} from '@tourney/protocol';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
-import { LiveHub } from '../tournaments/hub.js';
+import { SettingsService } from '../settings/settings.service.js';
+import { heldBack, LiveHub } from '../tournaments/hub.js';
+import { LiveRecorder } from '../tournaments/live-recorder.js';
 import { ACTIVE_PHASES, TournamentsService } from '../tournaments/tournaments.service.js';
 import { AgentsService } from './agents.service.js';
 import { AgentConnections } from './connections.js';
@@ -26,6 +32,8 @@ export class AgentGateway {
     @Inject(EventLogService) private readonly log: EventLogService,
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
     @Inject(LiveHub) private readonly hub: LiveHub,
+    @Inject(LiveRecorder) private readonly recorder: LiveRecorder,
+    @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(LOGGER) private readonly logger: ApiLogger,
   ) {
     this.connections.onChange((agentId, online) => {
@@ -161,6 +169,7 @@ export class AgentGateway {
             ? { tournamentId, accepted: true, events: res.events }
             : { tournamentId, accepted: false, events: res.missing, reason: res.reason },
         });
+        if (res.accepted) this.recordEnds(tournamentId, res.events);
         if (res.accepted && res.events.some((e) => e.type === 'match.result')) {
           this.hub.clearLive(tournamentId);
           // Bets were decided: the bots' personalities (bet news) go to the bridge.
@@ -196,12 +205,32 @@ export class AgentGateway {
       }
       case 'match.live': {
         const t = this.tournaments.get(msg.payload.tournamentId);
-        if (t && t.agentId === agentId) this.hub.publish(t.id, { type: 'live', data: msg.payload });
+        if (!t || t.agentId !== agentId) return;
+        this.hub.publish(t.id, { type: 'live', data: msg.payload });
+        this.recorder.telemetry(t.id, msg.payload);
         return;
       }
       case 'match.feed': {
         const t = this.tournaments.get(msg.payload.tournamentId);
-        if (t && t.agentId === agentId) this.hub.publish(t.id, { type: 'feed', data: msg.payload });
+        if (!t || t.agentId !== agentId) return;
+        this.recorder.feed(t.id, msg.payload);
+        const e = msg.payload;
+        const delay = e.humans ? this.delayMs() : 0;
+        if (heldBack(e)) this.hub.publish(t.id, { type: 'feed', data: e }, delay);
+        else if (delay && e.kind === 'kill') {
+          // Kills stay live, without what tells the state (health, amplifier, where); the
+          // replay keeps all of it.
+          const { killerHealth: _h, distance: _d, amp: _a, ...live } = e;
+          this.hub.publish(t.id, { type: 'feed', data: live });
+        } else this.hub.publish(t.id, { type: 'feed', data: e });
+        return;
+      }
+      case 'match.state': {
+        const t = this.tournaments.get(msg.payload.tournamentId);
+        if (!t || t.agentId !== agentId) return;
+        this.recorder.state(t.id, msg.payload);
+        const delay = msg.payload.humans ? this.delayMs() : 0;
+        this.hub.publish(t.id, { type: 'state', data: msg.payload }, delay);
         return;
       }
       case 'agent.log': {
@@ -211,6 +240,25 @@ export class AgentGateway {
         else this.logger.debug(line);
         return;
       }
+    }
+  }
+
+  /** Delay of the live state, items and thoughts while a human plays (setting). */
+  private delayMs(): number {
+    return this.settings.get().live.delaySec * 1000;
+  }
+
+  /** Games (runs) that ended get their replay stored. */
+  private recordEnds(tournamentId: string, events: readonly TournamentEvent[]): void {
+    for (const e of events) {
+      if (e.type === 'match.runFinished')
+        this.recorder.finish(tournamentId, e.data.matchId, e.data.game, true);
+      else if (e.type === 'match.gameFinished')
+        this.recorder.finish(tournamentId, e.data.matchId, e.data.game);
+      else if (e.type === 'match.result')
+        this.recorder.finishMatch(tournamentId, e.data.result.matchId);
+      else if (e.type === 'tournament.finished' || e.type === 'tournament.aborted')
+        this.recorder.finishAll(tournamentId);
     }
   }
 }

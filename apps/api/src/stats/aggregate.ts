@@ -38,6 +38,14 @@ export interface PlayerRow {
   runsFinished: number;
   monsters: number;
   monsterPoints: number;
+  /** Mod 0.16.0: games with damage data, damage dealt and taken in them, items taken. */
+  damageGames: number;
+  damageDealt: number;
+  damageTaken: number;
+  amps: number;
+  belts: number;
+  armors: number;
+  kegs: number;
 }
 
 export interface RecordHolder {
@@ -110,6 +118,13 @@ function emptyRow(r: PlayerRef): PlayerRow {
     runsFinished: 0,
     monsters: 0,
     monsterPoints: 0,
+    damageGames: 0,
+    damageDealt: 0,
+    damageTaken: 0,
+    amps: 0,
+    belts: 0,
+    armors: 0,
+    kegs: 0,
   };
 }
 
@@ -168,6 +183,17 @@ export function playerTable(
       x.timeSec += s.timeSec;
       x.monsters += s.monsters;
       x.monsterPoints += s.monsterPoints;
+      if (s.damageDealt !== undefined) {
+        x.damageGames++;
+        x.damageDealt += s.damageDealt;
+        x.damageTaken += s.damageTaken ?? 0;
+      }
+      if (s.items) {
+        x.amps += s.items.amp;
+        x.belts += s.items.belt;
+        x.armors += s.items.armor;
+        x.kegs += s.items.keg;
+      }
       const w = weapons.get(p.key) ?? new Map<string, number>();
       for (const [name, n] of Object.entries(s.weapons)) w.set(name, (w.get(name) ?? 0) + n);
       weapons.set(p.key, w);
@@ -272,6 +298,8 @@ export function records(
   gameRecord('game.spree', (x) => x.s.bestSpree);
   gameRecord('game.headshots', (x) => x.s.headshots);
   gameRecord('game.multiKills', (x) => multi(x.s));
+  gameRecord('game.damage', (x) => x.s.damageDealt ?? 0);
+  gameRecord('game.amps', (x) => x.s.items?.amp ?? 0);
   gameRecord(
     'game.kd',
     (x) => (x.s.kills >= 10 ? round2(x.s.kills / Math.max(1, x.s.deaths)) : 0),

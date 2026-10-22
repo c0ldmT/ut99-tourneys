@@ -10,6 +10,8 @@ import {
   type BotAiSettings,
   UdtSettingsSchema,
   type UdtSettings,
+  LiveSettingsSchema,
+  type LiveSettings,
   RatingSettingsSchema,
   SettingsService,
   ShopSettingsSchema,
@@ -79,6 +81,12 @@ export class SettingsController {
   @Put('udt')
   udt(@Body(new PatchPipe(UdtSettingsSchema.partial())) body: Partial<UdtSettings>) {
     return this.settings.setUdt(body);
+  }
+
+  /** Live data: replay retention and the delay while humans play. */
+  @Put('live')
+  live(@Body(new PatchPipe(LiveSettingsSchema.partial())) body: Partial<LiveSettings>) {
+    return this.settings.setLive(body);
   }
 
   /** Names for teams made of bots only. */

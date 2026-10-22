@@ -13,6 +13,8 @@ import { users } from '../src/db/schema.js';
 import { TournamentsService } from '../src/tournaments/tournaments.service.js';
 import type { DiscordOut, DiscordPost } from '../src/notify/discord-out.js';
 import { LiveHub } from '../src/tournaments/hub.js';
+import { LiveRecorder } from '../src/tournaments/live-recorder.js';
+import { SettingsService } from '../src/settings/settings.service.js';
 
 const d0 = (v: unknown) => typeof v === 'string' && v.length > 0;
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
@@ -576,5 +578,73 @@ describe('website + bridge + simulated UT server', () => {
     env.agent.link.start();
     await until(async () => (await admin.get('/agents')).body[0]?.online === true);
     await env.run(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'finished');
+  });
+
+  it('relays the live state, stores replays of every game and deletes them after the set days', async () => {
+    const env = await setup();
+    const { admin, id } = env;
+    // No delay here (the hub's delay has its own test).
+    expect((await admin.req('PUT', '/settings/live', { delaySec: 0 })).status).toBe(200);
+    await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's1' });
+    expect((await admin.post(`/tournaments/${id}/run`)).status).toBe(204);
+    await until(async () => (await admin.get(`/tournaments/${id}`)).body.phase === 'checkIn');
+    env.startSim();
+    const states: any[] = [];
+    const off = env.api.app
+      .get(LiveHub)
+      .subscribe(id, (m) => void (m.type === 'state' && states.push(m.data)));
+    let snapshot: any;
+    await env.run(async () => {
+      if (!snapshot) {
+        const l = (await admin.get(`/tournaments/${id}/live-state`)).body;
+        if (l.state?.players.length >= 2) snapshot = l;
+      }
+      return (await admin.get(`/tournaments/${id}`)).body.phase === 'finished';
+    });
+    off();
+    expect(states.length).toBeGreaterThan(0);
+    expect(snapshot.state.players[0]).toMatchObject({ alive: true, weapon: 'Shock Rifle' });
+    expect(snapshot.timeline.samples.length).toBeGreaterThan(0);
+    // Humans play: the state says so (the website would hold it back).
+    expect(states.some((s) => s.humans)).toBe(true);
+
+    const d = (await admin.get(`/tournaments/${id}`)).body;
+    const played = d.projection.results.find((r: any) => r.outcome === 'played');
+    const replays = (await admin.get(`/tournaments/${id}/matches/${played.matchId}/replays`)).body;
+    expect(replays.length).toBeGreaterThanOrEqual(1);
+    const r = replays[0];
+    expect(r.game).toBe(1);
+    expect(r.feed.some((e: any) => e.kind === 'item' && e.item === 'amp')).toBe(true);
+    expect(r.feed.some((e: any) => e.kind === 'kill' && e.killerHealth > 0)).toBe(true);
+    expect(r.samples.length).toBeGreaterThan(0);
+    expect(r.samples[0]).toHaveLength(5);
+    expect(r.players.length).toBeGreaterThanOrEqual(2);
+    // Damage and items are in the match's statistics.
+    const m = (await admin.get(`/tournaments/${id}/matches/${played.matchId}`)).body;
+    expect(m.games[0].players[0]).toMatchObject({
+      damageDealt: expect.any(Number),
+      items: { belt: 1, keg: 2 },
+    });
+
+    const recorder = env.api.app.get(LiveRecorder);
+    // A late line of a finished game does not replace its replay.
+    const line = { ...r.feed[0], tournamentId: id, matchId: 'X1', game: 1 };
+    recorder.feed(id, line);
+    recorder.feed(id, { ...line, at: line.at + 1 });
+    recorder.finish(id, 'X1', 1);
+    recorder.feed(id, { ...line, at: line.at + 2 });
+    recorder.finishMatch(id, 'X1');
+    expect(recorder.replays(id, 'X1')[0]!.feed).toHaveLength(2);
+
+    // Kept for the set days (default 60), then deleted; 0 keeps them for good.
+    const settings = env.api.app.get(SettingsService);
+    env.clock.advance(59 * 86_400_000);
+    expect(recorder.cleanup()).toBe(0);
+    settings.setLive({ replayDays: 0 });
+    env.clock.advance(5 * 86_400_000);
+    expect(recorder.cleanup()).toBe(0);
+    settings.setLive({ replayDays: 60 });
+    expect(recorder.cleanup()).toBeGreaterThan(0);
+    expect(recorder.replays(id, played.matchId)).toEqual([]);
   });
 });

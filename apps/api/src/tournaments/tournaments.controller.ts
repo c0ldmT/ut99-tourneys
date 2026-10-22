@@ -19,6 +19,8 @@ import { ZodPipe } from '../common/http.js';
 import { AdminOnly, CurrentUser } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { LiveHub, type HubMessage } from './hub.js';
+import { LiveRecorder } from './live-recorder.js';
+import { SettingsService } from '../settings/settings.service.js';
 import {
   ArchiveQuerySchema,
   CommandBody,
@@ -51,6 +53,8 @@ export class TournamentsController {
   constructor(
     @Inject(TournamentsService) private readonly svc: TournamentsService,
     @Inject(LiveHub) private readonly hub: LiveHub,
+    @Inject(LiveRecorder) private readonly recorder: LiveRecorder,
+    @Inject(SettingsService) private readonly settings: SettingsService,
   ) {}
 
   /**
@@ -109,6 +113,13 @@ export class TournamentsController {
   @Get(':id/matches/:matchId')
   match(@Param('id') id: string, @Param('matchId') matchId: string) {
     return this.svc.matchDetail(id, matchId);
+  }
+
+  /** Replays of the match's games (Monster Hunt: runs): feed, timeline, players at the end. */
+  @Get(':id/matches/:matchId/replays')
+  replays(@Param('id') id: string, @Param('matchId') matchId: string) {
+    this.svc.require(id);
+    return this.recorder.replays(id, matchId);
   }
 
   /** Rating changes of the games of this tournament (empty when it is not ranked). */
@@ -301,7 +312,30 @@ export class TournamentsController {
     return this.hub.latestFeed(id);
   }
 
-  /** Server-sent events: "change" (refetch the detail), "live" (match telemetry), "feed" (kills). */
+  /**
+   * Live state of the game in progress (mod 0.16.0; delayed like the stream while a human plays)
+   * and its timeline so far (scores; a race: points, deaths, monsters).
+   */
+  @Get(':id/live-state')
+  liveState(@Param('id') id: string) {
+    this.svc.require(id);
+    // The timeline of the game on the server only (not of a game an organizer ended).
+    const live = this.hub.latestLive(id) as { matchId?: string; game?: number } | undefined;
+    const timeline = this.recorder.progress(id);
+    return {
+      state: this.hub.latestState(id) ?? null,
+      timeline:
+        timeline && live?.matchId === timeline.matchId && live.game === timeline.game
+          ? timeline
+          : null,
+      delaySec: this.settings.get().live.delaySec,
+    };
+  }
+
+  /**
+   * Server-sent events: "change" (refetch the detail), "live" (match telemetry), "feed" (kills,
+   * items, thoughts), "state" (live state of the players).
+   */
   @Get(':id/stream')
   stream(@Param('id') id: string, @Req() req: Request, @Res() res: Response) {
     this.svc.require(id);
@@ -313,7 +347,7 @@ export class TournamentsController {
     });
     const send = (msg: HubMessage) => {
       res.write(
-        `event: ${msg.type}\ndata: ${JSON.stringify(msg.type === 'live' || msg.type === 'feed' ? msg.data : msg)}\n\n`,
+        `event: ${msg.type}\ndata: ${JSON.stringify(msg.type === 'live' || msg.type === 'feed' || msg.type === 'state' ? msg.data : msg)}\n\n`,
       );
     };
     res.write(': connected\n\n');

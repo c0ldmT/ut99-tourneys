@@ -525,4 +525,18 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE udt_offers ADD COLUMN demand REAL NOT NULL DEFAULT 1;
   `,
+  // 30: replays of games (Monster Hunt: runs): the whole feed and a timeline, compressed JSON.
+  // Deleted with the tournament and after the days set under Settings (live.replayDays).
+  `
+  CREATE TABLE game_replays (
+    tournament_id TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    game INTEGER NOT NULL,
+    run INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    data BLOB NOT NULL,
+    PRIMARY KEY (tournament_id, match_id, game, run)
+  );
+  CREATE INDEX game_replays_created ON game_replays(created_at);
+  `,
 ];

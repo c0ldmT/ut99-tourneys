@@ -112,6 +112,18 @@ export const UdtSettingsSchema = z.object({
 });
 export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
 
+/**
+ * Live data of games (mod 0.16.0): how long replays (feed and timeline of each game) are kept,
+ * and the delay of health, items and bot thoughts while a human plays (kills stay live).
+ */
+export const LiveSettingsSchema = z.object({
+  /** Days a replay is kept; 0 = for good. */
+  replayDays: z.number().int().min(0).max(3650).default(60),
+  /** Seconds the state, items and thoughts are held back while a human plays; 0 = live. */
+  delaySec: z.number().int().min(0).max(120).default(20),
+});
+export type LiveSettings = z.infer<typeof LiveSettingsSchema>;
+
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
   teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
@@ -119,6 +131,7 @@ export const WebsiteSettingsSchema = z.object({
   shop: ShopSettingsSchema.default(ShopSettingsSchema.parse({})),
   botAi: BotAiSettingsSchema.default(BotAiSettingsSchema.parse({})),
   udt: UdtSettingsSchema.default(UdtSettingsSchema.parse({})),
+  live: LiveSettingsSchema.default(LiveSettingsSchema.parse({})),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -148,7 +161,9 @@ export class SettingsService {
     const shop = ShopSettingsSchema.safeParse(raw['shop'] ?? {});
     const botAi = BotAiSettingsSchema.safeParse(raw['botAi'] ?? {});
     const udt = UdtSettingsSchema.safeParse(raw['udt'] ?? {});
+    const live = LiveSettingsSchema.safeParse(raw['live'] ?? {});
     return {
+      live: live.success ? live.data : LiveSettingsSchema.parse({}),
       udt: udt.success ? udt.data : UdtSettingsSchema.parse({}),
       botAi: botAi.success ? botAi.data : BotAiSettingsSchema.parse({}),
       shop: shop.success ? shop.data : ShopSettingsSchema.parse({}),
@@ -188,6 +203,13 @@ export class SettingsService {
     const next = UdtSettingsSchema.safeParse({ ...this.get().udt, ...value });
     if (!next.success) throw invalidInput(next.error);
     this.put('udt', next.data);
+    return this.get();
+  }
+
+  setLive(value: Partial<LiveSettings>): WebsiteSettings {
+    const next = LiveSettingsSchema.safeParse({ ...this.get().live, ...value });
+    if (!next.success) throw invalidInput(next.error);
+    this.put('live', next.data);
     return this.get();
   }
 
