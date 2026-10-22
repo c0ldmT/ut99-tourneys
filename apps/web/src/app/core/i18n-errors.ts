@@ -187,8 +187,9 @@ export const ERRORS_DE: Record<string, string> = {
   'the tag {tag} is taken': 'Das Tag {tag} ist vergeben.',
   'tag and bot name are too long for the game: {tag}{name} (at most {chars})':
     'Tag und Botname sind zu lang fürs Spiel: {tag}{name} (höchstens {chars} Zeichen).',
-  'the starter bot costs {cost} of {budget} points: lower skill or values':
-    'Der Starter-Bot kostet {cost} von {budget} Punkten: Senk Skill oder Werte.',
+  'the starter bot costs {cost} of {budget} points: lower the values':
+    'Der Starter-Bot kostet {cost} von {budget} Punkten: Senk die Werte.',
+  'the starter bot has skill {skill}': 'Der Starter-Bot hat Skill {skill}.',
   'a bot twice in the deathmatch lineup': 'Ein Bot steht doppelt in der Deathmatch-Aufstellung.',
   'a bot twice in the Monster Hunt lineup':
     'Ein Bot steht doppelt in der Monster-Hunt-Aufstellung.',

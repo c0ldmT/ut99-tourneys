@@ -27,7 +27,7 @@ async function setup() {
     expect((await admin.post('/bots', { name: `Lib${i}`, skill: 1 + i })).status).toBe(201);
   await admin.req('PUT', '/settings/udt', { enabled: true, offersPerDay: 6 });
   await startSeason(admin);
-  const starter = (name: string) => ({ name, skill: 2 });
+  const starter = (name: string) => ({ name, skill: 3 });
   await mario.post('/udt/team', { name: 'Nexus', tag: '[NX]', starter: starter('Mira') });
   await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: starter('Tox') });
   const market = api.app.get(UdtMarketService);

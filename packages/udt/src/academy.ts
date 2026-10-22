@@ -167,6 +167,9 @@ export function potentialWindow(potential: number, skill: number, seed: string):
   return [Math.min(lo, p), hi];
 }
 
+/** Every starter bot has skill 3, like the blueprints (a lower skill would make the values cheap). */
+export const STARTER_SKILL = 3;
+
 /** Potential of a starter bot: two skill steps above (at most Godlike). */
 export const starterPotential = (skill: number): number => Math.min(7, Math.round(skill) + 2);
 

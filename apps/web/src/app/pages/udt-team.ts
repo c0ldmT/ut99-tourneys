@@ -15,12 +15,13 @@ import {
   baseValue,
   botRarity,
   salaryOf,
+  SKILL_NAMES,
   UdtCard,
   UdtNav,
   valueScore,
   type CardBot,
 } from '../core/udt';
-import { DEFAULT_ECONOMY } from '@tourney/udt';
+import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
 
 /** Dream Team: founding the team (starter bot), the lineups, the roster and the ledger. */
 @Component({
@@ -80,18 +81,9 @@ import { DEFAULT_ECONOMY } from '@tourney/udt';
                 >{{ 'udt.found.bot' | t }}
                 <input name="bname" [(ngModel)]="botName" maxlength="17" required />
               </label>
-              <label
-                >{{ 'udt.found.skill' | t }}: <b>{{ skill }}</b>
-                <input
-                  type="range"
-                  name="skill"
-                  min="0"
-                  max="7"
-                  step="1"
-                  [(ngModel)]="skill"
-                  (ngModelChange)="tick()"
-                />
-              </label>
+              <p class="small">
+                {{ 'udt.found.skill' | t: { skill: skill, name: skillName } }}
+              </p>
               @for (k of keys; track k) {
                 <label
                   >{{ 'udt.value.' + k | t }}: <b>{{ pctOf(k) }}</b>
@@ -255,7 +247,9 @@ export class UdtTeamPage {
   protected teamName = '';
   protected teamTag = '';
   protected botName = '';
-  protected skill = 3;
+  /** Every starter has skill 3 (like the blueprints); the points go into the values. */
+  protected readonly skill = STARTER_SKILL;
+  protected readonly skillName = SKILL_NAMES[STARTER_SKILL];
   protected values: Record<'accuracy' | 'alertness' | 'strafing', number> = {
     accuracy: 0,
     alertness: 0,
@@ -288,14 +282,14 @@ export class UdtTeamPage {
   protected readonly budget = computed(() => (this.view()?.starterBudget ?? 1500) + this.extra());
   protected readonly cost = computed(() => {
     this.rev();
-    return Math.round(baseValue(Number(this.skill), valueScore(this.values)));
+    return Math.round(baseValue(this.skill, valueScore(this.values)));
   });
   protected readonly preview = computed<CardBot>(() => {
     this.rev();
     return {
       name: this.botName || '?',
-      skill: Number(this.skill),
-      rarity: botRarity(Number(this.skill)),
+      skill: this.skill,
+      rarity: botRarity(this.skill),
       traits: { ...this.values },
       tag: this.teamTag || undefined,
       value: this.cost(),
@@ -398,7 +392,7 @@ export class UdtTeamPage {
         tag: this.teamTag.trim(),
         starter: {
           name: this.botName.trim(),
-          skill: Number(this.skill),
+          skill: this.skill,
           ...(this.foundLook.botClass.trim() ? { botClass: this.foundLook.botClass.trim() } : {}),
           ...(this.foundLook.skin.trim() ? { skin: this.foundLook.skin.trim() } : {}),
           ...(this.foundLook.face.trim() ? { face: this.foundLook.face.trim() } : {}),

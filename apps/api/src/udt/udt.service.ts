@@ -14,6 +14,7 @@ import {
   valueAtTop,
   potentialWindow,
   SCRAP,
+  STARTER_SKILL,
   starterPotential,
   traitDef,
   traitSlots,
@@ -95,8 +96,8 @@ export const TeamBody = z.object({
       .min(1)
       .max(17)
       .regex(ASCII, 'ASCII letters, digits and signs only (UT99 names)'),
-    // Whole steps only: the game rounds the skill, the price would take the fraction (cheap values).
-    skill: z.number().int().min(0).max(7),
+    /** Always skill 3 (`STARTER_SKILL`); another skill is refused (older clients sent their choice). */
+    skill: z.number().int().min(0).max(7).optional(),
     botClass: z.string().trim().max(48).optional(),
     skin: z.string().trim().max(48).optional(),
     face: z.string().trim().max(48).optional(),
@@ -640,9 +641,12 @@ export class UdtService {
       );
     const cfg = this.settings.get().udt;
     const budget = cfg.starterBudget + cfg.starterExtra;
-    const cost = Math.round(baseValue(body.starter.skill, valueScore(body.starter.traits)));
+    const skill = body.starter.skill ?? STARTER_SKILL;
+    if (skill !== STARTER_SKILL)
+      throw badRequest('the starter bot has skill {skill}', { skill: STARTER_SKILL });
+    const cost = Math.round(baseValue(skill, valueScore(body.starter.traits)));
     if (cost > budget)
-      throw badRequest('the starter bot costs {cost} of {budget} points: lower skill or values', {
+      throw badRequest('the starter bot costs {cost} of {budget} points: lower the values', {
         cost,
         budget,
       });
@@ -654,7 +658,7 @@ export class UdtService {
     });
     const bot = this.bots.create({
       name: body.starter.name,
-      skill: body.starter.skill,
+      skill,
       ...(body.starter.botClass ? { botClass: body.starter.botClass } : {}),
       ...(body.starter.skin ? { skin: body.starter.skin } : {}),
       ...(body.starter.face ? { face: body.starter.face } : {}),
@@ -700,7 +704,7 @@ export class UdtService {
         season: season.number,
         userId: user.id,
         origin: 'starter',
-        potential: starterPotential(body.starter.skill),
+        potential: starterPotential(skill),
         createdAt: now,
       })
       .run();

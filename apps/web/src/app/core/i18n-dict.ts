@@ -1227,7 +1227,7 @@ const en = {
   'udt.look.edit': 'Model, skin, face, voice and chat lines of this bot',
   'udt.look.button': 'Look & lines',
   'udt.found.bot': 'Name of your starter bot',
-  'udt.found.skill': 'Skill',
+  'udt.found.skill': 'Skill {skill} ({name}) like every starter: the points go into the values.',
   'udt.found.cost': 'Costs {cost} of {budget} points',
   'udt.found.extra':
     'Extra points: {free} of {extra} left (skill 3 with average values uses the rest)',
@@ -3149,7 +3149,7 @@ const de: Record<TKey, string> = {
   'udt.look.edit': 'Model, Skin, Gesicht, Stimme und Sprüche dieses Bots',
   'udt.look.button': 'Aussehen & Sprüche',
   'udt.found.bot': 'Name deines Starter-Bots',
-  'udt.found.skill': 'Skill',
+  'udt.found.skill': 'Skill {skill} ({name}) wie jeder Starter: Die Punkte gehen in die Werte.',
   'udt.found.cost': 'Kostet {cost} von {budget} Punkten',
   'udt.found.extra':
     'Extrapunkte: {free} von {extra} übrig (Skill 3 mit durchschnittlichen Werten nutzt den Rest)',

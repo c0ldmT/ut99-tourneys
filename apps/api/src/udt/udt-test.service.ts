@@ -200,7 +200,7 @@ export class UdtTestService {
       this.udt.createTeam(user, {
         name: `Test Team ${n}`,
         tag: `[T${n}]`,
-        starter: { name: `Rookie${n}`, skill: 2 + (n % 2) },
+        starter: { name: `Rookie${n}` },
       });
       made.push(name);
     }

@@ -33,7 +33,7 @@ async function setup() {
     tag: '[NX]',
     starter: { name: 'Mira', skill: 3 },
   });
-  await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: { name: 'Tox', skill: 2 } });
+  await tim.post('/udt/team', { name: 'Iron', tag: '[IG]', starter: { name: 'Tox' } });
   const marioId = (await mario.get('/me')).body.id as string;
   const timId = (await tim.get('/me')).body.id as string;
   const db = api.app.get<Db>(DB);

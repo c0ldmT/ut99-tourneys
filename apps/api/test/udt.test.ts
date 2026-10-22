@@ -26,10 +26,22 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect((await admin.req('PUT', '/settings/udt', { enabled: true })).status).toBe(200);
     expect((await mario.post('/udt/team', team())).status).toBe(409); // no season
     await startSeason(admin);
-    // Over the budget (skill 5 is far above 1500 points).
-    const tooGood = await mario.post('/udt/team', team({ starter: { name: 'Ace', skill: 5 } }));
+    // Over the budget (all values at 100 cost 1,800 at skill 3).
+    const tooGood = await mario.post(
+      '/udt/team',
+      team({ starter: { name: 'Ace', traits: { accuracy: 1, alertness: 1, strafing: 1 } } }),
+    );
     expect(tooGood.status).toBe(400);
     expect(JSON.stringify(tooGood.body)).toMatch(/points/);
+    // Every starter has skill 3: skill 2 with top values would be skill 3 with them after 3 points.
+    const low = await mario.post(
+      '/udt/team',
+      team({
+        starter: { name: 'Ace', skill: 2, traits: { accuracy: 1, alertness: 1, strafing: 1 } },
+      }),
+    );
+    expect(low.status).toBe(400);
+    expect(JSON.stringify(low.body)).toMatch(/has skill 3/);
     // Whole skill steps only: 2.68 with top values would play as skill 3 for less than its price.
     const fraction = await mario.post(
       '/udt/team',
@@ -55,12 +67,10 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect((await mario.post('/udt/team', team())).status).toBe(409);
     // Names and tags are unique per season.
     const tim = await Client.login(api, 'Tim');
-    expect((await tim.post('/udt/team', team({ starter: { name: 'Tox', skill: 2 } }))).status).toBe(
-      409,
-    );
+    expect((await tim.post('/udt/team', team({ starter: { name: 'Tox' } }))).status).toBe(409);
     const t2 = await tim.post(
       '/udt/team',
-      team({ name: 'Iron Guard', tag: '[IG]', starter: { name: 'Tox', skill: 2 } }),
+      team({ name: 'Iron Guard', tag: '[IG]', starter: { name: 'Tox' } }),
     );
     expect(t2.status).toBe(201);
     expect((await tim.get('/udt/teams')).body.map((t: { tag: string }) => t.tag).sort()).toEqual([
@@ -115,7 +125,7 @@ describe('Unreal Dream Team: teams and rosters', () => {
     const tim = await Client.login(api, 'Tim');
     const long = await tim.post(
       '/udt/team',
-      team({ name: 'Long', tag: '<<XXXX>>', starter: { name: 'Abcdefghijklmnopq', skill: 2 } }),
+      team({ name: 'Long', tag: '<<XXXX>>', starter: { name: 'Abcdefghijklmnopq' } }),
     );
     expect(long.status).toBe(400);
   });
@@ -217,10 +227,7 @@ describe('Unreal Dream Team: looks, chat lines and squads', () => {
     // Only the owner.
     expect((await tim.req('PUT', `/udt/bots/${miraId}`, { skin: 'X.y' })).status).toBe(403);
     // Squads: everybody sees every team and its roster.
-    await tim.post(
-      '/udt/team',
-      team({ name: 'Iron', tag: '[IG]', starter: { name: 'Tox', skill: 2 } }),
-    );
+    await tim.post('/udt/team', team({ name: 'Iron', tag: '[IG]', starter: { name: 'Tox' } }));
     const squads = (await tim.get('/udt/squads')).body;
     expect(squads.map((s: any) => s.name).sort()).toEqual(['Iron', 'Nexus Rising']);
     const marioId = (await mario.get('/me')).body.id as string;

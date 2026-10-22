@@ -6,6 +6,7 @@ import {
   cannotBreakthrough,
   DEVELOP_VALUES,
   levelOf,
+  STARTER_SKILL,
   TALENT_NAMES,
   traitDef,
   traitSlots,
@@ -171,8 +172,8 @@ export class UdtAiService implements OnModuleInit {
       const library = new Set(this.bots.list().map((b) => b.name.toLowerCase()));
       const botName =
         [...TALENT_NAMES].find((x) => !library.has(x.toLowerCase())) ?? `Unit${m.n}${season}`;
-      // A starter within the budget: skill 2-3, values around average.
-      const skill = rng() < 0.5 ? 3 : 2;
+      // A starter within the budget: skill 3 (every starter), values around average.
+      const skill = STARTER_SKILL;
       const v = () => Math.round((rng() * 0.6 - 0.3) * 100) / 100;
       let traits = { accuracy: v(), alertness: v(), strafing: v() };
       if (buildCost(skill, traits) > cfg.starterBudget)
