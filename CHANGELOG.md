@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.16.0, live data on the match page: health and armour bars, weapon, powerups (damage amplifier with its seconds, shield belt) and ping of every player, a table per team for 2on2 to 5on5; damage dealt and items taken per side, the momentum of the game, items and what bots are up to in the feed (with filters), kills with the killer's health and the distance. While a human plays, health, items and bot thoughts arrive 20 s late (Settings → Live data); bot-only games are live. Monster Hunt: the run panel with the time to beat, monsters left and the points of both runs.
+- Replays: after a game the match page keeps its momentum, damage and items and the whole feed (kept 60 days, setting). Statistics: damage and items per player, records for the most damage and amplifiers in a game. The bridge logs what bots do (`bot-logs/`) for tuning the bots.
 - 3D look preview: wherever a bot's look is chosen (Dream Team, control center) the model turns next to the choices with its skin, face and the talk portrait, team colours at a tap; drag turns it. The bridge reads models and skins from the game server's own files (new models and skin packs show up by themselves); the website keeps them, so they also show while the server is off.
 - Mod 0.15.0: bots dodge rockets and other projectiles themselves - weak bots late or to the wrong side, sometimes without leading their target; strafing makes bots dodge more; weak bots use fewer detours. A bot left with only the impact hammer stops chasing an enemy it cannot reach and looks for a weapon (DM-SpaceNoxx).
 - Dream Team: market values weigh accuracy more and alertness less; daredevil reacts faster, bouncer dodges more.
@@ -153,6 +155,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Monster Hunt: the kill feed of the match page vanished after the first run of a game; it goes on in run 2 and shows each run with its own times.
 - The bridge no longer offers the tournament mod's internal bot classes (`TourneyMale1Bot` etc.) as models.
 - Server sync: the bridge also reads the .int files in SystemLocalized/int (UT 469) and keeps all voice packs (with their meta class) and texture entries; skins named with 4 letters only (Cyborg Trooper) were missing.
 - Pages that load in an effect (tournament page with its live connection, the names' looks) loaded twice since the loading display; the Dream Team market no longer marks sold bots as in demand or cheaper.

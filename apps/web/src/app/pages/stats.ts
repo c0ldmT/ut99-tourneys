@@ -683,6 +683,12 @@ export class StatsPage {
       { key: 'bestSpree', label: 'stats.col.bestSpree', value: (r) => r.bestSpree },
       { key: 'multiKills', label: 'stats.col.multiKills', value: (r) => r.multiKills },
       { key: 'firstBloods', label: 'stats.col.firstBloods', value: (r) => r.firstBloods },
+      {
+        key: 'damageDealt',
+        label: 'stats.col.damage',
+        value: (r) => (r.damageGames ? (r.damageDealt ?? 0) : '–'),
+      },
+      { key: 'amps', label: 'stats.col.amps', value: (r) => (r.damageGames ? (r.amps ?? 0) : '–') },
     ];
     const mh: Column[] = [
       { key: 'runsFinished', label: 'stats.col.runs', value: (r) => `${r.runsFinished}/${r.runs}` },

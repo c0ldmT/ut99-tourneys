@@ -249,6 +249,44 @@ import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
       </div>
     </form>
 
+    <form class="card" (ngSubmit)="saveLive()">
+      <h2>{{ 'liveSet.title' | t }}</h2>
+      <p class="muted small">{{ 'liveSet.hint' | t }}</p>
+      <label
+        >{{ 'liveSet.delay' | t }}
+        <span class="row"
+          ><input
+            type="number"
+            name="liveDelay"
+            min="0"
+            max="120"
+            class="narrow"
+            [(ngModel)]="liveDelay"
+          />
+          s</span
+        >
+      </label>
+      <p class="muted small">{{ 'liveSet.delayHint' | t }}</p>
+      <label
+        >{{ 'liveSet.days' | t }}
+        <span class="row"
+          ><input
+            type="number"
+            name="replayDays"
+            min="0"
+            max="3650"
+            class="narrow"
+            [(ngModel)]="replayDays"
+          />
+          {{ 'liveSet.daysUnit' | t }}</span
+        >
+      </label>
+      <p class="muted small">{{ 'liveSet.daysHint' | t }}</p>
+      <div class="row">
+        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
+      </div>
+    </form>
+
     <form class="card" (ngSubmit)="saveUdt()">
       <h2>{{ 'udt.settings.title' | t }}</h2>
       <p class="muted small">{{ 'udt.settings.hint' | t }}</p>
@@ -547,6 +585,8 @@ export class SettingsPage {
   protected betsDiscord = true;
   protected botsPerMatch = 6;
   protected botAiLevel = 2;
+  protected liveDelay = 20;
+  protected replayDays = 60;
   protected botSkillCurve = true;
   protected udtOn = false;
   protected ai = pickAi({});
@@ -608,6 +648,8 @@ export class SettingsPage {
       this.windowSec = s.betting.windowSec;
       this.betsDiscord = s.betting.discord;
       this.botAiLevel = s.botAi?.level ?? 2;
+      this.liveDelay = s.live?.delaySec ?? 20;
+      this.replayDays = s.live?.replayDays ?? 60;
       this.botSkillCurve = s.botAi?.skillCurve ?? true;
       if (s.udt) {
         this.udtOn = s.udt.enabled;
@@ -729,6 +771,22 @@ export class SettingsPage {
       });
       this.botAiLevel = s.botAi.level;
       this.botSkillCurve = s.botAi.skillCurve;
+    } catch {
+      // the toast shows the error
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async saveLive() {
+    this.busy.set(true);
+    try {
+      const s = await this.api.setLiveSettings({
+        delaySec: Number(this.liveDelay),
+        replayDays: Number(this.replayDays),
+      });
+      this.liveDelay = s.live.delaySec;
+      this.replayDays = s.live.replayDays;
     } catch {
       // the toast shows the error
     } finally {

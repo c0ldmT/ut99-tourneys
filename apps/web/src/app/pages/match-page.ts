@@ -7,10 +7,17 @@ import {
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { PageTitle } from '../core/page-title';
 import { TournamentStream } from '../core/stream';
-import { KillFeed } from '../components/kill-feed';
+import { KillFeed, type FeedSection } from '../components/kill-feed';
+import { LiveBoard, type LiveSide } from '../components/live-board';
+import { MomentumChart, type RaceLine } from '../components/momentum-chart';
+import { DamageItems, type CompareRow, type SideTotals } from '../components/damage-items';
+import { RacePanel } from '../components/race-panel';
+import { mmss, sideSum, withKills } from '../core/live';
+import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Loading } from '../core/loading';
@@ -21,10 +28,12 @@ import { BetColumns } from '../components/bet-columns';
 import type {
   BetMatchView,
   KillFeedEntry,
+  LiveSnapshot,
   MatchDetailView,
   MatchGameView,
   MatchPlayerView,
   MatchRunView,
+  ReplayView,
   TournamentDetail,
 } from '../core/types';
 
@@ -64,7 +73,17 @@ const SUM_KEYS = [
 /** Match page: entrants, series score, every game with the players' statistics, bets. */
 @Component({
   selector: 'app-match-page',
-  imports: [TPipe, RouterLink, BetColumns, KillFeed],
+  imports: [
+    TPipe,
+    RouterLink,
+    BetColumns,
+    KillFeed,
+    LiveBoard,
+    MomentumChart,
+    DamageItems,
+    RacePanel,
+    NgTemplateOutlet,
+  ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -151,11 +170,54 @@ const SUM_KEYS = [
               }
               @if (g.live) {
                 · <span class="live">{{ 'match.live' | t }}</span>
+                @if (delayed(); as n) {
+                  <span class="delay" [title]="'live.delayHint' | t">{{
+                    'live.delayed' | t: { n }
+                  }}</span>
+                }
               }
             </p>
           }
 
-          @if (race() && v.runs.length) {
+          @if (v.game?.live) {
+            @if (!race() && liveScore(); as ls) {
+              <div class="livescore card">
+                <span class="nm">{{ d.entrants[0]!.name }}</span>
+                <span class="mid">
+                  <span class="sc"
+                    ><b class="sa">{{ ls[0] }}</b
+                    ><i>:</i><b class="sb">{{ ls[1] }}</b></span
+                  >
+                  <span class="clk muted small">
+                    @if (clock(); as c) {
+                      <b class="mono">{{ c }}</b> ·
+                    }
+                    {{ limits() }}
+                  </span>
+                </span>
+                <span class="nm">{{ d.entrants[1]!.name }}</span>
+              </div>
+            }
+            @if (race()) {
+              <app-race-panel
+                [runs]="v.runs"
+                [race]="liveRace()"
+                [state]="liveState()"
+                [names]="names()"
+              />
+            }
+            @if (liveState(); as st) {
+              <app-live-board [players]="st.players" [sides]="liveSides()" [race]="race()" />
+            }
+          }
+          @if (v.game?.live) {
+            <ng-container *ngTemplateOutlet="extras; context: { $implicit: v, d: d }" />
+          }
+          @if (v.game?.live && !race()) {
+            <p class="muted small">{{ 'match.statsAfter' | t }}</p>
+          }
+
+          @if (race() && v.runs.length && !v.game?.live) {
             <div class="versus">
               @for (s of d.entrants; track s.id; let i = $index) {
                 <div class="card runs" [class.b]="i === 1">
@@ -180,6 +242,9 @@ const SUM_KEYS = [
           }
 
           @if (v.players.length) {
+            @if (v.game?.live) {
+              <h3 class="sh">{{ 'match.statsDone' | t }}</h3>
+            }
             <div class="versus">
               @for (s of d.entrants; track s.id; let i = $index) {
                 <div class="card players" [class.b]="i === 1">
@@ -235,31 +300,37 @@ const SUM_KEYS = [
                         @if (p.favWeapon) {
                           · {{ p.favWeapon }}
                         }
+                        @if (p.damageDealt !== undefined) {
+                          · {{ 'match.damage' | t: { d: p.damageDealt, t: p.damageTaken ?? 0 } }}
+                        }
+                        @if (p.items; as it) {
+                          @if (it.amp || it.belt || it.armor || it.keg) {
+                            ·
+                            {{
+                              'match.items' | t: { a: it.amp, b: it.belt, r: it.armor, k: it.keg }
+                            }}
+                          }
+                        }
                         @if (p.run) {
                           · {{ 'match.run' | t: { n: p.run } }}
                         }
                       </div>
                     </div>
                   } @empty {
-                    <span class="muted small">{{ 'match.noStats' | t }}</span>
+                    <span class="muted small">{{
+                      (v.game?.live && liveRace()?.runner === s.id
+                        ? 'match.statsRunning'
+                        : 'match.noStats'
+                      ) | t
+                    }}</span>
                   }
                 </div>
               }
             </div>
             <p class="muted small">{{ (race() ? 'match.mvpHintMh' : 'match.mvpHint') | t }}</p>
-          } @else if (v.game?.live) {
-            @if (liveScore(); as ls) {
-              <div class="livescore">
-                <span class="nm">{{ d.entrants[0]!.name }}</span>
-                <span class="sc"
-                  ><b class="sa">{{ ls[0] }}</b
-                  ><i>:</i><b class="sb">{{ ls[1] }}</b></span
-                >
-                <span class="nm">{{ d.entrants[1]!.name }}</span>
-              </div>
-            }
-            <app-kill-feed [entries]="gameFeed(v.game!.game)" [sideA]="d.entrants[0]!.id" />
-            <p class="muted small">{{ 'match.statsAfter' | t }}</p>
+          }
+          @if (!v.game?.live) {
+            <ng-container *ngTemplateOutlet="extras; context: { $implicit: v, d: d }" />
           }
         }
       } @else {
@@ -284,6 +355,52 @@ const SUM_KEYS = [
         <p class="muted small">{{ 'match.noBetting' | t }}</p>
       }
     }
+
+    <!-- Momentum, damage and items, feed: below the live board, after the statistics later. -->
+    <ng-template #extras let-v let-d="d">
+      @if (chart(); as c) {
+        <div class="grid2" [class.one]="!totals() && !raceCompare()">
+          <div class="card">
+            <div class="lc-head">
+              <h3>{{ c.title | t }}</h3>
+              <span class="muted small">{{ c.hint }}</span>
+            </div>
+            <app-momentum-chart
+              [samples]="c.samples"
+              [race]="c.race"
+              [duration]="c.duration"
+              [now]="c.now"
+              [label]="c.title | t"
+            />
+          </div>
+          @if (totals(); as tt) {
+            <div class="card">
+              <div class="lc-head">
+                <h3>{{ 'live.dmgItems' | t }}</h3>
+              </div>
+              <app-damage-items [a]="tt.a" [b]="tt.b" />
+            </div>
+          } @else if (raceCompare(); as rc) {
+            <div class="card">
+              <div class="lc-head">
+                <h3>{{ 'live.compare' | t: { t: rc.at } }}</h3>
+              </div>
+              <app-damage-items [rows]="rc.rows" />
+              <p class="muted small">{{ 'live.compareHint' | t }}</p>
+            </div>
+          }
+        </div>
+      }
+      @if (sections().length) {
+        <app-kill-feed
+          [sections]="sections()"
+          [sideA]="d.entrants[0]!.id"
+          [live]="!!v.game?.live"
+          [title]="v.game?.live ? 'feed.title' : 'feed.titleDone'"
+          [thoughts]="fewBots()"
+        />
+      }
+    </ng-template>
   `,
   styles: `
     h1 {
@@ -440,17 +557,62 @@ const SUM_KEYS = [
     }
     .livescore {
       display: grid;
-      grid-template-columns: 1fr auto 1fr;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
       align-items: center;
       gap: 16px;
-      margin: 4px 0 14px;
+      margin: 4px 0 10px;
+      padding: 12px 20px;
+      background:
+        linear-gradient(
+          90deg,
+          rgba(255, 77, 94, 0.1),
+          transparent 35%,
+          transparent 65%,
+          rgba(76, 141, 255, 0.1)
+        ),
+        var(--panel);
     }
     .livescore .nm {
-      font-weight: 700;
-      font-size: 1.1rem;
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-style: italic;
+      text-transform: uppercase;
+      font-size: 1.6rem;
+      color: var(--side-a);
     }
-    .livescore .nm:first-child {
+    .livescore .nm:last-child {
       text-align: right;
+      color: var(--side-b);
+    }
+    .livescore .mid {
+      display: grid;
+      justify-items: center;
+    }
+    .grid2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+      gap: 10px;
+    }
+    .grid2.one {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .sh {
+      margin: 6px 0 8px;
+    }
+    @media (max-width: 760px) {
+      .grid2 {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .livescore {
+        gap: 8px;
+        padding: 10px 12px;
+      }
+      .livescore .nm {
+        font-size: 1.05rem;
+      }
+      .livescore .sc {
+        font-size: 2.4rem;
+      }
     }
     .livescore .sc {
       font-family: var(--font-display);
@@ -471,6 +633,15 @@ const SUM_KEYS = [
     }
     .bets-title {
       margin-top: 24px;
+    }
+    .delay {
+      font-size: 0.78rem;
+      color: var(--neuro-text);
+      border: 1px solid rgba(245, 184, 61, 0.4);
+      background: rgba(245, 184, 61, 0.08);
+      border-radius: 999px;
+      padding: 1px 10px;
+      margin-left: 6px;
     }
   `,
 })
@@ -542,6 +713,254 @@ export class MatchPage {
     return this.feed().filter((e) => e.game === game);
   }
 
+  /** Live state and timeline when the page opened during a game (then the stream). */
+  protected readonly snapshot = signal<LiveSnapshot | null>(null);
+  /** Stored replays of the match's finished games (runs). */
+  protected readonly replays = signal<ReplayView[]>([]);
+  private replayKey = '';
+  private liveKey = '';
+  /** Monster Hunt: points of the run in progress from the telemetry, `[sec, points, deaths]`. */
+  private readonly racePts = signal<number[][]>([]);
+
+  /** The game of the open tab while it is played. */
+  private readonly liveGame = computed(() => {
+    const g = this.current()?.game;
+    return g?.live ? g : null;
+  });
+  /** Monster Hunt: the run on the server (telemetry). */
+  protected readonly liveRace = computed(() => {
+    const l = this.stream.live() ?? this.t()?.live ?? null;
+    const d = this.d();
+    return l?.race && d && l.matchId === d.matchId ? l.race : null;
+  });
+  /** Players of the game in progress (mod 0.16.0), newest of stream and snapshot. */
+  protected readonly liveState = computed(() => {
+    const g = this.liveGame();
+    const d = this.d();
+    if (!g || !d) return null;
+    const a = this.stream.state();
+    const b = this.snapshot()?.state ?? null;
+    const s = !a ? b : !b ? a : a.at >= b.at ? a : b;
+    if (!s || s.matchId !== d.matchId || s.game !== g.game) return null;
+    const r = this.liveRace();
+    if (this.race() && r && s.run !== r.run) return null;
+    return s;
+  });
+  protected readonly liveSides = computed<LiveSide[]>(() => {
+    const d = this.d();
+    if (!d) return [];
+    const all = d.entrants.map((e, index) => ({ id: e.id, name: e.name, index }));
+    if (!this.race()) return all;
+    const r = this.liveRace();
+    return r ? all.filter((e) => e.id === r.runner) : [];
+  });
+  /** Bot thoughts show by default with a few bots (more would fill the feed). */
+  protected readonly fewBots = computed(() => {
+    const g = this.current()?.game;
+    const players = g?.live
+      ? (this.liveState()?.players ?? [])
+      : (this.gameReplays(g?.game ?? 0)[0]?.players ?? []);
+    return players.filter((p) => p.bot).length <= 4;
+  });
+  /** The state is held back while a human plays (setting). */
+  protected readonly delayed = computed(() =>
+    this.liveState()?.humans ? (this.snapshot()?.delaySec ?? 0) : 0,
+  );
+  /**
+   * Seconds of the game so far: the state's time plus its delay (it is that old), or the last
+   * kill (kills are live), whichever is later.
+   */
+  private readonly nowSec = computed(() => {
+    const s = this.liveState();
+    const g = this.liveGame();
+    if (!s || !g) return null;
+    let sec = s.sec + this.delayed();
+    for (const e of this.feed())
+      if (e.game === g.game && e.sec !== undefined && (e.kind ?? 'kill') === 'kill')
+        sec = Math.max(sec, e.sec);
+    return sec;
+  });
+  protected readonly clock = computed(() => {
+    const n = this.nowSec();
+    return n === null ? null : mmss(n);
+  });
+  private readonly rules = computed(() => {
+    const r = (this.t()?.settings.game.rules ?? {}) as {
+      fragLimit?: number;
+      timeLimitMin?: number;
+    };
+    return { frags: r.fragLimit ?? 0, timeSec: (r.timeLimitMin ?? 0) * 60 };
+  });
+  protected readonly limits = computed(() => {
+    const r = this.rules();
+    const parts: string[] = [];
+    if (r.frags) parts.push(this.i18n.t('live.fragLimit', { n: r.frags }));
+    if (r.timeSec) parts.push(this.i18n.t('live.timeLimit', { t: mmss(r.timeSec) }));
+    return parts.join(' · ');
+  });
+
+  private gameReplays(game: number): ReplayView[] {
+    return this.replays().filter((r) => r.game === game);
+  }
+
+  /** Momentum: frag difference (deathmatch) or the runs' points (Monster Hunt). */
+  protected readonly chart = computed(() => {
+    const d = this.d();
+    const g = this.current()?.game;
+    if (!d || !g) return null;
+    const a = d.entrants[0]!.id;
+    const b = d.entrants[1]!.id;
+    const reps = this.gameReplays(g.game);
+    if (this.race()) {
+      const lr = g.live ? this.liveRace() : null;
+      const lines: RaceLine[] = [];
+      for (const r of reps)
+        if (r.run && r.run !== lr?.run && r.samples.length)
+          lines.push({ samples: r.samples, side: r.sides[0] === a ? 'a' : 'b', dashed: true });
+      if (lr) {
+        const tl = this.snapshot()?.timeline;
+        const base =
+          tl && tl.matchId === d.matchId && tl.game === g.game && tl.run === lr.run
+            ? tl.samples
+            : [];
+        const last = base.at(-1)?.[0] ?? -1;
+        lines.push({
+          samples: [...base, ...this.racePts().filter((p) => (p[0] ?? 0) > last)],
+          side: lr.runner === a ? 'a' : 'b',
+        });
+      } else if (lines.length > 1) lines[lines.length - 1] = { ...lines.at(-1)!, dashed: false };
+      if (!lines.some((l) => l.samples.length)) return null;
+      const end = Math.max(...lines.map((l) => l.samples.at(-1)?.[0] ?? 0));
+      return {
+        title: 'live.racePoints',
+        hint: this.i18n.t('live.raceHint'),
+        samples: [] as number[][],
+        race: lines,
+        duration: Math.max(120, Math.round(end * 1.08)),
+        now: lr ? lr.timeMs / 1000 : null,
+      };
+    }
+    let samples: number[][];
+    let now: number | null = null;
+    if (g.live) {
+      const tl = this.snapshot()?.timeline;
+      const flip = tl?.sides[0] === b;
+      const base =
+        tl && tl.matchId === d.matchId && tl.game === g.game
+          ? tl.samples.map((x) => [x[0] ?? 0, x[flip ? 2 : 1] ?? 0, x[flip ? 1 : 2] ?? 0])
+          : [];
+      samples = withKills(base, this.gameFeed(g.game), a, b);
+      now = this.nowSec() ?? samples.at(-1)?.[0] ?? null;
+    } else {
+      const rep = reps[0];
+      if (!rep) return null;
+      const flip = rep.sides[0] === b;
+      samples = rep.samples.map((x) => [x[0] ?? 0, x[flip ? 2 : 1] ?? 0, x[flip ? 1 : 2] ?? 0]);
+    }
+    if (!samples.length) return null;
+    const end = samples.at(-1)![0] ?? 0;
+    return {
+      title: 'live.momentum',
+      hint: this.i18n.t('live.momentumHint', { name: d.entrants[0]!.name }),
+      samples,
+      race: null,
+      duration: g.live ? Math.max(this.rules().timeSec, (now ?? end) + 60) : Math.max(60, end),
+      now,
+    };
+  });
+
+  /** Damage and items per side: live from the state, afterwards from the statistics. */
+  protected readonly totals = computed<{ a: SideTotals; b: SideTotals } | null>(() => {
+    const d = this.d();
+    const g = this.current()?.game;
+    if (!d || !g || this.race()) return null;
+    const [a, b] = [d.entrants[0]!.id, d.entrants[1]!.id];
+    if (g.live) {
+      const s = this.liveState();
+      return s ? { a: sideSum(s.players, a), b: sideSum(s.players, b) } : null;
+    }
+    const stats = g.players.filter((p) => p.damageDealt !== undefined);
+    if (stats.length) return { a: statSum(stats, a), b: statSum(stats, b) };
+    const rep = this.gameReplays(g.game)[0];
+    return rep?.players.length ? { a: sideSum(rep.players, a), b: sideSum(rep.players, b) } : null;
+  });
+
+  /** Monster Hunt: the finished run at the same time against the run on the server. */
+  protected readonly raceCompare = computed<{ at: string; rows: CompareRow[] } | null>(() => {
+    const d = this.d();
+    const g = this.liveGame();
+    const lr = this.liveRace();
+    if (!this.race() || !d || !g || !lr) return null;
+    const first = this.gameReplays(g.game).find((r) => r.run && r.run !== lr.run);
+    if (!first?.samples.length) return null;
+    const now = lr.timeMs / 1000;
+    let then = first.samples[0]!;
+    for (const x of first.samples) {
+      if ((x[0] ?? 0) > now) break;
+      then = x;
+    }
+    const m = this.liveState()?.monsters;
+    const total = m?.total ?? first.monsters?.total ?? 0;
+    const killedThen = total && (then[3] ?? -1) >= 0 ? total - then[3]! : null;
+    const killedNow = m ? m.total - m.alive : null;
+    // left: side a's run, right: side b's run
+    const firstIsA = first.sides[0] === d.entrants[0]!.id;
+    const pair = (x: number, y: number) => (firstIsA ? { a: x, b: y } : { a: y, b: x });
+    const rows: CompareRow[] = [
+      { label: 'match.points', ...pair(then[1] ?? 0, lr.points) },
+      { label: 'match.deathsShort', ...pair(then[2] ?? 0, lr.deaths) },
+    ];
+    if (killedThen !== null && killedNow !== null)
+      rows.push({ label: 'match.monsters', ...pair(killedThen, killedNow) });
+    return { at: raceTime(lr.timeMs, false), rows };
+  });
+
+  /** Feed: the game in progress, its runs (Monster Hunt), or the stored feed afterwards. */
+  protected readonly sections = computed<FeedSection[]>(() => {
+    const d = this.d();
+    const v = this.current();
+    const g = v?.game;
+    if (!d || !g) return [];
+    const reps = this.gameReplays(g.game);
+    const byAt = (l: KillFeedEntry[]) => [...l].sort((x, y) => x.at - y.at);
+    const side = (id: string | undefined) =>
+      id === d.entrants[0]!.id ? 'a' : id === d.entrants[1]!.id ? 'b' : null;
+    const name = (id: string | undefined) => (id ? (this.names()[id] ?? '?') : '?');
+    if (this.race()) {
+      const lr = g.live ? this.liveRace() : null;
+      const out: FeedSection[] = [];
+      for (const n of [2, 1]) {
+        const rep = reps.find((r) => r.run === n);
+        const live = lr?.run === n;
+        const entries =
+          live || !rep ? byAt(this.gameFeed(g.game).filter((e) => (e.run ?? 1) === n)) : rep.feed;
+        if (!entries.length && !live) continue;
+        const team = live ? lr.runner : (rep?.sides[0] ?? v.runs[n - 1]?.entrantId);
+        out.push({
+          key: `r${n}`,
+          title: this.i18n.t('live.runOf', { n, team: name(team) }),
+          side: side(team),
+          sub: live ? this.i18n.t('match.live') : this.i18n.t('feed.count', { n: entries.length }),
+          entries,
+          open: live,
+        });
+      }
+      return out;
+    }
+    if (g.live) return [{ key: 'g', entries: byAt(this.gameFeed(g.game)), open: true }];
+    const rep = reps[0];
+    if (!rep?.feed.length) return [];
+    return [
+      {
+        key: 'all',
+        title: this.i18n.t('feed.whole'),
+        sub: this.i18n.t('feed.count', { n: rep.feed.length }),
+        entries: rep.feed,
+        open: false,
+      },
+    ];
+  });
+
   constructor() {
     effect(() =>
       this.title.set(this.d() ? `${this.d()!.matchId} · ${this.t()?.name ?? ''}` : null),
@@ -552,23 +971,62 @@ export class MatchPage {
       const m = this.matchId();
       void this.load(id, m, true);
       this.feed.set([]);
+      untracked(() => {
+        this.replays.set([]);
+        this.snapshot.set(null);
+      });
+      this.replayKey = '';
+      this.liveKey = '';
       this.api.killFeed(id).then(
         (l) => this.feed.set(l.filter((e) => e.matchId === m)),
         () => undefined,
       );
       this.stream.open(id, () => void this.load(this.id(), this.matchId(), false));
     });
-    // New kills from the stream.
-    effect(() => {
-      const k = this.stream.kill();
-      if (!k || k.matchId !== this.matchId()) return;
+    // New feed entries from the stream (all of them, also when several come at once).
+    this.stream.onFeed = (k) => {
+      if (k.matchId !== this.matchId()) return;
       this.feed.update((l) =>
         l.some(
           (x) =>
-            x.at === k.at && x.killer === k.killer && x.victim === k.victim && x.chat === k.chat,
+            x.at === k.at &&
+            x.kind === k.kind &&
+            x.killer === k.killer &&
+            x.victim === k.victim &&
+            x.chat === k.chat &&
+            x.item === k.item &&
+            x.thought?.state === k.thought?.state,
         )
           ? l
-          : [...l, k].slice(-80),
+          : [...l, k].slice(-600),
+      );
+    };
+    // A game (run) went live: its state and timeline so far.
+    effect(() => {
+      const g = this.liveGame();
+      const r = this.liveRace();
+      const key = g ? `${this.matchId()}/${g.game}/${r?.run ?? 0}` : '';
+      if (key === this.liveKey) return;
+      this.liveKey = key;
+      this.racePts.set([]);
+      if (!key) return;
+      const id = this.id();
+      this.api.liveState(id).then(
+        (s) => {
+          if (this.liveKey === key) this.snapshot.set(s);
+        },
+        () => undefined,
+      );
+    });
+    // Monster Hunt: the run's points over time from the telemetry.
+    effect(() => {
+      const r = this.liveRace();
+      if (!r) return;
+      const sec = r.timeMs / 1000;
+      untracked(() =>
+        this.racePts.update((l) =>
+          (l.at(-1)?.[0] ?? -1) < sec ? [...l, [sec, r.points, r.deaths]].slice(-2000) : l,
+        ),
       );
     });
     // While the match is not decided, refresh now and then (games end, stats arrive).
@@ -588,6 +1046,17 @@ export class MatchPage {
       ]);
       this.t.set(t);
       this.d.set(d);
+      // Replays of the finished games (runs), again when one more is done.
+      const key = d.games
+        .map((g) => `${g.game}:${g.runs?.length ?? 0}:${g.winnerId ? 1 : 0}`)
+        .join('|');
+      if (key !== this.replayKey && d.games.some((g) => g.winnerId || g.runs?.length)) {
+        this.replayKey = key;
+        void this.api.matchReplays(id, matchId).then(
+          (r) => this.replays.set(r),
+          () => undefined,
+        );
+      }
       this.bets.set(b?.matches.find((m) => m.matchId === matchId) ?? null);
       if (first) {
         // Decided series: the total; else the game being played (or the last one).
@@ -650,6 +1119,17 @@ export class MatchPage {
   }
 }
 
+/** Damage and items of a side from the statistics. */
+function statSum(players: readonly MatchPlayerView[], side: string): SideTotals {
+  const out: SideTotals = { damage: 0, items: { amp: 0, belt: 0, armor: 0, keg: 0 } };
+  for (const p of players) {
+    if (p.entrantId !== side) continue;
+    out.damage += p.damageDealt ?? 0;
+    for (const k of ['amp', 'belt', 'armor', 'keg'] as const) out.items[k] += p.items?.[k] ?? 0;
+  }
+  return out;
+}
+
 /** The series in total: one row per player and side, numbers added up. */
 function mergePlayers(list: readonly MatchPlayerView[]): MatchPlayerView[] {
   const out = new Map<string, MatchPlayerView>();
@@ -658,12 +1138,24 @@ function mergePlayers(list: readonly MatchPlayerView[]): MatchPlayerView[] {
     const x = out.get(k);
     if (!x) {
       const { run: _run, ...rest } = p;
-      out.set(k, { ...rest, weapons: { ...p.weapons } });
+      out.set(k, {
+        ...rest,
+        weapons: { ...p.weapons },
+        ...(p.items ? { items: { ...p.items } } : {}),
+      });
       continue;
     }
     for (const key of SUM_KEYS)
       x[key] = key === 'bestSpree' ? Math.max(x[key], p[key]) : x[key] + p[key];
     x.firstBlood ||= p.firstBlood;
+    if (p.damageDealt !== undefined) {
+      x.damageDealt = (x.damageDealt ?? 0) + p.damageDealt;
+      x.damageTaken = (x.damageTaken ?? 0) + (p.damageTaken ?? 0);
+    }
+    if (p.items) {
+      const it = (x.items ??= { amp: 0, belt: 0, armor: 0, keg: 0 });
+      for (const k of ['amp', 'belt', 'armor', 'keg'] as const) it[k] += p.items[k];
+    }
     for (const [w, n] of Object.entries(p.weapons)) x.weapons[w] = (x.weapons[w] ?? 0) + n;
   }
   return [...out.values()];

@@ -63,6 +63,8 @@ import type {
   ShopSettings,
   ShopDedication,
   KillFeedEntry,
+  LiveSnapshot,
+  ReplayView,
   SiteConfig,
   StatMode,
   StatScope,
@@ -228,6 +230,8 @@ export class Api {
   settings = () => this.call<WebsiteSettings>('GET', '/settings');
   setRatingSettings = (body: Partial<WebsiteSettings['rating']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/rating', body, { ok: 'ok.settings' });
+  setLiveSettings = (body: Partial<WebsiteSettings['live']>) =>
+    this.call<WebsiteSettings>('PUT', '/settings/live', body, { ok: 'ok.settings' });
   setUdtSettings = (body: Partial<WebsiteSettings['udt']>) =>
     this.call<WebsiteSettings>('PUT', '/settings/udt', body, { ok: 'ok.settings' });
 
@@ -518,6 +522,19 @@ export class Api {
   seriesOverview = () => this.call<SeriesOverview[]>('GET', '/series/overview');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);
   killFeed = (id: string) => this.call<KillFeedEntry[]>('GET', `/tournaments/${id}/feed`);
+  /** Live state of the game in progress (decoration of the match page: quiet). */
+  liveState = (id: string) =>
+    this.call<LiveSnapshot>('GET', `/tournaments/${id}/live-state`, undefined, {
+      quiet: true,
+      background: true,
+    });
+  matchReplays = (id: string, matchId: string) =>
+    this.call<ReplayView[]>(
+      'GET',
+      `/tournaments/${id}/matches/${encodeURIComponent(matchId)}/replays`,
+      undefined,
+      { quiet: true },
+    );
   /** Decoration only (names in the looks of their owners): never an error toast. */
   looks = () =>
     this.call<{ userId: string; name: string; look: LookView }[]>('GET', '/shop/looks', undefined, {

@@ -323,6 +323,14 @@ export interface StatsPlayerRow {
   runsFinished: number;
   monsters: number;
   monsterPoints: number;
+  /** Mod 0.16.0: games with damage data, damage in them, items taken. */
+  damageGames?: number;
+  damageDealt?: number;
+  damageTaken?: number;
+  amps?: number;
+  belts?: number;
+  armors?: number;
+  kegs?: number;
 }
 
 export interface RecordHolder {
@@ -477,6 +485,8 @@ export interface WebsiteSettings {
   /** Bot AI help in deathmatch: 0 off, 1 failsafe, 2 failsafe and duel mode. */
   botAi: { level: number; skillCurve: boolean };
   udt: UdtSettings;
+  /** Live data: replay retention (days, 0 = for good) and the delay while humans play. */
+  live: { replayDays: number; delaySec: number };
 }
 
 // --- Bot control center ---------------------------------------------------------------------
@@ -736,6 +746,17 @@ export interface MatchPlayerView {
   monsters: number;
   monsterPoints: number;
   weapons: Record<string, number>;
+  /** Mod 0.16.0: damage dealt (Monster Hunt: to monsters) and taken, items taken. */
+  damageDealt?: number;
+  damageTaken?: number;
+  items?: ItemCounts;
+}
+
+export interface ItemCounts {
+  amp: number;
+  belt: number;
+  armor: number;
+  keg: number;
 }
 
 export interface MatchRunView {
@@ -827,12 +848,27 @@ export interface SeriesPreview {
   next: { start: string; name: string | null }[];
 }
 
-/** One kill of the game in progress (kill feed, live only). */
+export type FeedItem = 'amp' | 'belt' | 'armor' | 'keg' | 'invis' | 'boots' | 'redeemer';
+export type BotState = 'atk' | 'chg' | 'tac' | 'ret' | 'hunt' | 'roam' | 'item' | 'camp';
+
+/** One entry of the feed of a game: a kill, a bot's chat line, an item taken, a bot's thought. */
 export interface KillFeedEntry {
   tournamentId: string;
   matchId: string;
   game: number;
+  /** Monster Hunt: the run. */
+  run?: number;
   at: number;
+  /** Seconds since the game (run) went live. */
+  sec?: number;
+  kind?: 'kill' | 'chat' | 'item' | 'thought';
+  humans?: boolean;
+  killerHealth?: number;
+  /** Unreal units. */
+  distance?: number;
+  amp?: boolean;
+  item?: FeedItem;
+  thought?: { state: BotState; target: string };
   killer: string;
   killerSide: string | null;
   victim: string;
@@ -847,6 +883,69 @@ export interface KillFeedEntry {
   multi: number;
   /** A bot's chat line (mod 0.12.0): `killer` is the bot. */
   chat?: string;
+}
+
+/** A player or bot of the game in progress (mod 0.16.0). */
+export interface LivePlayer {
+  name: string;
+  side: string | null;
+  bot: boolean;
+  userId?: string;
+  alive: boolean;
+  health: number;
+  armor: number;
+  weapon: string;
+  /** Bits: 1 damage amplifier, 2 shield belt, 4 invisibility, 8 jump boots. */
+  powerups: number;
+  ampSec: number;
+  kills: number;
+  deaths: number;
+  suicides: number;
+  damageDealt: number;
+  damageTaken: number;
+  ping?: number;
+  loss?: number;
+  items: ItemCounts;
+}
+
+export interface LiveStateView {
+  tournamentId: string;
+  matchId: string;
+  game: number;
+  run?: number;
+  at: number;
+  sec: number;
+  humans: boolean;
+  players: LivePlayer[];
+  monsters?: { alive: number; total: number; bosses: number };
+}
+
+/** Timeline of the game in progress: `[sec, scoreA, scoreB]`; a race: `[sec, points, deaths, monstersAlive]`. */
+export interface LiveTimeline {
+  matchId: string;
+  game: number;
+  run?: number;
+  sides: string[];
+  samples: number[][];
+}
+
+export interface LiveSnapshot {
+  state: LiveStateView | null;
+  timeline: LiveTimeline | null;
+  /** Seconds the state is held back while a human plays. */
+  delaySec: number;
+}
+
+/** A finished game (Monster Hunt: run): its feed, timeline and players at the end. */
+export interface ReplayView {
+  game: number;
+  run?: number;
+  sides: string[];
+  /** `[sec, scoreA, scoreB, damageA, damageB]`; a race: `[sec, points, deaths, monstersAlive]`. */
+  samples: number[][];
+  feed: Omit<KillFeedEntry, 'tournamentId' | 'matchId' | 'game' | 'run'>[];
+  players: LivePlayer[];
+  monsters?: { alive: number; total: number; bosses: number };
 }
 
 // --- Neuro shop -------------------------------------------------------------------------------
