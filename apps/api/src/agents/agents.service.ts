@@ -138,6 +138,15 @@ export class AgentsService {
     return row ? JSON.parse(row.dataJson) : undefined;
   }
 
+  /** Every stored inventory with its server and profile. */
+  inventoryRows(): { agentId: string; profileId: string; data: unknown }[] {
+    return this.db
+      .select()
+      .from(inventories)
+      .all()
+      .map((r) => ({ agentId: r.agentId, profileId: r.profileId, data: JSON.parse(r.dataJson) }));
+  }
+
   /** Every stored inventory (all servers and profiles). */
   allInventories(): unknown[] {
     return this.db

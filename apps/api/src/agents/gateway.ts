@@ -176,6 +176,9 @@ export class AgentGateway {
       case 'command.ack':
         this.connections.ack(msg.payload.commandId, msg.payload.ok, msg.payload.error);
         return;
+      case 'asset.data':
+        this.connections.answer(agentId, msg);
+        return;
       case 'server.status': {
         this.connections.setStatus(agentId, msg.payload);
         this.agents.touch(agentId);

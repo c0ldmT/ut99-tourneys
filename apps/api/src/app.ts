@@ -35,6 +35,8 @@ import { SettingsService } from './settings/settings.service.js';
 import { SeasonsController } from './seasons/seasons.controller.js';
 import { SeasonsService } from './seasons/seasons.service.js';
 import { BotsController } from './bots/bots.controller.js';
+import { LooksController } from './bots/looks.controller.js';
+import { LookPreviewService } from './bots/look-preview.service.js';
 import { BotsService } from './bots/bots.service.js';
 import { SeriesController, SeriesOverviewController } from './series/series.controller.js';
 import { ShopController } from './shop/shop.controller.js';
@@ -90,6 +92,7 @@ class AppModule {
         SettingsController,
         SeasonsController,
         BotsController,
+        LooksController,
         BetsController,
         SeriesOverviewController,
         SeriesController,
@@ -133,6 +136,7 @@ class AppModule {
         SettingsService,
         SeasonsService,
         BotsService,
+        LookPreviewService,
         BetsService,
         SeriesService,
         AutoStartService,

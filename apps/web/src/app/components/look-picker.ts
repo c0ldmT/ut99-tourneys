@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core
 import { FormsModule } from '@angular/forms';
 import { I18n, TPipe } from '../core/i18n';
 import type { AssetItem, ModelChoice, SkinChoice } from '../core/types';
+import { LookViewer } from './look-viewer';
 
 /** What the picker edits (both editors' drafts have these fields). */
 export interface LookFields {
@@ -17,96 +18,102 @@ const DEFAULT_CLASS = 'botpack.tmale1bot';
 let nextId = 0;
 
 /**
- * Model, skin, face and voice as UT's own setup menu offers them (decision 172): the skins of
+ * Model, skin, face and voice as UT's own setup menu offers them (decision 172), with a 3D
+ * preview of the look (decision 176; above the fields on phones, beside them on wider screens): the skins of
  * the model, the faces of the skin, the voices of the model; a new model starts with its first
  * skin and face and its own voice. Native selects with the readable names (they work on every phone).
  * `free`: admins may type a skin or face for models the website does not know yet.
  */
 @Component({
   selector: 'app-look-picker',
-  imports: [FormsModule, TPipe],
+  imports: [FormsModule, TPipe, LookViewer],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let d = draft();
     @let m = model();
-    <div class="fields">
-      <div class="field">
-        <label [for]="id + 'c'">{{ 'bots.class' | t }}</label>
-        <select
-          [id]="id + 'c'"
-          [name]="id + 'c'"
-          [ngModel]="canon(modelList(), d.botClass)"
-          (ngModelChange)="setModel($event)"
-        >
-          <option value="">{{ 'bots.defaultIs' | t: { name: defaultLabel() } }}</option>
-          @for (c of modelList(); track c.name) {
-            <option [value]="c.name">{{ c.label }}</option>
-          }
-        </select>
-      </div>
-      <div class="field">
-        <label [for]="id + 's'">{{ 'bots.skin' | t }}</label>
-        @if (m?.known || !free()) {
-          <select
-            [id]="id + 's'"
-            [name]="id + 's'"
-            [ngModel]="canon(m?.skins ?? [], d.skin)"
-            (ngModelChange)="setSkin($event)"
-            [disabled]="!m?.skins?.length && !d.skin"
-          >
-            <option value="">{{ standard(m?.defaults?.skin, m?.skins) }}</option>
-            @for (s of withCurrent(m?.skins ?? [], d.skin); track s.name) {
-              <option [value]="s.name">{{ s.label }}</option>
-            }
-          </select>
-        } @else {
-          <input
-            [id]="id + 's'"
-            [name]="id + 's'"
-            [placeholder]="'bots.default' | t"
-            [(ngModel)]="d.skin"
-          />
-        }
-      </div>
-      @if (m?.multi || (free() && !m?.known)) {
-        <div class="field">
-          <label [for]="id + 'f'">{{ 'bots.face' | t }}</label>
-          @if (m?.known || !free()) {
+    <div class="look-pick">
+      <div class="look-pick-in">
+        <app-look-viewer [cls]="d.botClass" [skin]="d.skin" [face]="m?.multi ? d.face : ''" />
+        <div class="fields">
+          <div class="field">
+            <label [for]="id + 'c'">{{ 'bots.class' | t }}</label>
             <select
-              [id]="id + 'f'"
-              [name]="id + 'f'"
-              [ngModel]="canon(faces(), d.face)"
-              (ngModelChange)="d.face = $event"
-              [disabled]="!faces().length && !d.face"
+              [id]="id + 'c'"
+              [name]="id + 'c'"
+              [ngModel]="canon(modelList(), d.botClass)"
+              (ngModelChange)="setModel($event)"
             >
-              <option value="">{{ 'bots.default' | t }}</option>
-              @for (f of withCurrent(faces(), d.face); track f.name) {
-                <option [value]="f.name">{{ f.label }}</option>
+              <option value="">{{ 'bots.defaultIs' | t: { name: defaultLabel() } }}</option>
+              @for (c of modelList(); track c.name) {
+                <option [value]="c.name">{{ c.label }}</option>
               }
             </select>
-          } @else {
-            <input
-              [id]="id + 'f'"
-              [name]="id + 'f'"
-              [placeholder]="'bots.default' | t"
-              [(ngModel)]="d.face"
-            />
+          </div>
+          <div class="field">
+            <label [for]="id + 's'">{{ 'bots.skin' | t }}</label>
+            @if (m?.known || !free()) {
+              <select
+                [id]="id + 's'"
+                [name]="id + 's'"
+                [ngModel]="canon(m?.skins ?? [], d.skin)"
+                (ngModelChange)="setSkin($event)"
+                [disabled]="!m?.skins?.length && !d.skin"
+              >
+                <option value="">{{ standard(m?.defaults?.skin, m?.skins) }}</option>
+                @for (s of withCurrent(m?.skins ?? [], d.skin); track s.name) {
+                  <option [value]="s.name">{{ s.label }}</option>
+                }
+              </select>
+            } @else {
+              <input
+                [id]="id + 's'"
+                [name]="id + 's'"
+                [placeholder]="'bots.default' | t"
+                [(ngModel)]="d.skin"
+              />
+            }
+          </div>
+          @if (m?.multi || (free() && !m?.known)) {
+            <div class="field">
+              <label [for]="id + 'f'">{{ 'bots.face' | t }}</label>
+              @if (m?.known || !free()) {
+                <select
+                  [id]="id + 'f'"
+                  [name]="id + 'f'"
+                  [ngModel]="canon(faces(), d.face)"
+                  (ngModelChange)="d.face = $event"
+                  [disabled]="!faces().length && !d.face"
+                >
+                  <option value="">{{ 'bots.default' | t }}</option>
+                  @for (f of withCurrent(faces(), d.face); track f.name) {
+                    <option [value]="f.name">{{ f.label }}</option>
+                  }
+                </select>
+              } @else {
+                <input
+                  [id]="id + 'f'"
+                  [name]="id + 'f'"
+                  [placeholder]="'bots.default' | t"
+                  [(ngModel)]="d.face"
+                />
+              }
+            </div>
           }
+          <div class="field">
+            <label [for]="id + 'v'">{{ 'bots.voice' | t }}</label>
+            <select
+              [id]="id + 'v'"
+              [name]="id + 'v'"
+              [ngModel]="canon(m?.voices ?? [], d.voice)"
+              (ngModelChange)="d.voice = $event"
+            >
+              <option value="">{{ standard(m?.defaults?.voice, m?.voices) }}</option>
+              @for (v of withCurrent(m?.voices ?? [], d.voice); track v.name) {
+                <option [value]="v.name">{{ v.label }}</option>
+              }
+            </select>
+          </div>
         </div>
-      }
-      <div class="field">
-        <label [for]="id + 'v'">{{ 'bots.voice' | t }}</label>
-        <select
-          [id]="id + 'v'"
-          [name]="id + 'v'"
-          [ngModel]="canon(m?.voices ?? [], d.voice)"
-          (ngModelChange)="d.voice = $event"
-        >
-          <option value="">{{ standard(m?.defaults?.voice, m?.voices) }}</option>
-          @for (v of withCurrent(m?.voices ?? [], d.voice); track v.name) {
-            <option [value]="v.name">{{ v.label }}</option>
-          }
-        </select>
       </div>
     </div>
     @if (m && !m.known) {

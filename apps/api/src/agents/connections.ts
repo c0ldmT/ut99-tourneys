@@ -1,6 +1,11 @@
 import crypto from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { PROTOCOL_VERSION, type AgentCommand, type WebsiteToBridge } from '@tourney/protocol';
+import {
+  PROTOCOL_VERSION,
+  type AgentCommand,
+  type BridgeToWebsite,
+  type WebsiteToBridge,
+} from '@tourney/protocol';
 import type { WebSocket } from 'ws';
 import { CLOCK, type ApiClock } from '../config.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
@@ -42,6 +47,16 @@ interface Pending {
 export class AgentConnections {
   private sockets = new Map<string, WebSocket>();
   private pending = new Map<string, Pending>();
+  /** Requests waiting for the message that answers them (`re`). */
+  private replies = new Map<
+    string,
+    {
+      agentId: string;
+      resolve: (m: BridgeToWebsite) => void;
+      reject: (e: Error) => void;
+      timer: NodeJS.Timeout;
+    }
+  >();
   private statuses = new Map<string, unknown>();
   private listeners = new Set<(agentId: string, online: boolean) => void>();
 
@@ -61,6 +76,12 @@ export class AgentConnections {
     if (this.sockets.get(agentId) !== ws) return;
     this.sockets.delete(agentId);
     this.statuses.delete(agentId);
+    for (const [id, r] of this.replies)
+      if (r.agentId === agentId) {
+        clearTimeout(r.timer);
+        this.replies.delete(id);
+        r.reject(new AgentOfflineError(agentId));
+      }
     this.emit(agentId, false);
   }
 
@@ -111,6 +132,40 @@ export class AgentConnections {
     });
   }
 
+  /** Sends a message and waits for the agent's message that answers it (its `re`). */
+  request(agentId: string, msg: Outgoing, timeoutMs = 20_000): Promise<BridgeToWebsite> {
+    return new Promise((resolve, reject) => {
+      let id: string;
+      try {
+        id = this.send(agentId, msg);
+      } catch (e) {
+        reject(e as Error);
+        return;
+      }
+      const timer = setTimeout(() => {
+        this.replies.delete(id);
+        reject(
+          new CommandFailedError(
+            `agent ${agentId} did not answer ${msg.type}`,
+            'agent {id} did not answer {command}',
+            { id: agentId, command: msg.type },
+          ),
+        );
+      }, timeoutMs);
+      this.replies.set(id, { agentId, resolve, reject, timer });
+    });
+  }
+
+  /** An agent's answer to a request (false: nobody waits for it). */
+  answer(agentId: string, msg: BridgeToWebsite): boolean {
+    const r = msg.re ? this.replies.get(msg.re) : undefined;
+    if (!r || r.agentId !== agentId) return false;
+    clearTimeout(r.timer);
+    this.replies.delete(msg.re!);
+    r.resolve(msg);
+    return true;
+  }
+
   ack(commandId: string, ok: boolean, error?: string): void {
     const p = this.pending.get(commandId);
     if (!p) return;
@@ -131,10 +186,11 @@ export class AgentConnections {
   closeAll(): void {
     for (const ws of this.sockets.values()) ws.close(1001, 'server shutting down');
     this.sockets.clear();
-    for (const p of this.pending.values()) {
+    for (const p of [...this.pending.values(), ...this.replies.values()]) {
       clearTimeout(p.timer);
       p.reject(new CommandFailedError('server shutting down', 'server shutting down'));
     }
     this.pending.clear();
+    this.replies.clear();
   }
 }

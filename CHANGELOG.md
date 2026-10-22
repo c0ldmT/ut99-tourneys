@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- 3D look preview: wherever a bot's look is chosen (Dream Team, control center) the model turns next to the choices with its skin, face and the talk portrait, team colours at a tap; drag turns it. The bridge reads models and skins from the game server's own files (new models and skin packs show up by themselves); the website keeps them, so they also show while the server is off.
 - Mod 0.15.0: bots dodge rockets and other projectiles themselves - weak bots late or to the wrong side, sometimes without leading their target; strafing makes bots dodge more; weak bots use fewer detours. A bot left with only the impact hammer stops chasing an enemy it cannot reach and looks for a weapon (DM-SpaceNoxx).
 - Dream Team: market values weigh accuracy more and alertness less; daredevil reacts faster, bouncer dodges more.
 - Mod 0.14.1: the game server reports its bot classes' defaults (mesh, skin format, voices, default skin), so every model on the server - War Boss, Xan Mark II, custom packs - gets its skins, faces and voices in the look picker without maintenance; the bridge asks once per class and keeps the answers.

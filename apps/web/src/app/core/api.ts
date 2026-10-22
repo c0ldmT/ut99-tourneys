@@ -38,6 +38,8 @@ import type {
   BetBoard,
   BetRecordView,
   BotAssets,
+  LookPreview,
+  MeshPreview,
   BotClan,
   BotProfile,
   InvitePreview,
@@ -441,6 +443,21 @@ export class Api {
 
   bots = () => this.call<{ bots: LibraryBot[]; clans: BotClan[] }>('GET', '/bots');
   botAssets = () => this.call<BotAssets>('GET', '/bots/assets');
+  /** 3D look preview (decision 176): decoration, so quiet and in the background. */
+  lookPreview = (cls: string, skin: string, face: string, team: number | null) =>
+    this.call<LookPreview>(
+      'GET',
+      `/looks/preview?${new URLSearchParams({ cls, skin, face, ...(team !== null ? { team: String(team) } : {}) })}`,
+      undefined,
+      { quiet: true, background: true },
+    );
+  lookMesh = (cls: string, stamp: string) =>
+    this.call<MeshPreview>(
+      'GET',
+      `/looks/mesh?${new URLSearchParams({ cls, v: stamp })}`,
+      undefined,
+      { quiet: true, background: true },
+    );
   botProfile = (id: string, quiet = false) =>
     this.call<BotProfile>('GET', `/bots/${encodeURIComponent(id)}`, undefined, { quiet });
   createBot = (body: unknown) =>

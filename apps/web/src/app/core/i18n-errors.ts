@@ -42,6 +42,7 @@ export const ERRORS_DE: Record<string, string> = {
   'agent {id} is offline': 'Server {id} ist offline.',
   'agent {id} is not connected': 'Server {id} ist nicht verbunden.',
   'agent {id} did not answer {command}': 'Server {id} hat auf {command} nicht geantwortet.',
+  '3D preview of {name} not found': '3D-Vorschau für {name} nicht gefunden.',
   'agent {agentId} is offline': 'Server {agentId} ist offline.',
   'agent {agentId} is busy with {name}': 'Server {agentId} ist mit {name} beschäftigt.',
   'agent {agentId} has no server profile {profileId}':

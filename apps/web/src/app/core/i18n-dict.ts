@@ -1772,6 +1772,14 @@ const en = {
     "The website does not know this model's skins yet: the game server reports them when it runs next (mod 0.14.1 or later). Until then the default skin is used.",
   'bots.lookHint':
     "As in UT's player setup: the skins of the model, the faces of the skin, the voices of the model (from the stock game and the synced servers: Servers → Sync maps, models and skins). The tournament server offers custom packages to the players for download.",
+  'look.preview': '3D preview of the look (drag to turn)',
+  'look.none': 'No 3D preview for this model',
+  'look.team': 'Team colour',
+  'look.team.none': 'No team',
+  'look.team.0': 'Red team',
+  'look.team.1': 'Blue team',
+  'look.team.2': 'Green team',
+  'look.team.3': 'Gold team',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3562,6 +3570,14 @@ const de: Record<TKey, string> = {
     'Die Skins dieses Modells kennt die Website noch nicht: Der Spielserver meldet sie beim nächsten Start (ab Mod 0.14.1). Bis dahin gilt der Standard-Skin.',
   'bots.lookHint':
     'Wie im Player-Setup von UT: die Skins des Modells, die Gesichter des Skins, die Stimmen des Modells (aus dem Standardspiel und den synchronisierten Servern: Server → Maps, Models und Skins synchronisieren). Eigene Pakete bietet der Turnierserver den Spielern zum Download an.',
+  'look.preview': '3D-Vorschau des Aussehens (ziehen zum Drehen)',
+  'look.none': 'Keine 3D-Vorschau für dieses Modell',
+  'look.team': 'Teamfarbe',
+  'look.team.none': 'Kein Team',
+  'look.team.0': 'Rotes Team',
+  'look.team.1': 'Blaues Team',
+  'look.team.2': 'Grünes Team',
+  'look.team.3': 'Goldenes Team',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

@@ -422,3 +422,87 @@ export function changedLookProblems(
       (p.field === 'face' && !same('skin')),
   );
 }
+
+/** What the 3D look preview draws per skin slot (decision 176). */
+export interface LookSlots {
+  /** Texture ("Package.Name") per skin slot (MultiSkins index 0..7), '' = none. */
+  slots: string[];
+  /** The face's talk texture (portrait), if there is one. */
+  portrait: string | null;
+  /** The skin has team colours (`…T_<team>` textures). */
+  teams: boolean;
+}
+
+/**
+ * The textures a look puts on the model's skin slots, as UT does it:
+ * - multi-skin classes (TournamentPlayer.SetMultiSkin): texture `<skin><n>` on slot n-1, the
+ *   face `<skin><n><face>` (face package) instead, in a team `<skin><n>T_<team>`; the portrait
+ *   is `<skin>5<face>`. Which slot is the face's or the team's follows from the digit, so it
+ *   works for every multi-skin model without knowing its FaceSkin/TeamSkin values;
+ * - other classes (Pawn.SetMultiSkin): the skin texture is the actor's Skin;
+ * - then UMesh.GetTexture: MultiSkins, else the mesh's own texture (slots > 0), else Skin.
+ *
+ * `known`: full names (lower case) of textures the servers report; `listed`: the packages
+ * (lower case) whose textures are all known (read from the files). For other packages the plain
+ * skin textures `<skin>1..4` are assumed, team colours stay off.
+ */
+export function lookSlots(input: {
+  multi: boolean;
+  /** The class's default skin (DefaultSkinName), used when the look has none. */
+  defaultSkin: string | null;
+  meshTextures: readonly string[];
+  skin: string;
+  face: string;
+  team: number | null;
+  known: ReadonlySet<string>;
+  listed: ReadonlySet<string>;
+}): LookSlots {
+  const multiSkins: string[] = Array.from({ length: 8 }, () => '');
+  let skinTex = '';
+  let portrait: string | null = null;
+  let teams = false;
+  const skinName = input.skin || input.defaultSkin || '';
+  const has = (name: string) => input.known.has(lower(name));
+  if (skinName && input.multi && skinName.includes('.')) {
+    const pkg = pkgOf(skinName).slice(0, -1);
+    const base = item(skinName);
+    const pkgListed = input.listed.has(lower(pkg));
+    for (let d = 1; d <= 8; d++) {
+      const n = `${pkg}.${base}${d}`;
+      if (pkgListed ? has(n) : d <= 4) multiSkins[d - 1] = n;
+    }
+    if (pkgListed) {
+      const teamRe = new RegExp(`^${escapeRe(lower(pkg))}\\.${escapeRe(lower(base))}\\dt_\\d$`);
+      teams = [...input.known].some((k) => teamRe.test(k));
+      if (input.team !== null && teams)
+        for (let d = 1; d <= 8; d++) {
+          const n = `${pkg}.${base}${d}T_${input.team}`;
+          if (has(n)) multiSkins[d - 1] = n;
+        }
+    }
+    if (input.face.includes('.')) {
+      const fpkg = pkgOf(input.face).slice(0, -1);
+      const fitem = item(input.face);
+      for (let d = 1; d <= 8; d++) {
+        if (d === 5) continue; // the talk texture
+        const n = `${fpkg}.${base}${d}${fitem}`;
+        if (has(n)) multiSkins[d - 1] = n;
+      }
+      const talk = `${fpkg}.${base}5${fitem}`;
+      if (has(talk)) portrait = talk;
+    }
+  } else if (skinName) {
+    skinTex = skinName;
+  }
+  const slots = multiSkins.map((m, i) => {
+    const own = input.meshTextures[i] ?? '';
+    if (m) return m;
+    if (i !== 0 && own) return own;
+    return skinTex || own;
+  });
+  return { slots, portrait, teams };
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}

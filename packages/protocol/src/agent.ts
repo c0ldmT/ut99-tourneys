@@ -228,6 +228,14 @@ export const AgentInventory = envelope(
     assets: GameAssetsSchema.optional(),
     scannedAt: z.iso.datetime(),
     warnings: z.array(z.string()).default([]),
+    /**
+     * Changes when a model or skin package of the installation changes (3D look previews,
+     * decision 176): the website drops its cached previews of this server then.
+     */
+    assetStamp: z
+      .string()
+      .regex(/^[0-9a-f]{8,64}$/)
+      .optional(),
   }),
 );
 
@@ -235,6 +243,66 @@ export const AgentInventory = envelope(
 export const AgentClassDefaults = envelope(
   'agent.classDefaults',
   z.object({ profileId: Id, classDefaults: z.array(ClassDefaultsSchema).max(500) }),
+);
+
+/**
+ * A bot model for the 3D look preview (decision 176): one idle animation of a LodMesh. Binary
+ * parts are base64 (little endian): `verts` u32 per vertex and frame (UE1 packing: X 11 bits,
+ * Y 11 bits, Z 10 bits, signed), `wedges` per wedge u16 vertex + u8 S + u8 T (texture
+ * coordinates of 256), `faces` per face u16 × 3 wedges + u16 material. A material draws with the
+ * texture of its skin slot (MultiSkins index) and UT's poly flags; `textures` are the mesh's own
+ * textures per slot ("Package.Name", '' none).
+ */
+export const MeshPreviewSchema = z.object({
+  name: z.string().max(64),
+  seq: z.string().max(64),
+  frames: z.number().int().min(1).max(64),
+  rate: z.number().positive().max(120),
+  modelVerts: z.number().int().min(1).max(4000),
+  verts: z.string().max(2_000_000),
+  wedges: z.string().max(200_000),
+  faces: z.string().max(200_000),
+  materials: z
+    .array(z.object({ slot: z.number().int().min(0).max(7), flags: z.number().int() }))
+    .max(64),
+  textures: z.array(z.string().max(128)).max(8),
+  scale: z.tuple([z.number(), z.number(), z.number()]),
+  origin: z.tuple([z.number(), z.number(), z.number()]),
+  rotOrigin: z.tuple([z.number().int(), z.number().int(), z.number().int()]),
+});
+export type MeshPreview = z.infer<typeof MeshPreviewSchema>;
+
+/** Website asks for a look preview part (a bot model's mesh or a skin texture), decision 176. */
+export const AssetRequest = envelope(
+  'asset.request',
+  z.discriminatedUnion('kind', [
+    /** `pkg`: the package to look in first (the bot class's own). */
+    z.object({
+      kind: z.literal('mesh'),
+      profileId: Id,
+      mesh: z.string().min(1).max(64),
+      pkg: z.string().max(64).optional(),
+    }),
+    z.object({ kind: z.literal('texture'), profileId: Id, name: z.string().min(1).max(128) }),
+  ]),
+);
+
+/** The answer to `asset.request` (`re` = its id): the mesh, or the texture as PNG (base64). */
+export const AssetData = envelope(
+  'asset.data',
+  z.object({
+    ok: z.boolean(),
+    error: z.string().max(300).optional(),
+    /** Not ok because the part is not there or not usable (worth remembering; else: try again). */
+    missing: z.boolean().optional(),
+    /** The installation's asset stamp the part was read from. */
+    stamp: z
+      .string()
+      .regex(/^[0-9a-f]{8,64}$/)
+      .optional(),
+    mesh: MeshPreviewSchema.optional(),
+    png: z.string().max(3_000_000).optional(),
+  }),
 );
 
 export const AgentServerStatus = envelope(
@@ -470,12 +538,14 @@ export const BridgeToWebsiteSchema = z.discriminatedUnion('type', [
   MatchLive,
   MatchFeed,
   AgentLog,
+  AssetData,
 ]);
 export const WebsiteToBridgeSchema = z.discriminatedUnion('type', [
   AgentWelcome,
   TournamentSync,
   EventsAck,
   AgentCommandMessage,
+  AssetRequest,
 ]);
 export type BridgeToWebsite = z.infer<typeof BridgeToWebsiteSchema>;
 export type WebsiteToBridge = z.infer<typeof WebsiteToBridgeSchema>;

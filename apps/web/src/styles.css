@@ -290,6 +290,100 @@ label {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 0 16px;
 }
+/* look editor: 3D preview beside the fields (above them on narrow screens), decision 176 */
+.look-pick {
+  container-type: inline-size;
+}
+.look-pick-in {
+  display: grid;
+  gap: 0 16px;
+}
+@container (min-width: 560px) {
+  .look-pick-in {
+    grid-template-columns: 210px 1fr;
+    align-items: start;
+  }
+  .lv {
+    height: 280px;
+  }
+}
+.lv {
+  position: relative;
+  height: 240px;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: radial-gradient(ellipse at 50% 70%, var(--panel-3) 0%, var(--bg-2) 72%);
+  overflow: hidden;
+}
+.lv canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+  touch-action: pan-y;
+  cursor: grab;
+}
+.lv canvas:active {
+  cursor: grabbing;
+}
+.lv.ready canvas {
+  opacity: 1;
+}
+.lv.none {
+  height: auto;
+  background: var(--bg-2);
+}
+.lv.none canvas {
+  display: none;
+}
+.lv-none {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.lv-face {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  pointer-events: none;
+}
+.lv-teams {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 6px;
+}
+button.lv-team {
+  width: 24px;
+  height: 24px;
+  min-height: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--line);
+  background: var(--c);
+}
+button.lv-team:first-child {
+  background: linear-gradient(135deg, transparent 44%, var(--muted) 44% 56%, transparent 56%);
+}
+button.lv-team:hover:not(:disabled) {
+  background: var(--c);
+  border-color: var(--text-2);
+}
+button.lv-team:first-child:hover:not(:disabled) {
+  background: linear-gradient(135deg, transparent 44%, var(--muted) 44% 56%, transparent 56%);
+}
+button.lv-team.on {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14);
+}
 fieldset {
   border: 1px solid var(--border);
   border-radius: var(--radius);

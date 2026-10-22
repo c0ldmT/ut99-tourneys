@@ -4,12 +4,14 @@ import type {
   BotSpec,
   Entrant,
   MapInfo,
+  MeshPreview,
   TournamentProjection,
   TournamentSettings,
   TournamentSettingsInput,
 } from '@tourney/protocol';
 
 export type {
+  MeshPreview,
   BracketState,
   MatchState,
   Standing,
@@ -1418,4 +1420,14 @@ export interface UdtSquad {
   manager: string;
   ai: boolean;
   roster: UdtRosterBot[];
+}
+
+/** The textures a look puts on the model's skin slots (3D preview, decision 176). */
+export interface LookPreview {
+  stamp: string;
+  /** Texture per skin slot ("Package.Name", '' none). */
+  slots: string[];
+  portrait: string | null;
+  /** The skin has team colours. */
+  teams: boolean;
 }

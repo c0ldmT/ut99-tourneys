@@ -16,9 +16,9 @@ export interface LevelMeta {
   idealPlayerCount?: string;
 }
 
-class Reader {
+export class Reader {
   constructor(
-    private readonly buf: Buffer,
+    readonly buf: Buffer,
     public pos = 0,
   ) {}
 
@@ -38,6 +38,11 @@ class Reader {
   }
   u32(): number {
     const v = this.buf.readUInt32LE(this.pos);
+    this.pos += 4;
+    return v;
+  }
+  f32(): number {
+    const v = this.buf.readFloatLE(this.pos);
     this.pos += 4;
     return v;
   }
@@ -254,6 +259,7 @@ function readProperties(r: Reader, names: string[], hasStack: boolean, end: numb
     }
     if (type === 3) continue; // bool: value lives in the array bit, no payload
     const start = r.pos;
+    if (size < 0 || start + size > end) break;
     const key = WANTED[name.toLowerCase()];
     if (key && (type === 13 || type === 7)) {
       // 13 = StrProperty (length-prefixed); 7 = old fixed StringProperty (zero-terminated)

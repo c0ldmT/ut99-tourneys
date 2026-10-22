@@ -6,6 +6,7 @@ import {
   parseRules,
   validateAgainstInventory,
 } from '@tourney/adapter-ut99';
+import { AssetData } from '@tourney/protocol';
 import type {
   AccessEntry,
   BotPersonality,
@@ -14,6 +15,7 @@ import type {
   AgentCommand,
   AgentProfile,
   BotSpec,
+  BridgeToWebsite,
   KillFeedEntry,
   MapInfo,
   WebsiteToBridge,
@@ -24,6 +26,7 @@ import { MatchDirector, type DirectorTiming, type LiveInfo } from '../director.j
 import type { Logger } from '../log.js';
 import type { ModHello, ModServer } from '../mod-server.js';
 import { readAssets, scanInventory } from '../ut99/inventory.js';
+import { LookAssets } from '../ut99/look-preview.js';
 import { ModelCatalog, modDescribes } from '../ut99/model-catalog.js';
 import { botPackages, prepareServer } from '../ut99/prepare.js';
 import { ServerProcess } from '../ut99/server-process.js';
@@ -31,6 +34,8 @@ import { WebsiteLink } from './link.js';
 import { RemoteEventStore } from './remote-store.js';
 
 export const AGENT_VERSION = '0.3.0';
+
+type AssetPayload = Extract<BridgeToWebsite, { type: 'asset.data' }>['payload'];
 
 export interface WebsiteAgentOptions {
   config: BridgeConfig & { website: NonNullable<BridgeConfig['website']> };
@@ -77,9 +82,15 @@ export class WebsiteAgent {
   private modelsTimer?: TimerHandle;
   /** New answers the website has not got yet (it was offline). */
   private modelsUnsent = false;
+  /** Meshes and textures for the website's 3D look previews (only with a server profile). */
+  private readonly lookAssets?: LookAssets;
+  /** Look preview requests run one after the other (each reads a package). */
+  private assetQueue: Promise<void> = Promise.resolve();
+  private assetsWaiting = 0;
 
   constructor(private readonly o: WebsiteAgentOptions) {
     const { config, log } = o;
+    if (config.server) this.lookAssets = new LookAssets(config.server.installDir);
     if (config.server)
       this.models = new ModelCatalog({
         installDir: config.server.installDir,
@@ -197,6 +208,21 @@ export class WebsiteAgent {
         }
         return;
       }
+      case 'asset.request': {
+        const id = msg.id;
+        const req = msg.payload;
+        // A few at a time: the bridge also drives the games (the website asks again later).
+        if (this.assetsWaiting >= 24) {
+          this.sendAsset(id, { ok: false, error: 'busy' });
+          return;
+        }
+        this.assetsWaiting++;
+        const asked = Date.now();
+        this.assetQueue = this.assetQueue
+          .then(() => this.answerAsset(id, req, asked))
+          .finally(() => this.assetsWaiting--);
+        return;
+      }
       case 'command': {
         const { commandId, command } = msg.payload;
         try {
@@ -210,6 +236,47 @@ export class WebsiteAgent {
       }
       default:
         return;
+    }
+  }
+
+  /** A mesh or texture for a look preview (decision 176), answered with `asset.data`. */
+  private async answerAsset(
+    re: string,
+    req: Extract<WebsiteToBridge, { type: 'asset.request' }>['payload'],
+    asked: number,
+  ): Promise<void> {
+    // Let other messages (the mod, the website) in between two package reads.
+    await new Promise((resolve) => setImmediate(resolve));
+    // The website gave up after 20 s.
+    if (Date.now() - asked > 18_000 || !this.link.connected) return;
+    let payload: AssetPayload;
+    try {
+      const assets = this.lookAssets;
+      if (!assets || this.o.config.server?.id !== req.profileId)
+        throw new Error(`no server profile ${req.profileId} on this bridge`);
+      payload =
+        req.kind === 'mesh'
+          ? { ok: true, stamp: assets.stamp(), mesh: assets.mesh(req.mesh, req.pkg) }
+          : { ok: true, stamp: assets.stamp(), png: assets.texture(req.name).toString('base64') };
+    } catch (e) {
+      // Missing or broken in the files (not a passing file system error): worth remembering.
+      const missing = !(e as NodeJS.ErrnoException).code;
+      payload = { ok: false, missing, error: (e as Error).message.slice(0, 300) };
+    }
+    this.sendAsset(re, payload);
+  }
+
+  /** Sends a look preview answer if it fits the protocol (else: not usable). */
+  private sendAsset(re: string, payload: AssetPayload): void {
+    const checked = AssetData.shape.payload.safeParse(payload);
+    try {
+      this.link.send(
+        'asset.data',
+        checked.success ? payload : { ok: false, missing: true, error: 'too large or malformed' },
+        re,
+      );
+    } catch {
+      // offline: the website gives up on its own
     }
   }
 
@@ -339,6 +406,7 @@ export class WebsiteAgent {
       assets: { ...inv.assets, classDefaults: this.models?.models() ?? [] },
       scannedAt: new Date(this.o.clock.now()).toISOString(),
       warnings: inv.warnings,
+      ...(this.lookAssets ? { assetStamp: this.lookAssets.stamp() } : {}),
     });
     this.modelsUnsent = false;
   }
