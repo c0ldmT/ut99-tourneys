@@ -149,6 +149,30 @@ describe('Unreal Dream Team: trades', () => {
     expect((await tim.post(`/udt/trades/${c}/accept`)).status).toBe(409);
   });
 
+  it('books nothing when the fee fails, so the next accept pays in full', async () => {
+    const { mario, tim, marioId, timId, lib, ledger } = await setup();
+    const body = { to: timId, give: [lib.Alpha], takeNeuro: 500 };
+    const made = await mario.post('/udt/trades', body);
+    expect(made.status, JSON.stringify(made.body)).toBe(201);
+    const offer = made.body.open[0] as { id: string; feeTo: number };
+    expect(offer.feeTo).toBeGreaterThan(0);
+    // Tim can pay the 500 but not the fee on top.
+    const short = ledger.spendable(timId).spendable - (500 + offer.feeTo - 1);
+    ledger.book({ season: 1, userId: timId, kind: 'udt_reward', amount: -short, ref: 'cut' });
+    const before = { m: ledger.spendable(marioId).balance, t: ledger.spendable(timId).balance };
+    expect((await tim.post(`/udt/trades/${offer.id}/accept`)).status).toBe(409);
+    expect(ledger.spendable(timId).balance).toBe(before.t);
+    expect(ledger.spendable(marioId).balance).toBe(before.m);
+    const names = (await tim.get('/udt')).body.roster.map((r: { name: string }) => r.name);
+    expect(names).not.toContain('Alpha');
+    // One Neuro more: the accept goes through and charges the 500 and the fee.
+    ledger.book({ season: 1, userId: timId, kind: 'udt_reward', amount: 1, ref: 'plus' });
+    const ok = await tim.post(`/udt/trades/${offer.id}/accept`);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    expect(ledger.spendable(timId).balance).toBe(before.t + 1 - 500 - offer.feeTo);
+    expect(ledger.spendable(marioId).balance).toBe(before.m + 500);
+  });
+
   it('limits trades per pair and week', async () => {
     const { admin, mario, tim, timId, lib } = await setup();
     await admin.req('PUT', '/settings/udt', { tradePairPerWeek: 1, tradeLockDays: 0 });

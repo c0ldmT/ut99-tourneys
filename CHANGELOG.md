@@ -159,6 +159,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Dream Team trades: when accepting failed on the fee, a second accept took the bots without paying the asked Neuro (the partner still got them); payment, fee and bots are now booked together or not at all.
 - Dream Team careers counted no wins in Dream Team games and missed bots' games in normal tournaments (also in the market's form); live frag and time limits show when the tournament keeps the defaults.
 - Monster Hunt: the kill feed of the match page vanished after the first run of a game; it goes on in run 2 and shows each run with its own times.
 - The bridge no longer offers the tournament mod's internal bot classes (`TourneyMale1Bot` etc.) as models.

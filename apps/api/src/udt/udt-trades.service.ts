@@ -425,16 +425,19 @@ export class UdtTradesService {
     // Values may have changed since the offer (market days): the balance must still hold. The
     // fees stay as offered.
     this.check(season, t.fromUser, t.toUser, give, take, t.giveNeuro, t.takeNeuro);
-    if (t.takeNeuro > 0)
-      this.ledger.charge({
-        userId: user.id,
-        kind: 'udt_trade',
-        amount: t.takeNeuro,
-        ref: `trade-pay:${id}`,
-        meta: { tradeId: id },
-      });
-    if (t.feeTo > 0)
-      try {
+    // Payment, fee, bots and the status in one transaction: when the fee cannot be paid nothing is
+    // booked, so a later accept pays again. (Before, the pay ref stayed booked and made the next
+    // accept free – hence the new ref name: old databases may hold `trade-pay:<id>`.)
+    this.db.transaction(() => {
+      if (t.takeNeuro > 0)
+        this.ledger.charge({
+          userId: user.id,
+          kind: 'udt_trade',
+          amount: t.takeNeuro,
+          ref: `trade-paid:${id}`,
+          meta: { tradeId: id },
+        });
+      if (t.feeTo > 0)
         this.ledger.charge({
           userId: user.id,
           kind: 'udt_trade_fee',
@@ -442,58 +445,47 @@ export class UdtTradesService {
           ref: `trade-fee:${id}`,
           meta: { tradeId: id },
         });
-      } catch (e) {
-        if (t.takeNeuro > 0)
-          this.ledger.book({
-            season,
-            userId: user.id,
-            kind: 'udt_trade',
-            amount: t.takeNeuro,
-            ref: `trade-pay-back:${id}`,
-            meta: { tradeId: id },
-          });
-        throw e;
-      }
-    const now = this.nowIso();
-    const move = (botIds: string[], to: string) => {
-      if (!botIds.length) return;
+      const now = this.nowIso();
+      const move = (botIds: string[], to: string) => {
+        if (!botIds.length) return;
+        this.db
+          .update(udtRoster)
+          .set({ userId: to, dmSlot: null, mhSlot: null, bench: null, acquiredAt: now })
+          .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, botIds)))
+          .run();
+        // The traits go with the bot.
+        this.db
+          .update(udtTraits)
+          .set({ userId: to })
+          .where(and(eq(udtTraits.season, season), inArray(udtTraits.botId, botIds)))
+          .run();
+      };
+      move(give, t.toUser);
+      move(take, t.fromUser);
+      if (t.giveNeuro > 0)
+        this.ledger.book({
+          season,
+          userId: t.toUser,
+          kind: 'udt_trade',
+          amount: t.giveNeuro,
+          ref: `trade-in:${id}:${t.toUser}`,
+          meta: { tradeId: id },
+        });
+      if (t.takeNeuro > 0)
+        this.ledger.book({
+          season,
+          userId: t.fromUser,
+          kind: 'udt_trade',
+          amount: t.takeNeuro,
+          ref: `trade-in:${id}:${t.fromUser}`,
+          meta: { tradeId: id },
+        });
       this.db
-        .update(udtRoster)
-        .set({ userId: to, dmSlot: null, mhSlot: null, bench: null, acquiredAt: now })
-        .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, botIds)))
+        .update(udtTrades)
+        .set({ status: 'accepted', decidedAt: now })
+        .where(eq(udtTrades.id, id))
         .run();
-      // The traits go with the bot.
-      this.db
-        .update(udtTraits)
-        .set({ userId: to })
-        .where(and(eq(udtTraits.season, season), inArray(udtTraits.botId, botIds)))
-        .run();
-    };
-    move(give, t.toUser);
-    move(take, t.fromUser);
-    if (t.giveNeuro > 0)
-      this.ledger.book({
-        season,
-        userId: t.toUser,
-        kind: 'udt_trade',
-        amount: t.giveNeuro,
-        ref: `trade-in:${id}:${t.toUser}`,
-        meta: { tradeId: id },
-      });
-    if (t.takeNeuro > 0)
-      this.ledger.book({
-        season,
-        userId: t.fromUser,
-        kind: 'udt_trade',
-        amount: t.takeNeuro,
-        ref: `trade-in:${id}:${t.fromUser}`,
-        meta: { tradeId: id },
-      });
-    this.db
-      .update(udtTrades)
-      .set({ status: 'accepted', decidedAt: now })
-      .where(eq(udtTrades.id, id))
-      .run();
+    });
     this.log.info(`udt trade ${id} accepted (${give.length} for ${take.length} bots)`);
     // Other offers with these bots cannot happen any more.
     this.sweep(season);
