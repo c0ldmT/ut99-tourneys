@@ -254,7 +254,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
               <div class="ob">
                 <udt-card
                   [bot]="ownCard(b, v.tag)"
-                  [points]="b.own!.points"
+                  [points]="b.own!.maxed ? 0 : b.own!.points"
                   (pointsClick)="toTeam(b.botId)"
                 />
                 <div class="oinfo">

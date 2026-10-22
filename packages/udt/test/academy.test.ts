@@ -68,6 +68,47 @@ describe('academy', () => {
   });
 });
 
+describe('breakthrough', () => {
+  it('needs a fully developed bot of level 10, once, below Godlike; dearer higher up', async () => {
+    const { cannotBreakthrough, breakthroughStep, breakthroughValues } =
+      await import('../src/index.js');
+    const top = { accuracy: 1, alertness: 1, strafing: 1 };
+    const bot = { skill: 5, potential: 5, level: 10, done: false, values: top };
+    expect(cannotBreakthrough(bot, 6)).toBeNull();
+    expect(cannotBreakthrough(bot, 5)).toBe('points');
+    expect(cannotBreakthrough({ ...bot, done: true }, 99)).toBe('done');
+    expect(cannotBreakthrough({ ...bot, skill: 7, potential: 7 }, 99)).toBe('godlike');
+    // Potential 7 below skill 7 is "not reached" (the level comes first in the API, so a hidden
+    // potential 7 is not told).
+    expect(cannotBreakthrough({ ...bot, skill: 4, potential: 7, level: 3 }, 99)).toBe('potential');
+    expect(cannotBreakthrough({ ...bot, skill: 4 }, 99)).toBe('potential');
+    expect(cannotBreakthrough({ ...bot, level: 9 }, 99)).toBe('level');
+    expect(cannotBreakthrough({ ...bot, values: { ...top, strafing: 0.9 } }, 99)).toBe('values');
+    // 5 -> 6 costs less than 6 -> 7.
+    expect(breakthroughStep(5).cost).toBeLessThan(breakthroughStep(6).cost);
+    expect([3, 4, 5, 6].map((s) => breakthroughStep(s).cost)).toEqual([4, 5, 6, 8]);
+    // 100 -> 65 (75 towards Godlike), in steps of 5.
+    expect(breakthroughValues(5, top)).toEqual({ accuracy: 0.3, alertness: 0.3, strafing: 0.3 });
+    expect(breakthroughValues(6, top)).toEqual({ accuracy: 0.5, alertness: 0.5, strafing: 0.5 });
+  });
+
+  it('leaves the bot a bit stronger than before (duel simulator)', async () => {
+    const { duelSeries, fromPct, breakthroughValues } = await import('../src/index.js');
+    const top = { accuracy: 1, alertness: 1, strafing: 1 };
+    for (const s of [3, 5, 6]) {
+      const after = breakthroughValues(s, top);
+      const r = duelSeries(
+        { level: s + 1, ...after },
+        { level: s, ...top },
+        { duels: 400, seed: s },
+      );
+      expect(r.winDecided, `${s} -> ${s + 1}`).toBeGreaterThan(0.5);
+      expect(r.winDecided, `${s} -> ${s + 1}`).toBeLessThan(0.65);
+      expect(fromPct(65)).toBeCloseTo(0.3);
+    }
+  });
+});
+
 describe('potential window', () => {
   it('holds the potential, never below the skill, two steps until Godlike', async () => {
     const { potentialWindow } = await import('../src/index.js');

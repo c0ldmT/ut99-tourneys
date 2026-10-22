@@ -1053,6 +1053,10 @@ export interface UdtRosterBot {
     spent: number;
     /** The one free renaming is still open. */
     canRename: boolean;
+    /** The one breakthrough happened. */
+    breakthrough?: boolean;
+    /** Fully developed for good: points have nothing left to buy (no plaque). */
+    maxed?: boolean;
   } | null;
   career?: UdtCareer | null;
 }

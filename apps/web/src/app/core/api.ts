@@ -358,6 +358,10 @@ export class Api {
       { stat },
       { ok: 'ok.udt.developed' },
     );
+  udtBreakthrough = (botId: string) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/breakthrough`, undefined, {
+      ok: 'ok.udt.breakthrough',
+    });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');
   udtNominate = (botId: string) =>
     this.call<UdtGraduation>('POST', `/udt/graduation/${encodeURIComponent(botId)}`, undefined, {

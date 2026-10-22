@@ -226,6 +226,14 @@ export const ERRORS_DE: Record<string, string> = {
   'the build costs {cost} of {budget} points: lower the values':
     'Der Bau kostet {cost} von {budget} Punkten: Senk die Werte.',
   'the potential is reached': 'Das Potenzial ist erreicht.',
+  'a bot has one breakthrough': 'Ein Bot hat nur einen Durchbruch – den hatte er schon.',
+  'the bot is Godlike already': 'Der Bot ist schon Godlike.',
+  'a breakthrough needs level {level}': 'Ein Durchbruch geht ab Level {level}.',
+  'a breakthrough needs the potential reached':
+    'Für einen Durchbruch muss das Potenzial erreicht sein.',
+  'a breakthrough needs every value at 100':
+    'Für einen Durchbruch müssen alle drei Werte auf 100 sein.',
+  'the breakthrough costs {cost} points': 'Der Durchbruch kostet {cost} Punkte.',
   'the potential is skill {potential}': 'Das Potenzial ist Skill {potential}.',
   'the value is at its maximum': 'Der Wert ist schon am Maximum.',
   '{name} has an apprentice this season': '{name} hat diese Season schon einen Lehrling.',

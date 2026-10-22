@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team breakthrough: a fully developed own bot (level 10, skill at its potential, all values at 100) can raise skill and potential once for development points; its values drop by about a third, so it comes out a bit stronger and grows further with training. Fully developed bots lose the points plaque.
 - Tournament page: the match being played in the match page's look - scorebar with clock and limits, every player's health and frags - and a tap opens the match page.
 - Dream Team bot page: team, card, potential, Dream Team statistics (games, wins, K/D, damage, latest matches) and career; every bot link in Dream Team leads there, the normal bot profile only shows for bots that also play normal tournaments.
 - Dream Team potential on every card of an own bot and as a skill ladder in the bot details and the academy, so a closed skill step explains itself.

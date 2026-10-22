@@ -232,6 +232,12 @@ export const DEVELOP_COST: Readonly<Record<DevelopStat, number>> = {
 export const developPoints = (level: number, spent: number): number =>
   Math.max(0, level - 1 - spent);
 
+/** The values development points raise. */
+export const DEVELOP_VALUES = ['accuracy', 'alertness', 'strafing'] as const;
+
+/** A value at 100 on the 0..100 scale (development ends there; the breakthrough needs it). */
+export const valueAtTop = (v: number | undefined): boolean => pct(v ?? 0) >= 100;
+
 /** Why a development step is not possible (null: it is). */
 export function cannotDevelop(
   stat: DevelopStat,
@@ -240,11 +246,78 @@ export function cannotDevelop(
 ): 'points' | 'potential' | 'max' | null {
   if (points < DEVELOP_COST[stat]) return 'points';
   if (stat === 'skill') return Math.round(bot.skill) >= bot.potential ? 'potential' : null;
-  return (bot.values[stat] ?? 0) >= 1 ? 'max' : null;
+  return valueAtTop(bot.values[stat]) ? 'max' : null;
 }
 
 /** The value after a development step (+5 on the 0..100 scale). */
 export const developValue = (v: number | undefined): number => r3(clamp((v ?? 0) + 0.1, -1, 1));
+
+// ---------- breakthrough ----------
+
+/** A breakthrough needs this level (the potential shows exactly from level 5). */
+export const BREAKTHROUGH_LEVEL = 10;
+
+export interface BreakthroughStep {
+  /** Development points it costs. */
+  cost: number;
+  /** Share the three values lose (0..1, of the 0..100 scale). */
+  cut: number;
+}
+
+/**
+ * A breakthrough from `skill` to the next step (owner, 22.10.): dearer the higher it goes. The
+ * cut keeps the bot a bit stronger than before (duel simulator, mod 0.15.0, all weapons: skill +1
+ * with every value at 65 wins about 56 % against the old bot with all at 100 from 3 to 6; Godlike
+ * needs 75; a step to skill 3 or below 75 as well).
+ */
+export function breakthroughStep(skill: number): BreakthroughStep {
+  const s = Math.round(skill);
+  if (s >= 6) return { cost: 8, cut: 0.25 };
+  if (s === 5) return { cost: 6, cut: 0.35 };
+  if (s === 4) return { cost: 5, cut: 0.35 };
+  if (s === 3) return { cost: 4, cut: 0.35 };
+  return { cost: 3, cut: 0.25 };
+}
+
+export type BreakthroughBlock = 'done' | 'godlike' | 'potential' | 'level' | 'values' | 'points';
+
+/**
+ * Why an own bot cannot break through (null: it can): once per bot, below Godlike, the potential
+ * reached, level 10, every value at 100, the points.
+ */
+export function cannotBreakthrough(
+  bot: {
+    skill: number;
+    potential: number;
+    level: number;
+    done: boolean;
+    values: Partial<TalentValues>;
+  },
+  points: number,
+): BreakthroughBlock | null {
+  if (bot.done) return 'done';
+  if (Math.round(bot.skill) >= 7) return 'godlike';
+  if (Math.round(bot.skill) < bot.potential) return 'potential';
+  if (bot.level < BREAKTHROUGH_LEVEL) return 'level';
+  if (DEVELOP_VALUES.some((k) => !valueAtTop(bot.values[k]))) return 'values';
+  if (points < breakthroughStep(bot.skill).cost) return 'points';
+  return null;
+}
+
+/** The values after a breakthrough: each loses the step's share, in steps of 5 (0..100). */
+export function breakthroughValues(
+  skill: number,
+  values: Partial<TalentValues>,
+): Record<'accuracy' | 'alertness' | 'strafing', number> {
+  const { cut } = breakthroughStep(skill);
+  const one = (v: number | undefined) =>
+    r3(clamp((Math.round((pct(v ?? 0) * (1 - cut)) / 5) * 5) / 50 - 1, -1, 1));
+  return {
+    accuracy: one(values.accuracy),
+    alertness: one(values.alertness),
+    strafing: one(values.strafing),
+  };
+}
 
 // ---------- blueprints (from packs) ----------
 

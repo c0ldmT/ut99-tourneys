@@ -369,6 +369,13 @@ export class UdtController {
     return this.academy.develop(user, botId, body.stat);
   }
 
+  /** The one breakthrough of a fully developed own bot. */
+  @Post('roster/:botId/breakthrough')
+  @HttpCode(200)
+  breakthrough(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.academy.breakthrough(user, botId);
+  }
+
   /** The manager's own bots of the season and what their graduation needs. */
   @Get('graduation')
   graduation(@CurrentUser() user: User) {

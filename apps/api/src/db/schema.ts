@@ -459,6 +459,8 @@ export const udtBots = sqliteTable('udt_bots', {
   honours: integer('honours', { mode: 'boolean' }).notNull().default(false),
   /** The manager used the one free renaming. */
   renamed: integer('renamed', { mode: 'boolean' }).notNull().default(false),
+  /** The one breakthrough happened (potential and skill +1, values cut). */
+  breakthrough: integer('breakthrough', { mode: 'boolean' }).notNull().default(false),
 });
 
 /** The manager's latest scout report (three talents) of a season. */

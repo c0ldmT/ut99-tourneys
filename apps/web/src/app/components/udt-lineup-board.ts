@@ -117,7 +117,7 @@ export interface TraitDrop {
                 <udt-card
                   [bot]="card(b)"
                   [small]="true"
-                  [points]="b.own?.points ?? 0"
+                  [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
                   (pointsClick)="open.emit(b.botId)"
                 />
                 <div class="ph" *cdkDragPlaceholder></div>
@@ -167,7 +167,7 @@ export interface TraitDrop {
                 <udt-card
                   [bot]="card(b)"
                   [small]="true"
-                  [points]="b.own?.points ?? 0"
+                  [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
                   (pointsClick)="open.emit(b.botId)"
                 />
                 <div class="ph" *cdkDragPlaceholder></div>
@@ -298,7 +298,7 @@ export interface TraitDrop {
                     [bot]="card(b)"
                     [small]="true"
                     [note]="placeLabel(b.botId)"
-                    [points]="b.own?.points ?? 0"
+                    [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
                     (pointsClick)="open.emit(b.botId)"
                   />
                   <!-- Phones: a compact strip instead of full cards (the field stays in view). -->

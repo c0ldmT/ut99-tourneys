@@ -539,4 +539,8 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX game_replays_created ON game_replays(created_at);
   `,
+  // 31: Dream Team: an own bot's one breakthrough (potential and skill +1, values cut).
+  `
+  ALTER TABLE udt_bots ADD COLUMN breakthrough INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

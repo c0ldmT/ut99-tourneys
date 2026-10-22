@@ -1,7 +1,16 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { asc } from 'drizzle-orm';
 import { createRng } from '@tourney/bracket';
-import { buildCost, levelOf, TALENT_NAMES, traitDef, traitSlots } from '@tourney/udt';
+import {
+  buildCost,
+  cannotBreakthrough,
+  DEVELOP_VALUES,
+  levelOf,
+  TALENT_NAMES,
+  traitDef,
+  traitSlots,
+  valueAtTop,
+} from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
 import { BotsService } from '../bots/bots.service.js';
@@ -381,10 +390,32 @@ export class UdtAiService implements OnModuleInit {
     }
   }
 
-  /** Development points: skill when possible, else accuracy, alertness, strafing in turn. */
+  /**
+   * Development points: the breakthrough when possible, else skill when possible, else accuracy,
+   * alertness, strafing in turn.
+   */
   private develop(user: User, season: number) {
     for (const r of this.udt.roster(user.id, season)) {
       if (!r.own) continue;
+      const bt = cannotBreakthrough(
+        {
+          skill: r.skill,
+          potential: r.own.potential[1],
+          level: r.level,
+          done: r.own.breakthrough,
+          values: r.traits,
+        },
+        r.own.points,
+      );
+      if (bt === null)
+        try {
+          this.academy.breakthrough(user, r.botId);
+        } catch {
+          // checked above; the next round tries again
+        }
+      // Skill while it can grow (the potential may be lower than the range's top), else the
+      // lowest value below 100; nothing left: the points wait (for the breakthrough).
+      let skillClosed = false;
       for (
         let guard = 0;
         guard < 10 &&
@@ -392,14 +423,18 @@ export class UdtAiService implements OnModuleInit {
         guard++
       ) {
         const now = this.udt.roster(user.id, season).find((x) => x.botId === r.botId)!;
-        const stat =
-          now.own!.points >= 3 && Math.round(now.skill) < now.own!.potential[1]
-            ? 'skill'
-            : (['accuracy', 'alertness', 'strafing'] as const)[guard % 3]!;
+        const skill =
+          !skillClosed && now.own!.points >= 3 && Math.round(now.skill) < now.own!.potential[1];
+        const value = DEVELOP_VALUES.filter((k) => !valueAtTop(now.traits[k])).sort(
+          (a, b) => (now.traits[a] ?? 0) - (now.traits[b] ?? 0),
+        )[0];
+        const stat = skill ? 'skill' : value;
+        if (!stat) break;
         try {
           this.academy.develop(user, r.botId, stat);
         } catch {
-          break;
+          if (stat === 'skill') skillClosed = true;
+          else break;
         }
       }
     }

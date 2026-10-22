@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
+import { BotsService } from '../src/bots/bots.service.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
 import { udtBlueprints, udtBots, udtRoster } from '../src/db/schema.js';
@@ -141,6 +142,49 @@ describe('Unreal Dream Team: academy', () => {
     expect((await mario.get('/udt/breeders')).body).toMatchObject([
       { name: 'Mario', graduates: 1, honours: 1 },
     ]);
+  });
+
+  it('breakthrough: once, for a fully developed bot from level 10', async () => {
+    const { mario, db } = await setup();
+    const starter = (await mario.get('/udt')).body.roster[0];
+    const id = starter.botId as string;
+    const bt = () => mario.post(`/udt/roster/${id}/breakthrough`);
+    // Level 9, skill 3 below the potential 5, values 50: refused for the level first; a hidden
+    // potential 7 at level 3 gets the same answer (it does not tell the potential).
+    db.update(udtRoster).set({ xp: 585 }).where(eq(udtRoster.botId, id)).run();
+    expect((await bt()).body.key).toBe('a breakthrough needs level {level}');
+    db.update(udtRoster).set({ xp: 60 }).where(eq(udtRoster.botId, id)).run();
+    db.update(udtBots).set({ potential: 7 }).where(eq(udtBots.botId, id)).run();
+    expect((await bt()).body.key).toBe('a breakthrough needs level {level}');
+    // Level 12 (11 points): skill at the potential, but the values are not at 100.
+    db.update(udtRoster).set({ xp: 880 }).where(eq(udtRoster.botId, id)).run();
+    db.update(udtBots).set({ potential: 3 }).where(eq(udtBots.botId, id)).run();
+    expect((await bt()).body.key).toBe('a breakthrough needs every value at 100');
+    api!.app
+      .get(BotsService)
+      .update(id, { traits: { ...starter.traits, accuracy: 1, alertness: 1, strafing: 1 } });
+    let r = (await mario.get('/udt')).body.roster[0];
+    expect(r.own).toMatchObject({
+      potential: [3, 3],
+      points: 11,
+      breakthrough: false,
+      maxed: false,
+    });
+    // Not enough points (11 - 8 spent = 3 of 4).
+    db.update(udtBots).set({ pointsSpent: 8 }).where(eq(udtBots.botId, id)).run();
+    expect((await bt()).body.key).toBe('the breakthrough costs {cost} points');
+    db.update(udtBots).set({ pointsSpent: 0 }).where(eq(udtBots.botId, id)).run();
+    const ok = await bt();
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    r = ok.body.roster[0];
+    // Skill and potential 4, values 100 -> 65, 4 points spent.
+    expect(r).toMatchObject({
+      skill: 4,
+      own: { potential: [4, 4], points: 7, breakthrough: true },
+    });
+    expect(r.traits).toMatchObject({ accuracy: 0.3, alertness: 0.3, strafing: 0.3 });
+    // Once per bot.
+    expect((await bt()).body.key).toBe('a bot has one breakthrough');
   });
 
   it('builds an own bot from a blueprint: skill 3, points, potential, model, start trait', async () => {

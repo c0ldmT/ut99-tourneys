@@ -13,7 +13,15 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { cannotDevelop, DEFAULT_ECONOMY, DEVELOP_COST } from '@tourney/udt';
+import {
+  BREAKTHROUGH_LEVEL,
+  breakthroughStep,
+  breakthroughValues,
+  cannotBreakthrough,
+  cannotDevelop,
+  DEFAULT_ECONOMY,
+  DEVELOP_COST,
+} from '@tourney/udt';
 import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
@@ -95,7 +103,11 @@ const SHORT: Readonly<Record<Stat, string>> = {
                   <h3>{{ 'udt.academy.points' | t }}</h3>
                   <span class="pts" [class.zero]="own.points === 0">{{ own.points }}</span>
                 </div>
-                <udt-potential [skill]="b.skill" [potential]="own.potential" />
+                <udt-potential
+                  [skill]="b.skill"
+                  [potential]="own.potential"
+                  [next]="bt(b)?.to ?? null"
+                />
                 <p class="muted small">{{ 'udt.points.explain' | t }}</p>
                 <div class="steps">
                   @for (s of stats; track s) {
@@ -118,6 +130,45 @@ const SHORT: Readonly<Record<Stat, string>> = {
                     </button>
                   }
                 </div>
+                @if (bt(b); as x) {
+                  <div class="udt-bt" [class.ready]="x.why === null">
+                    <div class="udt-bt-head">
+                      <b>{{ 'udt.bt.title' | t: { from: x.from, to: x.to } }}</b>
+                      <span class="udt-bt-cost">{{ 'udt.points.cost' | t: { n: x.cost } }}</span>
+                    </div>
+                    <p class="muted small">{{ 'udt.bt.explain' | t: { cut: x.cut } }}</p>
+                    <ul class="udt-bt-req small">
+                      <li [class.ok]="x.levelOk">
+                        {{ 'udt.bt.reqLevel' | t: { n: x.level, now: b.level } }}
+                      </li>
+                      <li [class.ok]="x.valuesOk">
+                        {{ 'udt.bt.reqValues' | t }}
+                        @if (!x.valuesOk) {
+                          <span class="mono">({{ x.missing }})</span>
+                        }
+                      </li>
+                      <li [class.ok]="x.pointsOk">
+                        {{ 'udt.bt.reqPoints' | t: { n: x.cost, have: own.points } }}
+                      </li>
+                    </ul>
+                    <p class="mono small udt-bt-vals">{{ x.preview }}</p>
+                    <button
+                      type="button"
+                      class="primary"
+                      [disabled]="busy() || x.why !== null"
+                      (click)="breakthrough(b, x)"
+                    >
+                      {{ 'udt.bt.button' | t: { to: x.to } }}
+                    </button>
+                  </div>
+                } @else if (own.maxed) {
+                  <p class="udt-bt-maxed small">{{ 'udt.bt.maxed' | t }}</p>
+                }
+                @if (own.breakthrough) {
+                  <p class="small">
+                    <span class="udt-mark star">{{ 'udt.bt.done' | t }}</span>
+                  </p>
+                }
               </section>
             } @else {
               <p class="muted small">{{ 'udt.points.bought' | t }}</p>
@@ -422,6 +473,55 @@ export class UdtBotPanel {
 
   protected sellPrice(b: UdtRosterBot) {
     return Math.round((b.value * DEFAULT_ECONOMY.sellBack) / 10) * 10;
+  }
+
+  /**
+   * The breakthrough card: shown once the skill is at the potential (its top while it is a range)
+   * and the bot has not had its one breakthrough, below Godlike; what is missing and the values
+   * after it.
+   */
+  protected bt(b: UdtRosterBot) {
+    const own = b.own;
+    if (!own || own.breakthrough || own.potential[1] >= 7) return null;
+    const skill = Math.round(b.skill);
+    if (skill < own.potential[1]) return null;
+    const step = breakthroughStep(skill);
+    const after = breakthroughValues(skill, b.traits);
+    const short = (k: 'accuracy' | 'alertness' | 'strafing') => SHORT[k];
+    const pctOf = (v: number | undefined) => Math.round(((v ?? 0) + 1) * 50);
+    const keys = ['accuracy', 'alertness', 'strafing'] as const;
+    return {
+      from: skill,
+      to: skill + 1,
+      cost: step.cost,
+      cut: Math.round(step.cut * 100),
+      level: BREAKTHROUGH_LEVEL,
+      levelOk: b.level >= BREAKTHROUGH_LEVEL,
+      valuesOk: keys.every((k) => pctOf(b.traits[k]) >= 100),
+      pointsOk: own.points >= step.cost,
+      missing: keys
+        .filter((k) => pctOf(b.traits[k]) < 100)
+        .map((k) => `${short(k)} ${pctOf(b.traits[k])}`)
+        .join(', '),
+      preview:
+        `Skill ${skill} → ${skill + 1} · ` +
+        keys.map((k) => `${short(k)} ${pctOf(b.traits[k])} → ${pctOf(after[k])}`).join(' · '),
+      why: cannotBreakthrough(
+        {
+          skill,
+          potential: own.potential[1],
+          level: b.level,
+          done: !!own.breakthrough,
+          values: b.traits,
+        },
+        own.points,
+      ),
+    };
+  }
+
+  protected async breakthrough(b: UdtRosterBot, x: { from: number; to: number; cut: number }) {
+    if (!confirm(this.i18n.t('udt.bt.confirm', { from: x.from, to: x.to, cut: x.cut }))) return;
+    await this.act(() => this.api.udtBreakthrough(b.botId));
   }
 
   protected async develop(b: UdtRosterBot, s: Stat) {

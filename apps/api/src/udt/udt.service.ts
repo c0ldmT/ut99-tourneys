@@ -9,7 +9,9 @@ import {
   effectiveValues,
   levelOf,
   developPoints,
+  DEVELOP_VALUES,
   marketValue,
+  valueAtTop,
   potentialWindow,
   SCRAP,
   starterPotential,
@@ -148,6 +150,10 @@ export interface RosterBot {
     spent: number;
     /** The one free renaming is still open. */
     canRename: boolean;
+    /** The one breakthrough happened. */
+    breakthrough: boolean;
+    /** Fully developed for good (from level 5): points have nothing left to buy. */
+    maxed: boolean;
   } | null;
 }
 
@@ -519,7 +525,7 @@ export class UdtService {
             effective: { skill: eff.skill, traits: eff.values, overflow: eff.overflow },
             striking: r.striking,
             games: r.games,
-            own: ownView(own.get(b.id), level, b.skill),
+            own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}),
           },
         ];
       })
@@ -751,14 +757,22 @@ export function withTraits(
 }
 
 /** What the roster shows of an own bot: the potential is a range until level 5. */
-function ownView(b: typeof udtBots.$inferSelect | undefined, level: number, skill: number) {
+function ownView(
+  b: typeof udtBots.$inferSelect | undefined,
+  level: number,
+  skill: number,
+  values: LibraryBot['traits'],
+) {
   if (!b) return null;
   const p = b.potential;
+  const full = DEVELOP_VALUES.every((k) => valueAtTop(values[k]));
   return {
     origin: b.origin,
     potential: (level >= 5 ? [p, p] : potentialWindow(p, skill, b.botId)) as [number, number],
     points: developPoints(level, b.pointsSpent),
     spent: b.pointsSpent,
     canRename: !b.renamed && b.status === 'own',
+    breakthrough: b.breakthrough,
+    maxed: level >= 5 && full && Math.round(skill) >= p && (b.breakthrough || p >= 7),
   };
 }

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { I18n, TPipe } from '../core/i18n';
 import { potLine, potNames, potState, potText, SKILL_NAMES } from '../core/udt';
 
-type Step = 'on' | 'reach' | 'maybe' | 'lock';
+type Step = 'on' | 'reach' | 'maybe' | 'lock' | 'lock bt';
 
 /**
  * A bot's potential as a skill ladder (Novice to Godlike): the skill it has, the steps it can
@@ -23,7 +23,7 @@ type Step = 'on' | 'reach' | 'maybe' | 'lock';
           <span class="udt-pot-st">
             @switch (st.kind) {
               @case ('reached') {
-                {{ 'udt.pot.reached' | t }}
+                {{ (next() !== null ? 'udt.pot.reachedBt' : 'udt.pot.reached') | t }}
               }
               @case ('maybe') {
                 {{ 'udt.pot.maybe' | t: { n: st.b } }}
@@ -50,6 +50,8 @@ export class UdtPotential {
   readonly potential = input.required<readonly [number, number]>();
   /** One line without the explanation (cards in lists). */
   readonly compact = input(false);
+  /** The step a breakthrough would open (marked on the ladder), null: none. */
+  readonly next = input<number | null>(null);
 
   protected readonly state = computed(() => potState(this.skill(), this.potential()));
   protected readonly text = computed(() => potText(this.potential()));
@@ -58,7 +60,15 @@ export class UdtPotential {
     const s = Math.round(this.skill());
     const [lo, hi] = this.potential();
     return Array.from({ length: 8 }, (_, i) =>
-      i <= s ? 'on' : i <= lo ? 'reach' : i <= hi ? 'maybe' : 'lock',
+      i <= s
+        ? 'on'
+        : i <= lo
+          ? 'reach'
+          : i <= hi
+            ? 'maybe'
+            : i === this.next()
+              ? 'lock bt'
+              : 'lock',
     );
   });
   private readonly i18n = inject(I18n);

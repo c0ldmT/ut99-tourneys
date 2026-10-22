@@ -1798,6 +1798,61 @@ udt-pack-stage .stage.lg .rays {
   border-color: var(--line);
   color: var(--faint);
 }
+.udt-pot-s.lock.bt {
+  border: 1px dashed var(--neuro);
+  color: var(--neuro-text);
+  background: rgba(245, 184, 61, 0.1);
+}
+/* Dream Team breakthrough card (bot details) */
+.udt-bt {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(245, 184, 61, 0.5);
+  background: rgba(245, 184, 61, 0.05);
+}
+.udt-bt.ready {
+  border-style: solid;
+  border-color: var(--neuro);
+  background: rgba(245, 184, 61, 0.1);
+}
+.udt-bt p {
+  margin: 0;
+}
+.udt-bt-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+.udt-bt-cost {
+  font-size: 0.75rem;
+  color: var(--neuro-text);
+}
+.udt-bt-req {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.udt-bt-req li::before {
+  content: '○ ';
+  color: var(--faint);
+}
+.udt-bt-req li.ok::before {
+  content: '✓ ';
+  color: var(--live);
+}
+.udt-bt-vals {
+  color: var(--text-2);
+}
+.udt-bt-maxed {
+  margin: 10px 0 0;
+  color: var(--text-2);
+}
 .udt-pot.compact .udt-pot-s {
   height: 12px;
 }

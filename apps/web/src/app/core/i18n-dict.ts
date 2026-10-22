@@ -1729,6 +1729,7 @@ const en = {
     'Talent signed: it is in your roster now. You can rename it once for free (Academy › Own bots).',
   'ok.udt.apprentice': 'Apprentice taken on. You can rename it once for free.',
   'ok.udt.built': 'Bot built from the blueprint. You can rename it once for free.',
+  'ok.udt.breakthrough': 'Breakthrough! Skill and potential +1.',
   'udt.help.button': 'How it works',
   'udt.help.title': 'How the Dream Team works',
   'udt.help.intro':
@@ -1820,6 +1821,18 @@ const en = {
   'udt.points.why.points': 'Not enough points',
   'udt.points.why.potential': 'The potential is reached',
   'udt.pot.label': 'Potential',
+  'udt.pot.reachedBt': 'Potential reached – a breakthrough can raise it once',
+  'udt.bt.title': 'Breakthrough {from} → {to}',
+  'udt.bt.explain':
+    'Once per bot: potential and skill +1, all three values lose {cut} %. The bot comes out a bit stronger and grows further with training.',
+  'udt.bt.reqLevel': 'Level {n} (now {now})',
+  'udt.bt.reqValues': 'All three values at 100',
+  'udt.bt.reqPoints': '{n} points (has {have})',
+  'udt.bt.button': 'Break through to skill {to}',
+  'udt.bt.confirm':
+    'Breakthrough {from} → {to}: skill and potential +1, every value −{cut} %. Only once per bot. Go ahead?',
+  'udt.bt.maxed': 'Fully developed: further points have no use any more.',
+  'udt.bt.done': 'Breakthrough',
   'udt.pot.chip': 'Pot {p}',
   'udt.pot.chipMax': 'Pot max',
   'udt.pot.title': 'Potential: skill {p} ({names})',
@@ -3640,6 +3653,7 @@ const de: Record<TKey, string> = {
     'Talent verpflichtet: Es ist jetzt in deinem Kader. Einmal umbenennen kannst du es kostenlos (Akademie › Eigene Bots).',
   'ok.udt.apprentice': 'Lehrling aufgenommen. Einmal umbenennen kannst du ihn kostenlos.',
   'ok.udt.built': 'Bot aus dem Bauplan gebaut. Einmal umbenennen kannst du ihn kostenlos.',
+  'ok.udt.breakthrough': 'Durchbruch! Skill und Potenzial +1.',
   'udt.help.button': "So funktioniert's",
   'udt.help.title': 'So funktioniert das Dream Team',
   'udt.help.intro':
@@ -3734,6 +3748,18 @@ const de: Record<TKey, string> = {
   'udt.points.why.points': 'Nicht genug Punkte',
   'udt.points.why.potential': 'Das Potenzial ist erreicht',
   'udt.pot.label': 'Potenzial',
+  'udt.pot.reachedBt': 'Potenzial erreicht – ein Durchbruch kann es einmal anheben',
+  'udt.bt.title': 'Durchbruch {from} → {to}',
+  'udt.bt.explain':
+    'Einmal pro Bot: Potenzial und Skill +1, alle drei Werte verlieren {cut} %. Der Bot ist danach etwas stärker und wächst mit Training weiter.',
+  'udt.bt.reqLevel': 'Level {n} (jetzt {now})',
+  'udt.bt.reqValues': 'Alle drei Werte auf 100',
+  'udt.bt.reqPoints': '{n} Punkte (hat {have})',
+  'udt.bt.button': 'Durchbruch auf Skill {to}',
+  'udt.bt.confirm':
+    'Durchbruch {from} → {to}: Skill und Potenzial +1, alle Werte −{cut} %. Nur einmal pro Bot. Los?',
+  'udt.bt.maxed': 'Voll entwickelt: Weitere Punkte haben keine Wirkung mehr.',
+  'udt.bt.done': 'Durchbruch',
   'udt.pot.chip': 'Pot {p}',
   'udt.pot.chipMax': 'Pot max',
   'udt.pot.title': 'Potenzial: Skill {p} ({names})',

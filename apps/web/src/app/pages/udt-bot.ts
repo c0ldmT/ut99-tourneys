@@ -57,6 +57,9 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
               <span class="udt-mark own">{{ 'udt.starter' | t }}</span>
             } @else if (p.made; as m) {
               <span class="udt-mark own">{{ 'udt.academy.origin.' + m.origin | t }}</span>
+              @if (p.roster?.own?.breakthrough) {
+                <span class="udt-mark star">{{ 'udt.bt.done' | t }}</span>
+              }
               <span>{{ 'udt.bot.madeBy' | t: { name: m.breeder, s: m.season } }}</span>
             }
           </p>

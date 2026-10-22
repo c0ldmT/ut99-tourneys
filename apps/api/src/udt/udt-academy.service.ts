@@ -5,7 +5,11 @@ import {
   apprentice,
   BLUEPRINTS,
   blueprintPotential,
+  BREAKTHROUGH_LEVEL,
+  breakthroughStep,
+  breakthroughValues,
   buildCost,
+  cannotBreakthrough,
   cannotBuild,
   cannotDevelop,
   DEVELOP_COST,
@@ -443,6 +447,56 @@ export class UdtAcademyService {
       .set({ pointsSpent: own.pointsSpent + DEVELOP_COST[stat] })
       .where(eq(udtBots.botId, botId))
       .run();
+    return this.udt.view(user);
+  }
+
+  /**
+   * The one breakthrough of a fully developed own bot (level 10, skill at the potential, every
+   * value at 100): potential and skill +1, the values lose the step's share, for points.
+   */
+  breakthrough(user: User, botId: string) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const own = this.udt.ownBots(season, user.id).get(botId);
+    const r = this.udt.roster(user.id, season).find((x) => x.botId === botId);
+    if (!own || !r) throw notFound('own bot in your roster');
+    const level = levelOf(r.xp);
+    const points = developPoints(level, own.pointsSpent);
+    const step = breakthroughStep(r.skill);
+    const why = cannotBreakthrough(
+      {
+        skill: r.skill,
+        potential: own.potential,
+        level,
+        done: own.breakthrough,
+        values: r.traits,
+      },
+      points,
+    );
+    if (why === 'done') throw conflict('a bot has one breakthrough');
+    if (why === 'godlike') throw conflict('the bot is Godlike already');
+    // Before level 10 the potential may still be hidden: the level comes first then.
+    if (level < BREAKTHROUGH_LEVEL)
+      throw conflict('a breakthrough needs level {level}', { level: BREAKTHROUGH_LEVEL });
+    if (why === 'potential') throw conflict('a breakthrough needs the potential reached');
+    if (why === 'values') throw conflict('a breakthrough needs every value at 100');
+    if (why === 'points')
+      throw conflict('the breakthrough costs {cost} points', { cost: step.cost });
+    this.db.transaction(() => {
+      this.bots.update(botId, {
+        skill: Math.round(r.skill) + 1,
+        traits: { ...r.traits, ...breakthroughValues(r.skill, r.traits) },
+      });
+      this.db
+        .update(udtBots)
+        .set({
+          potential: Math.max(own.potential, Math.round(r.skill)) + 1,
+          pointsSpent: own.pointsSpent + step.cost,
+          breakthrough: true,
+        })
+        .where(eq(udtBots.botId, botId))
+        .run();
+    });
     return this.udt.view(user);
   }
 }
