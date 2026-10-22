@@ -95,7 +95,8 @@ export const TeamBody = z.object({
       .min(1)
       .max(17)
       .regex(ASCII, 'ASCII letters, digits and signs only (UT99 names)'),
-    skill: z.number().min(0).max(7),
+    // Whole steps only: the game rounds the skill, the price would take the fraction (cheap values).
+    skill: z.number().int().min(0).max(7),
     botClass: z.string().trim().max(48).optional(),
     skin: z.string().trim().max(48).optional(),
     face: z.string().trim().max(48).optional(),

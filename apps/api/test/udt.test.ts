@@ -30,6 +30,18 @@ describe('Unreal Dream Team: teams and rosters', () => {
     const tooGood = await mario.post('/udt/team', team({ starter: { name: 'Ace', skill: 5 } }));
     expect(tooGood.status).toBe(400);
     expect(JSON.stringify(tooGood.body)).toMatch(/points/);
+    // Whole skill steps only: 2.68 with top values would play as skill 3 for less than its price.
+    const fraction = await mario.post(
+      '/udt/team',
+      team({
+        starter: {
+          name: 'Ace',
+          skill: 2.68,
+          traits: { accuracy: 1, alertness: 1, strafing: 1 },
+        },
+      }),
+    );
+    expect(fraction.status).toBe(400);
     const made = await mario.post('/udt/team', team());
     expect(made.status, JSON.stringify(made.body)).toBe(201);
     expect(made.body).toMatchObject({
