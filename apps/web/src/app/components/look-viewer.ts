@@ -40,20 +40,20 @@ const textureUrl = (name: string, stamp: string) =>
   imports: [TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="lv" [class.ready]="state() === 'ready'" [class.none]="state() === 'none'">
+    <div class="look3d" [class.ready]="state() === 'ready'" [class.none]="state() === 'none'">
       <canvas #cv role="img" [attr.aria-label]="'look.preview' | t"></canvas>
       @if (state() === 'none') {
-        <p class="lv-none">{{ 'look.none' | t }}</p>
+        <p class="look3d-none">{{ 'look.none' | t }}</p>
       }
       @if (portrait(); as p) {
-        <img class="lv-face" [src]="p" alt="" />
+        <img class="look3d-face" [src]="p" alt="" />
       }
       @if (teams() && state() === 'ready') {
-        <div class="lv-teams" role="group" [attr.aria-label]="'look.team' | t">
+        <div class="look3d-teams" role="group" [attr.aria-label]="'look.team' | t">
           @for (t of TEAMS; track t.key) {
             <button
               type="button"
-              class="lv-team"
+              class="look3d-team"
               [class.on]="team() === t.v"
               [style.--c]="t.c"
               [attr.aria-label]="t.key | t"
