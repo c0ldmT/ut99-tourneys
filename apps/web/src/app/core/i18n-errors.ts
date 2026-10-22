@@ -222,11 +222,12 @@ export const ERRORS_DE: Record<string, string> = {
   'own bot in your roster not found': 'Der eigene Bot ist nicht in deinem Kader.',
   'scout first': 'Scoute zuerst.',
   'talent not found': 'Talent nicht gefunden.',
-  'the build costs {cost} of {budget} points: lower skill or values':
-    'Der Bau kostet {cost} von {budget} Punkten: Senk Skill oder Werte.',
+  'blueprints build skill {skill}': 'Baupläne bauen Skill {skill}.',
+  'the build costs {cost} of {budget} points: lower the values':
+    'Der Bau kostet {cost} von {budget} Punkten: Senk die Werte.',
+  'the potential is reached': 'Das Potenzial ist erreicht.',
   'the potential is skill {potential}': 'Das Potenzial ist Skill {potential}.',
   'the value is at its maximum': 'Der Wert ist schon am Maximum.',
-  'this blueprint builds up to skill {skillCap}': 'Dieser Bauplan baut bis Skill {skillCap}.',
   '{name} has an apprentice this season': '{name} hat diese Season schon einen Lehrling.',
   '{tag}{name} is too long for the game': '{tag}{name} ist zu lang fürs Spiel.',
 

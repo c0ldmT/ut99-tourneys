@@ -1307,7 +1307,7 @@ const en = {
   'udt.packs.blueprints': 'Blueprints',
   'udt.academy.blueprints': 'Blueprints',
   'udt.academy.blueprintText':
-    'Blueprints come from packs. Build an own bot from one with a creation licence: skill and values within its points, like the starter bot.',
+    'Blueprints come from packs. Build an own skill 3 bot from one with a creation licence: its points go into the values, its rarity sets the potential (drawn when you build, exact from level 5).',
   'udt.academy.blueprint': 'Blueprint',
   'udt.academy.bpTrait': 'Starts with a {r} trait.',
   'udt.academy.model': 'Model',
@@ -1330,7 +1330,6 @@ const en = {
   'udt.academy.scoutText':
     "Three talents with the scout's view of their values and their potential (the highest skill they can reach). Sign one with a creation licence; a new scout report replaces the old one.",
   'udt.academy.report': 'Scout report',
-  'udt.academy.potential': 'Potential',
   'udt.academy.name': 'Name',
   'udt.academy.sign': 'Sign',
   'udt.academy.full': 'Your roster is full (7 bots).',
@@ -1748,14 +1747,15 @@ const en = {
   'stats.playerMissing':
     'No games and no profile here: the player has not played in this season (choose another one) or does not exist.',
   'udt.packs.done': 'Done',
-  'udt.bpE.common': 'Build an own bot: 1,500 points (a default starter), up to skill 3',
-  'udt.bpE.uncommon': 'Build an own bot: a starter +150 points, up to skill 3',
-  'udt.bpE.rare': 'Build an own bot: a starter +300 points, up to skill 3, potential +3',
-  'udt.bpE.epic': 'Build an own bot: a starter +1,000 points, up to skill 4, a rare start trait',
+  'udt.bpE.common': 'Build an own skill 3 bot: 1,500 points (a default starter), potential 3–4',
+  'udt.bpE.uncommon': 'Build an own skill 3 bot: a starter +50 points, potential 3–4',
+  'udt.bpE.rare': 'Build an own skill 3 bot: a starter +75 points, potential 3–5, choose the model',
+  'udt.bpE.epic':
+    'Build an own skill 3 bot: a starter +125 points, potential 4–6, a rare start trait',
   'udt.bpE.legendary':
-    'Build an own bot: a starter +1,500 points, up to skill 4, an epic start trait',
+    'Build an own skill 3 bot: a starter +225 points, potential 6–7, an epic start trait',
   'udt.academy.bpRule':
-    '{pts} points (a default starter +{extra}), up to skill {cap}, potential +{up}.',
+    '{pts} points for the values (a default starter +{extra}), always skill {skill} ({name}).',
   'udt.rest.hint': 'Buy stamina with Neuro: {n} per point',
   'udt.staminaHelp.buy':
     'Rest with Neuro: in the roster, "Rest" buys stamina at {n} Neuro per point (up to 100).',
@@ -1795,10 +1795,18 @@ const en = {
   'udt.points.xpBar': 'Experience: {xp} of {need} XP to level {lv}',
   'udt.points.explain':
     'Every level from level 2 brings one point. +5 on a value costs 1 point, +1 skill costs 3.',
-  'udt.points.potential': 'Skill grows up to the potential ({p}; now {now}).',
   'udt.points.cost': '{n} point(s)',
   'udt.points.why.points': 'Not enough points',
   'udt.points.why.potential': 'The potential is reached',
+  'udt.pot.label': 'Potential',
+  'udt.pot.chip': 'Pot {p}',
+  'udt.pot.chipMax': 'Pot max',
+  'udt.pot.title': 'Potential: skill {p} ({names})',
+  'udt.pot.reached': 'Potential reached – the skill cannot grow any further',
+  'udt.pot.maybe': 'Maybe up to +{n} skill (exact from level 5)',
+  'udt.pot.left': '+{a} to +{b} skill possible',
+  'udt.pot.left1': '+{a} skill possible',
+  'udt.points.skillMax': 'Potential reached',
   'udt.points.why.max': 'At its maximum (100)',
   'udt.points.bought':
     'Bought bots do not get development points: they get stronger with traits (more places from level 5 and 10).',
@@ -3187,7 +3195,7 @@ const de: Record<TKey, string> = {
   'udt.packs.blueprints': 'Baupläne',
   'udt.academy.blueprints': 'Baupläne',
   'udt.academy.blueprintText':
-    'Baupläne kommen aus Packs. Baue daraus mit einer Erschaffungs-Lizenz einen eigenen Bot: Skill und Werte im Punktebudget, wie beim Starter-Bot.',
+    'Baupläne kommen aus Packs. Baue daraus mit einer Erschaffungs-Lizenz einen eigenen Skill-3-Bot: Die Punkte gehen in die Werte, die Seltenheit bestimmt das Potenzial (beim Bauen gezogen, genau ab Level 5).',
   'udt.academy.blueprint': 'Bauplan',
   'udt.academy.bpTrait': 'Startet mit einem Trait ({r}).',
   'udt.academy.model': 'Modell',
@@ -3210,7 +3218,6 @@ const de: Record<TKey, string> = {
   'udt.academy.scoutText':
     'Drei Talente mit der Einschätzung des Scouts zu ihren Werten und ihrem Potenzial (dem höchsten Skill, den sie erreichen können). Verpflichte eines mit einer Erschaffungs-Lizenz; ein neuer Scout-Bericht ersetzt den alten.',
   'udt.academy.report': 'Scout-Bericht',
-  'udt.academy.potential': 'Potenzial',
   'udt.academy.name': 'Name',
   'udt.academy.sign': 'Verpflichten',
   'udt.academy.full': 'Dein Kader ist voll (7 Bots).',
@@ -3630,15 +3637,17 @@ const de: Record<TKey, string> = {
   'stats.playerMissing':
     'Hier gibt es weder Spiele noch ein Profil: Der Spieler hat in dieser Season nicht gespielt (wähl eine andere) oder es gibt ihn nicht.',
   'udt.packs.done': 'Fertig',
-  'udt.bpE.common': 'Baue einen eigenen Bot: 1.500 Punkte (ein Standard-Starter), bis Skill 3',
-  'udt.bpE.uncommon': 'Baue einen eigenen Bot: Starter +150 Punkte, bis Skill 3',
-  'udt.bpE.rare': 'Baue einen eigenen Bot: Starter +300 Punkte, bis Skill 3, Potenzial +3',
+  'udt.bpE.common':
+    'Baue einen eigenen Skill-3-Bot: 1.500 Punkte (ein Standard-Starter), Potenzial 3–4',
+  'udt.bpE.uncommon': 'Baue einen eigenen Skill-3-Bot: Starter +50 Punkte, Potenzial 3–4',
+  'udt.bpE.rare':
+    'Baue einen eigenen Skill-3-Bot: Starter +75 Punkte, Potenzial 3–5, Modell wählbar',
   'udt.bpE.epic':
-    'Baue einen eigenen Bot: Starter +1.000 Punkte, bis Skill 4, seltener Start-Trait',
+    'Baue einen eigenen Skill-3-Bot: Starter +125 Punkte, Potenzial 4–6, seltener Start-Trait',
   'udt.bpE.legendary':
-    'Baue einen eigenen Bot: Starter +1.500 Punkte, bis Skill 4, epischer Start-Trait',
+    'Baue einen eigenen Skill-3-Bot: Starter +225 Punkte, Potenzial 6–7, epischer Start-Trait',
   'udt.academy.bpRule':
-    '{pts} Punkte (Standard-Starter +{extra}), bis Skill {cap}, Potenzial +{up}.',
+    '{pts} Punkte für die Werte (Standard-Starter +{extra}), immer Skill {skill} ({name}).',
   'udt.rest.hint': 'Ausdauer mit Neuro kaufen: {n} pro Punkt',
   'udt.staminaHelp.buy':
     'Erholen mit Neuro: Im Kader kauft „Erholen“ Ausdauer für {n} Neuro pro Punkt (bis 100).',
@@ -3679,10 +3688,18 @@ const de: Record<TKey, string> = {
   'udt.points.xpBar': 'Erfahrung: {xp} von {need} XP bis Level {lv}',
   'udt.points.explain':
     'Jedes Level ab Level 2 bringt einen Punkt. +5 auf einen Wert kostet 1 Punkt, +1 Skill kostet 3.',
-  'udt.points.potential': 'Skill wächst bis zum Potenzial ({p}; jetzt {now}).',
   'udt.points.cost': '{n} Punkt(e)',
   'udt.points.why.points': 'Nicht genug Punkte',
   'udt.points.why.potential': 'Das Potenzial ist erreicht',
+  'udt.pot.label': 'Potenzial',
+  'udt.pot.chip': 'Pot {p}',
+  'udt.pot.chipMax': 'Pot max',
+  'udt.pot.title': 'Potenzial: Skill {p} ({names})',
+  'udt.pot.reached': 'Potenzial erreicht – der Skill kann nicht weiter steigen',
+  'udt.pot.maybe': 'Vielleicht noch bis +{n} Skill (genau ab Level 5)',
+  'udt.pot.left': 'Noch +{a} bis +{b} Skill möglich',
+  'udt.pot.left1': 'Noch +{a} Skill möglich',
+  'udt.points.skillMax': 'Potenzial erreicht',
   'udt.points.why.max': 'Schon am Maximum (100)',
   'udt.points.bought':
     'Gekaufte Bots bekommen keine Entwicklungspunkte: Sie werden mit Traits stärker (mehr Plätze ab Level 5 und 10).',

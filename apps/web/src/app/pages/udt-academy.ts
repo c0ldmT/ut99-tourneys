@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { UdtPotential } from '../components/udt-potential';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
@@ -20,7 +21,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
  */
 @Component({
   selector: 'app-udt-academy',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
+  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtPotential],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -73,12 +74,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                         <span class="mono">{{ t.ranges[k][0] }}–{{ t.ranges[k][1] }}</span>
                       </div>
                     }
-                    <div class="rg pot">
-                      <span>{{ 'udt.academy.potential' | t }}</span>
-                      <span class="mono" [title]="potTitle(t.potential)">{{
-                        potText(t.potential)
-                      }}</span>
-                    </div>
+                    <udt-potential [skill]="t.skill" [potential]="t.potential" [compact]="true" />
                     <label
                       >{{ 'udt.academy.name' | t }}
                       <input
@@ -138,8 +134,8 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                           : {
                               pts: bp.rule.budget,
                               extra: bp.rule.extra,
-                              cap: bp.rule.skillCap,
-                              up: bp.rule.potentialUp,
+                              skill: bp.rule.skill,
+                              name: skillName(bp.rule.skill),
                             }
                     }}
                     @if (bp.rule.startTrait) {
@@ -152,18 +148,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                     >{{ 'udt.academy.name' | t }}
                     <input type="text" maxlength="20" name="bpName" [(ngModel)]="bpName" />
                   </label>
-                  <label
-                    >Skill
-                    <select
-                      name="bpSkill"
-                      [ngModel]="bpSkill()"
-                      (ngModelChange)="bpSkill.set(+$event)"
-                    >
-                      @for (s of skillsUpTo(bp.rule.skillCap); track s) {
-                        <option [ngValue]="s">{{ s }} {{ skillName(s) }}</option>
-                      }
-                    </select>
-                  </label>
+                  <udt-potential [skill]="bp.rule.skill" [potential]="bp.rule.potential" />
                   @for (k of keys; track k) {
                     <label
                       >{{ 'udt.academy.stat.' + k | t }} <span class="mono">{{ bpVal()[k] }}</span>
@@ -273,12 +258,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                   (pointsClick)="toTeam(b.botId)"
                 />
                 <div class="oinfo">
-                  <div class="rg">
-                    <span>{{ 'udt.academy.potential' | t }}</span
-                    ><span class="mono" [title]="potTitle(b.own!.potential)">{{
-                      potText(b.own!.potential)
-                    }}</span>
-                  </div>
+                  <udt-potential [skill]="b.skill" [potential]="b.own!.potential" />
                   <div class="rg">
                     <span>{{ 'udt.academy.points' | t }}</span
                     ><b class="mono">{{ b.own!.points }}</b>
@@ -361,9 +341,6 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       justify-content: space-between;
       font-size: 0.85rem;
     }
-    .pot {
-      color: #d4adff;
-    }
     .mrow {
       display: flex;
       align-items: center;
@@ -408,7 +385,8 @@ export class UdtAcademyPage {
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
   private readonly router = inject(Router);
   protected readonly bpId = signal<string | null>(null);
-  protected readonly bpSkill = signal(3);
+  /** Blueprints build one skill (3): the points go into the values. */
+  protected readonly bpSkill = computed(() => this.blueprint()?.rule.skill ?? 3);
   protected readonly bpVal = signal({ accuracy: 50, alertness: 50, strafing: 50 });
   protected bpName = '';
   protected readonly blueprint = computed(
@@ -436,18 +414,12 @@ export class UdtAcademyPage {
     }
   }
 
-  protected skillsUpTo(cap: number) {
-    return Array.from({ length: cap + 1 }, (_, i) => i);
-  }
-
   protected skillName(s: number) {
     return SKILL_NAMES[s] ?? '';
   }
 
   protected pickBlueprint(id: string) {
     this.bpId.set(id);
-    const bp = this.blueprint();
-    if (bp && this.bpSkill() > bp.rule.skillCap) this.bpSkill.set(bp.rule.skillCap);
   }
 
   protected setBpVal(k: 'accuracy' | 'alertness' | 'strafing', v: number) {
@@ -461,6 +433,7 @@ export class UdtAcademyPage {
       rarity: botRarity(this.bpSkill()),
       tag,
       traits: this.bpTraits(),
+      ...(this.blueprint() ? { potential: this.blueprint()!.rule.potential } : {}),
     };
   }
 
@@ -489,14 +462,6 @@ export class UdtAcademyPage {
     return botRarity(skill);
   }
 
-  protected potText(p: [number, number]) {
-    return p[0] === p[1] ? `${p[0]}` : `${p[0]}–${p[1]}`;
-  }
-
-  protected potTitle(p: [number, number]) {
-    return p.map((s) => SKILL_NAMES[s] ?? '').join(' – ');
-  }
-
   /** The talent as a card: values in the middle of the scout's ranges. */
   protected talentCard(t: UdtTalentReport, tag: string): CardBot {
     const mid = (k: 'accuracy' | 'alertness' | 'strafing') =>
@@ -507,11 +472,12 @@ export class UdtAcademyPage {
       rarity: botRarity(t.skill),
       tag,
       traits: { accuracy: mid('accuracy'), alertness: mid('alertness'), strafing: mid('strafing') },
+      potential: t.potential,
     };
   }
 
   protected ownCard(b: UdtRosterBot, tag: string): CardBot {
-    return { ...b, tag };
+    return { ...b, tag, ...(b.own ? { potential: b.own.potential } : {}) };
   }
 
   protected gradOf(id: string) {

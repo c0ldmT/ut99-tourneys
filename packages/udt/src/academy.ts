@@ -147,6 +147,26 @@ export function talentReport(t: Talent, rng: () => number): TalentReport {
   };
 }
 
+/**
+ * What a manager sees of an own bot's potential before level 5: two skill steps that hold it,
+ * never below the bot's skill (so a blueprint's range is not left); whether the potential is the
+ * lower or the upper step is fixed per bot (`seed`, e.g. its id), so the range does not give it
+ * away. From level 5 the roster shows the potential itself.
+ */
+export function potentialWindow(potential: number, skill: number, seed: string): [number, number] {
+  const s = Math.max(0, Math.min(7, Math.round(skill)));
+  const p = Math.max(s, Math.min(7, potential));
+  let h = 0;
+  for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  let lo = Math.max(s, p - (h % 2));
+  let hi = lo + 1;
+  if (hi > 7) {
+    hi = 7;
+    lo = Math.max(s, 6);
+  }
+  return [Math.min(lo, p), hi];
+}
+
 /** Potential of a starter bot: two skill steps above (at most Godlike). */
 export const starterPotential = (skill: number): number => Math.min(7, Math.round(skill) + 2);
 
@@ -229,14 +249,14 @@ export const developValue = (v: number | undefined): number => r3(clamp((v ?? 0)
 // ---------- blueprints (from packs) ----------
 
 export interface BlueprintRule {
-  /** Points for skill and values at index 1.0, as the starter budget (base value). */
+  /** Points for the values at index 1.0, as the starter budget (base value). */
   budget: number;
   /** What the blueprint gives on top of a default starter (BLUEPRINT_BASE). */
   extra: number;
-  /** Highest skill the bot can be built with. */
-  skillCap: number;
-  /** Potential = skill + this (at most Godlike). */
-  potentialUp: number;
+  /** The skill every blueprint builds (the points only go into the values). */
+  skill: number;
+  /** The potential is drawn from this range when the bot is built (hidden like a talent's). */
+  potential: readonly [number, number];
   /** The bot class (model) can be chosen. */
   models: boolean;
   /** Signature blueprints: the bot starts with a trait of this rarity. */
@@ -246,25 +266,38 @@ export interface BlueprintRule {
 /** The points of a default starter bot (skill 3, average values): what blueprints add to. */
 export const BLUEPRINT_BASE = 1500;
 
-const rule = (extra: number, r: Omit<BlueprintRule, 'budget' | 'extra'>): BlueprintRule => ({
+/** The skill blueprints build: a lower one would make the values cheap (a skill step is 3 points). */
+export const BLUEPRINT_SKILL = 3;
+
+const rule = (
+  extra: number,
+  r: Omit<BlueprintRule, 'budget' | 'extra' | 'skill'>,
+): BlueprintRule => ({
   budget: BLUEPRINT_BASE + extra,
   extra,
+  skill: BLUEPRINT_SKILL,
   ...r,
 });
 
 /**
- * Uncommon blank+, rare blueprint, epic and legendary signature blueprints (owner, 21.10.: a
- * default starter plus 150 / 300; epic and legendary reach skill 4: 2,500 is skill 4 with the
- * weakest values, 3,000 with values a bit below average). Packs bring blueprints one rarity above
- * the draw, so a common one only remains from before.
+ * Uncommon blank+, rare blueprint, epic and legendary signature blueprints (owner, 22.10.: a
+ * default starter plus 50 / 75 / 125 / 225 points for the values, potential 3-4 / 3-5 / 4-6 /
+ * 6-7; 300 extra let a rare one put every value at 100). All of them build skill 3. Packs bring
+ * blueprints one rarity above the draw, so a common one only remains from before.
  */
 export const BLUEPRINTS: Readonly<Record<Rarity, BlueprintRule>> = {
-  common: rule(0, { skillCap: 3, potentialUp: 2, models: false, startTrait: null }),
-  uncommon: rule(150, { skillCap: 3, potentialUp: 2, models: false, startTrait: null }),
-  rare: rule(300, { skillCap: 3, potentialUp: 3, models: true, startTrait: null }),
-  epic: rule(1000, { skillCap: 4, potentialUp: 3, models: true, startTrait: 'rare' }),
-  legendary: rule(1500, { skillCap: 4, potentialUp: 4, models: true, startTrait: 'epic' }),
+  common: rule(0, { potential: [3, 4], models: false, startTrait: null }),
+  uncommon: rule(50, { potential: [3, 4], models: false, startTrait: null }),
+  rare: rule(75, { potential: [3, 5], models: true, startTrait: null }),
+  epic: rule(125, { potential: [4, 6], models: true, startTrait: 'rare' }),
+  legendary: rule(225, { potential: [6, 7], models: true, startTrait: 'epic' }),
 };
+
+/** The potential of a bot built from a blueprint: any step of the rarity's range. */
+export function blueprintPotential(rarity: Rarity, rng: () => number): number {
+  const [lo, hi] = BLUEPRINTS[rarity].potential;
+  return Math.min(hi, lo + Math.floor(rng() * (hi - lo + 1)));
+}
 
 /** Share of pack draws that bring a blueprint instead of a trait. */
 export const BLUEPRINT_CHANCE = 0.12;
@@ -291,7 +324,7 @@ export function cannotBuild(
   values: { accuracy?: number; alertness?: number; strafing?: number },
 ): 'skill' | 'budget' | null {
   const r = BLUEPRINTS[rarity];
-  if (Math.round(skill) > r.skillCap) return 'skill';
+  if (Math.round(skill) !== r.skill) return 'skill';
   if (buildCost(skill, values) > r.budget) return 'budget';
   return null;
 }

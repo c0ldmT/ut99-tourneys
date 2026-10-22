@@ -68,31 +68,67 @@ describe('academy', () => {
   });
 });
 
+describe('potential window', () => {
+  it('holds the potential, never below the skill, two steps until Godlike', async () => {
+    const { potentialWindow } = await import('../src/index.js');
+    for (const seed of ['a', 'b', 'c', 'd'])
+      for (let skill = 0; skill <= 7; skill++)
+        for (let p = skill; p <= 7; p++) {
+          const [lo, hi] = potentialWindow(p, skill, seed);
+          expect(lo).toBeGreaterThanOrEqual(skill);
+          expect(lo).toBeLessThanOrEqual(p);
+          expect(hi).toBeGreaterThanOrEqual(p);
+          expect(hi).toBeLessThanOrEqual(7);
+          expect(hi - lo).toBeLessThanOrEqual(1);
+          if (p < 7) expect(hi - lo).toBe(1);
+        }
+    // An uncommon bot with potential 3 at skill 3 shows 3-4, not 2-4.
+    for (const seed of ['a', 'b']) expect(potentialWindow(3, 3, seed)).toEqual([3, 4]);
+    // Which side the potential is on depends on the bot, not on the potential.
+    const sides = new Set(['a', 'b', 'c', 'd', 'e'].map((s) => potentialWindow(5, 3, s)[0]));
+    expect([...sides].sort()).toEqual([4, 5]);
+  });
+});
+
 describe('blueprints', () => {
-  it('limits skill and points by rarity', async () => {
+  it("build skill 3 with the rarity's points for the values", async () => {
     const { cannotBuild, buildCost, BLUEPRINTS, blueprintRarity } = await import('../src/index.js');
     expect(cannotBuild('common', 3, {})).toBeNull();
     expect(cannotBuild('common', 4, {})).toBe('skill');
+    // A lower skill would make the values cheap: blueprints always build skill 3.
+    expect(cannotBuild('legendary', 2, {})).toBe('skill');
     expect(cannotBuild('common', 3, { accuracy: 1, alertness: 1, strafing: 1 })).toBe('budget');
-    // A default starter plus 150 / 300 / 1,000 / 1,500 points.
+    // A default starter plus 50 / 75 / 125 / 225 points.
     expect(
       [BLUEPRINTS.uncommon, BLUEPRINTS.rare, BLUEPRINTS.epic, BLUEPRINTS.legendary].map(
         (b) => b.budget,
       ),
-    ).toEqual([1650, 1800, 2500, 3000]);
-    // Rare: skill 3 with the best values; epic and legendary reach skill 4.
-    expect(cannotBuild('rare', 3, { accuracy: 1, alertness: 1, strafing: 1 })).toBeNull();
-    expect(cannotBuild('rare', 4, { accuracy: -1, alertness: -1, strafing: -1 })).toBe('skill');
-    expect(cannotBuild('epic', 4, { accuracy: -1, alertness: -1, strafing: -1 })).toBeNull();
-    expect(cannotBuild('epic', 4, {})).toBe('budget');
-    expect(buildCost(4, { accuracy: -0.4, alertness: -0.4, strafing: -0.4 })).toBeLessThanOrEqual(
+    ).toEqual([1550, 1575, 1625, 1725]);
+    // Not even a legendary one puts every value at 100.
+    expect(buildCost(3, { accuracy: 1, alertness: 1, strafing: 1 })).toBeGreaterThan(
       BLUEPRINTS.legendary.budget,
     );
-    expect(cannotBuild('legendary', 5, {})).toBe('skill');
+    expect(cannotBuild('rare', 3, { accuracy: 1, alertness: 1, strafing: 1 })).toBe('budget');
+    expect(cannotBuild('rare', 3, { accuracy: 0.2, alertness: 0.2, strafing: 0.2 })).toBeNull();
     expect(BLUEPRINTS.legendary.startTrait).toBe('epic');
     // Packs bring them one rarity above the draw.
     expect(blueprintRarity('common')).toBe('uncommon');
     expect(blueprintRarity('epic')).toBe('legendary');
     expect(blueprintRarity('legendary')).toBe('legendary');
+  });
+
+  it("draws the potential from the rarity's range", async () => {
+    const { blueprintPotential, BLUEPRINTS } = await import('../src/index.js');
+    expect(BLUEPRINTS.uncommon.potential).toEqual([3, 4]);
+    expect(BLUEPRINTS.rare.potential).toEqual([3, 5]);
+    expect(BLUEPRINTS.epic.potential).toEqual([4, 6]);
+    expect(BLUEPRINTS.legendary.potential).toEqual([6, 7]);
+    for (const r of ['uncommon', 'rare', 'epic', 'legendary'] as const) {
+      const seen = new Set<number>();
+      for (let i = 0; i < 40; i++) seen.add(blueprintPotential(r, () => i / 40));
+      seen.add(blueprintPotential(r, () => 0.999999));
+      const [lo, hi] = BLUEPRINTS[r].potential;
+      expect([...seen].sort()).toEqual(Array.from({ length: hi - lo + 1 }, (_, k) => lo + k));
+    }
   });
 });

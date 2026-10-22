@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team potential on every card of an own bot and as a skill ladder in the bot details and the academy, so a closed skill step explains itself.
 - Mod 0.16.0, live data on the match page: health and armour bars, weapon, powerups (damage amplifier with its seconds, shield belt) and ping of every player, a table per team for 2on2 to 5on5; damage dealt and items taken per side, the momentum of the game, items and what bots are up to in the feed (with filters), kills with the killer's health and the distance. While a human plays, health, items and bot thoughts arrive 20 s late (Settings → Live data); bot-only games are live. Monster Hunt: the run panel with the time to beat, monsters left and the points of both runs.
 - Replays: after a game the match page keeps its momentum, damage and items and the whole feed (kept 60 days, setting). Statistics: damage and items per player, records for the most damage and amplifiers in a game. The bridge logs what bots do (`bot-logs/`) for tuning the bots.
 - 3D look preview: wherever a bot's look is chosen (Dream Team, control center) the model turns next to the choices with its skin, face and the talk portrait, team colours at a tap; drag turns it. The bridge reads models and skins from the game server's own files (new models and skin packs show up by themselves); the website keeps them, so they also show while the server is off.
@@ -181,6 +182,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team blueprints always build skill 3 with fewer points for the values (a starter +50 / +75 / +125 / +225) and a potential range by rarity (3–4, 3–5, 4–6, 6–7), drawn when the bot is built.
 - Bot looks as in UT's player setup: the model's skins, the skin's faces and the model's voices with their readable names, as dropdowns that work on phones; unfitting looks are refused for Dream Team managers.
 - Tournaments: an overview (live, coming up by day, series as cards, last results) and an archive of all finished and aborted tournaments (by day, in pages), with search and filters.
 - Softer page changes: the old page sinks back and fades, the new one's blocks rise one after another, the Dream Team tabs stay in place, the loader comes and goes softly; shown also when the system asks for reduced motion.

@@ -1461,8 +1461,10 @@ export interface UdtBlueprint {
     budget: number;
     /** Points on top of a default starter. */
     extra: number;
-    skillCap: number;
-    potentialUp: number;
+    /** The skill every blueprint builds. */
+    skill: number;
+    /** The potential is drawn from this range when the bot is built. */
+    potential: [number, number];
     models: boolean;
     startTrait: 'rare' | 'epic' | null;
   };

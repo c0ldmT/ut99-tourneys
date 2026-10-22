@@ -10,6 +10,7 @@ import {
   levelOf,
   developPoints,
   marketValue,
+  potentialWindow,
   SCRAP,
   starterPotential,
   traitDef,
@@ -518,7 +519,7 @@ export class UdtService {
             effective: { skill: eff.skill, traits: eff.values, overflow: eff.overflow },
             striking: r.striking,
             games: r.games,
-            own: ownView(own.get(b.id), level),
+            own: ownView(own.get(b.id), level, b.skill),
           },
         ];
       })
@@ -750,12 +751,12 @@ export function withTraits(
 }
 
 /** What the roster shows of an own bot: the potential is a range until level 5. */
-function ownView(b: typeof udtBots.$inferSelect | undefined, level: number) {
+function ownView(b: typeof udtBots.$inferSelect | undefined, level: number, skill: number) {
   if (!b) return null;
   const p = b.potential;
   return {
     origin: b.origin,
-    potential: (level >= 5 ? [p, p] : [Math.max(0, p - 1), Math.min(7, p + 1)]) as [number, number],
+    potential: (level >= 5 ? [p, p] : potentialWindow(p, skill, b.botId)) as [number, number],
     points: developPoints(level, b.pointsSpent),
     spent: b.pointsSpent,
     canRename: !b.renamed && b.status === 'own',

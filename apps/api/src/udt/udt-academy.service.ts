@@ -4,6 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import {
   apprentice,
   BLUEPRINTS,
+  blueprintPotential,
   buildCost,
   cannotBuild,
   cannotDevelop,
@@ -54,7 +55,8 @@ const Value = z.number().min(-1).max(1);
 export const BuildBody = z.object({
   blueprintId: z.string().min(1).max(40),
   name: BotName,
-  skill: z.number().int().min(0).max(7),
+  /** Blueprints build skill 3; another skill is refused (older clients sent their choice). */
+  skill: z.number().int().min(0).max(7).optional(),
   traits: z.object({ accuracy: Value, alertness: Value, strafing: Value }),
   botClass: z.string().max(128).optional(),
   look: BotLookBody.optional(),
@@ -362,12 +364,12 @@ export class UdtAcademyService {
     if (!bp) throw notFound('blueprint');
     const rarity = bp.rarity as Rarity;
     const rule = BLUEPRINTS[rarity];
-    const why = cannotBuild(rarity, body.skill, body.traits);
-    if (why === 'skill')
-      throw badRequest('this blueprint builds up to skill {skillCap}', { skillCap: rule.skillCap });
+    const skill = body.skill ?? rule.skill;
+    const why = cannotBuild(rarity, skill, body.traits);
+    if (why === 'skill') throw badRequest('blueprints build skill {skill}', { skill: rule.skill });
     if (why === 'budget')
-      throw badRequest('the build costs {cost} of {budget} points: lower skill or values', {
-        cost: buildCost(body.skill, body.traits),
+      throw badRequest('the build costs {cost} of {budget} points: lower the values', {
+        cost: buildCost(skill, body.traits),
         budget: rule.budget,
       });
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
@@ -379,9 +381,9 @@ export class UdtAcademyService {
       season,
       {
         name: body.name,
-        skill: body.skill,
+        skill,
         values: { ...body.traits, combatStyle: 0, camping: 0 },
-        potential: Math.min(7, body.skill + rule.potentialUp),
+        potential: blueprintPotential(rarity, rng),
       },
       body.name,
       'blueprint',
@@ -429,6 +431,8 @@ export class UdtAcademyService {
       points,
     );
     if (why === 'points') throw conflict('not enough development points (one per level)');
+    // Before level 5 the potential is a range: the refusal must not tell the exact step.
+    if (why === 'potential' && level < 5) throw conflict('the potential is reached');
     if (why === 'potential')
       throw conflict('the potential is skill {potential}', { potential: own.potential });
     if (why === 'max') throw conflict('the value is at its maximum');

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { udtBlueprints, udtRoster } from '../src/db/schema.js';
+import { eq } from 'drizzle-orm';
+import { udtBlueprints, udtBots, udtRoster } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
 
@@ -142,7 +143,7 @@ describe('Unreal Dream Team: academy', () => {
     ]);
   });
 
-  it('builds an own bot from a blueprint: points, skill cap, model, start trait', async () => {
+  it('builds an own bot from a blueprint: skill 3, points, potential, model, start trait', async () => {
     const { mario, marioId, db } = await setup();
     for (const [id, rarity] of [
       ['pC', 'common'],
@@ -182,28 +183,36 @@ describe('Unreal Dream Team: academy', () => {
         })
       ).status,
     ).toBe(200); // the model is cosmetic: free for every blueprint
-    // Epic: 2,500 points, skill 4 with the weakest values (skill 5 is beyond it).
-    const weak = { accuracy: -1, alertness: -1, strafing: -1 };
-    expect(
-      (
-        await mario.post('/udt/academy/build', {
-          blueprintId: 'pE',
-          name: 'Signa',
-          skill: 5,
-          traits: weak,
-        })
-      ).status,
-    ).toBe(400);
+    // Epic: 1,625 points for skill 3 (always skill 3: no skill 4, no cheap skill 2).
+    const top = { accuracy: 1, alertness: 1, strafing: 1 };
+    for (const [skill, traits] of [
+      [4, avg],
+      [2, avg],
+      [3, top],
+    ] as const)
+      expect(
+        (
+          await mario.post('/udt/academy/build', {
+            blueprintId: 'pE',
+            name: 'Signa',
+            skill,
+            traits,
+          })
+        ).status,
+      ).toBe(400);
     const ok = await mario.post('/udt/academy/build', {
       blueprintId: 'pE',
       name: 'Signa',
-      skill: 4,
-      traits: weak,
+      traits: { accuracy: 0.2, alertness: 0.2, strafing: 0.2 },
     });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(ok.body.built.startTrait).toBeTruthy();
     const b = ok.body.own.find((x: { name: string }) => x.name === 'Signa');
-    expect(b).toMatchObject({ skill: 4, own: { origin: 'blueprint' } });
+    expect(b).toMatchObject({ skill: 3, own: { origin: 'blueprint' } });
+    // The potential comes from the epic range 4-6.
+    const pot = db.select().from(udtBots).where(eq(udtBots.botId, b.botId)).get()!.potential;
+    expect(pot).toBeGreaterThanOrEqual(4);
+    expect(pot).toBeLessThanOrEqual(6);
     expect(b.udtTraits[0].code).toBe(ok.body.built.startTrait);
     expect(ok.body.blueprints).toHaveLength(0);
     const blank = ok.body.own.find((x: { name: string }) => x.name === 'Blank');

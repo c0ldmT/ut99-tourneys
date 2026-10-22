@@ -1703,6 +1703,107 @@ udt-pack-stage .stage.lg .rays {
 .udt-card .car.ph-decline {
   color: #ff9aa4;
 }
+/* Dream Team potential: chip on the card, skill ladder (udt-potential) */
+.udt-card .udt-potc {
+  color: var(--accent);
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  border-radius: 4px;
+  padding: 0 4px;
+  background: rgba(34, 211, 238, 0.08);
+}
+.udt-card .udt-potc.max {
+  color: var(--muted);
+  border-color: var(--line);
+  background: transparent;
+}
+.udt-pot {
+  display: grid;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: rgba(34, 211, 238, 0.06);
+}
+.udt-pot.reached {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+.udt-pot.compact {
+  padding: 6px 8px;
+  gap: 4px;
+}
+.udt-pot-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.udt-pot-lbl {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.udt-pot-val {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--accent);
+}
+.udt-pot.reached .udt-pot-val {
+  color: var(--text-2);
+}
+.udt-pot-st {
+  flex: 1 1 160px;
+  font-size: 0.8rem;
+  color: var(--text-2);
+}
+.udt-pot.reached .udt-pot-st {
+  color: var(--neuro-text);
+}
+.udt-pot-lad {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 3px;
+}
+.udt-pot-s {
+  height: 16px;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+}
+.udt-pot-s i {
+  font-style: normal;
+  font-size: 0.6rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.udt-pot-s.on {
+  background: var(--text-2);
+  color: var(--bg);
+}
+.udt-pot-s.reach {
+  background: rgba(34, 211, 238, 0.28);
+  border-color: var(--accent);
+  color: var(--text);
+}
+.udt-pot-s.maybe {
+  border: 1px dashed var(--accent);
+  color: var(--accent);
+}
+.udt-pot-s.lock {
+  background: var(--panel-3);
+  border-color: var(--line);
+  color: var(--faint);
+}
+.udt-pot.compact .udt-pot-s {
+  height: 12px;
+}
+.udt-pot.compact .udt-pot-s i {
+  display: none;
+}
 /* Dream Team sign-up on the tournament page */
 .card.udt-signup {
   border-color: rgba(178, 107, 255, 0.45);

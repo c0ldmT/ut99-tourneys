@@ -64,6 +64,40 @@ export const SKILL_NAMES = [
 /** Values -1..1 shown as 0..100. */
 export const pct = (v: number | undefined) => Math.round(((v ?? 0) + 1) * 50);
 
+/** "4" or "4–6". */
+export function potText(p: readonly [number, number]): string {
+  return p[0] === p[1] ? `${p[0]}` : `${p[0]}–${p[1]}`;
+}
+
+/** The skill names of a potential range ("Skilled – Masterful"). */
+export function potNames(p: readonly [number, number]): string {
+  return (p[0] === p[1] ? [p[0]] : p).map((s) => SKILL_NAMES[s] ?? '').join(' – ');
+}
+
+/** Where a bot stands against its potential (the range's top is the most it can be). */
+export function potState(
+  skill: number,
+  p: readonly [number, number],
+): { kind: 'reached' | 'maybe' | 'left'; a: number; b: number } {
+  const s = Math.round(skill);
+  if (s >= p[1]) return { kind: 'reached', a: 0, b: 0 };
+  if (s >= p[0]) return { kind: 'maybe', a: 0, b: p[1] - s };
+  return { kind: 'left', a: p[0] - s, b: p[1] - s };
+}
+
+/** The potential in words: "Potential: skill 4–6 (…) · +1–3 skill possible". */
+export function potLine(i18n: I18n, skill: number, p: readonly [number, number]): string {
+  const st = potState(skill, p);
+  const head = i18n.t('udt.pot.title', { p: potText(p), names: potNames(p) });
+  const tail =
+    st.kind === 'reached'
+      ? i18n.t('udt.pot.reached')
+      : st.kind === 'maybe'
+        ? i18n.t('udt.pot.maybe', { n: st.b })
+        : i18n.t(st.a === st.b ? 'udt.pot.left1' : 'udt.pot.left', { a: st.a, b: st.b });
+  return `${head} · ${tail}`;
+}
+
 export interface CardBot {
   name: string;
   skill: number;
@@ -80,14 +114,24 @@ export interface CardBot {
   xp?: number;
   effective?: { skill: number; traits: BotTraitsView; overflow: boolean };
   career?: UdtCareer | null;
+  /** Bots a manager made (and talents, blueprints): the skill they can grow to. */
+  potential?: readonly [number, number];
 }
 
 /** A roster bot (own, another team's, a trade partner's) as a card, with the team's tag. */
 export function rosterCard(
-  b: Omit<CardBot, 'tag'> & { career?: CardBot['career'] },
+  b: Omit<CardBot, 'tag'> & {
+    career?: CardBot['career'];
+    own?: { potential: [number, number] } | null;
+  },
   tag?: string,
 ): CardBot {
-  return { ...b, ...(tag ? { tag } : {}), career: b.career ?? null };
+  return {
+    ...b,
+    ...(tag ? { tag } : {}),
+    ...(b.own ? { potential: b.own.potential } : {}),
+    career: b.career ?? null,
+  };
 }
 
 /** A bot as a Dream Team card (rarity from the skill): skill, values, value, stamina. */
@@ -123,6 +167,19 @@ export function rosterCard(
             <span class="rar">{{ rarityLabel() }}</span>
             @if (b.level) {
               <span class="lvl">Level {{ b.level }}</span>
+            }
+            @if (b.potential; as p) {
+              @let ps = potState(b.skill, p);
+              <span
+                class="udt-potc"
+                [class.max]="ps.kind === 'reached'"
+                [title]="potLine(b.skill, p)"
+                >{{
+                  ps.kind === 'reached'
+                    ? ('udt.pot.chipMax' | t)
+                    : ('udt.pot.chip' | t: { p: potText(p) })
+                }}</span
+              >
             }
             @if (b.career) {
               <span
@@ -225,6 +282,12 @@ export class UdtCard {
     return SKILL_NAMES[Math.max(0, Math.min(7, Math.round(s)))];
   }
   protected readonly rarityLabel = computed(() => this.i18n.t(`udt.rarity.${this.bot().rarity}`));
+  protected readonly potState = potState;
+  protected readonly potText = potText;
+  /** The potential with its names and what is left (the chip's title). */
+  protected potLine(skill: number, p: readonly [number, number]) {
+    return potLine(this.i18n, skill, p);
+  }
   protected staminaColor(s: number) {
     return staminaColor(s);
   }

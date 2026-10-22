@@ -19,6 +19,7 @@ import { NeuroPipe } from '../core/neuro';
 import type { UdtRosterBot, UdtTraitOnBot } from '../core/types';
 import { rosterCard, SCRAP, staminaColor, UdtCard, xpStep, type CardBot } from '../core/udt';
 import { lookBody, lookFromBot, UdtBotLook, type LookDraft, type UdtLooks } from './udt-bot-look';
+import { UdtPotential } from './udt-potential';
 import { UdtRename } from './udt-rename';
 
 type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
@@ -37,7 +38,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
  */
 @Component({
   selector: 'udt-bot-panel',
-  imports: [FormsModule, TPipe, NeuroPipe, UdtCard, UdtBotLook, UdtRename],
+  imports: [FormsModule, TPipe, NeuroPipe, UdtCard, UdtBotLook, UdtRename, UdtPotential],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <dialog #dlg class="panel" aria-labelledby="udt-panel-title" (close)="closed.emit()">
@@ -81,25 +82,26 @@ const SHORT: Readonly<Record<Stat, string>> = {
                   <h3>{{ 'udt.academy.points' | t }}</h3>
                   <span class="pts" [class.zero]="own.points === 0">{{ own.points }}</span>
                 </div>
-                <p class="muted small">
-                  {{ 'udt.points.explain' | t }}
-                  {{
-                    'udt.points.potential' | t: { p: potText(own.potential), now: round(b.skill) }
-                  }}
-                </p>
+                <udt-potential [skill]="b.skill" [potential]="own.potential" />
+                <p class="muted small">{{ 'udt.points.explain' | t }}</p>
                 <div class="steps">
                   @for (s of stats; track s) {
                     @let why = whyNot(b, s);
                     <button
                       type="button"
                       class="step"
+                      [class.capped]="why === 'potential'"
                       [disabled]="busy() || why !== null"
                       [title]="why ? ('udt.points.why.' + why | t) : ''"
                       (click)="develop(b, s)"
                     >
                       <b>{{ 'udt.academy.dev.' + s | t }}</b>
-                      <span class="mono small">{{ preview(b, s) }}</span>
-                      <span class="cost">{{ 'udt.points.cost' | t: { n: cost[s] } }}</span>
+                      @if (why === 'potential') {
+                        <span class="small">{{ 'udt.points.skillMax' | t }}</span>
+                      } @else {
+                        <span class="mono small">{{ preview(b, s) }}</span>
+                        <span class="cost">{{ 'udt.points.cost' | t: { n: cost[s] } }}</span>
+                      }
                     </button>
                   }
                 </div>
@@ -311,6 +313,9 @@ const SHORT: Readonly<Record<Stat, string>> = {
       font-size: 0.72rem;
       color: var(--neuro-text);
     }
+    .step.capped {
+      border-style: dashed;
+    }
     .tx {
       min-height: 0;
       height: 16px;
@@ -348,7 +353,6 @@ export class UdtBotPanel {
   protected readonly stats = STATS;
   protected readonly cost = DEVELOP_COST;
   protected readonly restPrice = DEFAULT_ECONOMY.restPrice;
-  protected readonly round = Math.round;
   protected readonly xp = computed(() => {
     const b = this.bot();
     return b ? xpStep(b.xp, b.level) : null;
@@ -382,13 +386,13 @@ export class UdtBotPanel {
     return staminaColor(s);
   }
 
-  protected potText(p: [number, number]) {
-    return p[0] === p[1] ? `${p[0]}` : `${p[0]}–${p[1]}`;
-  }
-
-  /** Why a step is not possible; the exact potential shows from level 5 (until then the top). */
+  /**
+   * Why a step is not possible; the exact potential shows from level 5 (until then the top). A
+   * reached potential comes first (also without points), so the skill step says why it is closed.
+   */
   protected whyNot(b: UdtRosterBot, s: Stat): 'points' | 'potential' | 'max' | null {
     if (!b.own) return 'points';
+    if (s === 'skill' && Math.round(b.skill) >= b.own.potential[1]) return 'potential';
     return cannotDevelop(
       s,
       { skill: b.skill, potential: b.own.potential[1], values: b.traits },
