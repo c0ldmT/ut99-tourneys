@@ -131,6 +131,54 @@ describe('potential window', () => {
   });
 });
 
+describe('drawn potential window', () => {
+  it('holds the potential inside the public range, both sides drawn, never 7-7', async () => {
+    const { drawPotentialWindow, shownWindow, talentReport } = await import('../src/index.js');
+    let i = 0;
+    const seq = [0.1, 0.9];
+    const rng = () => seq[i++ % 2]!;
+    for (let skill = 0; skill <= 6; skill++)
+      for (let p = skill; p <= 7; p++)
+        for (const range of [
+          [skill, 7],
+          [3, 5],
+          [4, 6],
+          [6, 7],
+        ] as [number, number][]) {
+          const [lo, hi] = drawPotentialWindow(p, skill, range, rng);
+          expect(lo).toBeLessThanOrEqual(p);
+          expect(hi).toBeGreaterThanOrEqual(p);
+          expect(hi - lo).toBe(1);
+          expect(lo).toBeGreaterThanOrEqual(skill);
+          // Inside the public range whenever the range has room for two steps around p.
+          if (
+            p >= range[0] &&
+            p <= range[1] &&
+            Math.min(7, range[1]) - Math.max(skill, range[0]) >= 1
+          ) {
+            expect(lo).toBeGreaterThanOrEqual(Math.max(skill, range[0]));
+            expect(hi).toBeLessThanOrEqual(range[1]);
+          }
+        }
+    // Rare (3-5) with potential 5 at skill 3: 4-5, never 5-6 (that would give it away).
+    for (let k = 0; k < 4; k++) expect(drawPotentialWindow(5, 3, [3, 5], rng)).toEqual([4, 5]);
+    // Both sides come up when the range allows them.
+    const sides = new Set([0, 1, 2, 3].map(() => drawPotentialWindow(5, 3, [3, 7], rng)[0]));
+    expect([...sides].sort()).toEqual([4, 5]);
+    // The scout report of a potential 7 talent: 6-7.
+    const t = {
+      name: 'X',
+      skill: 3,
+      values: { accuracy: 0, alertness: 0, strafing: 0, combatStyle: 0, camping: 0 },
+      potential: 7,
+    };
+    for (let k = 0; k < 4; k++) expect(talentReport(t, rng).potential).toEqual([6, 7]);
+    // A window shown later never goes below the skill reached.
+    expect(shownWindow([4, 5], 5)).toEqual([5, 5]);
+    expect(shownWindow([4, 5], 3)).toEqual([4, 5]);
+  });
+});
+
 describe('blueprints', () => {
   it("build skill 3 with the rarity's points for the values", async () => {
     const { cannotBuild, buildCost, BLUEPRINTS, blueprintRarity } = await import('../src/index.js');

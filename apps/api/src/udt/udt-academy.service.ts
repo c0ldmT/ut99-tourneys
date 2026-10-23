@@ -2,6 +2,7 @@ import { randomInt } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
+  drawPotentialWindow,
   apprentice,
   BLUEPRINTS,
   blueprintPotential,
@@ -36,7 +37,14 @@ import { DB, type Db } from '../db/database.js';
 import { bots, udtBlueprints, udtBots, udtRoster, udtScouts, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { ROSTER_MAX } from './udt-market.service.js';
-import { BotLookBody, gameName, lookFields, UdtService, type BotLook } from './udt.service.js';
+import {
+  BotLookBody,
+  gameName,
+  lookFields,
+  UdtService,
+  windowOf,
+  type BotLook,
+} from './udt.service.js';
 
 export const BotName = z
   .string()
@@ -236,6 +244,7 @@ export class UdtAcademyService {
     name: string,
     origin: 'academy' | 'apprentice' | 'blueprint',
     mentorId: string | null,
+    window: [number, number],
     botClass?: string,
     look?: BotLook,
   ): string {
@@ -273,6 +282,7 @@ export class UdtAcademyService {
         userId: user.id,
         origin,
         potential: t.potential,
+        ...windowOf(window),
         mentorId,
         createdAt: now,
       })
@@ -288,11 +298,23 @@ export class UdtAcademyService {
     if (!s) throw conflict('scout first');
     const talent = (JSON.parse(s.talentsJson) as Talent[])[body.pick];
     if (!talent) throw notFound('talent');
+    // The roster keeps the window the report showed (no second window to cross with it).
+    const shown = (JSON.parse(s.reportJson) as TalentReport[])[body.pick]?.potential;
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict('a bot is called {name} already', { name: body.name });
     this.checkLook(undefined, body.look);
     this.licence(user, season, body.name);
-    this.create(user, season, talent, body.name, 'academy', null, undefined, body.look);
+    this.create(
+      user,
+      season,
+      talent,
+      body.name,
+      'academy',
+      null,
+      shown ?? drawPotentialWindow(talent.potential, talent.skill, [talent.skill, 7], Math.random),
+      undefined,
+      body.look,
+    );
     this.db
       .delete(udtScouts)
       .where(and(eq(udtScouts.season, season), eq(udtScouts.userId, user.id)))
@@ -325,7 +347,17 @@ export class UdtAcademyService {
       m.udtTraits.some((x) => x.code === 'mentor'),
       rng,
     );
-    const id = this.create(user, season, t, body.name, 'apprentice', m.botId, undefined, body.look);
+    const id = this.create(
+      user,
+      season,
+      t,
+      body.name,
+      'apprentice',
+      m.botId,
+      drawPotentialWindow(t.potential, t.skill, [t.skill, 7], rng),
+      undefined,
+      body.look,
+    );
     if (t.inherited)
       this.db
         .insert(udtTraits)
@@ -380,6 +412,7 @@ export class UdtAcademyService {
       throw conflict('a bot is called {name} already', { name: body.name });
     this.checkLook(body.botClass, body.look);
     this.licence(user, season, body.name);
+    const potential = blueprintPotential(rarity, rng);
     const id = this.create(
       user,
       season,
@@ -387,11 +420,13 @@ export class UdtAcademyService {
         name: body.name,
         skill,
         values: { ...body.traits, combatStyle: 0, camping: 0 },
-        potential: blueprintPotential(rarity, rng),
+        potential,
       },
       body.name,
       'blueprint',
       null,
+      // Inside the rarity's public range: the window never tells more than the blueprint.
+      drawPotentialWindow(potential, skill, BLUEPRINTS[rarity].potential, rng),
       body.botClass,
       body.look,
     );

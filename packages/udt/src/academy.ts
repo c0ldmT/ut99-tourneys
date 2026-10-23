@@ -134,7 +134,6 @@ export function talentReport(t: Talent, rng: () => number): TalentReport {
     const c = pct(v) + Math.round((rng() * 2 - 1) * 4);
     return [clamp(c - 8, 0, 100), clamp(c + 8, 0, 100)];
   };
-  const lo = clamp(t.potential - Math.round(rng()), t.skill, 7);
   return {
     name: t.name,
     skill: t.skill,
@@ -143,8 +142,39 @@ export function talentReport(t: Talent, rng: () => number): TalentReport {
       alertness: range(t.values.alertness),
       strafing: range(t.values.strafing),
     },
-    potential: [lo, Math.min(7, lo + 1)],
+    potential: drawPotentialWindow(t.potential, t.skill, [t.skill, 7], rng),
   };
+}
+
+/**
+ * A window of two skill steps that holds the potential, drawn at random (side not tied to
+ * anything public) and kept inside `range` (the public range of the bot's origin, never below
+ * its skill), so the window never tells more than the range. Stored with the bot: the roster
+ * shows the same window as the scout report.
+ */
+export function drawPotentialWindow(
+  potential: number,
+  skill: number,
+  range: readonly [number, number],
+  rng: () => number,
+): [number, number] {
+  const s = Math.max(0, Math.min(7, Math.round(skill)));
+  const p = Math.max(s, Math.min(7, potential));
+  const fits = (lo: number, hi: number) => (w: [number, number]) => w[0] >= lo && w[1] <= hi;
+  const all: [number, number][] = [
+    [p - 1, p],
+    [p, p + 1],
+  ];
+  const inRange = all.filter(fits(Math.max(s, range[0]), Math.min(7, range[1])));
+  const pool = inRange.length ? inRange : all.filter(fits(s, 7));
+  if (!pool.length) return [p, p];
+  return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))]!;
+}
+
+/** The stored window as the roster shows it: never below the skill reached since. */
+export function shownWindow(window: readonly [number, number], skill: number): [number, number] {
+  const lo = Math.max(window[0], Math.round(skill));
+  return [lo, Math.max(window[1], lo)];
 }
 
 /**

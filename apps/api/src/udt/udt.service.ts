@@ -13,6 +13,8 @@ import {
   marketValue,
   valueAtTop,
   potentialWindow,
+  shownWindow,
+  drawPotentialWindow,
   SCRAP,
   STARTER_SKILL,
   starterPotential,
@@ -128,6 +130,11 @@ export interface RosterBot {
   traits: LibraryBot['traits'];
   price: number;
   value: number;
+  /**
+   * What the bot counts against a team value cap: the market value; own bots at their skill and
+   * values now (they develop between market days); the starter only above a default starter.
+   */
+  capValue: number;
   starter: boolean;
   dmSlot: number | null;
   mhSlot: number | null;
@@ -492,6 +499,10 @@ export class UdtService {
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const onBots = this.traitsOnBots(season);
     const own = this.ownBots(season, userId);
+    const index = this.index(season);
+    const plainValue = (skill: number, traits: LibraryBot['traits'] = {}) =>
+      marketValue(baseValue(skill, valueScore(traits)), 1, 1, index);
+    const starterBase = plainValue(STARTER_SKILL);
     return this.db
       .select()
       .from(udtRoster)
@@ -517,6 +528,11 @@ export class UdtService {
             traits: b.traits,
             price: r.price,
             value: r.starter ? 0 : this.value(b, season, cards),
+            capValue: !own.has(b.id)
+              ? this.value(b, season, cards)
+              : r.starter
+                ? Math.max(0, withTraits(plainValue(b.skill, b.traits), b, cards) - starterBase)
+                : withTraits(plainValue(b.skill, b.traits), b, cards),
             starter: r.starter,
             dmSlot: r.dmSlot,
             mhSlot: r.mhSlot,
@@ -708,6 +724,7 @@ export class UdtService {
         userId: user.id,
         origin: 'starter',
         potential: starterPotential(skill),
+        ...windowOf(drawPotentialWindow(starterPotential(skill), skill, [skill, 7], Math.random)),
         createdAt: now,
       })
       .run();
@@ -764,6 +781,9 @@ export function withTraits(
   return Math.round((plain * traitValueFactor(bot.skill, bot.traits ?? {}, traits)) / 10) * 10;
 }
 
+/** The window columns of `udt_bots`. */
+export const windowOf = (w: [number, number]) => ({ windowLo: w[0], windowHi: w[1] });
+
 /** What the roster shows of an own bot: the potential is a range until level 5. */
 function ownView(
   b: typeof udtBots.$inferSelect | undefined,
@@ -776,7 +796,11 @@ function ownView(
   const full = DEVELOP_VALUES.every((k) => valueAtTop(values[k]));
   return {
     origin: b.origin,
-    potential: (level >= 5 ? [p, p] : potentialWindow(p, skill, b.botId)) as [number, number],
+    potential: (level >= 5
+      ? [p, p]
+      : b.windowLo !== null && b.windowHi !== null
+        ? shownWindow([b.windowLo, b.windowHi], skill)
+        : potentialWindow(p, skill, b.botId)) as [number, number],
     points: developPoints(level, b.pointsSpent),
     spent: b.pointsSpent,
     canRename: !b.renamed && b.status === 'own',

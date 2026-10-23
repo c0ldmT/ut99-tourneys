@@ -551,4 +551,9 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE udt_roster ADD COLUMN salary_due INTEGER NOT NULL DEFAULT 0;
   `,
+  // 34: Dream Team own bots keep the potential window they were made with (drawn, not from the id).
+  `
+  ALTER TABLE udt_bots ADD COLUMN window_lo INTEGER;
+  ALTER TABLE udt_bots ADD COLUMN window_hi INTEGER;
+  `,
 ];

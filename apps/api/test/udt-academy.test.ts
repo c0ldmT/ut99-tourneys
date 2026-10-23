@@ -54,6 +54,12 @@ describe('Unreal Dream Team: academy', () => {
     expect(ledger.spendable(marioId).balance).toBe(before - 360 - 600);
     const kid = signed.body.own.find((b: { name: string }) => b.name === 'Kid');
     expect(kid).toMatchObject({ skill: r.skill, own: { origin: 'academy', points: 0 } });
+    // The roster shows the report's window (crossing two windows told the potential).
+    expect(kid.own.potential).toEqual(r.potential);
+    // The open yearbook does not tell it either before level 5.
+    const book = JSON.stringify((await mario.get('/udt/yearbook')).body);
+    expect(book).toContain('Kid');
+    expect(book).not.toMatch(/"potential":\d/);
     // Own bots stay: not for sale.
     expect((await mario.post(`/udt/roster/${kid.botId}/sell`)).status).toBe(409);
     // One free renaming: the game name keeps the tag; a second one is refused.

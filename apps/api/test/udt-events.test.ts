@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
-import { udtRoster, udtTraits } from '../src/db/schema.js';
+import { bots, udtRoster, udtTraits } from '../src/db/schema.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -121,6 +121,22 @@ describe('Unreal Dream Team: events', () => {
     const off = await admin.post(`/tournaments/${id}/command`, { kind: 'abort', reason: 'test' });
     expect(off.status, JSON.stringify(off.body)).toBe(204);
     expect((await mario.post(`/udt/roster/${bought}/sell`)).status).toBe(200);
+  });
+
+  it('the team value cap counts own bots as they are now, the starter above a default one', async () => {
+    const { admin, mario } = await setup();
+    const id = (await admin.post('/tournaments', udtCup(1, { valueCap: 1000 }))).body.id as string;
+    const lineup = async () =>
+      (
+        (await mario.get('/udt/events')).body as { id: string; lineup: { problems: string[] } }[]
+      ).find((e) => e.id === id)!.lineup;
+    // A fresh starter counts (almost) nothing.
+    expect((await lineup()).problems).toEqual([]);
+    // Developed to skill 5 (here set directly): it counts with its value above a default starter.
+    const mira = (await mario.get('/udt')).body.roster[0].botId as string;
+    const db = api!.app.get<Db>(DB);
+    db.update(bots).set({ skill: 5 }).where(eq(bots.id, mira)).run();
+    expect((await lineup()).problems.join()).toMatch(/team value cap/);
   });
 
   it('the tournament page signs up through the Dream Team: one count, one season', async () => {

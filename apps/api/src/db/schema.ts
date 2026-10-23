@@ -455,6 +455,12 @@ export const udtBots = sqliteTable('udt_bots', {
   /** "starter", "academy", "apprentice" or "blueprint". */
   origin: text('origin').notNull(),
   potential: integer('potential').notNull(),
+  /**
+   * What the manager sees of the potential before level 5 (two steps, drawn when made; the scout
+   * report's for talents). Null for older bots: `potentialWindow` from the id.
+   */
+  windowLo: integer('window_lo'),
+  windowHi: integer('window_hi'),
   pointsSpent: integer('points_spent').notNull().default(0),
   mentorId: text('mentor_id'),
   createdAt: text('created_at').notNull(),

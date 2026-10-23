@@ -243,6 +243,10 @@ export class UdtCareerService implements OnModuleInit {
       .from(udtTeams)
       .where(and(eq(udtTeams.season, b.season), eq(udtTeams.userId, b.userId)))
       .get();
+    const level = levelOf(r?.xp ?? 0);
+    // The yearbook is open to everybody: the potential only once the roster shows it too
+    // (level 5) or the season is over.
+    const shown = level >= 5 || b.season !== this.seasons.current()?.number;
     return {
       botId: b.botId,
       season: b.season,
@@ -252,10 +256,10 @@ export class UdtCareerService implements OnModuleInit {
       origin: b.origin,
       status: b.status,
       honours: b.honours,
-      potential: b.potential,
+      potential: shown ? b.potential : null,
       games: r?.games ?? 0,
       xp: r?.xp ?? 0,
-      level: levelOf(r?.xp ?? 0),
+      level,
       breeder: this.users.byId(b.userId)?.displayName ?? '?',
       team: team?.name ?? '?',
       tag: team?.tag ?? '',

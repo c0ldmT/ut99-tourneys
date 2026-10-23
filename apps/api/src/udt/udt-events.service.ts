@@ -42,7 +42,7 @@ const TIRED = 40;
 
 export interface Lineup {
   bots: RosterBot[];
-  /** Market value of the lineup (the starter bot counts 0). */
+  /** Value of the lineup against the cap (`capValue`: own bots now, the starter above default). */
   value: number;
   /** Why the team cannot play (empty: it can). */
   problems: string[];
@@ -325,12 +325,12 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         starred = true;
         continue;
       }
-      if (value + r.value > cap) {
+      if (value + r.capValue > cap) {
         capped = true;
         continue;
       }
       picked.push(r);
-      value += r.value;
+      value += r.capValue;
       if (star) stars++;
     }
     const problems: string[] = [];
