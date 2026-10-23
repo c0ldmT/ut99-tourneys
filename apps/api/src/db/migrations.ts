@@ -563,4 +563,11 @@ export const MIGRATIONS: string[] = [
   VALUES ('rescueRulesFrom', json_quote(strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
   `,
+  // 36: Dream Team matches are played, never simulated: drafts and series templates watch.
+  `
+  UPDATE tournaments SET settings_json = json_set(settings_json, '$.botMatchMode', 'watch')
+  WHERE kind = 'udt' AND phase = 'draft';
+  UPDATE series SET template_json = json_set(template_json, '$.settings.botMatchMode', 'watch')
+  WHERE json_extract(template_json, '$.kind') = 'udt';
+  `,
 ];

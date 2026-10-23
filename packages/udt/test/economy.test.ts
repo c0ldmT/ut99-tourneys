@@ -127,11 +127,15 @@ describe('packs', () => {
       'legendary',
     );
     expect(rollBox('elite', { sinceEpic: 0, sinceLegendary: 0 }, seq([0])).rarity).toBe('uncommon');
-    // Pity: the 10th standard box without an epic is epic, the 50th without a legendary legendary.
+    // Pity: the 30th standard box without an epic is epic, the 150th without a legendary
+    // legendary (review F7: before 10/50, so every 10-pull held an epic anyway).
     expect(rollBox('standard', { sinceEpic: 9, sinceLegendary: 9 }, seq([0.1])).rarity).toBe(
+      'common',
+    );
+    expect(rollBox('standard', { sinceEpic: 29, sinceLegendary: 29 }, seq([0.1])).rarity).toBe(
       'epic',
     );
-    const l = rollBox('standard', { sinceEpic: 3, sinceLegendary: 49 }, seq([0.1]));
+    const l = rollBox('standard', { sinceEpic: 3, sinceLegendary: 149 }, seq([0.1]));
     expect(l).toEqual({ rarity: 'legendary', pity: { sinceEpic: 0, sinceLegendary: 0 } });
     const c = rollBox('standard', { sinceEpic: 3, sinceLegendary: 7 }, seq([0.1]));
     expect(c.pity).toEqual({ sinceEpic: 4, sinceLegendary: 8 });
@@ -141,9 +145,9 @@ describe('packs', () => {
     const low = seq([0.1]);
     const s = rollTen('standard', { sinceEpic: 0, sinceLegendary: 0 }, low);
     expect(s.rarities).toHaveLength(10);
-    // Ten commons in a row: the pity makes the 10th epic, which also covers the rare promise.
-    expect(s.rarities.slice(0, 9).every((r) => r === 'common')).toBe(true);
-    expect(s.rarities[9]).toBe('epic');
+    // Ten commons in a row: the 10-pull's promise turns one of them rare (no epic pity yet).
+    expect(s.rarities.filter((r) => r === 'rare')).toHaveLength(1);
+    expect(s.rarities.filter((r) => r === 'common')).toHaveLength(9);
     const after = rollTen('standard', { sinceEpic: 0, sinceLegendary: 0 }, seq([0.1]), {
       ...DEFAULT_ECONOMY,
       packs: {

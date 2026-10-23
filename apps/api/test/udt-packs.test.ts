@@ -46,7 +46,7 @@ describe('Unreal Dream Team: packs and traits', () => {
     const view = (await mario.get('/udt/packs')).body;
     expect(view.boxes.map((b: { box: string }) => b.box)).toEqual(['standard', 'premium', 'elite']);
     // Index 0.3 before the first market day: 1500 × 0.3, the 10-pull costs 9 boxes.
-    expect(view.boxes[0]).toMatchObject({ price: 450, tenPrice: 4050, epicIn: 10, opened: 0 });
+    expect(view.boxes[0]).toMatchObject({ price: 450, tenPrice: 4050, epicIn: 30, opened: 0 });
     const before = ledger.spendable(marioId).balance;
     const one = await mario.post('/udt/packs/open', { box: 'standard' });
     expect(one.status, JSON.stringify(one.body)).toBe(200);

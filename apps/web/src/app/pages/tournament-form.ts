@@ -1098,9 +1098,11 @@ function toLocalInput(iso: string | null): string {
                 </div>
                 <div class="field">
                   <label for="fbmm">{{ 'form.botMatches' | t }}</label>
-                  <select id="fbmm" name="bmm" [(ngModel)]="f.botMatchMode">
+                  <select id="fbmm" name="bmm" [(ngModel)]="f.botMatchMode" [disabled]="f.udt">
                     <option value="watch">{{ 'form.botWatch' | t }}</option>
-                    <option value="simulate">{{ 'form.botSimulate' | t }}</option>
+                    @if (!f.udt) {
+                      <option value="simulate">{{ 'form.botSimulate' | t }}</option>
+                    }
                   </select>
                 </div>
                 <div class="field">
@@ -2193,7 +2195,8 @@ export class TournamentFormPage {
       noShowSec: f.noShowSec,
       reconnectGraceSec: f.reconnectGraceSec,
       maxReconnects: f.maxReconnects,
-      botMatchMode: f.botMatchMode,
+      // Dream Team matches are always played (traits, values and form only act in the game).
+      botMatchMode: f.udt ? 'watch' : f.botMatchMode,
       botPlacement: f.botPlacement,
       clanTeams: f.teamSize > 1 && f.clanTeams,
       postTournamentShutdownSec: f.postTournamentShutdownSec,

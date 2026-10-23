@@ -194,6 +194,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team: a bot plays one tournament at a time (a second drawn cup goes on without it); pack pity comes later (epic after 30/15/6 boxes, legendary after 150/75/20), so the shown rates hold and the 10-pull promises count; Dream Team matches cannot be simulated.
 - Dream Team academy: a breakthrough needs every value at 60 or more (not 100); an apprentice's potential is one step below its mentor's skill; graduations are approved when the season is over.
 - Rescue floor: Neuro in bought Dream Team bots count towards it, so a manager whose Neuro is in bots gets no free bet after each loss; a corrected result that turns a spent win into a loss leaves a debt instead of a rescue.
 - Dream Team economy: rewards follow the economy index only weakly (index^0.2), so several cups a day no longer push it to its cap; the high stakes winner's bonus is at most a tenth of the pot; the index counts managers active in the last 7 days; selling a bot back pays at most what it cost.

@@ -190,6 +190,8 @@ export const ERRORS_DE: Record<string, string> = {
   'the starter bot costs {cost} of {budget} points: lower the values':
     'Der Starter-Bot kostet {cost} von {budget} Punkten: Senk die Werte.',
   'the starter bot has skill {skill}': 'Der Starter-Bot hat Skill {skill}.',
+  'Dream Team matches are played, not simulated (bot matches: watch)':
+    'Dream-Team-Matches werden gespielt, nicht simuliert (Bot-Matches: zuschauen).',
   'a graduation is approved when season {season} is over':
     'Ein Abschluss wird freigegeben, wenn Season {season} vorbei ist.',
   '{name} is on strike: its salary is not paid': '{name} streikt: Das Gehalt ist nicht bezahlt.',

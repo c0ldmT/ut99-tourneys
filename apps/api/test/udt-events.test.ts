@@ -147,6 +147,41 @@ describe('Unreal Dream Team: events', () => {
     expect((await lineup()).problems.join()).toMatch(/team value cap/);
   });
 
+  it('a bot plays one Dream Team tournament at a time; matches are never simulated', async () => {
+    const { admin, mario, tim } = await setup();
+    const marioId = (await mario.get('/me')).body.id as string;
+    const a = (await admin.post('/tournaments', udtCup(1))).body.id as string;
+    const b = (await admin.post('/tournaments', udtCup(1))).body.id as string;
+    for (const id of [a, b]) {
+      expect((await mario.post(`/udt/events/${id}/enter`)).status).toBe(200);
+      expect((await tim.post(`/udt/events/${id}/enter`)).status).toBe(200);
+    }
+    const seed = (id: string) =>
+      admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect((await seed(a)).body.projection.entrants[`udt-${marioId}`]).toBeTruthy();
+    // Drawn again: its own bots are not "busy elsewhere".
+    const again = await seed(a);
+    expect(again.status, JSON.stringify(again.body)).toBe(200);
+    expect(again.body.projection.entrants[`udt-${marioId}`]).toBeTruthy();
+    // Signing up for another cup stays possible while Mira plays.
+    const c = (await admin.post('/tournaments', udtCup(1))).body.id as string;
+    expect((await mario.post(`/udt/events/${c}/enter`)).status).toBe(200);
+    // Mira plays in cup A: cup B goes on without Mario's team (only one bot).
+    const second = await seed(b);
+    expect(second.status, JSON.stringify(second.body)).toBe(200);
+    expect(second.body.projection.entrants[`udt-${marioId}`]).toBeUndefined();
+    // Simulated bot matches are refused for Dream Team tournaments.
+    const sim = await admin.post(
+      '/tournaments',
+      tournamentBody(
+        { name: 'Sim Cup', botPool: [], kind: 'udt', udt: {} },
+        { size: 4, format: 'single', teamSize: 1, botMatchMode: 'simulate' },
+      ),
+    );
+    expect(sim.status).toBe(400);
+    expect(JSON.stringify(sim.body)).toMatch(/not simulated/);
+  });
+
   it('the tournament page signs up through the Dream Team: one count, one season', async () => {
     const { admin, mario, tim, anna } = await setup();
     // No season switch of its own: a Dream Team tournament always belongs to the season.

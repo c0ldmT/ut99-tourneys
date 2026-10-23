@@ -335,6 +335,7 @@ export class TournamentsService {
       agentId: t.agentId,
       profileId: t.profileId,
     });
+    if (t.kind === 'udt') this.checkUdtSettings(t.settings);
   }
 
   /**
@@ -419,6 +420,7 @@ export class TournamentsService {
       body.seasonal = true;
       if (!season) throw conflict('no season is running');
       this.checkUdtRules(UdtEventRulesSchema.parse(body.udt ?? {}), body.settings.size);
+      this.checkUdtSettings(body.settings);
     }
     if (body.seasonal && !inSeason && !opts.seriesId) throw conflict('no season is running');
     let id = body.id ?? slugify(body.name);
@@ -514,6 +516,7 @@ export class TournamentsService {
         // Turned into a Dream Team tournament now: it belongs to the running season.
         if (t.kind !== 'udt') set.udtSeason = season.number;
         this.checkUdtRules(rules, (body.settings ?? this.settings(t)).size);
+        this.checkUdtSettings(body.settings ?? this.settings(t));
       } else set.udtSeason = null;
       // Entered teams paid by the old rules (ticket) and signed up for that kind: they leave first.
       const old = this.udtRules(t);
@@ -529,8 +532,10 @@ export class TournamentsService {
           'teams have entered: the kind, the ticket and the finale change only without entries',
         );
       set.udtJson = rules ? JSON.stringify(rules) : null;
-    } else if (t.kind === 'udt' && body.settings)
+    } else if (t.kind === 'udt' && body.settings) {
       this.checkUdtRules(this.udtRules(t)!, body.settings.size);
+      this.checkUdtSettings(body.settings);
+    }
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
     const udtNow = (body.kind ?? t.kind) === 'udt';
     if (!udtNow && body.seasonal !== undefined && body.seasonal !== t.seasonal) {
@@ -1089,6 +1094,12 @@ export class TournamentsService {
     const season = this.seasons.current();
     if (!this.settingsSvc.get().udt.enabled || !season) return false;
     return start === undefined || this.seasons.at(start)?.number === season.number;
+  }
+
+  /** Dream Team matches are played, never simulated (owner, 23.10.). */
+  private checkUdtSettings(settings: TournamentSettings): void {
+    if (settings.botMatchMode === 'simulate')
+      throw badRequest('Dream Team matches are played, not simulated (bot matches: watch)');
   }
 
   /** High stakes needs at least `minTeams` human teams: they must fit into the bracket. */

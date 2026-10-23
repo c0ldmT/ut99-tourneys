@@ -125,9 +125,13 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   // season with three Daily Cups a day, nothing with one; the index does not move.
   restPrice: 7,
   packs: {
-    standard: { price: 1500, rates: [60, 25, 10, 4, 1], pityEpic: 10, pityLegendary: 50 },
-    premium: { price: 4000, rates: [35, 35, 20, 8, 2], pityEpic: 7, pityLegendary: 30 },
-    elite: { price: 10_000, rates: [0, 30, 40, 22, 8], pityEpic: 4, pityLegendary: 15 },
+    // Pity as a safety net about 1.5-2 times the expected wait (review F7, owner 23.10.): with
+    // 10/7/4 and 50/30/15 every 10-pull held an epic anyway and the real rates were 13/20/41 %
+    // epic+ and 2.5/4.4/11 % legendary for 5/10/30 and 1/2/8 shown; now about 6.5/13/35 % and
+    // 1.2/2.5/10 % (simulator, 20,000 boxes each), and the 10-pull guarantees count again.
+    standard: { price: 1500, rates: [60, 25, 10, 4, 1], pityEpic: 30, pityLegendary: 150 },
+    premium: { price: 4000, rates: [35, 35, 20, 8, 2], pityEpic: 15, pityLegendary: 75 },
+    elite: { price: 10_000, rates: [0, 30, 40, 22, 8], pityEpic: 6, pityLegendary: 20 },
   },
   tenPullBoxes: 9,
   scouting: 1200,

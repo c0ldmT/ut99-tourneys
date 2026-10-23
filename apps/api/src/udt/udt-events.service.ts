@@ -36,6 +36,8 @@ import {
 import { UdtCareerService } from './udt-career.service.js';
 import { gameName, UdtService, type RosterBot } from './udt.service.js';
 import { pickTeamNames } from '../common/names.js';
+import { EventLogService } from '../tournaments/event-log.service.js';
+import { playingBots } from './udt-playing.js';
 
 /** Bots below this stamina are tired: they play worse and the bench comes first. */
 const TIRED = 40;
@@ -68,6 +70,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
     @Inject(UsersService) private readonly users: UsersService,
+    @Inject(EventLogService) private readonly log: EventLogService,
   ) {}
 
   onModuleInit(): void {
@@ -295,7 +298,16 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
    * players, strikers never; at most `starLimit` bots of skill 6-7 and a total market value up
    * to the cap × index.
    */
-  lineup(userId: string, settings: TournamentSettings, rules: UdtEventRules): Lineup {
+  lineup(
+    userId: string,
+    settings: TournamentSettings,
+    rules: UdtEventRules,
+    /**
+     * Bots playing in another drawn or running Dream Team tournament (one at a time): only the
+     * seeding leaves them out; sign-ups stay possible (they may be free by then).
+     */
+    busy: ReadonlySet<string> = new Set(),
+  ): Lineup {
     const season = this.udt.season().number;
     const mh = settings.game.adapter === ADAPTER_MH;
     const roster = this.udt.roster(userId, season);
@@ -304,7 +316,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const bench = roster
       .filter((r) => r.bench !== null && slot(r) === null)
       .sort((a, b) => a.bench! - b.bench!);
-    const playable = (r: RosterBot) => !r.striking;
+    const playable = (r: RosterBot) => !r.striking && !busy.has(r.botId);
     const fit = (r: RosterBot) => r.stamina >= TIRED;
     const order = [
       ...slotted.filter((r) => playable(r) && fit(r)),
@@ -336,7 +348,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const problems: string[] = [];
     if (picked.length < settings.teamSize) {
       problems.push(
-        `${picked.length} of ${settings.teamSize} bots can play (lineup and bench${roster.some((r) => r.striking) ? ', strikers left out' : ''})`,
+        `${picked.length} of ${settings.teamSize} bots can play (lineup and bench${roster.some((r) => r.striking) ? ', strikers left out' : ''}${roster.some((r) => busy.has(r.botId)) ? ', bots in another tournament left out' : ''})`,
       );
       if (capped) problems.push(`team value cap ${Math.round(cap)} Neuro`);
       if (starred) problems.push(`at most ${rules.starLimit} bots of skill 6-7`);
@@ -372,6 +384,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
   /** Lineup provider for the seeding (TournamentsService). */
   private provide(t: TournamentRow, settings: TournamentSettings, rng: () => number) {
     this.udt.assertOn();
+    if (settings.botMatchMode === 'simulate')
+      throw conflict('Dream Team matches are played, not simulated (bot matches: watch)');
     // Rosters, index and table are the season's: only the season it belongs to can seed it.
     if (!this.inSeason(t)) {
       const season = this.tournaments.udtSeason(t) ?? '–';
@@ -414,7 +428,9 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
       const team = this.udt.team(userId, season);
-      const l = team ? this.lineup(userId, settings, rules) : null;
+      // One tournament at a time (decision 200); the finale goes first and takes them anyway.
+      const busy = rules.finale ? undefined : playingBots(this.db, this.log, userId, t.id);
+      const l = team ? this.lineup(userId, settings, rules, busy) : null;
       if (!team || !l || l.problems.length || main.length >= settings.size) {
         // Cannot play (any more) or no room: left out, the ticket goes back.
         this.dropEntry(t.id, userId);
