@@ -46,6 +46,8 @@ export interface NeuroWallet {
   free: number;
   /** The rescue floor of the season. */
   floor: number;
+  /** What a rescue tops up to now: the floor minus Neuro in Dream Team bots (in debt: 0). */
+  rescueTo?: number;
   /** What can be spent (shop, Dream Team): free above the floor, 0 out of season. */
   spendable: number;
 }

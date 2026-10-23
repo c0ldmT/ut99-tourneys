@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
-import { betRecords, settleMatch, wallets, type Bet, type MatchBook } from '../src/bets/betting.js';
+import {
+  betRecords,
+  rescueTarget,
+  settleMatch,
+  wallets,
+  type Bet,
+  type MatchBook,
+} from '../src/bets/betting.js';
 import { BetsService } from '../src/bets/bets.service.js';
 import {
   bettingType,
@@ -297,6 +304,54 @@ describe('rescue after a loss', () => {
       balance: 100,
       free: 100,
     });
+  });
+});
+
+describe('rescue with corrections and Dream Team bots', () => {
+  const at = (h: number) => `2026-10-18T${String(h).padStart(2, '0')}:00:00.000Z`;
+  it('a corrected win that was spent leaves a debt, not a gift', () => {
+    // Bet 900 at 10:00, settled won at 11:00, a bot bought for 1,800 at 12:00; the organizer
+    // corrects the match at 13:00: the bet is lost (settled at the correction).
+    const s = [{ ...bet('u1', 'a', 900), status: 'lost' as const, payout: 0, settledAt: at(13) }];
+    const ledger = [{ userId: 'u1', amount: -1800, at: at(12), kind: 'udt_purchase' }];
+    const w = wallets(s, [], 1000, 100, [], ledger).get('u1')!;
+    // 1000 - 1800 - 900 = -1700: held in bots (1,800) the floor is reached, no rescue.
+    expect(w).toMatchObject({ balance: -1700, bailedOut: 0, invested: 1800 });
+    // Without the bot (shop spending): at most the floor comes back, the rest stays a debt.
+    const shop = [{ userId: 'u1', amount: 1800, at: at(12) }];
+    expect(wallets(s, [], 1000, 100, shop).get('u1')).toMatchObject({
+      balance: -1600,
+      bailedOut: 100,
+    });
+  });
+
+  it('Neuro held in bought bots count towards the floor; a sale gives it back', () => {
+    const s = [
+      { ...bet('u1', 'a', 100), status: 'lost' as const, payout: 0, settledAt: at(11) },
+      { ...bet('u1', 'a', 100), status: 'lost' as const, payout: 0, settledAt: at(14) },
+    ];
+    // 1000, a bot for 900 (balance 100), the floor bet lost: no rescue (900 in the bot).
+    const ledger = [
+      { userId: 'u1', amount: -900, at: at(10), kind: 'udt_purchase', botId: 'x' },
+      { userId: 'u1', amount: 600, at: at(12), kind: 'udt_sale', botId: 'x' },
+      { userId: 'u1', amount: -500, at: at(13), kind: 'udt_salary' },
+    ];
+    const w = wallets(s.slice(0, 1), [], 1000, 100, [], ledger.slice(0, 1)).get('u1')!;
+    expect(w).toMatchObject({ balance: 0, bailedOut: 0, invested: 900 });
+    // Sold (no bot left): 600 - 500 salary = 100, lost again: rescued to the floor.
+    const all = wallets(s, [], 1000, 100, [], ledger).get('u1')!;
+    expect(all).toMatchObject({ balance: 100, invested: 0, bailedOut: 100 });
+    expect(rescueTarget(100, 50)).toBe(50);
+  });
+
+  it('losses before the new rules keep their rescue (wallets are replayed)', () => {
+    const s = [{ ...bet('u1', 'a', 100), status: 'lost' as const, payout: 0, settledAt: at(11) }];
+    const ledger = [{ userId: 'u1', amount: -900, at: at(10), kind: 'udt_purchase', botId: 'x' }];
+    // Rules from 12:00: the loss at 11:00 is rescued to the floor as before.
+    const old = wallets(s, [], 1000, 100, [], ledger, at(12)).get('u1')!;
+    expect(old).toMatchObject({ balance: 100, bailedOut: 100 });
+    const now = wallets(s, [], 1000, 100, [], ledger, at(9)).get('u1')!;
+    expect(now).toMatchObject({ balance: 0, bailedOut: 0 });
   });
 });
 

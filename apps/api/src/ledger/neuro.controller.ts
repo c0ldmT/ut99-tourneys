@@ -1,3 +1,4 @@
+import { rescueTarget } from '../bets/betting.js';
 import { Controller, Get, Inject, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { CurrentUser } from '../auth/guard.js';
@@ -31,6 +32,7 @@ export class NeuroController {
         staked: 0,
         free: 0,
         floor: 0,
+        rescueTo: 0,
         spendable: 0,
       };
     const w = this.bets.wallet(user.id, season);
@@ -42,6 +44,8 @@ export class NeuroController {
       staked: w.staked,
       free: w.free,
       floor,
+      // What a rescue tops up to: the floor minus Neuro in Dream Team bots (a debt: none).
+      rescueTo: w.balance < 0 ? 0 : rescueTarget(floor, w.invested),
       spendable: current ? Math.max(0, w.free - floor) : 0,
     };
   }

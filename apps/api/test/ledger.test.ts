@@ -74,6 +74,7 @@ describe('Neuro ledger', () => {
       staked: 0,
       free: 1300,
       floor: 100,
+      rescueTo: 100,
       spendable: 1200,
     });
   });

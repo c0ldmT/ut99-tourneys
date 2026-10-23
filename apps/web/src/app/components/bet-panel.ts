@@ -540,8 +540,9 @@ export class BetPanel {
   protected maxFor(m: BetMatchView): number {
     const w = this.wallet();
     if (!w) return 0;
-    // A wallet below the floor is topped up when the bet is placed.
-    const free = Math.max(w.free, w.floor - w.staked);
+    // A wallet below its rescue target (the floor minus Neuro in Dream Team bots; none in debt)
+    // is topped up when the bet is placed.
+    const free = Math.max(w.free, (w.rescueTo ?? w.floor) - w.staked);
     return Math.max(0, free + (m.mine?.amount ?? 0));
   }
 

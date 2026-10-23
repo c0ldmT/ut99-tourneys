@@ -556,4 +556,11 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_bots ADD COLUMN window_lo INTEGER;
   ALTER TABLE udt_bots ADD COLUMN window_hi INTEGER;
   `,
+  // 35: the rescue rules of decision 196 hold for losses from now on (the wallets are replayed:
+  // earlier losses keep the rescue they had).
+  `
+  INSERT OR IGNORE INTO settings (key, value_json, updated_at)
+  VALUES ('rescueRulesFrom', json_quote(strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
+  `,
 ];

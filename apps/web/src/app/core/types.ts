@@ -614,6 +614,8 @@ export interface NeuroWalletView {
   staked: number;
   free: number;
   floor: number;
+  /** What a rescue tops up to now (floor minus Neuro in Dream Team bots; in debt: 0). */
+  rescueTo?: number;
   startBalance: number;
 }
 

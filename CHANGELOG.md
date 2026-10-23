@@ -194,6 +194,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Rescue floor: Neuro in bought Dream Team bots count towards it, so a manager whose Neuro is in bots gets no free bet after each loss; a corrected result that turns a spent win into a loss leaves a debt instead of a rescue.
 - Dream Team economy: rewards follow the economy index only weakly (index^0.2), so several cups a day no longer push it to its cap; the high stakes winner's bonus is at most a tenth of the pot; the index counts managers active in the last 7 days; selling a bot back pays at most what it cost.
 - Dream Team blueprints always build skill 3 with fewer points for the values (a starter +50 / +75 / +125 / +225) and a potential range by rarity (3–4, 3–5, 4–6, 6–7), drawn when the bot is built.
 - Bot looks as in UT's player setup: the model's skins, the skin's faces and the model's voices with their readable names, as dropdowns that work on phones; unfitting looks are refused for Dream Team managers.

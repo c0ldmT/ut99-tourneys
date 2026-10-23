@@ -291,7 +291,18 @@ export interface Bailout {
   userId: string;
   amount: number;
   at: string;
+  /** Ledger bookings: their kind (Dream Team purchases and sales count as bots held). */
+  kind?: string;
+  /** Ledger bookings: the Dream Team bot bought or sold. */
+  botId?: string;
 }
+
+/**
+ * The rescue floor a wallet is topped up to: Neuro held in bought Dream Team bots (purchases
+ * minus sales) count towards it (decision 196).
+ */
+export const rescueTarget = (floor: number, invested: number): number =>
+  Math.max(0, floor - Math.max(0, invested));
 
 /** A user's Neuro over a season. */
 export interface Wallet {
@@ -314,6 +325,8 @@ export interface Wallet {
   spent: number;
   /** Sum of the ledger bookings (Dream Team rewards minus purchases and salaries, ...). */
   ledger: number;
+  /** Neuro in bought Dream Team bots: purchases minus sales (counts towards the rescue floor). */
+  invested: number;
   bailouts: number;
   bailedOut: number;
   bestWin: number;
@@ -340,6 +353,7 @@ export const emptyWallet = (userId: string, start: number): Wallet => ({
   profit: 0,
   spent: 0,
   ledger: 0,
+  invested: 0,
   bailouts: 0,
   bailedOut: 0,
   bestWin: 0,
@@ -364,16 +378,28 @@ export function wallets(
   spends: readonly Bailout[] = [],
   /** Ledger bookings: positive earns, negative spends (spending never goes below the floor). */
   ledger: readonly Bailout[] = [],
+  /**
+   * Losses settled from this instant on follow decision 196 (bots held count, at most the stake
+   * and the floor); earlier ones keep the rescue up to the floor. Missing: all follow 196.
+   */
+  rulesFrom?: string,
 ): Map<string, Wallet> {
   type Step =
     | { at: string; order: 0; userId: string; bailout: number }
     | { at: string; order: 1; userId: string; bet: SettledBet }
     | { at: string; order: 2; userId: string; spend: number }
-    | { at: string; order: 3; userId: string; booking: number };
+    | { at: string; order: 3; userId: string; booking: number; kind?: string; botId?: string };
   const steps: Step[] = [
     ...bailouts.map((b) => ({ at: b.at, order: 0 as const, userId: b.userId, bailout: b.amount })),
     ...spends.map((b) => ({ at: b.at, order: 2 as const, userId: b.userId, spend: b.amount })),
-    ...ledger.map((b) => ({ at: b.at, order: 3 as const, userId: b.userId, booking: b.amount })),
+    ...ledger.map((b) => ({
+      at: b.at,
+      order: 3 as const,
+      userId: b.userId,
+      booking: b.amount,
+      kind: b.kind,
+      botId: b.botId,
+    })),
     ...settled
       .filter((b) => b.status !== 'open')
       .map((b) => ({ at: b.settledAt ?? b.placedAt, order: 1 as const, userId: b.userId, bet: b })),
@@ -385,6 +411,12 @@ export function wallets(
     return w;
   };
   const streak = new Map<string, number>(); // >0 wins in a row, <0 losses in a row
+  const heldBots = new Map<string, Map<string, number>>();
+  const heldOf = (id: string) => {
+    let m = heldBots.get(id);
+    if (!m) heldBots.set(id, (m = new Map()));
+    return m;
+  };
   for (const s of steps) {
     const w = of(s.userId);
     if ('spend' in s) {
@@ -395,6 +427,11 @@ export function wallets(
     if ('booking' in s) {
       w.balance += s.booking;
       w.ledger += s.booking;
+      // Bots held: what each bought bot cost, until it is sold (or its bid refunded).
+      const held = heldOf(s.userId);
+      if (s.kind === 'udt_purchase') held.set(s.botId ?? `?${held.size}`, -s.booking);
+      else if ((s.kind === 'udt_sale' || s.kind === 'udt_refund') && s.botId) held.delete(s.botId);
+      w.invested = [...held.values()].reduce((n, v) => n + v, 0);
       w.peak = Math.max(w.peak, w.balance);
       continue;
     }
@@ -427,11 +464,18 @@ export function wallets(
         const n = st < 0 ? st - 1 : -1;
         streak.set(s.userId, n);
         w.loseStreak = Math.max(w.loseStreak, -n);
-        // Salt mines: below the floor after a loss, the rescue comes at once.
-        if (w.balance < floor) {
+        // Salt mines: below the floor after a loss, the rescue comes at once - up to the floor
+        // minus what is held in Dream Team bots, at most the stake just lost and never more
+        // than that floor (as after any normal loss): a correction that turned a spent win into
+        // a loss leaves a debt instead of filling it.
+        const settled = b.settledAt ?? b.placedAt;
+        const v2 = !rulesFrom || settled >= rulesFrom;
+        const target = v2 ? rescueTarget(floor, w.invested) : floor;
+        if (w.balance < target) {
+          const add = v2 ? Math.min(target - w.balance, b.amount, target) : target - w.balance;
           w.bailouts++;
-          w.bailedOut += floor - w.balance;
-          w.balance = floor;
+          w.bailedOut += add;
+          w.balance += add;
         }
       }
     }

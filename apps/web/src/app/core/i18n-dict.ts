@@ -1006,7 +1006,7 @@ const en = {
   'bets.staked': 'staked',
   'bets.free': 'free',
   'bets.hint':
-    "Bet Neuro (€) on the winner. Pools stay hidden until the first game starts; the winners share the losers' pool in proportion to their stakes. If a lost bet leaves you below {floor}, you get {floor} right away.",
+    "Bet Neuro (€) on the winner. Pools stay hidden until the first game starts; the winners share the losers' pool in proportion to their stakes. If a lost bet leaves you below {floor}, you get up to {floor} right away (Neuro in your Dream Team bots count towards it).",
   'bets.closed.notSeasonal': 'No bets: this is not a season tournament.',
   'bets.closed.noSeason': 'No bets: no season is running (Neuro exist per season).',
   'bets.closed.phase': 'Bets are closed in this tournament.',
@@ -1760,7 +1760,7 @@ const en = {
     'Under Events you enter your team (or let it enter automatically). Games, wins and places bring Neuro and experience; the table shows the best teams of the season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
-    "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike until a market day can collect what it is owed (a sale pays it too).",
+    "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Neuro in bought bots count towards that floor: the rescue after a lost bet only tops up what is missing beyond them. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike until a market day can collect what it is owed (a sale pays it too).",
   'udt.help.go': "Let's go",
   'udt.rename.once': 'Once per bot, free (the look can change any time).',
   'ok.udt.autoOn': 'Automatic sign-up on: {n} tournament(s) entered right away.',
@@ -2928,7 +2928,7 @@ const de: Record<TKey, string> = {
   'bets.staked': 'gesetzt',
   'bets.free': 'frei',
   'bets.hint':
-    'Setze Neuro (€) auf den Sieger. Die Pools bleiben bis zum Start des ersten Spiels verdeckt; die Gewinner teilen sich den Pool der Verlierer im Verhältnis ihrer Einsätze. Fällst du nach einer verlorenen Wette unter {floor}, bekommst du sofort {floor}.',
+    'Setze Neuro (€) auf den Sieger. Die Pools bleiben bis zum Start des ersten Spiels verdeckt; die Gewinner teilen sich den Pool der Verlierer im Verhältnis ihrer Einsätze. Fällst du nach einer verlorenen Wette unter {floor}, bekommst du sofort bis zu {floor} (Neuro in deinen Dream-Team-Bots zählen mit).',
   'bets.closed.notSeasonal': 'Keine Wetten: Das ist kein Season-Turnier.',
   'bets.closed.noSeason': 'Keine Wetten: Es läuft keine Season (Neuro gibt es pro Season).',
   'bets.closed.phase': 'Die Wetten in diesem Turnier sind geschlossen.',
@@ -3685,7 +3685,7 @@ const de: Record<TKey, string> = {
     'Unter Events meldest du dein Team an (oder lässt es automatisch anmelden). Spiele, Siege und Platzierungen bringen Neuro und Erfahrung; die Tabelle zeigt die besten Teams der Season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
-    'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot, bis ein Markttag das Offene einziehen kann (ein Verkauf zahlt es auch).',
+    'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Neuro in gekauften Bots zählen zur Rettungsgrenze: Die Rettung nach einer verlorenen Wette füllt nur auf, was darüber hinaus fehlt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot, bis ein Markttag das Offene einziehen kann (ein Verkauf zahlt es auch).',
   'udt.help.go': "Los geht's",
   'udt.rename.once': 'Einmal pro Bot, kostenlos (das Aussehen jederzeit).',
   'ok.udt.autoOn': 'Automatische Anmeldung an: {n} Turnier(e) sofort angemeldet.',

@@ -8,7 +8,14 @@ import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { betBailouts, bets, neuroLedger, shopPurchases, tournaments } from '../db/schema.js';
+import {
+  betBailouts,
+  bets,
+  neuroLedger,
+  settings,
+  shopPurchases,
+  tournaments,
+} from '../db/schema.js';
 import { NeuroHub } from '../ledger/neuro-hub.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
 import { headToHead } from '../stats/aggregate.js';
@@ -24,6 +31,7 @@ import {
   matchBetSummary,
   matchBooks,
   pools,
+  rescueTarget,
   settleMatch,
   tournamentBetSummary,
   wallets,
@@ -170,20 +178,41 @@ export class BetsService {
           : eq(neuroLedger.season, season),
       )
       .all()
-      .map((r) => ({ userId: r.userId, amount: r.amount, at: r.at }));
+      .map((r) => ({
+        userId: r.userId,
+        amount: r.amount,
+        at: r.at,
+        kind: r.kind,
+        ...(botIdOf(r.metaJson) ? { botId: botIdOf(r.metaJson) } : {}),
+      }));
   }
 
-  /** Tops a wallet below the season's floor up to it; returns the (new) wallet. */
+  /** From when the rescue rules of decision 196 hold (migration 35; earlier losses keep theirs). */
+  private rescueRulesFrom(): string | undefined {
+    const row = this.db.select().from(settings).where(eq(settings.key, 'rescueRulesFrom')).get();
+    try {
+      const v = row ? (JSON.parse(row.valueJson) as unknown) : undefined;
+      return typeof v === 'string' ? v : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Tops a wallet below the season's floor up to it (minus what is held in Dream Team bots);
+   * a debt (below 0, after a corrected result) is not topped up. Returns the (new) wallet.
+   */
   private rescue(bettor: string, season: Season): Wallet {
     const w = this.wallet(bettor, season);
-    if (w.balance >= season.betting.floor) return w;
+    const target = rescueTarget(season.betting.floor, w.invested);
+    if (w.balance >= target || w.balance < 0) return w;
     this.db
       .insert(betBailouts)
       .values({
         id: `r${randomId(12)}`,
         season: season.number,
         ...(isBotBettor(bettor) ? { botId: bettor.slice(4) } : { userId: bettor }),
-        amount: season.betting.floor - w.balance,
+        amount: target - w.balance,
         at: this.now(),
       })
       .run();
@@ -212,6 +241,7 @@ export class BetsService {
       season.betting.floor,
       this.seasonSpends(season.number, userId),
       this.seasonLedger(season.number, userId),
+      this.rescueRulesFrom(),
     );
     return ws.get(userId) ?? emptyWallet(userId, season.betting.startBalance);
   }
@@ -334,6 +364,8 @@ export class BetsService {
       staked: w.staked,
       free: w.free,
       floor: season.betting.floor,
+      /** What a rescue tops up to now (floor minus Neuro in bought bots; a debt: none). */
+      rescueTo: w.balance < 0 ? 0 : rescueTarget(season.betting.floor, w.invested),
       startBalance: season.betting.startBalance,
     };
   }
@@ -630,6 +662,7 @@ export class BetsService {
       season.betting.floor,
       this.seasonSpends(season.number),
       this.seasonLedger(season.number),
+      this.rescueRulesFrom(),
     );
     const names = this.names();
     const ai = this.aiUsers();
@@ -661,6 +694,7 @@ export class BetsService {
       season.betting.floor,
       this.seasonSpends(season.number),
       this.seasonLedger(season.number),
+      this.rescueRulesFrom(),
     );
     const names = this.names();
     const tnames = this.tournamentNames();
@@ -726,6 +760,7 @@ export class BetsService {
       season.betting.floor,
       this.seasonSpends(season.number),
       this.seasonLedger(season.number),
+      this.rescueRulesFrom(),
     );
     const w = ws.get(bettor) ?? emptyWallet(bettor, season.betting.startBalance);
     const tnames = this.tournamentNames();
@@ -789,4 +824,15 @@ function betSide(
     clans,
     players: [...players, ...botIds.map(botBettor)],
   };
+}
+
+/** The Dream Team bot of a ledger booking (purchases, sales, refunds). */
+function botIdOf(metaJson: string | null): string | undefined {
+  if (!metaJson) return undefined;
+  try {
+    const m = JSON.parse(metaJson) as { botId?: unknown };
+    return typeof m.botId === 'string' ? m.botId : undefined;
+  } catch {
+    return undefined;
+  }
 }
