@@ -227,8 +227,8 @@ export class UdtRewardsService implements OnModuleInit {
   }
 
   /**
-   * High stakes: the best human team gets 60 % of the tickets plus one ticket as a bonus, the
-   * second best 20 %; the rest leaves the economy.
+   * High stakes: the best human team gets 60 % of the tickets plus one ticket as a bonus (at
+   * most a tenth of the tickets), the second best 20 %; the rest leaves the economy.
    */
   private payPot(
     tournamentId: string,
@@ -238,7 +238,9 @@ export class UdtRewardsService implements OnModuleInit {
     const paid = this.udtEvents.tickets(tournamentId).filter((e) => e.ticket > 0);
     if (!paid.length) return;
     const pot = paid.reduce((n, e) => n + e.ticket, 0);
-    const bonus = Math.max(...paid.map((e) => e.ticket));
+    // The winner's bonus (one ticket) comes out of the pot: at most a tenth of it, so at least
+    // 10 % always leaves the economy (a bonus on top made money with up to five teams, M2).
+    const bonus = Math.min(Math.max(...paid.map((e) => e.ticket)), roundNeuro(pot * 0.1));
     const ranked = [...managers]
       .map((m) => ({ userId: udtManagerOf(m.entrantId)!, place: m.placement ?? 99 }))
       .filter((m) => paid.some((e) => e.userId === m.userId))

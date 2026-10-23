@@ -1267,7 +1267,7 @@ const en = {
   'udt.tired': 'Tired',
   'udt.paid': 'paid',
   'udt.sell': 'Sell (85 %)',
-  'udt.sellConfirm': 'Sell {name} to the market for 85 % of its value?',
+  'udt.sellConfirm': 'Sell {name} to the market for 85 % of its value (at most what it cost)?',
   'udt.ledger': 'Ledger',
   'udt.ledgerEmpty': 'No bookings yet.',
   'udt.kind.udt_reward': 'Match reward',
@@ -1446,7 +1446,7 @@ const en = {
   'form.udtMinTeams': 'Fewest human teams',
   'form.udtTicketIndexed': 'Ticket at the economy index',
   'form.udtTicketHint':
-    'High stakes: managers pay the ticket when they enter. Place rewards are 1.5 times higher; on top, the best human team gets 60 % of the tickets plus one ticket, the second best 20 %, the rest leaves the economy. Fewer human teams at the seeding: all tickets go back.',
+    'High stakes: managers pay the ticket when they enter. Place rewards are 1.5 times higher; on top, the best human team gets 60 % of the tickets plus one ticket (at most a tenth of the tickets), the second best 20 %, the rest leaves the economy. Fewer human teams at the seeding: all tickets go back.',
   'udt.nav.trades': 'Trades',
   'udt.kind.udt_trade': 'Trade',
   'udt.kind.udt_trade_fee': 'Trade fee',
@@ -1710,7 +1710,7 @@ const en = {
   'udt.market.price': 'Price',
   'udt.market.value': 'Market value',
   'udt.market.surcharge':
-    'The price is the market value plus 10 % (weak), 20 % (middle) or 30 % (strong bots). Selling back pays 85 % of the value (not while the bot plays in a drawn or running Dream Team tournament).',
+    'The price is the market value plus 10 % (weak), 20 % (middle) or 30 % (strong bots). Selling back pays 85 % of the value, at most what the bot cost (not while the bot plays in a drawn or running Dream Team tournament).',
   'udt.market.buy': 'Buy · {price}',
   'udt.market.buyConfirm':
     'Buy {name} for {price}? The bot joins your roster at once; from the next Monday it draws a salary.',
@@ -1753,7 +1753,7 @@ const en = {
   'udt.help.way.trades.text':
     'Swap bought bots and Neuro with other managers. Your starter and the bots you made stay with your team.',
   'udt.help.bots.roster':
-    'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value (not while it plays in a drawn or running Dream Team tournament).',
+    'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value, at most what it cost (not while it plays in a drawn or running Dream Team tournament).',
   'udt.help.lineup.title': 'Line up',
   'udt.help.events.title': 'Play tournaments',
   'udt.help.events.text':
@@ -3190,7 +3190,7 @@ const de: Record<TKey, string> = {
   'udt.tired': 'Müde',
   'udt.paid': 'bezahlt',
   'udt.sell': 'Verkaufen (85 %)',
-  'udt.sellConfirm': '{name} für 85 % des Werts an den Markt verkaufen?',
+  'udt.sellConfirm': '{name} für 85 % des Werts (höchstens den Kaufpreis) an den Markt verkaufen?',
   'udt.ledger': 'Kontobuch',
   'udt.ledgerEmpty': 'Noch keine Buchungen.',
   'udt.kind.udt_reward': 'Match-Prämie',
@@ -3370,7 +3370,7 @@ const de: Record<TKey, string> = {
   'form.udtMinTeams': 'Mindestens menschliche Teams',
   'form.udtTicketIndexed': 'Ticket mit dem Wirtschaftsindex',
   'form.udtTicketHint':
-    'High Stakes: Manager zahlen das Ticket bei der Anmeldung. Die Platzprämien sind 1,5-mal so hoch; dazu bekommt das beste menschliche Team 60 % der Tickets plus ein Ticket, das zweitbeste 20 %, der Rest verlässt die Wirtschaft. Weniger menschliche Teams beim Seeding: alle Tickets gehen zurück.',
+    'High Stakes: Manager zahlen das Ticket bei der Anmeldung. Die Platzprämien sind 1,5-mal so hoch; dazu bekommt das beste menschliche Team 60 % der Tickets plus ein Ticket (höchstens ein Zehntel der Tickets), das zweitbeste 20 %, der Rest verlässt die Wirtschaft. Weniger menschliche Teams beim Seeding: alle Tickets gehen zurück.',
   'udt.nav.trades': 'Handel',
   'udt.kind.udt_trade': 'Handel',
   'udt.kind.udt_trade_fee': 'Handelsgebühr',
@@ -3635,7 +3635,7 @@ const de: Record<TKey, string> = {
   'udt.market.price': 'Preis',
   'udt.market.value': 'Marktwert',
   'udt.market.surcharge':
-    'Der Preis ist der Marktwert plus 10 % (schwache), 20 % (mittlere) oder 30 % (starke Bots). Zurückverkaufen bringt 85 % des Werts (nicht, solange der Bot in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
+    'Der Preis ist der Marktwert plus 10 % (schwache), 20 % (mittlere) oder 30 % (starke Bots). Zurückverkaufen bringt 85 % des Werts, höchstens den Kaufpreis (nicht, solange der Bot in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
   'udt.market.buy': 'Kaufen · {price}',
   'udt.market.buyConfirm':
     '{name} für {price} kaufen? Der Bot kommt sofort in deinen Kader; ab dem nächsten Montag bekommt er Gehalt.',
@@ -3678,7 +3678,7 @@ const de: Record<TKey, string> = {
   'udt.help.way.trades.text':
     'Tausche gekaufte Bots und Neuro mit anderen Managern. Dein Starter und selbst gemachte Bots bleiben in deinem Team.',
   'udt.help.bots.roster':
-    'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts (nicht, solange er in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
+    'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts, höchstens den Kaufpreis (nicht, solange er in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
   'udt.help.lineup.title': 'Aufstellen',
   'udt.help.events.title': 'Turniere spielen',
   'udt.help.events.text':

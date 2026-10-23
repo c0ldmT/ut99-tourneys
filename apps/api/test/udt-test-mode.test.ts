@@ -105,7 +105,7 @@ describe('Dream Team high stakes', () => {
     expect(JSON.stringify(failed.body)).toMatch(/high stakes needs 3/);
     expect(bal('NX')).toBe(1000);
     expect(bal('IG')).toBe(1000);
-    // Three teams: the winner takes 60 % + one ticket, the second best team 20 %.
+    // Three teams: the winner takes 60 % + a bonus of at most a tenth of the pot, the second 20 %.
     const b = await cup(2);
     for (const c of [mario, tim, anna])
       expect((await c.post(`/udt/events/${b}/enter`)).status).toBe(200);
@@ -120,7 +120,7 @@ describe('Dream Team high stakes', () => {
         .filter((e) => e.kind === 'udt_pot')
         .map((e) => e.amount),
     );
-    expect(pots.sort((x, y) => y - x)).toEqual([840, 180]);
+    expect(pots.sort((x, y) => y - x)).toEqual([630, 180]);
   });
 });
 

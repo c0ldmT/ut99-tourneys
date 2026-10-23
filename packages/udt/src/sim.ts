@@ -370,7 +370,8 @@ export function simulateSeason(o: SimOptions): SimResult {
     while (m.roster.length > 7) {
       const sellable = m.roster.filter((x) => !x.starter);
       const worst = sellable.reduce((w, x) => (strength(x) < strength(w) ? x : w), sellable[0]!);
-      m.cash += sellPrice(value(worst.bot), cfg);
+      // 85 % of the value, at most what it cost (decision 195).
+      m.cash += Math.min(sellPrice(value(worst.bot), cfg), worst.price);
       m.roster = m.roster.filter((x) => x !== worst);
       owner.delete(worst.bot.id);
     }

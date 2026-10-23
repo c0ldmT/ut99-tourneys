@@ -90,7 +90,9 @@ describe('rewards and stamina', () => {
   it('pays games, wins, MVPs and places by format and index', () => {
     expect(matchReward({ won: true, mvp: true, teamSize: 1, vsBaseBots: false }, 1)).toBe(380);
     expect(matchReward({ won: true, mvp: false, teamSize: 1, vsBaseBots: true }, 1)).toBe(210);
-    expect(matchReward({ won: false, mvp: false, teamSize: 5, vsBaseBots: false }, 2)).toBe(720);
+    // The index counts weakly (index^0.2, H4): 120 × 3 × 2^0.2 ≈ 414, at index 0.3 ≈ 0.79.
+    expect(matchReward({ won: false, mvp: false, teamSize: 5, vsBaseBots: false }, 2)).toBe(410);
+    expect(placeReward(1, 1, 0.3, false)).toBe(2360);
     expect(placeReward(1, 1, 1, false)).toBe(3000);
     expect(placeReward(2, 2, 1, false)).toBe(900);
     expect(placeReward(3, 1, 1, false)).toBe(300);

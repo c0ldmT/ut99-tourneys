@@ -55,6 +55,11 @@ export interface EconomyConfig {
     /** High stakes (ticket) tournaments: place rewards times this, on top of the pot. */
     highStakesPlaces: number;
   };
+  /**
+   * How strongly rewards follow the index: they are paid at index^this (1 = fully). Rewards raise
+   * the net worths and so the index: below 1 that loop is damped (review 23.10., H4).
+   */
+  rewardIndexExp: number;
   /** Reward factor per team size (more bots invested). */
   formatFactor: Readonly<Record<number, number>>;
   stamina: { perGame: number; perDay: number; tiredBelow: number };
@@ -109,6 +114,10 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
     soloPlaces: 0.3,
     highStakesPlaces: 1.5,
   },
+  // Rewards follow the index only weakly (review 23.10., H4): with index^1 the season simulator
+  // (40 seeds) ran into the cap of 5 in 31-40 of 40 seasons with 2-3 Daily Cups a day; with
+  // index^0.2 it ends at 2.4 (1 cup), 3.2-3.4 (2 cups) and 3.7-3.9 (3 cups), the cap almost never.
+  rewardIndexExp: 0.2,
   formatFactor: { 1: 1, 2: 1.5, 3: 2, 5: 3 },
   // 6 per game (was 15): a 4-team double elimination (up to 5 games) leaves a bot at 70.
   stamina: { perGame: 6, perDay: 30, tiredBelow: 40 },
@@ -287,8 +296,12 @@ export function matchReward(
   const r = cfg.rewards;
   let n = r.game + (m.mvp ? r.mvp : 0);
   if (m.won) n += r.win * (m.vsBaseBots ? r.baseBotWin : 1);
-  return roundNeuro(n * factor(m.teamSize, cfg) * index);
+  return roundNeuro(n * factor(m.teamSize, cfg) * rewardIndex(index, cfg));
 }
+
+/** The index the rewards are paid at (damped: index^rewardIndexExp). */
+export const rewardIndex = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number =>
+  index ** cfg.rewardIndexExp;
 
 /**
  * Place reward of a tournament (1 = champion, 2 = final, 3 = semifinal). Only human teams get one;
@@ -306,7 +319,7 @@ export function placeReward(
   const base = place === 1 ? p[0] : place === 2 ? p[1] : place <= 4 ? p[2] : 0;
   const solo = onlyBaseBots ? cfg.rewards.soloPlaces : 1;
   const hs = highStakes ? cfg.rewards.highStakesPlaces : 1;
-  return roundNeuro(base * factor(teamSize, cfg) * index * solo * hs);
+  return roundNeuro(base * factor(teamSize, cfg) * rewardIndex(index, cfg) * solo * hs);
 }
 
 /** Stamina after `games` UDT games. */

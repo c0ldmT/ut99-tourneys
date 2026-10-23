@@ -3,7 +3,7 @@ import { FakeClock } from '@tourney/bridge';
 import type { RunningApi } from '../src/app.js';
 import { buyPrice } from '@tourney/udt';
 import { DB, type Db } from '../src/db/database.js';
-import { udtBids } from '../src/db/schema.js';
+import { udtBids, udtValues } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtMarketService } from '../src/udt/udt-market.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -214,6 +214,34 @@ describe('Unreal Dream Team: transfer market', () => {
     const before = salaries();
     expect((await mario.post(`/udt/roster/${best.botId}/sell`)).status).toBe(200);
     expect(salaries()).toBe(before - again.salaryDue);
+  });
+
+  it('sells back for at most the price paid; the index counts active managers only', async () => {
+    const { clock, mario, tim, market, ledger } = await setup();
+    market.tick();
+    const m = (await mario.get('/udt/market')).body;
+    const best = [...(m.offers as Offer[])].filter((o) => o.price <= 900)[0]!;
+    const marioId = (await mario.get('/me')).body.id as string;
+    const timId = (await tim.get('/me')).body.id as string;
+    expect((await mario.post('/udt/market/buy', { botId: best.botId })).status).toBe(200);
+    // The value rose far above the price (here set directly): the sale pays the price.
+    const db = api!.app.get(DB) as Db;
+    db.insert(udtValues)
+      .values({ botId: best.botId, day: '2099-01-01', value: best.price * 10 })
+      .run();
+    expect((await mario.post(`/udt/roster/${best.botId}/sell`)).status).toBe(200);
+    const sale = ledger.entries(marioId, 1).find((e) => e.kind === 'udt_sale')!;
+    expect(sale.amount).toBe(best.price);
+    // Eight days later only Mario acted (his purchase is older, a bet or a new action counts).
+    clock.advance(8 * DAY);
+    const active = (since: number) =>
+      (
+        market as unknown as { activeManagers(s: number, since: string): Set<string> }
+      ).activeManagers(1, new Date(since).toISOString());
+    expect(active(clock.now() - 7 * DAY).size).toBe(0);
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_rest', amount: -10, ref: 'rest-x' });
+    expect([...active(clock.now() - 7 * DAY)]).toEqual([marioId]);
+    expect(active(clock.now() - 7 * DAY).has(timId)).toBe(false);
   });
 
   it('refunds the open bids of the old market once', async () => {

@@ -472,7 +472,8 @@ export class UdtBotPanel {
   }
 
   protected sellPrice(b: UdtRosterBot) {
-    return Math.round((b.value * DEFAULT_ECONOMY.sellBack) / 10) * 10;
+    // 85 % of the value, at most what the bot cost (as the server pays).
+    return Math.min(Math.round((b.value * DEFAULT_ECONOMY.sellBack) / 10) * 10, b.price);
   }
 
   /**

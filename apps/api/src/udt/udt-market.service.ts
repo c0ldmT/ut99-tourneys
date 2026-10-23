@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm';
 import {
   baseValue,
   botRarity,
@@ -25,7 +25,15 @@ import { conflict, notFound } from '../common/http.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { udtBids, udtDays, udtOffers, udtRoster, udtValues } from '../db/schema.js';
+import {
+  bets,
+  neuroLedger,
+  udtBids,
+  udtDays,
+  udtOffers,
+  udtRoster,
+  udtValues,
+} from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { nextDay, zonedMs } from '../seasons/season-time.js';
 import { SeasonsService, type Season } from '../seasons/seasons.service.js';
@@ -52,6 +60,20 @@ export type BuyInput = z.infer<typeof BuyBody>;
  * and every bot's market value, and puts new bots on offer at a fixed price (market value plus
  * the bracket's surcharge). Managers buy an offer at once: first come, first served.
  */
+const DAY_MS = 86_400_000;
+
+/** Ledger kinds a manager books by acting (spending): purchases, packs, academy, trades, rest, tickets. */
+const MANAGER_ACTIONS = [
+  'udt_purchase',
+  'udt_pack',
+  'udt_scout',
+  'udt_licence',
+  'udt_trade',
+  'udt_trade_fee',
+  'udt_rest',
+  'udt_ticket',
+];
+
 @Injectable()
 export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
@@ -102,6 +124,32 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       this.log.error(`udt market day failed: ${e instanceof Error ? e.message : String(e)}`);
       return false;
     }
+  }
+
+  /** Managers with a bet, a Dream Team action of their own or a new team since `since`. */
+  private activeManagers(season: number, since: string): Set<string> {
+    const out = new Set<string>();
+    for (const b of this.db
+      .select({ userId: bets.userId })
+      .from(bets)
+      .where(and(eq(bets.season, season), gte(bets.placedAt, since)))
+      .all())
+      if (b.userId) out.add(b.userId);
+    for (const l of this.db
+      .select({ userId: neuroLedger.userId })
+      .from(neuroLedger)
+      .where(
+        and(
+          eq(neuroLedger.season, season),
+          gte(neuroLedger.at, since),
+          inArray(neuroLedger.kind, MANAGER_ACTIONS),
+          lt(neuroLedger.amount, 0),
+        ),
+      )
+      .all())
+      out.add(l.userId);
+    for (const t of this.udt.teams(season)) if (t.createdAt >= since) out.add(t.userId);
+    return out;
   }
 
   private dayDone(day: string): boolean {
@@ -165,7 +213,13 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     // 4. Index from the managers' book net worth (balance + what their bots cost).
     // AI managers do not move the index.
     const ai = this.udt.aiIds();
-    const teams = this.udt.teams(s).filter((t) => !ai.has(t.userId));
+    const all = this.udt.teams(s).filter((t) => !ai.has(t.userId));
+    // Only active managers (a bet or a Dream Team action in the last 7 days, or a new team):
+    // left teams would hold the median down (review 23.10., M3). Nobody active: all count.
+    const active = this.activeManagers(s, new Date(this.clock.now() - 7 * DAY_MS).toISOString());
+    const teams = all.some((t) => active.has(t.userId))
+      ? all.filter((t) => active.has(t.userId))
+      : all;
     const nets = teams.map((t) => {
       const w = this.bets.wallet(t.userId, season);
       const book = roster.filter((r) => r.userId === t.userId).reduce((n, r) => n + r.price, 0);
@@ -538,7 +592,9 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       throw conflict('{name} plays in a running Dream Team tournament', {
         name: bot?.name ?? botId,
       });
-    const price = sellPrice(bot ? this.udt.value(bot, season.number) : r.price);
+    // 85 % of today's value, at most what the bot cost (a rising index made buying and selling
+    // back a sure gain, M7; with traits the value counted them and the scrap came on top).
+    const price = Math.min(sellPrice(bot ? this.udt.value(bot, season.number) : r.price), r.price);
     this.db
       .delete(udtRoster)
       .where(and(eq(udtRoster.season, season.number), eq(udtRoster.botId, botId)))
