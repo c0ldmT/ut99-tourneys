@@ -85,6 +85,17 @@ export class LedgerService {
     return true;
   }
 
+  /** The season a booking went into (null: no such ref). */
+  seasonOfRef(ref: string): number | null {
+    return (
+      this.db
+        .select({ season: neuroLedger.season })
+        .from(neuroLedger)
+        .where(eq(neuroLedger.ref, ref))
+        .get()?.season ?? null
+    );
+  }
+
   /** Takes Neuro above the rescue floor of the running season, or throws 409. */
   charge(b: Omit<Booking, 'season' | 'amount'> & { amount: number }): number {
     const s = this.spendable(b.userId);

@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
+import { CLOCK, type ApiClock } from '../src/config.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
+import { TournamentsService } from '../src/tournaments/tournaments.service.js';
+import { UdtEventsService } from '../src/udt/udt-events.service.js';
+import { UdtRewardsService } from '../src/udt/udt-rewards.service.js';
 
 let api: RunningApi | undefined;
 afterEach(async () => {
@@ -227,5 +231,88 @@ describe('Dream Team season finale', () => {
         champs.push(c);
     }
     expect(champs).toHaveLength(1);
+  });
+});
+
+describe('Dream Team across the season end', () => {
+  it('books into the tournament season, gives tickets back there and keeps the next season clean', async () => {
+    ({ api } = await startApi({ TEST_MODE: 'true' }));
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    const tim = await Client.login(api, 'Tim');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    for (let i = 0; i < 6; i++) await admin.post('/bots', { name: `Lib${i}`, skill: 2 + (i % 3) });
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    const ids: Record<string, string> = {};
+    for (const [c, n, tag] of [
+      [mario, 'Nexus', 'NX'],
+      [tim, 'Iron', 'IG'],
+    ] as const) {
+      await c.post('/udt/team', { name: n, tag, starter: { name: `${tag}bot` } });
+      ids[tag] = (await c.get('/me')).body.id as string;
+    }
+    const ledger = api.app.get(LedgerService);
+    const sum = (tag: string, season: number, kind: string) =>
+      ledger
+        .entries(ids[tag]!, season)
+        .filter((e) => e.kind === kind)
+        .reduce((n, e) => n + e.amount, 0);
+    const make = async (name: string, udt: Record<string, unknown>, size = 4) =>
+      admin.post(
+        '/tournaments',
+        tournamentBody({ name, botPool: [], kind: 'udt', udt }, { size, format: 'single' }),
+      );
+    // High stakes needs room for its minimum of human teams.
+    const tooBig = await make('Too big', { ticket: 300, ticketIndexed: false, minTeams: 8 });
+    expect(tooBig.status).toBe(400);
+    const hs = (await make('High Stakes', { ticket: 300, ticketIndexed: false, minTeams: 2 })).body
+      .id as string;
+    const cup = (await make('Late Cup', {})).body.id as string;
+    for (const c of [mario, tim]) {
+      expect((await c.post(`/udt/events/${hs}/enter`)).status).toBe(200);
+      expect((await c.post(`/udt/events/${cup}/enter`)).status).toBe(200);
+    }
+    expect(sum('NX', 1, 'udt_ticket')).toBe(-300);
+    // With entries the ticket and the kind stay.
+    const change = await admin.patch(`/tournaments/${hs}`, { udt: { ticket: 500, minTeams: 2 } });
+    expect(change.status).toBe(409);
+    expect((await admin.patch(`/tournaments/${hs}`, { kind: 'standard' })).status).toBe(409);
+    // The cup is drawn in season 1 and ends after it.
+    expect(
+      (await admin.post(`/tournaments/${cup}/seed`, { mode: 'auto', rngSeed: 's' })).status,
+    ).toBe(200);
+    const core = api.app.get(TournamentsService);
+    expect(core.canMake('udt')).toBe(true);
+    expect((await admin.post('/udt/test/season-end')).status).toBe(200);
+    // Series skip Dream Team starts now; a new one cannot be made either.
+    expect(core.canMake('udt')).toBe(false);
+    expect((await make('Off season', {})).status).toBe(409);
+    const sim = await admin.post(`/udt/test/simulate/${cup}`);
+    expect(sim.status, JSON.stringify(sim.body)).toBe(200);
+    expect(sum('NX', 1, 'udt_reward') + sum('IG', 1, 'udt_reward')).toBeGreaterThan(0);
+    // The high stakes draft of season 1 closes: tickets back into season 1.
+    expect(api.app.get(UdtEventsService).closeStale()).toBe(1);
+    expect(sum('NX', 1, 'udt_ticket')).toBe(0);
+    expect(sum('IG', 1, 'udt_ticket')).toBe(0);
+    expect((await admin.get(`/tournaments/${hs}`)).body).toMatchObject({ registrationOpen: false });
+    // Season 2: the old draft can neither be entered nor drawn; its tournament is not in table 2.
+    await admin.post('/udt/test/advance', { hours: 24 });
+    await startSeason(admin);
+    await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: { name: 'NXbot2' } });
+    // A series makes Dream Team cups for starts in the running season only.
+    const now = api.app.get<ApiClock>(CLOCK).now();
+    expect(core.canMake('udt', now)).toBe(true);
+    expect(core.canMake('udt', now + 400 * 86_400_000)).toBe(false);
+    await admin.patch(`/tournaments/${hs}`, { registrationOpen: true });
+    expect((await mario.post(`/udt/events/${hs}/enter`)).status).toBe(409);
+    const seed = await admin.post(`/tournaments/${hs}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seed.status).toBe(409);
+    expect(JSON.stringify(seed.body)).toMatch(/belongs to season 1/);
+    expect(sum('NX', 2, 'udt_ticket')).toBe(0);
+    const rewards = api.app.get(UdtRewardsService);
+    expect(rewards.table(1).length).toBe(2);
+    expect(rewards.table(2)).toEqual([]);
+    expect((await admin.req('DELETE', `/tournaments/${hs}`)).status).toBe(204);
   });
 });

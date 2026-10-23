@@ -138,6 +138,7 @@ export class StatsService {
         createdAt: tournaments.createdAt,
         seasonal: tournaments.seasonal,
         kind: tournaments.kind,
+        udtSeason: tournaments.udtSeason,
       })
       .from(tournaments)
       .all()
@@ -165,8 +166,14 @@ export class StatsService {
         this.cache.set(r.id, { sig, facts });
       }
       const first = firstGameAt(facts);
+      // Dream Team tournaments count for the season they belong to (decision 186; older ones:
+      // the season of their first game).
       const season =
-        (r.seasonal || udt) && first !== undefined ? this.seasonOf(seasons, first) : undefined;
+        udt && r.udtSeason !== null
+          ? r.udtSeason
+          : (r.seasonal || udt) && first !== undefined
+            ? this.seasonOf(seasons, first)
+            : undefined;
       out.push({
         facts,
         seasonal: r.seasonal,

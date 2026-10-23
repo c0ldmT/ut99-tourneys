@@ -543,4 +543,8 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE udt_bots ADD COLUMN breakthrough INTEGER NOT NULL DEFAULT 0;
   `,
+  // 32: Dream Team tournaments keep the season they belong to (null: the season of created_at).
+  `
+  ALTER TABLE tournaments ADD COLUMN udt_season INTEGER;
+  `,
 ];

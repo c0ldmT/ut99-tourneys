@@ -411,9 +411,15 @@ export class TournamentsService {
         : input.botPool!.map((b) => this.bots.resolveSpec(b)),
     };
     this.checkFields(body);
-    const inSeason = !!this.seasons.current();
-    // Dream Team tournaments belong to the running season, always (no switch of their own).
-    if (body.kind === 'udt') body.seasonal = true;
+    const season = this.seasons.current();
+    const inSeason = !!season;
+    // Dream Team tournaments belong to the running season, always (no switch of their own), also
+    // from a series (it skips them out of season).
+    if (body.kind === 'udt') {
+      body.seasonal = true;
+      if (!season) throw conflict('no season is running');
+      this.checkUdtRules(UdtEventRulesSchema.parse(body.udt ?? {}), body.settings.size);
+    }
     if (body.seasonal && !inSeason && !opts.seriesId) throw conflict('no season is running');
     let id = body.id ?? slugify(body.name);
     if (this.get(id)) {
@@ -441,6 +447,7 @@ export class TournamentsService {
         kind: body.kind ?? 'standard',
         udtJson:
           body.kind === 'udt' ? JSON.stringify(UdtEventRulesSchema.parse(body.udt ?? {})) : null,
+        udtSeason: body.kind === 'udt' ? season!.number : null,
         createdBy: by.id,
         createdAt: this.now(),
       })
@@ -498,15 +505,32 @@ export class TournamentsService {
       if (t.phase !== 'draft') throw conflict('the kind of a tournament changes in draft only');
       const kind = body.kind ?? (t.kind as TournamentKind);
       set.kind = kind;
-      if (kind === 'udt') {
-        if (!this.seasons.current()) throw conflict('no season is running');
+      const rules =
+        kind === 'udt' ? UdtEventRulesSchema.parse(body.udt ?? this.udtRules(t) ?? {}) : null;
+      if (rules) {
+        const season = this.seasons.current();
+        if (!season) throw conflict('no season is running');
         set.seasonal = true;
-      }
-      set.udtJson =
-        kind === 'udt'
-          ? JSON.stringify(UdtEventRulesSchema.parse(body.udt ?? this.udtRules(t) ?? {}))
-          : null;
-    }
+        // Turned into a Dream Team tournament now: it belongs to the running season.
+        if (t.kind !== 'udt') set.udtSeason = season.number;
+        this.checkUdtRules(rules, (body.settings ?? this.settings(t)).size);
+      } else set.udtSeason = null;
+      // Entered teams paid by the old rules (ticket) and signed up for that kind: they leave first.
+      const old = this.udtRules(t);
+      const entered = t.kind === 'udt' ? (this.signupProviders.get('udt')?.entries(id) ?? []) : [];
+      if (
+        entered.length &&
+        (!rules ||
+          rules.ticket !== old?.ticket ||
+          rules.ticketIndexed !== old?.ticketIndexed ||
+          rules.finale !== old?.finale)
+      )
+        throw conflict(
+          'teams have entered: the kind, the ticket and the finale change only without entries',
+        );
+      set.udtJson = rules ? JSON.stringify(rules) : null;
+    } else if (t.kind === 'udt' && body.settings)
+      this.checkUdtRules(this.udtRules(t)!, body.settings.size);
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
     const udtNow = (body.kind ?? t.kind) === 'udt';
     if (!udtNow && body.seasonal !== undefined && body.seasonal !== t.seasonal) {
@@ -1047,6 +1071,35 @@ export class TournamentsService {
   }
 
   /** The rules of a Dream Team tournament (null for other kinds). */
+  /**
+   * The season a Dream Team tournament belongs to (null: not one, or made out of season): the
+   * stored one, for older tournaments the season of their creation.
+   */
+  udtSeason(t: TournamentRow): number | null {
+    if (t.kind !== 'udt') return null;
+    return t.udtSeason ?? this.seasons.at(Date.parse(t.createdAt))?.number ?? null;
+  }
+
+  /**
+   * Whether a tournament of this kind can be made now (Dream Team: switched on, in season; with a
+   * start: one in the running season, so a series makes the next season's cups once it runs).
+   */
+  canMake(kind: TournamentKind | undefined, start?: number): boolean {
+    if (kind !== 'udt') return true;
+    const season = this.seasons.current();
+    if (!this.settingsSvc.get().udt.enabled || !season) return false;
+    return start === undefined || this.seasons.at(start)?.number === season.number;
+  }
+
+  /** High stakes needs at least `minTeams` human teams: they must fit into the bracket. */
+  private checkUdtRules(rules: UdtEventRules, size: number): void {
+    if (rules.ticket && rules.minTeams > size)
+      throw badRequest('high stakes needs {minTeams} teams, the bracket has {size} places', {
+        minTeams: rules.minTeams,
+        size,
+      });
+  }
+
   udtRules(t: TournamentRow): UdtEventRules | null {
     if (t.kind !== 'udt') return null;
     try {
@@ -1449,6 +1502,8 @@ export class TournamentsService {
    * running season (where it would count if it started now). Undefined: no season tournament.
    */
   seasonOf(t: TournamentRow): number | undefined {
+    // Dream Team tournaments: the season they belong to (they count for no season statistics).
+    if (t.kind === 'udt') return this.udtSeason(t) ?? undefined;
     if (!t.seasonal) return undefined;
     try {
       const played = this.stats.seasonOfTournament(t.id);
@@ -1549,7 +1604,8 @@ export class TournamentsService {
   private mapRecordsFor(t: TournamentRow): MapRecords | undefined {
     const settings = this.settings(t);
     if (settings.game.adapter !== 'ut99-mh') return undefined;
-    const counts = this.seasonOf(t) !== undefined;
+    // Dream Team runs set no map records (they stay out of the statistics).
+    const counts = t.kind !== 'udt' && this.seasonOf(t) !== undefined;
     try {
       const season =
         this.seasonOf(t) ?? (this.seasons.current() ?? this.seasons.latestStarted())?.number;

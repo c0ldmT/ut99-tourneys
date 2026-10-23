@@ -1,4 +1,4 @@
-import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import { ADAPTER_MH } from '@tourney/adapter-ut99';
 import {
@@ -55,7 +55,9 @@ export interface Lineup {
  * similar strength.
  */
 @Injectable()
-export class UdtEventsService implements OnModuleInit {
+export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
+  private timer?: NodeJS.Timeout;
+
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: ApiClock,
@@ -70,10 +72,20 @@ export class UdtEventsService implements OnModuleInit {
 
   onModuleInit(): void {
     this.tournaments.registerLineupProvider('udt', (t, s, rng) => this.provide(t, s, rng));
+    // Deleted before it finished (draft or seeded): every ticket goes back.
     this.tournaments.onRemove((t) => {
-      if (t.kind === 'udt' && t.phase === 'draft') this.refundTickets(t.id);
+      if (t.kind === 'udt' && t.phase !== 'finished') this.refundTickets(t.id);
     });
     this.tournaments.onResetAll(() => this.udt.wipeAll());
+    // Sign-ups of a season that is over close by themselves (tickets back).
+    this.timer = setInterval(() => {
+      try {
+        this.closeStale();
+      } catch {
+        // tried again in a minute
+      }
+    }, 60_000);
+    this.timer.unref();
     // AI managers enter as soon as a Dream Team tournament opens its sign-up.
     this.tournaments.onSaved((t) => {
       if (t.kind === 'udt' && t.phase === 'draft' && t.registrationOpen && !this.rules(t).finale) {
@@ -91,6 +103,44 @@ export class UdtEventsService implements OnModuleInit {
         return { aiOn: this.udt.aiOn(), aiCount: cfg.aiEnabled ? cfg.aiCount : 0 };
       },
     });
+  }
+
+  onModuleDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  /** Whether the tournament belongs to the running season (its sign-up and seeding need it). */
+  private inSeason(t: TournamentRow): boolean {
+    const s = this.tournaments.udtSeason(t);
+    return s !== null && s === this.udt.seasonNumber();
+  }
+
+  /**
+   * Dream Team tournaments of a season that is over (or made out of season) and not seeded: the
+   * tickets go back into the season they were paid in, the entries go, the sign-up and the
+   * autostart close (the organizer deletes it or leaves it). Runs every minute.
+   */
+  closeStale(): number {
+    let n = 0;
+    for (const t of this.db
+      .select()
+      .from(tournaments)
+      .where(and(eq(tournaments.kind, 'udt'), eq(tournaments.phase, 'draft')))
+      .all()) {
+      if (this.inSeason(t)) continue;
+      const entered = this.entries(t.id).length;
+      if (!entered && !t.registrationOpen && !t.autoStart) continue;
+      this.refundTickets(t.id);
+      this.db.delete(udtEntries).where(eq(udtEntries.tournamentId, t.id)).run();
+      this.db
+        .update(tournaments)
+        .set({ registrationOpen: false, autoStart: false })
+        .where(eq(tournaments.id, t.id))
+        .run();
+      this.tournaments.changed(t.id);
+      n++;
+    }
+    return n;
   }
 
   private row(id: string): TournamentRow {
@@ -181,15 +231,16 @@ export class UdtEventsService implements OnModuleInit {
       .get();
     if (!e) return;
     if (e.ticket > 0 && e.ticketRef) {
-      const season = this.udt.season().number;
-      this.ledger.book({
-        season,
-        userId,
-        kind: 'udt_ticket',
-        amount: e.ticket,
-        ref: `${e.ticketRef}:back`,
-        meta: { tournamentId },
-      });
+      const season = this.ticketSeason(e.ticketRef, tournamentId);
+      if (season !== null)
+        this.ledger.book({
+          season,
+          userId,
+          kind: 'udt_ticket',
+          amount: e.ticket,
+          ref: `${e.ticketRef}:back`,
+          meta: { tournamentId },
+        });
     }
     this.db
       .delete(udtEntries)
@@ -197,22 +248,36 @@ export class UdtEventsService implements OnModuleInit {
       .run();
   }
 
-  /** All tickets of a tournament back (called off, deleted, too few teams). */
+  /**
+   * The season a ticket goes back into: the one it was paid in (also when another one runs now,
+   * or none), else the tournament's.
+   */
+  private ticketSeason(ticketRef: string, tournamentId: string): number | null {
+    const paid = this.ledger.seasonOfRef(ticketRef);
+    if (paid !== null) return paid;
+    const t = this.db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).get();
+    return t ? this.tournaments.udtSeason(t) : null;
+  }
+
+  /** All tickets of a tournament back (called off, deleted, too few teams, season over). */
   refundTickets(tournamentId: string): void {
     for (const e of this.db
       .select()
       .from(udtEntries)
       .where(eq(udtEntries.tournamentId, tournamentId))
-      .all())
-      if (e.ticket > 0 && e.ticketRef)
+      .all()) {
+      const season =
+        e.ticket > 0 && e.ticketRef ? this.ticketSeason(e.ticketRef, tournamentId) : null;
+      if (season !== null)
         this.ledger.book({
-          season: this.udt.season().number,
+          season,
           userId: e.userId,
           kind: 'udt_ticket',
           amount: e.ticket,
           ref: `${e.ticketRef}:back`,
           meta: { tournamentId },
         });
+    }
   }
 
   private entries(tournamentId: string): string[] {
@@ -306,6 +371,23 @@ export class UdtEventsService implements OnModuleInit {
 
   /** Lineup provider for the seeding (TournamentsService). */
   private provide(t: TournamentRow, settings: TournamentSettings, rng: () => number) {
+    this.udt.assertOn();
+    // Rosters, index and table are the season's: only the season it belongs to can seed it.
+    if (!this.inSeason(t)) {
+      const season = this.tournaments.udtSeason(t) ?? '–';
+      if (t.phase !== 'draft')
+        throw conflict(
+          'this Dream Team tournament belongs to season {season}, which is not running',
+          {
+            season,
+          },
+        );
+      this.closeStale();
+      throw conflict(
+        'this Dream Team tournament belongs to season {season}, which is not running: the tickets went back',
+        { season: this.tournaments.udtSeason(t) ?? '–' },
+      );
+    }
     const rules = this.rules(t);
     const season = this.udt.season().number;
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
@@ -452,7 +534,7 @@ export class UdtEventsService implements OnModuleInit {
         /** AI teams among them (a human takes the place of the last one when it is full). */
         aiEntries: who.filter((u) => ai.has(u)).length,
         entered: who.includes(user.id),
-        open: t.phase === 'draft' && t.registrationOpen && !rules.finale,
+        open: t.phase === 'draft' && t.registrationOpen && !rules.finale && this.inSeason(t),
         /** Finale: the teams that would play now (top of the table). */
         qualified: rules.finale && t.phase === 'draft' ? this.qualified(t, s) : null,
         lineup: mine
@@ -486,7 +568,8 @@ export class UdtEventsService implements OnModuleInit {
   enter(user: User, id: string) {
     this.udt.assertOn();
     const t = this.row(id);
-    if (t.phase !== 'draft' || !t.registrationOpen) throw conflict('the sign-up is closed');
+    if (t.phase !== 'draft' || !t.registrationOpen || !this.inSeason(t))
+      throw conflict('the sign-up is closed');
     if (this.rules(t).finale)
       throw conflict('the finale has no sign-up: the top of the season table plays');
     const season = this.udt.season().number;

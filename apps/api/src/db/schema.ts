@@ -103,6 +103,11 @@ export const tournaments = sqliteTable('tournaments', {
   kind: text('kind').notNull().default('standard'),
   /** Dream Team tournaments: UdtEventRules (team value cap, star limit). */
   udtJson: text('udt_json'),
+  /**
+   * Dream Team tournaments: the season they belong to (set when made one; older ones: null, the
+   * season of `createdAt`). Rewards, tickets and the table book there, the seeding needs it.
+   */
+  udtSeason: integer('udt_season'),
   headSeq: integer('head_seq').notNull().default(0),
   /** Discord channel: "default" (DISCORD_WEBHOOK_URL), "custom" (webhookUrl) or "off". */
   notifyMode: text('notify_mode').notNull().default('default'),

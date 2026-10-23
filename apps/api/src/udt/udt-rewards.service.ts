@@ -14,12 +14,11 @@ import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { DB, type Db } from '../db/database.js';
 import { tournaments, udtRoster } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
-import { dayStartMs } from '../seasons/season-time.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { AWARDS } from '../shop/catalog.js';
 import { ShopService } from '../shop/shop.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
-import { UdtEventRulesSchema } from '../tournaments/tournaments.service.js';
+import { TournamentsService, UdtEventRulesSchema } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtService } from './udt.service.js';
 
@@ -57,6 +56,7 @@ export class UdtRewardsService implements OnModuleInit {
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtEventsService) private readonly udtEvents: UdtEventsService,
     @Inject(ShopService) private readonly shop: ShopService,
+    @Inject(TournamentsService) private readonly tournaments: TournamentsService,
   ) {}
 
   onModuleInit(): void {
@@ -82,12 +82,14 @@ export class UdtRewardsService implements OnModuleInit {
     try {
       const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
       if (!t || t.kind !== 'udt') return;
-      const season = this.seasons.current();
-      if (!season) return;
+      // Everything books into the tournament's season, also when it ends after that season (or
+      // the next one runs already): its rosters, index and table.
+      const season = this.tournaments.udtSeason(t) ?? this.seasons.current()?.number;
       for (const e of stored) {
-        if (e.type === 'match.result') this.matchDone(id, season.number, e.data.result, after);
-        else if (e.type === 'tournament.finished') this.finished(id, season.number, after);
-        else if (e.type === 'tournament.aborted') this.udtEvents.refundTickets(id);
+        if (e.type === 'tournament.aborted') this.udtEvents.refundTickets(id);
+        else if (season === undefined) continue;
+        else if (e.type === 'match.result') this.matchDone(id, season, e.data.result, after);
+        else if (e.type === 'tournament.finished') this.finished(id, season, after);
       }
     } catch (err) {
       this.log.error(`udt rewards ${id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -262,13 +264,12 @@ export class UdtRewardsService implements OnModuleInit {
     const s = this.seasons.list().find((x) => x.number === season);
     if (!s) return null;
     const ai = this.udt.aiIds();
-    const from = new Date(dayStartMs(s.startDate, this.seasons.timeZone)).toISOString();
     const finales = this.db
       .select()
       .from(tournaments)
       .where(and(eq(tournaments.kind, 'udt'), eq(tournaments.phase, 'finished')))
       .all()
-      .filter((t) => t.createdAt >= from && this.seasonOf(t.createdAt) === season)
+      .filter((t) => this.tournaments.udtSeason(t) === season)
       .filter((t) => {
         try {
           return UdtEventRulesSchema.parse(t.udtJson ? JSON.parse(t.udtJson) : {}).finale;
@@ -277,8 +278,10 @@ export class UdtRewardsService implements OnModuleInit {
         }
       })
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    for (const f of finales) {
-      const champ = this.events.projection(f.id)?.championId;
+    // The last finale decides (decision 124): an AI winner there leaves it to the table.
+    const last = finales[0];
+    if (last) {
+      const champ = this.events.projection(last.id)?.championId;
       const userId = champ ? udtManagerOf(champ) : undefined;
       if (userId && !ai.has(userId)) return userId;
     }
@@ -286,15 +289,10 @@ export class UdtRewardsService implements OnModuleInit {
     return top?.userId ?? null;
   }
 
-  private seasonOf(iso: string): number | undefined {
-    return this.seasons.at(Date.parse(iso))?.number;
-  }
-
   /** Season table: points from the places of finished Dream Team tournaments of the season. */
   table(season: number): TableRow[] {
     const s = this.seasons.list().find((x) => x.number === season);
     if (!s) return [];
-    const from = new Date(dayStartMs(s.startDate, this.seasons.timeZone)).toISOString();
     const teams = new Map(this.udt.teams(season).map((t) => [t.userId, t]));
     const ai = this.udt.aiIds();
     const aiOn = this.udt.aiOn();
@@ -304,7 +302,8 @@ export class UdtRewardsService implements OnModuleInit {
       .from(tournaments)
       .where(and(eq(tournaments.kind, 'udt'), eq(tournaments.phase, 'finished')))
       .all()) {
-      if (t.createdAt < from) continue;
+      // Only the season's own tournaments (not the next season's, decision 110).
+      if (this.tournaments.udtSeason(t) !== season) continue;
       const proj = this.events.projection(t.id);
       if (!proj) continue;
       const factor = FORMAT_POINTS[proj.settings.teamSize] ?? 1;

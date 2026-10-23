@@ -190,6 +190,16 @@ export const ERRORS_DE: Record<string, string> = {
   'the starter bot costs {cost} of {budget} points: lower the values':
     'Der Starter-Bot kostet {cost} von {budget} Punkten: Senk die Werte.',
   'the starter bot has skill {skill}': 'Der Starter-Bot hat Skill {skill}.',
+  'teams have entered: the kind, the ticket and the finale change only without entries':
+    'Es sind schon Teams angemeldet: Art, Ticket und Finale lassen sich nur ohne Anmeldungen ändern.',
+  'high stakes needs {minTeams} teams, the bracket has {size} places':
+    'High Stakes braucht {minTeams} Teams, der Turnierbaum hat {size} Plätze.',
+  'Dream Team tournaments need the Dream Team on and a start in the running season':
+    'Dream-Team-Turniere brauchen ein eingeschaltetes Dream Team und einen Start in der laufenden Season.',
+  'this Dream Team tournament belongs to season {season}, which is not running':
+    'Dieses Dream-Team-Turnier gehört zu Season {season}, die nicht läuft.',
+  'this Dream Team tournament belongs to season {season}, which is not running: the tickets went back':
+    'Dieses Dream-Team-Turnier gehört zu Season {season}, die nicht läuft: Die Tickets gingen zurück.',
   'a bot twice in the deathmatch lineup': 'Ein Bot steht doppelt in der Deathmatch-Aufstellung.',
   'a bot twice in the Monster Hunt lineup':
     'Ein Bot steht doppelt in der Monster-Hunt-Aufstellung.',

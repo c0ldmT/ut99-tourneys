@@ -3,7 +3,7 @@ import { eq, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { TournamentSettingsSchema } from '@tourney/protocol';
 import { UsersService } from '../auth/users.service.js';
-import { badRequest, notFound } from '../common/http.js';
+import { badRequest, conflict, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
@@ -378,6 +378,10 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     const r = this.row(id);
     const n = this.next(r);
     if (!Number.isFinite(n.start)) throw badRequest('the series has no next start');
+    if (!this.tournaments.canMake((JSON.parse(r.templateJson) as Template).kind, n.start))
+      throw conflict(
+        'Dream Team tournaments need the Dream Team on and a start in the running season',
+      );
     this.createNext(r, n.start);
     return this.view(this.row(id));
   }
@@ -400,6 +404,10 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     const by = this.users.byId(r.createdBy) ?? this.users.list().find((u) => u.isAdmin);
     if (!by) throw badRequest('no admin to create the tournament');
     const name = seriesName(r.name, r.nextNumber, start, this.tz);
+    // Dream Team tournaments only while the Dream Team is on and for a start in the running
+    // season (decision 129): otherwise not yet - it is made once that season runs, and a start
+    // that passes meanwhile is left behind like a missed one.
+    if (!this.tournaments.canMake(t.kind, start)) return;
     const row = this.tournaments.create(
       {
         ...t,
