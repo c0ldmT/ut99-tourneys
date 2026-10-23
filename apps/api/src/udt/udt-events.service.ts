@@ -404,6 +404,9 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const entered = rules.finale ? this.qualified(t, settings) : this.entries(t.id);
     const ai = this.udt.aiIds();
     const aiOn = this.udt.aiOn();
+    // The game knows bots by name: one name twice ("[T]Xan" bought, "[T]Xan" made, or a fill
+    // bot whose clan tag is a team tag) would put only one of them into the game.
+    const named = uniqueNames();
     let humans = 0;
     for (const userId of entered) {
       if (ai.has(userId) && !aiOn) {
@@ -417,7 +420,9 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         this.dropEntry(t.id, userId);
         continue;
       }
-      const specs = l.bots.map((r) => this.spec(r, team.tag, lib, careers));
+      const specs = l.bots
+        .map((r) => this.spec(r, team.tag, lib, careers))
+        .map((s) => ({ ...s, name: named(s.name) }));
       skills.push(...l.bots.map((r) => r.effective.skill));
       main.push(
         settings.teamSize > 1
@@ -466,7 +471,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       const s = this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill });
       const traits = { ...(s.traits ?? b.traits ?? {}) };
       withCareer(traits, careers.get(b.id));
-      return { ...s, traits };
+      return { ...s, name: named(s.name), traits };
     };
     for (let n = 0; n < need; n++) {
       if (settings.teamSize > 1) {
@@ -636,6 +641,21 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       return { userId, label: team ? `${team.tag} ${team.name}` : userId, ai: ai.has(userId) };
     });
   }
+}
+
+/**
+ * Unique game names (case-insensitive, as long as the game keeps them): a taken one gets a
+ * number at the end ("[T]Xan" -> "[T]Xan2").
+ */
+export function uniqueNames(max = 24): (name: string) => string {
+  const used = new Set<string>();
+  return (name) => {
+    let out = name.slice(0, max);
+    for (let i = 2; used.has(out.toLowerCase()); i++)
+      out = `${name.slice(0, max - String(i).length)}${i}`;
+    used.add(out.toLowerCase());
+    return out;
+  };
 }
 
 /**

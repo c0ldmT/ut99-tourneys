@@ -37,3 +37,17 @@ describe('team names of the list', () => {
     expect(names).toEqual(['Alpha', 'Bots 2', 'Bots 3']);
   });
 });
+
+describe('game names of a Dream Team seeding', () => {
+  it('stay unique: a taken name gets a number, within the 24 signs of the game', async () => {
+    const { uniqueNames } = await import('../src/udt/udt-events.service.js');
+    const named = uniqueNames();
+    expect(named('[T]Xan')).toBe('[T]Xan');
+    expect(named('[t]xan')).toBe('[t]xan2');
+    expect(named('[T]Xan')).toBe('[T]Xan3');
+    const long = '<<XXXX>>Abcdefghijklmnop';
+    expect(named(long)).toBe(long);
+    expect(named(long)).toBe('<<XXXX>>Abcdefghijklmno2');
+    expect(named(long).length).toBe(24);
+  });
+});

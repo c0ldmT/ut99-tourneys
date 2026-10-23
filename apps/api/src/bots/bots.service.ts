@@ -556,7 +556,11 @@ export class BotsService {
       if (!b) continue;
       const rivals = b.personality.rivals
         .map((r) => ({
-          name: r.kind === 'user' ? users.get(r.id) : all.find((x) => x.id === r.id)?.gameName,
+          // A rival bot under its name in this game (Dream Team: with the manager's tag).
+          name:
+            r.kind === 'user'
+              ? users.get(r.id)
+              : (names?.get(r.id) ?? all.find((x) => x.id === r.id)?.gameName),
           level: r.level,
         }))
         .filter((r): r is { name: string; level: 'rival' | 'nemesis' } => !!r.name)
