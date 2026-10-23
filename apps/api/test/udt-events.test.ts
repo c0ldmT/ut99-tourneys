@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
 import { bots, udtRoster, udtTraits } from '../src/db/schema.js';
+import { StatsService } from '../src/stats/stats.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -65,10 +66,17 @@ describe('Unreal Dream Team: events', () => {
     expect((await mario.post(`/udt/events/${id}/enter`)).status).toBe(200);
     expect((await tim.post(`/udt/events/${id}/enter`)).status).toBe(200);
     expect((await anna.post(`/udt/events/${id}/enter`)).status).toBe(409); // no team
+    const strength = vi.spyOn(api!.app.get(StatsService), 'strength');
     const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
     expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
     const entrants = Object.values(seeded.body.projection.entrants) as any[];
     expect(entrants).toHaveLength(4);
+    // Ratings for the bracket and the betting bots, looked up by bot id (not by name).
+    expect(Object.keys(seeded.body.projection.seedRatings ?? {}).sort()).toEqual(
+      entrants.map((e) => e.id).sort(),
+    );
+    const ids = entrants.map((e) => `b:${String(e.bot.id).toLowerCase()}`);
+    expect(strength.mock.calls.map((c) => c[1]).sort()).toEqual(ids.sort());
     const marioId = (await mario.get('/me')).body.id as string;
     const nx = entrants.find((e) => e.id === `udt-${marioId}`);
     expect(nx, JSON.stringify(nx)).toMatchObject({

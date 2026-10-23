@@ -1285,6 +1285,9 @@ export class TournamentsService {
     }
     const used = new Set(slots);
     const entrants = [...main, ...fill].filter((e) => used.has(e.id));
+    // Ratings for the bracket and the betting bots' tips (Dream Team: the bots' own ratings at
+    // their skill in the game; without them every side looked the same).
+    const ratings = this.entrantRatings(settings, entrants);
     const actor = { kind: 'admin' as const, id: by.id };
     const batch: NewTournamentEvent[] = [];
     const head = this.log.load(t.id).length;
@@ -1307,6 +1310,7 @@ export class TournamentsService {
           grandFinalReset: settings.grandFinalReset,
           bestOf: settings.bestOf,
         },
+        ...(ratings ? { ratings } : {}),
       },
     });
     const res = this.log.append(t.id, head, batch);
@@ -1372,7 +1376,8 @@ export class TournamentsService {
   private strengthOf(settings: TournamentSettings, ref: { userId?: string; bot?: BotSpec }) {
     const mode = statMode(settings);
     if (ref.userId) return this.stats.strength(mode, userKey(ref.userId));
-    return this.stats.strength(mode, botKey(ref.bot!.name), ref.bot!.skill);
+    // Ratings are kept under the bot's id (`botKey(id ?? name)`, decision 181), not its name.
+    return this.stats.strength(mode, botKey(ref.bot!.id ?? ref.bot!.name), ref.bot!.skill);
   }
 
   /** Strength of an entrant: the player, the bot, or the average of a team's starters and bots. */
