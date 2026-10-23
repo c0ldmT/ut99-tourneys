@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, getTableColumns, sql } from 'drizzle-orm';
 import { createRng } from '@tourney/bracket';
 import type { Entrant, TournamentProjection } from '@tourney/protocol';
 import { UsersService } from '../auth/users.service.js';
@@ -57,6 +57,18 @@ import {
 const BETTING_PHASES = ['seeded', 'checkIn', 'running', 'paused'];
 
 type BetRow = typeof bets.$inferSelect;
+
+const matchKey = (b: { tournamentId: string; matchId: string }) =>
+  `${b.tournamentId}\u0000${b.matchId}`;
+
+/** A match's settled bets and the row of its first bet (the order of the season's list). */
+type SettledMatch = { first: number; bets: SettledBet[] };
+
+/**
+ * Matches settled during one round of bot bets, for the next bettors: all but those of the
+ * tournament the bots bet on (`except`), whose open matches get bets meanwhile.
+ */
+type SettledReuse = { except: string; matches: Map<string, SettledMatch> };
 
 const toBet = (r: BetRow): Bet => ({
   id: r.id,
@@ -202,8 +214,8 @@ export class BetsService {
    * Tops a wallet below the season's floor up to it (minus what is held in Dream Team bots);
    * a debt (below 0, after a corrected result) is not topped up. Returns the (new) wallet.
    */
-  private rescue(bettor: string, season: Season): Wallet {
-    const w = this.wallet(bettor, season);
+  private rescue(bettor: string, season: Season, reuse?: SettledReuse): Wallet {
+    const w = this.wallet(bettor, season, reuse);
     const target = rescueTarget(season.betting.floor, w.invested);
     if (w.balance >= target || w.balance < 0) return w;
     this.db
@@ -216,7 +228,7 @@ export class BetsService {
         at: this.now(),
       })
       .run();
-    return this.wallet(bettor, season);
+    return this.wallet(bettor, season, reuse);
   }
 
   /**
@@ -227,15 +239,74 @@ export class BetsService {
     return this.settle(this.seasonBets(season));
   }
 
+  /**
+   * One bettor's settled bets of a season: the same as `settledSeason(season)` filtered to the
+   * bettor (same order), but only the matches it bet on are settled, each with all its bets of
+   * the season (pools are per match). Wallets are read for every bot that bets: settling the
+   * whole season each time made the seeding slow. `reuse`: matches settled for an earlier
+   * bettor of the same round of bot bets (all but the tournament they bet on, whose open
+   * matches get bets meanwhile).
+   */
+  private settledOf(season: number, bettor: string, reuse?: SettledReuse): SettledBet[] {
+    const who = isBotBettor(bettor) ? eq(bets.botId, bettor.slice(4)) : eq(bets.userId, bettor);
+    const keys = new Map(
+      this.db
+        .select({ tournamentId: bets.tournamentId, matchId: bets.matchId })
+        .from(bets)
+        .where(and(eq(bets.season, season), who))
+        .all()
+        .map((m) => [matchKey(m), m]),
+    );
+    const need = [...keys].filter(([k]) => !reuse?.matches.has(k)).map(([, m]) => m);
+    const rows: (BetRow & { rid: number })[] = [];
+    // Row values in chunks (SQLite's limit on bound parameters).
+    for (let i = 0; i < need.length; i += 2000) {
+      const chunk = need.slice(i, i + 2000);
+      for (const r of this.db
+        .select({ ...getTableColumns(bets), rid: sql<number>`rowid` })
+        .from(bets)
+        // The match index finds them (`+` keeps SQLite from scanning the season instead).
+        .where(
+          and(
+            sql`(${bets.tournamentId}, ${bets.matchId}) IN (VALUES ${sql.join(
+              chunk.map((m) => sql`(${m.tournamentId}, ${m.matchId})`),
+              sql`, `,
+            )})`,
+            sql`+${bets.season} = ${season}`,
+          ),
+        )
+        .all())
+        rows.push(r);
+    }
+    // Per match its bets in the order of the season's list (by row), settled together.
+    const fetched = new Map<string, { first: number; bets: Bet[] }>();
+    for (const r of rows.sort((x, y) => x.rid - y.rid)) {
+      const k = matchKey(r);
+      const m = fetched.get(k) ?? { first: r.rid, bets: [] };
+      m.bets.push(toBet(r));
+      fetched.set(k, m);
+    }
+    const settled = new Map<string, SettledMatch>();
+    for (const [k, m] of fetched) {
+      const done = { first: m.first, bets: this.settle(m.bets) };
+      settled.set(k, done);
+      if (reuse && keys.get(k)!.tournamentId !== reuse.except) reuse.matches.set(k, done);
+    }
+    return [...keys.keys()]
+      .map((k) => settled.get(k) ?? reuse!.matches.get(k)!)
+      .sort((x, y) => x.first - y.first)
+      .flatMap((m) => m.bets.filter((b) => b.userId === bettor));
+  }
+
   private seasonOr(n: number | undefined): Season | undefined {
     if (n !== undefined) return this.seasons.list().find((s) => s.number === n);
     return this.seasons.current() ?? this.seasons.latestStarted();
   }
 
   /** A bettor's wallet in a season (a fresh one before the first bet). */
-  wallet(userId: string, season: Season): Wallet {
+  wallet(userId: string, season: Season, reuse?: SettledReuse): Wallet {
     const ws = wallets(
-      this.settledSeason(season.number).filter((b) => b.userId === userId),
+      this.settledOf(season.number, userId, reuse),
       this.seasonBailouts(season.number, userId),
       season.betting.startBalance,
       season.betting.floor,
@@ -272,6 +343,8 @@ export class BetsService {
       .select()
       .from(bets)
       .where(eq(bets.tournamentId, tournamentId))
+      // In the order of the rows (the match index of migration 37 would sort by match).
+      .orderBy(sql`rowid`)
       .all()
       .map(toBet);
     const settled = this.settle(all);
@@ -460,9 +533,10 @@ export class BetsService {
       if (!open.length) return;
       const library = this.bots.list().filter((x) => x.active);
       const revenge = this.revengeTargets(library, season.number);
+      const reuse: SettledReuse = { except: t.id, matches: new Map() };
       for (const m of open) {
         this.botsDecided.add(`${tournamentId}/${m.matchId}`);
-        this.matchBotBets(t.id, m, b.proj, library, revenge, season);
+        this.matchBotBets(t.id, m, b.proj, library, revenge, season, reuse);
       }
     } catch {
       // Bots betting must never break the event log.
@@ -476,6 +550,7 @@ export class BetsService {
     library: readonly LibraryBot[],
     revenge: ReadonlyMap<string, string>,
     season: Season,
+    reuse: SettledReuse,
   ): void {
     const existing = new Set(
       this.db
@@ -501,7 +576,7 @@ export class BetsService {
         ),
         ...(revenge.get(bot.id) ? { revenge: revenge.get(bot.id)! } : {}),
       };
-      const w = this.rescue(botBettor(bot.id), season);
+      const w = this.rescue(botBettor(bot.id), season, reuse);
       const d = botBet(bot, sides, feelings, w.free, createRng(`${seed}|${bot.id}`));
       if (!d) continue;
       this.db
@@ -581,16 +656,20 @@ export class BetsService {
   }
 
   private tournamentBets(tournamentId: string, matchId?: string): Bet[] {
-    return this.db
-      .select()
-      .from(bets)
-      .where(
-        matchId
-          ? and(eq(bets.tournamentId, tournamentId), eq(bets.matchId, matchId))
-          : eq(bets.tournamentId, tournamentId),
-      )
-      .all()
-      .map(toBet);
+    return (
+      this.db
+        .select()
+        .from(bets)
+        .where(
+          matchId
+            ? and(eq(bets.tournamentId, tournamentId), eq(bets.matchId, matchId))
+            : eq(bets.tournamentId, tournamentId),
+        )
+        // In the order of the rows (ties in the summary; the match index would sort by match).
+        .orderBy(sql`rowid`)
+        .all()
+        .map(toBet)
+    );
   }
 
   /** Display name of a bettor (users and bots under their current name). */

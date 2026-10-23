@@ -102,12 +102,12 @@ export class UdtAiService implements OnModuleInit {
     let n = 0;
     for (const m of this.managers().slice(0, cfg.aiCount)) {
       if (!this.udt.team(m.user.id, season.number)) continue;
-      const e = this.events.events(m.user).find((x) => x.id === tournamentId);
+      const [e] = this.events.events(m.user, tournamentId);
       if (!e || !e.open || e.entered || e.ticketNow > 0 || e.lineup?.problems.length) continue;
       if (cfg.aiStrength === 'calm' && createRng(`ai-fill-${tournamentId}-${m.n}`)() > 0.5)
         continue;
       try {
-        this.events.enter(m.user, tournamentId);
+        this.events.signUp(m.user, tournamentId);
         n++;
       } catch {
         break; // the bracket is full
@@ -341,7 +341,7 @@ export class UdtAiService implements OnModuleInit {
       if (!e.open || e.entered || e.ticketNow > 0 || e.lineup?.problems.length) continue;
       if (rng() > chance) continue;
       try {
-        this.events.enter(user, e.id);
+        this.events.signUp(user, e.id);
         n++;
       } catch {
         // bracket full

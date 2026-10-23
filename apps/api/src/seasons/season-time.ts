@@ -21,18 +21,35 @@ export function isValidDate(d: string): boolean {
   return t.getUTCFullYear() === y && t.getUTCMonth() === m - 1 && t.getUTCDate() === day;
 }
 
+/**
+ * Formatters per time zone: making one is slow (ICU; about a millisecond on a Raspberry Pi), and
+ * the season dates are computed many times per request.
+ */
+const partsFormats = new Map<string, Intl.DateTimeFormat>();
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+
+function partsFormat(timeZone: string): Intl.DateTimeFormat {
+  let f = partsFormats.get(timeZone);
+  if (!f)
+    partsFormats.set(
+      timeZone,
+      (f = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hourCycle: 'h23',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      })),
+    );
+  return f;
+}
+
 /** Offset of the time zone from UTC at an instant, in ms (Berlin in summer: +2 h). */
 function offsetMs(instant: number, timeZone: string): number {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).formatToParts(new Date(instant));
+  const parts = partsFormat(timeZone).formatToParts(new Date(instant));
   const n = (t: string) => Number(parts.find((p) => p.type === t)?.value);
   const asUtc = Date.UTC(n('year'), n('month') - 1, n('day'), n('hour'), n('minute'), n('second'));
   return asUtc - Math.floor(instant / 1000) * 1000;
@@ -65,12 +82,18 @@ export function nextDay(date: string): string {
 
 /** Today (YYYY-MM-DD) in the time zone. */
 export function today(now: number, timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(now));
+  let f = dateFormats.get(timeZone);
+  if (!f)
+    dateFormats.set(
+      timeZone,
+      (f = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })),
+    );
+  return f.format(new Date(now));
 }
 
 /** [start, end) of a season in epoch ms. */

@@ -301,10 +301,7 @@ export class TournamentsService {
    */
   botPool(t: TournamentRow): BotSpec[] {
     if (t.botsFromLibrary && t.phase === 'draft') return this.libraryPool(t.agentId, t.profileId);
-    return z
-      .array(BotSpecSchema)
-      .parse(JSON.parse(t.botPoolJson))
-      .map((b) => this.bots.resolveSpec(b));
+    return this.bots.resolveSpecs(z.array(BotSpecSchema).parse(JSON.parse(t.botPoolJson)));
   }
 
   /**
@@ -312,11 +309,12 @@ export class TournamentsService {
    * bots of the server's configuration, else the stock bots.
    */
   libraryPool(agentId?: string, profileId?: string): BotSpec[] {
-    const active = this.bots
-      .list()
+    const all = this.bots.list();
+    const library = new Map(all.map((b) => [b.id, b]));
+    const active = all
       .filter((b) => b.active)
       .slice(0, 64)
-      .map((b) => this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill }));
+      .map((b) => this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill }, library));
     if (active.length) return active;
     const inv = z
       .object({ bots: z.array(BotSpecSchema).max(64) })
@@ -330,7 +328,7 @@ export class TournamentsService {
     this.checkFields({
       settings: t.settings,
       botPool: t.botPool?.length
-        ? t.botPool.map((b) => this.bots.resolveSpec(b))
+        ? this.bots.resolveSpecs(t.botPool)
         : this.libraryPool(t.agentId, t.profileId),
       agentId: t.agentId,
       profileId: t.profileId,
@@ -409,7 +407,7 @@ export class TournamentsService {
       ...input,
       botPool: fromLibrary
         ? this.libraryPool(input.agentId, input.profileId)
-        : input.botPool!.map((b) => this.bots.resolveSpec(b)),
+        : this.bots.resolveSpecs(input.botPool!),
     };
     this.checkFields(body);
     const season = this.seasons.current();
@@ -469,7 +467,7 @@ export class TournamentsService {
           ...input,
           botPool: fromLibrary
             ? this.libraryPool(input.agentId ?? t.agentId, input.profileId ?? t.profileId)
-            : input.botPool.map((b) => this.bots.resolveSpec(b)),
+            : this.bots.resolveSpecs(input.botPool),
         }
       : input;
     const structural =

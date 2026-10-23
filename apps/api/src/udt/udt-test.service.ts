@@ -250,7 +250,7 @@ export class UdtTestService {
       for (const e of this.events.events(u))
         if (e.open && !e.entered && !e.lineup?.problems.length)
           try {
-            this.events.enter(u, e.id);
+            this.events.signUp(u, e.id);
             entries++;
           } catch {
             // bracket full

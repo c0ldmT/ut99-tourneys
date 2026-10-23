@@ -570,4 +570,11 @@ export const MIGRATIONS: string[] = [
   UPDATE series SET template_json = json_set(template_json, '$.settings.botMatchMode', 'watch')
   WHERE json_extract(template_json, '$.kind') = 'udt';
   `,
+  // 37: indexes for a bettor's bets and a match's bets (wallets are read for every bot that
+  // bets; migration 9 had dropped the index per user).
+  `
+  CREATE INDEX IF NOT EXISTS bets_user ON bets(user_id, season);
+  CREATE INDEX IF NOT EXISTS bets_bot ON bets(bot_id, season);
+  CREATE INDEX IF NOT EXISTS bets_match ON bets(tournament_id, match_id);
+  `,
 ];

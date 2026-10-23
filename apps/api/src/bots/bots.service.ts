@@ -254,6 +254,12 @@ export class BotsService {
     return all.find((b) => b.id === id) ?? all.find((b) => b.id.toLowerCase() === id.toLowerCase());
   }
 
+  /** `get` in bots already read (the same lookup). */
+  private find(library: ReadonlyMap<string, LibraryBot>, id: string): LibraryBot | undefined {
+    const lower = id.toLowerCase();
+    return library.get(id) ?? [...library.values()].find((b) => b.id.toLowerCase() === lower);
+  }
+
   require(id: string): LibraryBot {
     const b = this.get(id);
     if (!b) throw notFound('bot {id}', { id });
@@ -515,10 +521,13 @@ export class BotsService {
 
   // --- tournaments ----------------------------------------------------------------------------
 
-  /** A pool entry with a library id gets the bot's current name, look and play style. */
-  resolveSpec(spec: BotSpec): BotSpec {
+  /**
+   * A pool entry with a library id gets the bot's current name, look and play style (`library`:
+   * the bots by id when the caller has read them already, for many entries at once).
+   */
+  resolveSpec(spec: BotSpec, library?: ReadonlyMap<string, LibraryBot>): BotSpec {
     if (!spec.id) return spec;
-    const b = this.get(spec.id);
+    const b = library ? this.find(library, spec.id) : this.get(spec.id);
     if (!b) return spec;
     return {
       id: b.id,
@@ -529,6 +538,14 @@ export class BotsService {
       ...(b.face ? { face: b.face } : {}),
       traits: b.traits,
     };
+  }
+
+  /** `resolveSpec` for a whole pool: the bots are read once (not once per entry). */
+  resolveSpecs(specs: readonly BotSpec[]): BotSpec[] {
+    const library = specs.some((s) => s.id)
+      ? new Map(this.list().map((b) => [b.id, b]))
+      : undefined;
+    return specs.map((s) => this.resolveSpec(s, library));
   }
 
   /** Clan of a library bot (for clan teams). */

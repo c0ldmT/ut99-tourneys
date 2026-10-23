@@ -37,7 +37,7 @@ import { UdtCareerService } from './udt-career.service.js';
 import { gameName, UdtService, type RosterBot } from './udt.service.js';
 import { pickTeamNames } from '../common/names.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
-import { playingBots } from './udt-playing.js';
+import { botsOf, lockedProjections } from './udt-playing.js';
 
 /** Bots below this stamina are tired: they play worse and the bench comes first. */
 const TIRED = 40;
@@ -98,7 +98,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     });
     // The tournament page signs up through the Dream Team: the manager enters the team.
     this.tournaments.registerSignupProvider('udt', {
-      enter: (t, user) => void this.enter(user, t.id),
+      enter: (t, user) => this.signUp(user, t.id),
       leave: (t, userId) => this.withdraw(t.id, userId),
       entries: (id) => this.labelledEntries(id),
       info: () => {
@@ -188,12 +188,11 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       if (onlyUser && id !== onlyUser) continue;
       const user = this.users.byId(id);
       if (!user) continue;
-      for (const e of this.events(user)) {
-        if (tournamentId && e.id !== tournamentId) continue;
+      for (const e of this.events(user, tournamentId)) {
         if (!e.open || e.entered || e.ticketNow > 0 || !e.lineup || e.lineup.problems.length)
           continue;
         try {
-          this.enter(user, e.id);
+          this.signUp(user, e.id);
           n++;
         } catch {
           // full of humans, or changed meanwhile
@@ -307,10 +306,11 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
      * seeding leaves them out; sign-ups stay possible (they may be free by then).
      */
     busy: ReadonlySet<string> = new Set(),
+    /** The manager's roster of the running season, when the caller has it already. */
+    roster: readonly RosterBot[] = this.udt.roster(userId, this.udt.season().number),
   ): Lineup {
     const season = this.udt.season().number;
     const mh = settings.game.adapter === ADAPTER_MH;
-    const roster = this.udt.roster(userId, season);
     const slot = (r: RosterBot) => (mh ? r.mhSlot : r.dmSlot);
     const slotted = roster.filter((r) => slot(r) !== null).sort((a, b) => slot(a)! - slot(b)!);
     const bench = roster
@@ -363,7 +363,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     careers: Map<string, Career>,
   ): BotSpec {
     const b = lib.get(r.botId);
-    const base = this.bots.resolveSpec({ id: r.botId, name: r.name, skill: r.skill });
+    const base = this.bots.resolveSpec({ id: r.botId, name: r.name, skill: r.skill }, lib);
     const tired = tiredPenalty(r.stamina);
     // Values traits (category A) raise the skill and the play-style values the game gets.
     const eff = effectiveValues(base.skill, { ...(base.traits ?? b?.traits ?? {}) }, r.udtTraits);
@@ -404,7 +404,6 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     }
     const rules = this.rules(t);
     const season = this.udt.season().number;
-    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     // Career phases change the accuracy of every bot in Dream Team games.
     const careers = this.career.careers();
     const main: Entrant[] = [];
@@ -415,6 +414,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       this.autoFill(t.id);
       this.aiFill(t.id);
     }
+    // After the sign-ups: a new AI team brings its starter bot.
+    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const entered = rules.finale ? this.qualified(t, settings) : this.entries(t.id);
     const ai = this.udt.aiIds();
     const aiOn = this.udt.aiOn();
@@ -422,14 +423,15 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     // bot whose clan tag is a team tag) would put only one of them into the game.
     const named = uniqueNames();
     let humans = 0;
+    // One tournament at a time (decision 200); the finale goes first and takes them anyway.
+    const locked = rules.finale ? [] : lockedProjections(this.db, this.log, t.id);
     for (const userId of entered) {
       if (ai.has(userId) && !aiOn) {
         this.dropEntry(t.id, userId);
         continue;
       }
       const team = this.udt.team(userId, season);
-      // One tournament at a time (decision 200); the finale goes first and takes them anyway.
-      const busy = rules.finale ? undefined : playingBots(this.db, this.log, userId, t.id);
+      const busy = rules.finale ? undefined : botsOf(locked, userId);
       const l = team ? this.lineup(userId, settings, rules, busy) : null;
       if (!team || !l || l.problems.length || main.length >= settings.size) {
         // Cannot play (any more) or no room: left out, the ticket goes back.
@@ -484,7 +486,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         ? pickTeamNames(this.settings.get().teamNames, need, taken, rng, (i) => `Bots ${i + 1}`)
         : [];
     const spec = (b: LibraryBot): BotSpec => {
-      const s = this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill });
+      const s = this.bots.resolveSpec({ id: b.id, name: b.gameName, skill: b.skill }, lib);
       const traits = { ...(s.traits ?? b.traits ?? {}) };
       withCareer(traits, careers.get(b.id));
       return { ...s, name: named(s.name), traits };
@@ -511,8 +513,11 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     return { entrants: main, fill };
   }
 
-  /** Dream Team tournaments: upcoming and running ones, the last finished ones. */
-  events(user: User) {
+  /**
+   * Dream Team tournaments: upcoming and running ones, the last finished ones (`only`: just
+   * that one of them, for the sign-ups of the AI and of automatic entries).
+   */
+  events(user: User, only?: string) {
     this.udt.assertOn();
     const rows = this.db
       .select()
@@ -531,11 +536,15 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       .all())
       entries.set(e.tournamentId, [...(entries.get(e.tournamentId) ?? []), e.userId]);
     const hasTeam = !!this.udt.team(user.id, this.udt.season().number);
-    return [...open, ...done].map((t) => {
+    const listed = [...open, ...done].filter((t) => only === undefined || t.id === only);
+    // The roster is the same for every tournament: read once.
+    const roster =
+      hasTeam && listed.length ? this.udt.roster(user.id, this.udt.season().number) : [];
+    return listed.map((t) => {
       const s = this.settingsOf(t);
       const rules = this.rules(t);
       const who = entries.get(t.id) ?? [];
-      const mine = hasTeam ? this.lineup(user.id, s, rules) : null;
+      const mine = hasTeam ? this.lineup(user.id, s, rules, undefined, roster) : null;
       return {
         id: t.id,
         name: t.name,
@@ -587,6 +596,12 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
 
   /** Signs the manager's team up (draft, registration open, the lineup can play). */
   enter(user: User, id: string) {
+    this.signUp(user, id);
+    return this.events(user);
+  }
+
+  /** `enter` without the answer (the list of tournaments): automatic and AI sign-ups. */
+  signUp(user: User, id: string): void {
     this.udt.assertOn();
     const t = this.row(id);
     if (t.phase !== 'draft' || !t.registrationOpen || !this.inSeason(t))
@@ -600,7 +615,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     if (l.problems.length)
       throw conflict('your team cannot play: {list}', { list: l.problems.join('; ') });
     const who = this.entries(id);
-    if (who.includes(user.id)) return this.events(user);
+    if (who.includes(user.id)) return;
     const ai = this.udt.aiIds();
     if (who.length >= s.size) {
       // Humans first: the AI team that entered last makes room.
@@ -630,7 +645,6 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       })
       .run();
     this.tournaments.changed(id);
-    return this.events(user);
   }
 
   /** Takes the team out again (until the seeding). */

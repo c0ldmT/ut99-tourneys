@@ -159,6 +159,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Drawing a bracket is much faster, above all late in a season and for Dream Team cups: the betting bots no longer settle every bet of the season for each bet they place, the AI and automatic sign-ups read only the tournament they enter, and season dates, bot pools and the bots playing elsewhere are read once instead of per entry. Tournament pages and the Neuro balance load faster too. Nothing in the rules changes.
 - Dream Team games: two bots with the same name in the game (a bought "[ND]Xan" and an own "Xan" under one tag, or a fill bot whose clan tag is a team tag) both play now (the second gets a number); rivals and nemeses also work under the manager's tag.
 - Bot ratings in the seeding, the bracket and the betting bots' tips: website bots now count their real rating (it was never found, so only the skill counted); Dream Team brackets show ratings and the betting bots tip on them.
 - Dream Team: the team value cap counts a developed starter (above a default one) and own bots at their current strength; the hidden potential can no longer be read from the yearbook, from crossing the scout report with the roster, from a blueprint's range or from the bot's id.
