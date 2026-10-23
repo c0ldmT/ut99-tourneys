@@ -1438,6 +1438,8 @@ export interface UdtYearbookEntry {
   origin: string;
   status: 'own' | 'nominated' | 'graduated' | 'rejected';
   honours: boolean;
+  /** Nominations: approvable once the bot's season is over. */
+  approvable?: boolean;
   /** Null while the season runs and the bot is below level 5 (hidden like in the roster). */
   potential: number | null;
   games: number;

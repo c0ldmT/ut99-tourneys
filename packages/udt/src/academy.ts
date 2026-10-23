@@ -204,8 +204,8 @@ export const STARTER_SKILL = 3;
 export const starterPotential = (skill: number): number => Math.min(7, Math.round(skill) + 2);
 
 /**
- * An apprentice of a mentor: skill three steps below the mentor (at least 1), potential the
- * mentor's skill; the values lean towards the mentor's (70 %, all of them with the mentor
+ * An apprentice of a mentor: skill three steps below the mentor (at least 1), potential one step
+ * below the mentor's skill (owner, 23.10.: a Godlike mentor made a salary-free Godlike); the values lean towards the mentor's (70 %, all of them with the mentor
  * trait); one of the mentor's traits is passed on by chance (25 %, 50 % with the mentor trait).
  */
 export function apprentice(
@@ -232,7 +232,7 @@ export function apprentice(
       combatStyle: v(mentor.values.combatStyle),
       camping: r3(clamp(lean * (mentor.values.camping ?? 0) + (1 - lean) * rng() * 0.5, 0, 1)),
     },
-    potential: Math.max(skill, Math.min(7, Math.round(mentor.skill))),
+    potential: Math.max(skill, Math.min(6, Math.round(mentor.skill) - 1)),
     inherited,
   };
 }
@@ -268,7 +268,7 @@ export const developPoints = (level: number, spent: number): number =>
 /** The values development points raise. */
 export const DEVELOP_VALUES = ['accuracy', 'alertness', 'strafing'] as const;
 
-/** A value at 100 on the 0..100 scale (development ends there; the breakthrough needs it). */
+/** A value at 100 on the 0..100 scale (development ends there; "fully developed"). */
 export const valueAtTop = (v: number | undefined): boolean => pct(v ?? 0) >= 100;
 
 /** Why a development step is not possible (null: it is). */
@@ -290,6 +290,17 @@ export const developValue = (v: number | undefined): number => r3(clamp((v ?? 0)
 /** A breakthrough needs this level (the potential shows exactly from level 5). */
 export const BREAKTHROUGH_LEVEL = 10;
 
+/**
+ * A breakthrough needs every value at least this (0..100; owner, 23.10.: not 100). With the cut
+ * the bot still comes out a bit stronger (duel simulator, 600 meetings: skill +1 with the values
+ * cut from 60 to 40 wins 60-64 % against the old bot; from 100 to 65/75 55-57 %), and a starter
+ * reaches it within a season of regular games instead of needing about level 40.
+ */
+export const BREAKTHROUGH_VALUE = 60;
+
+/** A value high enough for a breakthrough. */
+export const valueReady = (v: number | undefined): boolean => pct(v ?? 0) >= BREAKTHROUGH_VALUE;
+
 export interface BreakthroughStep {
   /** Development points it costs. */
   cost: number;
@@ -300,8 +311,9 @@ export interface BreakthroughStep {
 /**
  * A breakthrough from `skill` to the next step (owner, 22.10.): dearer the higher it goes. The
  * cut keeps the bot a bit stronger than before (duel simulator, mod 0.15.0, all weapons: skill +1
- * with every value at 65 wins about 56 % against the old bot with all at 100 from 3 to 6; Godlike
- * needs 75; a step to skill 3 or below 75 as well).
+ * with every value at 65 wins about 56 % against the old bot with all at 100 from 3 to 6, with
+ * the values at 60 (`BREAKTHROUGH_VALUE`) cut to 40 about 60-64 %; Godlike and a step to skill 3
+ * or below lose 25 %).
  */
 export function breakthroughStep(skill: number): BreakthroughStep {
   const s = Math.round(skill);
@@ -316,7 +328,7 @@ export type BreakthroughBlock = 'done' | 'godlike' | 'potential' | 'level' | 'va
 
 /**
  * Why an own bot cannot break through (null: it can): once per bot, below Godlike, the potential
- * reached, level 10, every value at 100, the points.
+ * reached, level 10, every value at 60 or more (`BREAKTHROUGH_VALUE`), the points.
  */
 export function cannotBreakthrough(
   bot: {
@@ -332,7 +344,7 @@ export function cannotBreakthrough(
   if (Math.round(bot.skill) >= 7) return 'godlike';
   if (Math.round(bot.skill) < bot.potential) return 'potential';
   if (bot.level < BREAKTHROUGH_LEVEL) return 'level';
-  if (DEVELOP_VALUES.some((k) => !valueAtTop(bot.values[k]))) return 'values';
+  if (DEVELOP_VALUES.some((k) => !valueReady(bot.values[k]))) return 'values';
   if (points < breakthroughStep(bot.skill).cost) return 'points';
   return null;
 }

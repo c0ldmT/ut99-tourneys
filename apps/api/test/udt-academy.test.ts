@@ -135,7 +135,14 @@ describe('Unreal Dream Team: academy', () => {
     expect(g.left).toBe(1);
     expect((await mario.get('/udt/nominations')).status).toBe(403);
     const n = (await admin.get('/udt/nominations')).body;
-    expect(n).toMatchObject([{ name: 'Mira', team: 'Nexus', breeder: 'Mario', level: 10 }]);
+    expect(n).toMatchObject([
+      { name: 'Mira', team: 'Nexus', breeder: 'Mario', level: 10, approvable: false },
+    ]);
+    // Approved only when the season is over.
+    const early = await admin.post(`/udt/nominations/${mira}/approve`, { name: 'Mirabelle' });
+    expect(early.status).toBe(409);
+    expect((await admin.post('/seasons/1/end')).status).toBeLessThan(300);
+    expect((await admin.get('/udt/nominations')).body[0].approvable).toBe(true);
     const ok = await admin.post(`/udt/nominations/${mira}/approve`, { name: 'Mirabelle' });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(ok.body).toEqual([]);
@@ -162,10 +169,10 @@ describe('Unreal Dream Team: academy', () => {
     db.update(udtRoster).set({ xp: 60 }).where(eq(udtRoster.botId, id)).run();
     db.update(udtBots).set({ potential: 7 }).where(eq(udtBots.botId, id)).run();
     expect((await bt()).body.key).toBe('a breakthrough needs level {level}');
-    // Level 12 (11 points): skill at the potential, but the values are not at 100.
+    // Level 12 (11 points): skill at the potential, but the values (50) are below 60.
     db.update(udtRoster).set({ xp: 880 }).where(eq(udtRoster.botId, id)).run();
     db.update(udtBots).set({ potential: 3 }).where(eq(udtBots.botId, id)).run();
-    expect((await bt()).body.key).toBe('a breakthrough needs every value at 100');
+    expect((await bt()).body.key).toBe('a breakthrough needs every value at {value} or more');
     api!.app
       .get(BotsService)
       .update(id, { traits: { ...starter.traits, accuracy: 1, alertness: 1, strafing: 1 } });

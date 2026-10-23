@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
   BREAKTHROUGH_LEVEL,
+  BREAKTHROUGH_VALUE,
   breakthroughStep,
   breakthroughValues,
   cannotBreakthrough,
@@ -142,7 +143,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
                         {{ 'udt.bt.reqLevel' | t: { n: x.level, now: b.level } }}
                       </li>
                       <li [class.ok]="x.valuesOk">
-                        {{ 'udt.bt.reqValues' | t }}
+                        {{ 'udt.bt.reqValues' | t: { n: x.valueMin } }}
                         @if (!x.valuesOk) {
                           <span class="mono">({{ x.missing }})</span>
                         }
@@ -498,10 +499,11 @@ export class UdtBotPanel {
       cut: Math.round(step.cut * 100),
       level: BREAKTHROUGH_LEVEL,
       levelOk: b.level >= BREAKTHROUGH_LEVEL,
-      valuesOk: keys.every((k) => pctOf(b.traits[k]) >= 100),
+      valueMin: BREAKTHROUGH_VALUE,
+      valuesOk: keys.every((k) => pctOf(b.traits[k]) >= BREAKTHROUGH_VALUE),
       pointsOk: own.points >= step.cost,
       missing: keys
-        .filter((k) => pctOf(b.traits[k]) < 100)
+        .filter((k) => pctOf(b.traits[k]) < BREAKTHROUGH_VALUE)
         .map((k) => `${short(k)} ${pctOf(b.traits[k])}`)
         .join(', '),
       preview:

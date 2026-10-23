@@ -190,6 +190,8 @@ export const ERRORS_DE: Record<string, string> = {
   'the starter bot costs {cost} of {budget} points: lower the values':
     'Der Starter-Bot kostet {cost} von {budget} Punkten: Senk die Werte.',
   'the starter bot has skill {skill}': 'Der Starter-Bot hat Skill {skill}.',
+  'a graduation is approved when season {season} is over':
+    'Ein Abschluss wird freigegeben, wenn Season {season} vorbei ist.',
   '{name} is on strike: its salary is not paid': '{name} streikt: Das Gehalt ist nicht bezahlt.',
   'teams have entered: the kind, the ticket and the finale change only without entries':
     'Es sind schon Teams angemeldet: Art, Ticket und Finale lassen sich nur ohne Anmeldungen ändern.',
@@ -243,8 +245,8 @@ export const ERRORS_DE: Record<string, string> = {
   'a breakthrough needs level {level}': 'Ein Durchbruch geht ab Level {level}.',
   'a breakthrough needs the potential reached':
     'Für einen Durchbruch muss das Potenzial erreicht sein.',
-  'a breakthrough needs every value at 100':
-    'Für einen Durchbruch müssen alle drei Werte auf 100 sein.',
+  'a breakthrough needs every value at {value} or more':
+    'Für einen Durchbruch müssen alle drei Werte mindestens {value} sein.',
   'the breakthrough costs {cost} points': 'Der Durchbruch kostet {cost} Punkte.',
   'the potential is skill {potential}': 'Das Potenzial ist Skill {potential}.',
   'the value is at its maximum': 'Der Wert ist schon am Maximum.',

@@ -49,7 +49,13 @@ describe('academy', () => {
   it('makes apprentices that lean towards the mentor', () => {
     const m = { skill: 6, values: { accuracy: 0.8, strafing: -0.5 }, traitCodes: ['eagle-eye'] };
     const a = apprentice(m, 'Pip', true, seq(0.1));
-    expect(a).toMatchObject({ name: 'Pip', skill: 3, potential: 6, inherited: 'eagle-eye' });
+    // Potential one step below the mentor (a Godlike mentor no longer makes a Godlike).
+    expect(a).toMatchObject({ name: 'Pip', skill: 3, potential: 5, inherited: 'eagle-eye' });
+    expect(apprentice({ ...m, skill: 7 }, 'Top', false, seq(0.5)).potential).toBe(6);
+    expect(apprentice({ ...m, skill: 3 }, 'Low', false, seq(0.5))).toMatchObject({
+      skill: 1,
+      potential: 2,
+    });
     expect(a.values.accuracy).toBe(0.8);
     const b = apprentice(m, 'Pop', false, seq(0.9));
     expect(b.inherited).toBeNull();
@@ -83,7 +89,9 @@ describe('breakthrough', () => {
     expect(cannotBreakthrough({ ...bot, skill: 4, potential: 7, level: 3 }, 99)).toBe('potential');
     expect(cannotBreakthrough({ ...bot, skill: 4 }, 99)).toBe('potential');
     expect(cannotBreakthrough({ ...bot, level: 9 }, 99)).toBe('level');
-    expect(cannotBreakthrough({ ...bot, values: { ...top, strafing: 0.9 } }, 99)).toBe('values');
+    // Every value at 60 or more (not 100): 55 is too low, 60 is enough.
+    expect(cannotBreakthrough({ ...bot, values: { ...top, strafing: 0.1 } }, 99)).toBe('values');
+    expect(cannotBreakthrough({ ...bot, values: { ...top, strafing: 0.2 } }, 99)).toBeNull();
     // 5 -> 6 costs less than 6 -> 7.
     expect(breakthroughStep(5).cost).toBeLessThan(breakthroughStep(6).cost);
     expect([3, 4, 5, 6].map((s) => breakthroughStep(s).cost)).toEqual([4, 5, 6, 8]);
@@ -95,7 +103,15 @@ describe('breakthrough', () => {
   it('leaves the bot a bit stronger than before (duel simulator)', async () => {
     const { duelSeries, fromPct, breakthroughValues } = await import('../src/index.js');
     const top = { accuracy: 1, alertness: 1, strafing: 1 };
+    const sixty = { accuracy: fromPct(60), alertness: fromPct(60), strafing: fromPct(60) };
     for (const s of [3, 5, 6]) {
+      const at60 = duelSeries(
+        { level: s + 1, ...breakthroughValues(s, sixty) },
+        { level: s, ...sixty },
+        { duels: 400, seed: s + 10 },
+      );
+      expect(at60.winDecided, `${s} -> ${s + 1} at 60`).toBeGreaterThan(0.5);
+      expect(at60.winDecided, `${s} -> ${s + 1} at 60`).toBeLessThan(0.68);
       const after = breakthroughValues(s, top);
       const r = duelSeries(
         { level: s + 1, ...after },

@@ -1359,7 +1359,7 @@ const en = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentors',
   'udt.academy.mentorText':
-    "A bought bot of level {lv} or more can take one apprentice per season (needs a licence): three skill steps lower, its potential the mentor's skill, the play style leans towards the mentor and a trait may be passed on.",
+    "A bought bot of level {lv} or more can take one apprentice per season (needs a licence): three skill steps lower, its potential one step below the mentor's skill, the play style leans towards the mentor and a trait may be passed on.",
   'udt.academy.hasApprentice': 'has an apprentice',
   'udt.academy.takeApprentice': 'Take an apprentice',
   'udt.academy.noMentors': 'No bought bots in your roster yet.',
@@ -1399,8 +1399,9 @@ const en = {
   'udt.yearbook.noBreeders': 'No graduates yet.',
   'udt.yearbook.nominations': 'Graduations to approve',
   'udt.yearbook.nominationsText':
-    'Approved bots become library bots (inactive until you activate them in the control center) and show up on the market as homegrown. Rename them if the name does not fit.',
+    'Approved after the season (with the skill and values they reached), bots become library bots (inactive until you activate them in the control center) and show up on the market as homegrown. Rename them if the name does not fit.',
   'udt.yearbook.rename': 'New name (optional)',
+  'udt.yearbook.afterSeason': 'Approvable when its season is over',
   'udt.yearbook.approve': 'Approve',
   'udt.market.homegrown': 'Homegrown',
   'udt.market.breeder': 'Breeder: {n}',
@@ -1827,7 +1828,7 @@ const en = {
   'udt.bt.explain':
     'Once per bot: potential and skill +1, all three values lose {cut} %. The bot comes out a bit stronger and grows further with training.',
   'udt.bt.reqLevel': 'Level {n} (now {now})',
-  'udt.bt.reqValues': 'All three values at 100',
+  'udt.bt.reqValues': 'All three values at least {n}',
   'udt.bt.reqPoints': '{n} points (has {have})',
   'udt.bt.button': 'Break through to skill {to}',
   'udt.bt.confirm':
@@ -3282,7 +3283,7 @@ const de: Record<TKey, string> = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentoren',
   'udt.academy.mentorText':
-    'Ein gekaufter Bot ab Level {lv} kann pro Season einen Lehrling ausbilden (braucht eine Lizenz): drei Skill-Stufen niedriger, Potenzial = Skill des Mentors, die Spielweise lehnt sich an den Mentor an und ein Trait kann übergehen.',
+    'Ein gekaufter Bot ab Level {lv} kann pro Season einen Lehrling ausbilden (braucht eine Lizenz): drei Skill-Stufen niedriger, Potenzial eine Stufe unter dem Skill des Mentors, die Spielweise lehnt sich an den Mentor an und ein Trait kann übergehen.',
   'udt.academy.hasApprentice': 'hat einen Lehrling',
   'udt.academy.takeApprentice': 'Lehrling aufnehmen',
   'udt.academy.noMentors': 'Noch keine gekauften Bots im Kader.',
@@ -3322,8 +3323,9 @@ const de: Record<TKey, string> = {
   'udt.yearbook.noBreeders': 'Noch keine Absolventen.',
   'udt.yearbook.nominations': 'Abschlüsse freigeben',
   'udt.yearbook.nominationsText':
-    'Freigegebene Bots werden Bibliotheks-Bots (inaktiv, bis du sie im Kontrollzentrum aktivierst) und erscheinen auf dem Markt als Eigengewächs. Benenne sie um, wenn der Name nicht passt.',
+    'Nach der Season freigegeben (mit dem erreichten Skill und den Werten), werden Bots zu Bibliotheks-Bots (inaktiv, bis du sie im Kontrollzentrum aktivierst) und erscheinen auf dem Markt als Eigengewächs. Benenne sie um, wenn der Name nicht passt.',
   'udt.yearbook.rename': 'Neuer Name (optional)',
+  'udt.yearbook.afterSeason': 'Freigabe, wenn seine Season vorbei ist',
   'udt.yearbook.approve': 'Freigeben',
   'udt.market.homegrown': 'Eigengewächs',
   'udt.market.breeder': 'Züchter: {n}',
@@ -3755,7 +3757,7 @@ const de: Record<TKey, string> = {
   'udt.bt.explain':
     'Einmal pro Bot: Potenzial und Skill +1, alle drei Werte verlieren {cut} %. Der Bot ist danach etwas stärker und wächst mit Training weiter.',
   'udt.bt.reqLevel': 'Level {n} (jetzt {now})',
-  'udt.bt.reqValues': 'Alle drei Werte auf 100',
+  'udt.bt.reqValues': 'Alle drei Werte mindestens {n}',
   'udt.bt.reqPoints': '{n} Punkte (hat {have})',
   'udt.bt.button': 'Durchbruch auf Skill {to}',
   'udt.bt.confirm':

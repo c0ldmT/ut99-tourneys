@@ -51,7 +51,13 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
             <button type="button" [disabled]="busy()" (click)="reject(n)">
               {{ 'udt.trades.decline' | t }}
             </button>
-            <button type="button" class="primary" [disabled]="busy()" (click)="approve(n)">
+            <button
+              type="button"
+              class="primary"
+              [disabled]="busy() || n.approvable === false"
+              [title]="n.approvable === false ? ('udt.yearbook.afterSeason' | t) : ''"
+              (click)="approve(n)"
+            >
               {{ 'udt.yearbook.approve' | t }}
             </button>
           </div>

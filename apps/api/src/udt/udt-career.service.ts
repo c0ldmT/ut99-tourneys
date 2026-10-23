@@ -194,16 +194,23 @@ export class UdtCareerService implements OnModuleInit {
     return this.graduation(user);
   }
 
-  /** Nominations waiting for an admin (all seasons). */
+  /** Nominations waiting for an admin (all seasons); approvable once their season is over. */
   nominations() {
     const rows = this.db.select().from(udtBots).where(eq(udtBots.status, 'nominated')).all();
-    return rows.map((b) => this.entry(b));
+    const running = this.seasons.current()?.number;
+    return rows.map((b) => ({ ...this.entry(b), approvable: b.season !== running }));
   }
 
   /** An admin approves: the bot becomes a library bot (inactive) with its breeder. */
   approve(id: string, body: z.infer<typeof ApproveBody>) {
     const b = this.db.select().from(udtBots).where(eq(udtBots.botId, id)).get();
     if (!b || b.status !== 'nominated') throw conflict('not nominated');
+    // Graduation at the season end only (owner, 23.10.): the bot plays and develops in its
+    // team until then; a library bot does not change any more afterwards.
+    if (b.season === this.seasons.current()?.number)
+      throw conflict('a graduation is approved when season {season} is over', {
+        season: b.season,
+      });
     const r = this.db
       .select()
       .from(udtRoster)

@@ -7,6 +7,7 @@ import {
   BLUEPRINTS,
   blueprintPotential,
   BREAKTHROUGH_LEVEL,
+  BREAKTHROUGH_VALUE,
   breakthroughStep,
   breakthroughValues,
   buildCost,
@@ -514,7 +515,10 @@ export class UdtAcademyService {
     if (level < BREAKTHROUGH_LEVEL)
       throw conflict('a breakthrough needs level {level}', { level: BREAKTHROUGH_LEVEL });
     if (why === 'potential') throw conflict('a breakthrough needs the potential reached');
-    if (why === 'values') throw conflict('a breakthrough needs every value at 100');
+    if (why === 'values')
+      throw conflict('a breakthrough needs every value at {value} or more', {
+        value: BREAKTHROUGH_VALUE,
+      });
     if (why === 'points')
       throw conflict('the breakthrough costs {cost} points', { cost: step.cost });
     this.db.transaction(() => {

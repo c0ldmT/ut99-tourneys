@@ -11,6 +11,7 @@ import {
   traitDef,
   traitSlots,
   valueAtTop,
+  valueReady,
 } from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
@@ -415,7 +416,8 @@ export class UdtAiService implements OnModuleInit {
           // checked above; the next round tries again
         }
       // Skill while it can grow (the potential may be lower than the range's top), else the
-      // lowest value below 100; nothing left: the points wait (for the breakthrough).
+      // lowest value below 100 - with a breakthrough ahead only up to its 60, then the points
+      // wait for it (decision 197); nothing left: the points wait.
       let skillClosed = false;
       for (
         let guard = 0;
@@ -426,9 +428,13 @@ export class UdtAiService implements OnModuleInit {
         const now = this.udt.roster(user.id, season).find((x) => x.botId === r.botId)!;
         const skill =
           !skillClosed && now.own!.points >= 3 && Math.round(now.skill) < now.own!.potential[1];
-        const value = DEVELOP_VALUES.filter((k) => !valueAtTop(now.traits[k])).sort(
-          (a, b) => (now.traits[a] ?? 0) - (now.traits[b] ?? 0),
-        )[0];
+        const ahead =
+          !now.own!.breakthrough &&
+          Math.round(now.skill) < 7 &&
+          Math.round(now.skill) >= now.own!.potential[1];
+        const value = DEVELOP_VALUES.filter((k) =>
+          ahead ? !valueReady(now.traits[k]) : !valueAtTop(now.traits[k]),
+        ).sort((a, b) => (now.traits[a] ?? 0) - (now.traits[b] ?? 0))[0];
         const stat = skill ? 'skill' : value;
         if (!stat) break;
         try {
