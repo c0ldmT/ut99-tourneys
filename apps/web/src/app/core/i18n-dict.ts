@@ -1484,6 +1484,7 @@ const en = {
   'udt.trades.noHistory': 'No trades yet.',
   'udt.trades.locked': 'tradable from {at}',
   'udt.trades.blocked.playing': 'playing now',
+  'udt.trades.blocked.striking': 'on strike: salary unpaid',
   'udt.trades.st.accepted': 'Accepted',
   'udt.trades.st.declined': 'Declined',
   'udt.trades.st.withdrawn': 'Withdrawn',
@@ -1759,7 +1760,7 @@ const en = {
     'Under Events you enter your team (or let it enter automatically). Games, wins and places bring Neuro and experience; the table shows the best teams of the season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
-    "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike.",
+    "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike until a market day can collect what it is owed (a sale pays it too).",
   'udt.help.go': "Let's go",
   'udt.rename.once': 'Once per bot, free (the look can change any time).',
   'ok.udt.autoOn': 'Automatic sign-up on: {n} tournament(s) entered right away.',
@@ -3407,6 +3408,7 @@ const de: Record<TKey, string> = {
   'udt.trades.noHistory': 'Noch keine Tausche.',
   'udt.trades.locked': 'handelbar ab {at}',
   'udt.trades.blocked.playing': 'spielt gerade',
+  'udt.trades.blocked.striking': 'streikt: Gehalt offen',
   'udt.trades.st.accepted': 'Angenommen',
   'udt.trades.st.declined': 'Abgelehnt',
   'udt.trades.st.withdrawn': 'Zurückgezogen',
@@ -3683,7 +3685,7 @@ const de: Record<TKey, string> = {
     'Unter Events meldest du dein Team an (oder lässt es automatisch anmelden). Spiele, Siege und Platzierungen bringen Neuro und Erfahrung; die Tabelle zeigt die besten Teams der Season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
-    'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot.',
+    'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot, bis ein Markttag das Offene einziehen kann (ein Verkauf zahlt es auch).',
   'udt.help.go': "Los geht's",
   'udt.rename.once': 'Einmal pro Bot, kostenlos (das Aussehen jederzeit).',
   'ok.udt.autoOn': 'Automatische Anmeldung an: {n} Turnier(e) sofort angemeldet.',

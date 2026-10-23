@@ -78,6 +78,7 @@ export class UdtTradesService {
   private blocked(r: RosterBot, acquiredAt: string, playing: Set<string>): string | null {
     if (r.starter || r.own) return 'starter';
     if (playing.has(r.botId)) return 'playing';
+    if (r.striking) return 'striking';
     const lock = this.cfg().tradeLockDays * DAY;
     if (lock && Date.parse(acquiredAt) + lock > this.clock.now()) return 'locked';
     return null;
@@ -163,6 +164,8 @@ export class UdtTradesService {
         });
       if (why === 'playing')
         throw conflict('{name} plays in a running Dream Team tournament', { name: r.name });
+      if (why === 'striking')
+        throw conflict('{name} is on strike: its salary is not paid', { name: r.name });
       if (why === 'locked')
         throw conflict('{name} was bought or traded less than {tradeLockDays} days ago', {
           name: r.name,

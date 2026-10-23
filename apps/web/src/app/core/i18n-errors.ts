@@ -190,6 +190,7 @@ export const ERRORS_DE: Record<string, string> = {
   'the starter bot costs {cost} of {budget} points: lower the values':
     'Der Starter-Bot kostet {cost} von {budget} Punkten: Senk die Werte.',
   'the starter bot has skill {skill}': 'Der Starter-Bot hat Skill {skill}.',
+  '{name} is on strike: its salary is not paid': '{name} streikt: Das Gehalt ist nicht bezahlt.',
   'teams have entered: the kind, the ticket and the finale change only without entries':
     'Es sind schon Teams angemeldet: Art, Ticket und Finale lassen sich nur ohne Anmeldungen ändern.',
   'high stakes needs {minTeams} teams, the bracket has {size} places':

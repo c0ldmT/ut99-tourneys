@@ -1341,7 +1341,7 @@ export interface UdtPartnerBot {
   stamina: number;
   value: number;
   starter: boolean;
-  blocked: 'starter' | 'playing' | 'locked' | null;
+  blocked: 'starter' | 'playing' | 'striking' | 'locked' | null;
   unlocksAt: string | null;
 }
 

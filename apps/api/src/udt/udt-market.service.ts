@@ -198,7 +198,12 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
         .onConflictDoUpdate({ target: [udtValues.botId, udtValues.day], set: { value: v } })
         .run();
     }
-    if (weekday(day) === 1 && last) this.paySalaries(s, day, roster, values, byId, onBots);
+    // Salaries: a week's for every Monday since the last market day (a missed Monday still
+    // counts), and what is owed is collected on every market day until it is paid.
+    // At most one week at a time: weeks without any market day (the Dream Team switched off)
+    // were weeks without games, sales or trades.
+    const weeks = last ? Math.min(1, mondaysAfter(last.day, day)) : 0;
+    this.paySalaries(s, day, weeks, roster, values, byId, onBots);
     // 6. New offers: free bots of the library (active, not made by a manager, not owned).
     const free = library.filter((b) => b.active && !b.udtOwner && !owned.has(b.id));
     const n = Math.min(this.settings.get().udt.offersPerDay, free.length);
@@ -298,6 +303,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   private paySalaries(
     season: number,
     day: string,
+    weeks: number,
     roster: (typeof udtRoster.$inferSelect)[],
     values: Map<string, number>,
     byId: Map<string, LibraryBot>,
@@ -319,19 +325,23 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             managerEffects(traits).salary) /
             10,
         ) * 10;
-      const can = this.ledger.spendable(r.userId).spendable >= salary;
-      if (can && salary > 0)
+      // A strike from before the owed salaries (migration 33) still owes that week.
+      const due = r.salaryDue + salary * weeks + (r.striking && !r.salaryDue ? salary : 0);
+      if (!due && !r.striking) continue;
+      const can = this.ledger.spendable(r.userId).spendable >= due;
+      if (can && due > 0)
         this.ledger.book({
           season,
           userId: r.userId,
           kind: 'udt_salary',
-          amount: -salary,
+          amount: -due,
           ref: `salary:${season}:${day}:${r.botId}`,
-          meta: { botId: r.botId },
+          meta: { botId: r.botId, weeks, owed: r.salaryDue },
         });
+      // Not payable: the bot strikes and the salary stays owed (no week goes free).
       this.db
         .update(udtRoster)
-        .set({ striking: !can && salary > 0 })
+        .set({ striking: !can, salaryDue: can ? 0 : due })
         .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))
         .run();
     }
@@ -535,21 +545,39 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .run();
     // Its traits do not go to the market: they turn into scrap.
     this.udt.scrapBotTraits(season.number, user.id, botId);
+    const ref = `sale:${season.number}:${botId}:${randomId(6)}`;
     this.ledger.book({
       season: season.number,
       userId: user.id,
       kind: 'udt_sale',
       amount: price,
-      ref: `sale:${season.number}:${botId}:${randomId(6)}`,
+      ref,
       meta: { botId },
     });
+    // Salary still owed comes out of the sale (at most the price).
+    const owed = Math.min(r.salaryDue, price);
+    if (owed > 0)
+      this.ledger.book({
+        season: season.number,
+        userId: user.id,
+        kind: 'udt_salary',
+        amount: -owed,
+        ref: `${ref}:salary`,
+        meta: { botId, owed: r.salaryDue },
+      });
     return this.udt.view(user);
   }
 }
 
-function weekday(day: string): number {
-  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 Sunday, 1 Monday
+/** Mondays after `from` up to and including `to` (days as YYYY-MM-DD). */
+export function mondaysAfter(from: string, to: string): number {
+  const days = daysBetween(from, to);
+  let n = 0;
+  for (let i = 1; i <= days; i++) {
+    const [y, m, d] = from.split('-').map(Number) as [number, number, number];
+    if (new Date(Date.UTC(y, m - 1, d + i)).getUTCDay() === 1) n++;
+  }
+  return n;
 }
 
 function daysBetween(a: string, b: string): number {

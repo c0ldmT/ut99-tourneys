@@ -142,6 +142,8 @@ export interface RosterBot {
   /** Skill and play-style values with the traits (what the game gets). */
   effective: { skill: number; traits: LibraryBot['traits']; overflow: boolean };
   striking: boolean;
+  /** Salary owed (on strike until a market day collects it). */
+  salaryDue: number;
   /** Dream Team games this season. */
   games: number;
   /** A bot the manager made: origin, potential (exact from level 5, else a range), points. */
@@ -526,6 +528,7 @@ export class UdtService {
             udtTraits: cards.map((c) => ({ ...c, rarity: traitDef(c.code)?.rarity ?? 'common' })),
             effective: { skill: eff.skill, traits: eff.values, overflow: eff.overflow },
             striking: r.striking,
+            salaryDue: r.salaryDue,
             games: r.games,
             own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}),
           },

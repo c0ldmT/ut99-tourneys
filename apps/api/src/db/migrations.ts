@@ -547,4 +547,8 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE tournaments ADD COLUMN udt_season INTEGER;
   `,
+  // 33: Dream Team salaries not paid are owed (a strike ends when they are paid).
+  `
+  ALTER TABLE udt_roster ADD COLUMN salary_due INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

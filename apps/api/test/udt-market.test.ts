@@ -165,6 +165,57 @@ describe('Unreal Dream Team: transfer market', () => {
     } else expect(r.striking).toBe(true);
   });
 
+  it('owes salaries it cannot pay (missed Mondays too) until a market day or a sale pays them', async () => {
+    const { clock, mario, market, ledger } = await setup();
+    market.tick(); // Monday 19.10.
+    const m = (await mario.get('/udt/market')).body;
+    const best = [...(m.offers as Offer[])]
+      .filter((o) => o.price <= 900)
+      .sort((a, b) => b.price - a.price)[0]!;
+    const marioId = (await mario.get('/me')).body.id as string;
+    expect((await mario.post('/udt/market/buy', { botId: best.botId })).status).toBe(200);
+    const drain = (ref: string) =>
+      ledger.book({
+        season: 1,
+        userId: marioId,
+        kind: 'udt_reward',
+        amount: -ledger.spendable(marioId).spendable,
+        ref,
+      });
+    const bot = async () =>
+      (await mario.get('/udt')).body.roster.find((x: { botId: string }) => x.botId === best.botId);
+    const salaries = () =>
+      ledger
+        .entries(marioId, 1)
+        .filter((e) => e.kind === 'udt_salary')
+        .reduce((n, e) => n + e.amount, 0);
+    drain('drain1');
+    // The server misses Monday 26.10.: the market day of Tuesday still charges the week.
+    clock.advance(8 * DAY);
+    market.tick();
+    const owed = await bot();
+    expect(owed.salaryDue).toBeGreaterThan(0);
+    expect(owed.striking).toBe(true);
+    // Neuro again: the next market day collects what is owed and the strike ends.
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_reward', amount: 5000, ref: 'gift' });
+    clock.advance(DAY);
+    market.tick();
+    expect(salaries()).toBe(-owed.salaryDue);
+    expect(await bot()).toMatchObject({ striking: false, salaryDue: 0 });
+    // Owed again on Monday 2.11.; a sale pays it from the price.
+    drain('drain2');
+    for (let d = 0; d < 5; d++) {
+      clock.advance(DAY);
+      market.tick();
+    }
+    const again = await bot();
+    expect(again).toMatchObject({ striking: true });
+    expect(again.salaryDue).toBeGreaterThan(0);
+    const before = salaries();
+    expect((await mario.post(`/udt/roster/${best.botId}/sell`)).status).toBe(200);
+    expect(salaries()).toBe(before - again.salaryDue);
+  });
+
   it('refunds the open bids of the old market once', async () => {
     const { mario, market, ledger } = await setup();
     market.tick();

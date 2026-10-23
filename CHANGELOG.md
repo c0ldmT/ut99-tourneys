@@ -159,6 +159,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Dream Team salaries: a bot on strike owes its salary until a market day can collect it (the strike ends then); a Monday the server missed is charged on the next market day; a sale pays what is owed; striking bots cannot be traded.
 - Dream Team at the season end: rewards, pot and table stay with the tournament's season (a cup ending after midnight paid nothing or into the new season), tickets go back into the season they were paid in, sign-ups of a season that is over close with the tickets back, series make no Dream Team tournaments out of season or with the Dream Team off; deleting a drawn high stakes tournament gives the tickets back; rules with paid entries stay. The season champion is the winner of the last finale or the top of the table.
 - Dream Team founding: every starter bot has skill 3 (like the blueprints), the start points go into its values; a lower or fractional skill was priced below what it plays (the game rounds the skill, and skill 2 with top values became skill 3 with them after three points).
 - Dream Team: a bot playing in a seeded or running Dream Team tournament (also a paused one or the finale) can no longer be sold or traded until the tournament ends; before, the seller kept the rewards of its games and a later buyer got their stamina and experience.

@@ -319,8 +319,10 @@ export const udtRoster = sqliteTable(
     xp: integer('xp').notNull().default(0),
     /** Dream Team games played this season (for the graduation). */
     games: integer('games').notNull().default(0),
-    /** Salary not paid: cannot play until the next market day pays it. */
+    /** Salary not paid: cannot play until a market day collects `salaryDue`. */
     striking: integer('striking', { mode: 'boolean' }).notNull().default(false),
+    /** Salary owed (weeks not paid): collected on the next market day that can, or on a sale. */
+    salaryDue: integer('salary_due').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.botId] })],
 );
