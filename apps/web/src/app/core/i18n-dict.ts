@@ -649,6 +649,13 @@ const en = {
     'Season finale: the best teams of the season table that can play are drawn (no sign-up).',
   'tp.udtSeedTicket':
     'High stakes: at least {n} human teams, otherwise all tickets go back and there is no draw.',
+  'tp.udtSeedBusy':
+    'A bot plays one Dream Team tournament at a time: a team whose bots play in another drawn or running one drops out (ticket back) if too few are left.',
+  'tp.seedAgainBets': 'Drawing again voids the bets placed so far (stakes back).',
+  'tp.udtDropped': 'Not in the bracket: {list}.',
+  'tp.udtDropped.busy': '{name} (its bots play in {list})',
+  'tp.udtDropped.lineup': '{name} (its lineup cannot play)',
+  'tp.udtDropped.full': '{name} (the bracket was full)',
   'tp.udtSeed': 'Draw the bracket',
   'tp.udtSeedAgain': 'Draw again',
   'tp.udtSignup': 'Dream Team sign-up',
@@ -1601,6 +1608,8 @@ const en = {
   'udt.events.stars': 'at most {n} stars',
   'udt.events.entered': 'signed up',
   'udt.events.plays': 'Would play',
+  'udt.events.busyIn':
+    'Your bots play in {list}: drawn now, your team would drop out (one tournament at a time). Automatic sign-up waits until they are free.',
   'udt.events.enter': 'Sign up',
   'udt.events.leave': 'Withdraw',
   'udt.events.none': 'No Dream Team tournaments yet.',
@@ -2566,6 +2575,13 @@ const de: Record<TKey, string> = {
     'Season-Finale: Die besten spielfähigen Teams der Season-Tabelle werden gelost (keine Anmeldung).',
   'tp.udtSeedTicket':
     'High Stakes: mindestens {n} menschliche Teams, sonst gehen alle Tickets zurück und es wird nicht gelost.',
+  'tp.udtSeedBusy':
+    'Ein Bot spielt nur ein Dream-Team-Turnier gleichzeitig: Ein Team, dessen Bots in einem anderen ausgelosten oder laufenden spielen, fliegt raus (Ticket zurück), wenn zu wenige übrig sind.',
+  'tp.seedAgainBets': 'Neu auslosen macht die bisherigen Wetten ungültig (Einsätze zurück).',
+  'tp.udtDropped': 'Nicht im Bracket: {list}.',
+  'tp.udtDropped.busy': '{name} (Bots spielen in {list})',
+  'tp.udtDropped.lineup': '{name} (Aufstellung kann nicht spielen)',
+  'tp.udtDropped.full': '{name} (Bracket war voll)',
   'tp.udtSeed': 'Bracket auslosen',
   'tp.udtSeedAgain': 'Neu auslosen',
   'tp.udtSignup': 'Dream-Team-Anmeldung',
@@ -3526,6 +3542,8 @@ const de: Record<TKey, string> = {
   'udt.events.stars': 'höchstens {n} Stars',
   'udt.events.entered': 'angemeldet',
   'udt.events.plays': 'Würde spielen',
+  'udt.events.busyIn':
+    'Deine Bots spielen in {list}: Bei einer Auslosung jetzt fiele dein Team raus (ein Turnier gleichzeitig). Die automatische Anmeldung wartet, bis sie frei sind.',
   'udt.events.enter': 'Anmelden',
   'udt.events.leave': 'Abmelden',
   'udt.events.none': 'Noch keine Dream-Team-Turniere.',

@@ -206,7 +206,7 @@ const toBooking = (r: typeof neuroLedger.$inferSelect): Bailout => ({
 export class BetsService {
   private bookCache = new Map<
     string,
-    { head: number; books: Map<string, MatchBook>; proj: TournamentProjection }
+    { events: readonly unknown[]; books: Map<string, MatchBook>; proj: TournamentProjection }
   >();
 
   /** Matches the bots have looked at (tournament/match), so they decide once. */
@@ -222,25 +222,52 @@ export class BetsService {
     @Inject(StatsService) private readonly stats: StatsService,
     @Inject(NeuroHub) private readonly neuro: NeuroHub,
   ) {
-    // A match opens for bets when its entrants are known: the bots bet right away.
-    this.log.onAppend((tournamentId) => this.botsBet(tournamentId));
+    // A match opens for bets when its entrants are known: the bots bet right away. A new draw
+    // (or a log cleared back to draft) voids the bets of the old one first.
+    this.log.onAppend((tournamentId, stored, projection) => {
+      if (projection.phase === 'seeded' && stored.some((e) => e.type === 'seeding.set'))
+        this.voidBets(tournamentId);
+      this.botsBet(tournamentId);
+    });
+    this.log.onClear((tournamentId) => this.voidBets(tournamentId));
   }
 
   private now(): string {
     return new Date(this.clock.now()).toISOString();
   }
 
-  /** Betting state of the matches of a tournament (cached by the log head). */
+  /**
+   * Betting state of the matches of a tournament, cached per log: the event log hands out a new
+   * list on every change (also after a reset, where the head alone repeats: a new draw showed
+   * the old pairings).
+   */
   private book(tournamentId: string) {
     const events = this.log.load(tournamentId);
-    const head = events.at(-1)?.seq ?? 0;
     const hit = this.bookCache.get(tournamentId);
-    if (hit?.head === head) return hit;
+    if (hit?.events === events) return hit;
     const proj = this.log.projection(tournamentId);
     if (!proj) return undefined;
-    const entry = { head, books: matchBooks(events, proj), proj };
+    const entry = { events, books: matchBooks(events, proj), proj };
     this.bookCache.set(tournamentId, entry);
     return entry;
+  }
+
+  /**
+   * A new draw (or a reset to draft) voids the tournament's bets: nothing was played yet, so
+   * every bet is open and its stake is free again; the bots look at the new matches anew.
+   * (Entrant ids like "udtbots-1" name another team after a new draw.)
+   */
+  private voidBets(tournamentId: string): void {
+    const gone = this.db
+      .delete(bets)
+      .where(eq(bets.tournamentId, tournamentId))
+      .returning({ userId: bets.userId })
+      .all();
+    for (const k of [...this.botsDecided])
+      if (k.startsWith(`${tournamentId}/`)) this.botsDecided.delete(k);
+    this.bookCache.delete(tournamentId);
+    for (const u of new Set(gone.flatMap((g) => (g.userId ? [g.userId] : []))))
+      this.neuro.changed(u);
   }
 
   private settle(list: readonly Bet[]): SettledBet[] {

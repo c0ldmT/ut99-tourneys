@@ -265,7 +265,9 @@ export class TournamentsController {
     @Body(new ZodPipe(SeedBody)) body: Seed,
   ) {
     this.svc.seed(id, body, user);
-    return this.svc.detail(id, user);
+    // Dream Team: the teams that signed up but are not in the bracket, and why.
+    const dropped = this.svc.takeDrawDrops(id);
+    return { ...this.svc.detail(id, user), ...(dropped.length ? { dropped } : {}) };
   }
 
   @AdminOnly()

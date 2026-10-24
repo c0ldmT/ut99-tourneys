@@ -143,7 +143,17 @@ export type LineupProvider = (
   t: TournamentRow,
   settings: TournamentSettings,
   rng: () => number,
-) => { entrants: Entrant[]; fill: Entrant[] };
+) => { entrants: Entrant[]; fill: Entrant[]; dropped?: DrawDrop[] };
+
+/**
+ * A team that signed up but is not in the drawn bracket, and why: its bots play in other
+ * tournaments (`busyIn`), its lineup cannot play, or the bracket was full.
+ */
+export interface DrawDrop {
+  name: string;
+  reason: 'busy' | 'lineup' | 'full';
+  busyIn?: string[];
+}
 
 /**
  * Who signs up for an add-on's kind of tournament (Dream Team: managers enter their teams).
@@ -154,8 +164,11 @@ export interface SignupProvider {
   enter(t: TournamentRow, user: User): void;
   leave(t: TournamentRow, userId: string): void;
   entries(tournamentId: string): { userId: string; label: string; ai?: boolean }[];
-  /** Extra facts for the tournament page (Dream Team: whether AI managers play). */
-  info?(t: TournamentRow): Record<string, unknown>;
+  /**
+   * Extra facts for the tournament page (Dream Team: whether AI managers play; for the viewer:
+   * the tournaments its bots play in, which would leave its team out of this draw).
+   */
+  info?(t: TournamentRow, user?: User): Record<string, unknown>;
 }
 
 const TournamentFields = z.object({
@@ -590,6 +603,7 @@ export class TournamentsService {
     for (const fn of this.removeHooks) fn(t);
     this.db.delete(tournaments).where(eq(tournaments.id, id)).run();
     this.log.forget(id);
+    this.drawDrops.delete(id);
     this.hub.clearLive(id);
   }
 
@@ -1273,7 +1287,7 @@ export class TournamentsService {
     const settings = this.settings(t);
     const rngSeed = body.rngSeed ?? `${t.id}-${this.clock.now()}`;
     const rng = createRng(rngSeed);
-    const { entrants: main, fill } = provider(t, settings, rng);
+    const { entrants: main, fill, dropped = [] } = provider(t, settings, rng);
     if (main.length > settings.size)
       throw badRequest('{n} teams do not fit into a bracket of {size}', {
         n: main.length,
@@ -1324,8 +1338,18 @@ export class TournamentsService {
     });
     const res = this.log.append(t.id, head, batch);
     if (!res.accepted) throw conflict(res.reason);
+    this.drawDrops.set(t.id, dropped);
     this.syncToAgent(t, head);
     return res.projection;
+  }
+
+  /** Teams left out of the last draw of a tournament (for the answer to the organizer). */
+  private readonly drawDrops = new Map<string, DrawDrop[]>();
+
+  takeDrawDrops(id: string): DrawDrop[] {
+    const out = this.drawDrops.get(id) ?? [];
+    this.drawDrops.delete(id);
+    return out;
   }
 
   private teamEntrant(v: TeamView, teamSize: number): TeamEntrant {
@@ -2018,7 +2042,7 @@ export class TournamentsService {
       kind: t.kind,
       udt: this.udtRules(t),
       ...(this.signupProviders.get(t.kind)?.info
-        ? { signup: this.signupProviders.get(t.kind)!.info!(t) }
+        ? { signup: this.signupProviders.get(t.kind)!.info!(t, user) }
         : {}),
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,

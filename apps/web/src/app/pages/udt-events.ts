@@ -95,6 +95,11 @@ import { UdtNav } from '../core/udt';
                 {{ 'udt.events.plays' | t }}: {{ l.bots.join(', ') }} ({{ l.value | neuro }})
               </p>
             }
+            @if (l.busyIn?.length) {
+              <p class="small" style="color: var(--hot-text)">
+                {{ 'udt.events.busyIn' | t: { list: l.busyIn!.join(', ') } }}
+              </p>
+            }
           }
           <div class="row">
             @if (e.open && !e.entered) {

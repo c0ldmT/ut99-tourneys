@@ -470,6 +470,61 @@ describe('bots betting (pure)', () => {
 });
 
 describe('bots bet with Neuro', () => {
+  it('a new draw voids the bets of the old one; the bets panel shows the new matches', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    await startSeason(admin);
+    const ids: string[] = [];
+    for (const name of ['Abe', 'Bea', 'Cid', 'Dot', 'Eli', 'Fay', 'Gus', 'Hal', 'Ida', 'Jo'])
+      ids.push((await admin.post('/bots', { name, skill: 3 })).body.id);
+    await admin.req('PUT', '/settings/betting', { botsPerMatch: 3 });
+    const t = await admin.post('/tournaments', {
+      ...tournamentBody({ name: 'Redraw' }, { size: 4, format: 'single' }),
+      botPool: ids.slice(0, 4).map((id) => ({ id, name: 'x', skill: 3 })),
+    });
+    const id = t.body.id as string;
+    const seed = (rngSeed: string) =>
+      admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed });
+    const pairs = (proj: { bracket: { matches: { id: string; entrants: string[] }[] } }) =>
+      proj.bracket.matches.filter((m) => m.id.startsWith('W1')).map((m) => m.entrants);
+    const view = async () => (await mario.get(`/bets/tournaments/${id}`)).body;
+    const first = await seed('one');
+    const before = await view();
+    const m = before.matches[0];
+    expect(
+      (
+        await mario.req('PUT', `/bets/tournaments/${id}/${m.matchId}`, {
+          pick: m.entrants[0],
+          amount: 100,
+        })
+      ).status,
+    ).toBe(200);
+    expect((await view()).wallet.free).toBe(900);
+    // Reset and draw again: the event log has the same length (the head repeats).
+    expect((await admin.post(`/tournaments/${id}/reset`)).status).toBe(200);
+    expect((await view()).wallet.free).toBe(1000);
+    let again = await seed('two');
+    let tries = 0;
+    while (
+      JSON.stringify(pairs(again.body.projection)) ===
+        JSON.stringify(pairs(first.body.projection)) &&
+      tries++ < 5
+    )
+      again = await seed(`two-${tries}`);
+    const after = await view();
+    expect(after.matches.map((x: { entrants: string[] }) => x.entrants)).toEqual(
+      pairs(again.body.projection),
+    );
+    // Mario's bet is gone, the bots bet on the new matches.
+    expect(after.wallet.free).toBe(1000);
+    for (const x of after.matches) {
+      expect(x.bettors).toBeGreaterThan(0);
+      expect(x.entrants).toContain(x.expert.pick);
+    }
+  });
+
   it('bet when a match opens, show the expert pick, count separately, tell the game', async () => {
     ({ api } = await startApi());
     const admin = await Client.login(api, 'Boss', true);

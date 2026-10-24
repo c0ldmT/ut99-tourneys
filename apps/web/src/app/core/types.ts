@@ -172,8 +172,10 @@ export interface TournamentDetail {
   /** "udt": Dream Team managers' lineups play. */
   kind?: 'standard' | 'udt';
   udt?: UdtEventRules | null;
-  /** Dream Team: whether AI managers play (and how many). */
-  signup?: { aiOn?: boolean; aiCount?: number };
+  /** Dream Team: whether AI managers play (and how many); where the viewer's bots play. */
+  signup?: { aiOn?: boolean; aiCount?: number; busyIn?: string[] };
+  /** Answer of a Dream Team draw: teams that signed up but are not in the bracket. */
+  dropped?: { name: string; reason: 'busy' | 'lineup' | 'full'; busyIn?: string[] }[];
   phase: Phase;
   headSeq: number;
   agentId: string;
@@ -1228,7 +1230,13 @@ export interface UdtEvent {
   aiEntries?: number;
   entered: boolean;
   open: boolean;
-  lineup: { bots: string[]; value: number; problems: string[] } | null;
+  lineup: {
+    bots: string[];
+    value: number;
+    problems: string[];
+    /** Drawn or running tournaments its bots play in: drawn now, the team would drop out. */
+    busyIn?: string[];
+  } | null;
 }
 
 export interface UdtTableRow {

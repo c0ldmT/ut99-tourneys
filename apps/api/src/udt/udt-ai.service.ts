@@ -25,6 +25,7 @@ import type { Season } from '../seasons/seasons.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { UdtAcademyService } from './udt-academy.service.js';
 import { UdtEventsService } from './udt-events.service.js';
+import { lockedTournaments } from './udt-playing.js';
 import { ROSTER_MAX, UdtMarketService } from './udt-market.service.js';
 import { UdtPacksService } from './udt-packs.service.js';
 import { UdtTradesService } from './udt-trades.service.js';
@@ -100,10 +101,13 @@ export class UdtAiService implements OnModuleInit {
     const season = { number: n0 };
     this.ensure(season.number);
     let n = 0;
+    // The drawn tournaments (one at a time, decision 200): read once for all managers.
+    const locked = lockedTournaments(this.db, this.events.eventLog);
     for (const m of this.managers().slice(0, cfg.aiCount)) {
       if (!this.udt.team(m.user.id, season.number)) continue;
-      const [e] = this.events.events(m.user, tournamentId);
+      const [e] = this.events.events(m.user, tournamentId, locked);
       if (!e || !e.open || e.entered || e.ticketNow > 0 || e.lineup?.problems.length) continue;
+      if (e.lineup?.busyIn.length) continue; // its bots play elsewhere (decision 200)
       if (cfg.aiStrength === 'calm' && createRng(`ai-fill-${tournamentId}-${m.n}`)() > 0.5)
         continue;
       try {
@@ -339,6 +343,7 @@ export class UdtAiService implements OnModuleInit {
     let n = 0;
     for (const e of this.events.events(user)) {
       if (!e.open || e.entered || e.ticketNow > 0 || e.lineup?.problems.length) continue;
+      if (e.lineup?.busyIn.length) continue; // its bots play elsewhere (decision 200)
       if (rng() > chance) continue;
       try {
         this.events.signUp(user, e.id);

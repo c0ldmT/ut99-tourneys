@@ -30,6 +30,7 @@ import { tournaments, udtEntries } from '../db/schema.js';
 import { SettingsService } from '../settings/settings.service.js';
 import {
   TournamentsService,
+  type DrawDrop,
   type TournamentRow,
   type UdtEventRules,
 } from '../tournaments/tournaments.service.js';
@@ -37,7 +38,7 @@ import { UdtCareerService } from './udt-career.service.js';
 import { gameName, UdtService, type RosterBot } from './udt.service.js';
 import { pickTeamNames } from '../common/names.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
-import { botsOf, lockedProjections } from './udt-playing.js';
+import { botsOf, lockedTournaments, playingIn, type LockedTournament } from './udt-playing.js';
 
 /** Bots below this stamina are tired: they play worse and the bench comes first. */
 const TIRED = 40;
@@ -101,9 +102,13 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       enter: (t, user) => this.signUp(user, t.id),
       leave: (t, userId) => this.withdraw(t.id, userId),
       entries: (id) => this.labelledEntries(id),
-      info: () => {
+      info: (t, user) => {
         const cfg = this.settings.get().udt;
-        return { aiOn: this.udt.aiOn(), aiCount: cfg.aiEnabled ? cfg.aiCount : 0 };
+        return {
+          aiOn: this.udt.aiOn(),
+          aiCount: cfg.aiEnabled ? cfg.aiCount : 0,
+          busyIn: user && t.phase === 'draft' ? this.busyIn(user, t.id) : [],
+        };
       },
     });
   }
@@ -184,13 +189,18 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const season = this.udt.seasonNumber();
     if (season === null || !this.udt.enabled()) return 0;
     let n = 0;
+    let locked: LockedTournament[] | undefined;
     for (const id of this.udt.autoEntrants(season)) {
       if (onlyUser && id !== onlyUser) continue;
       const user = this.users.byId(id);
       if (!user) continue;
-      for (const e of this.events(user, tournamentId)) {
+      // Read once for all managers (each entry changes no drawn tournament).
+      locked ??= lockedTournaments(this.db, this.log);
+      for (const e of this.events(user, tournamentId, locked)) {
         if (!e.open || e.entered || e.ticketNow > 0 || !e.lineup || e.lineup.problems.length)
           continue;
+        // Its bots play elsewhere: it would drop out at the draw (decision 200).
+        if (e.lineup.busyIn.length) continue;
         try {
           this.signUp(user, e.id);
           n++;
@@ -200,6 +210,11 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       }
     }
     return n;
+  }
+
+  /** The event log (the AI service reads the drawn tournaments through it). */
+  get eventLog(): EventLogService {
+    return this.log;
   }
 
   /** AI managers enter the tournament where they can (set by the AI service). */
@@ -424,18 +439,36 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const named = uniqueNames();
     let humans = 0;
     // One tournament at a time (decision 200); the finale goes first and takes them anyway.
-    const locked = rules.finale ? [] : lockedProjections(this.db, this.log, t.id);
+    const locked = rules.finale ? [] : lockedTournaments(this.db, this.log, t.id);
+    const lockedProj = locked.map((l) => l.projection);
+    // Human teams left out, for the organizer (AI teams are not reported).
+    const dropped: DrawDrop[] = [];
     for (const userId of entered) {
       if (ai.has(userId) && !aiOn) {
         this.dropEntry(t.id, userId);
         continue;
       }
       const team = this.udt.team(userId, season);
-      const busy = rules.finale ? undefined : botsOf(locked, userId);
+      const busy = rules.finale ? undefined : botsOf(lockedProj, userId);
       const l = team ? this.lineup(userId, settings, rules, busy) : null;
       if (!team || !l || l.problems.length || main.length >= settings.size) {
         // Cannot play (any more) or no room: left out, the ticket goes back.
         this.dropEntry(t.id, userId);
+        if (!ai.has(userId)) {
+          const name = team
+            ? `${team.tag} ${team.name}`
+            : (this.users.byId(userId)?.displayName ?? userId);
+          // Short only because of bots playing elsewhere?
+          const onlyBusy =
+            !!l?.problems.length &&
+            !!busy?.size &&
+            !this.lineup(userId, settings, rules).problems.length;
+          dropped.push(
+            onlyBusy
+              ? { name, reason: 'busy', busyIn: playingIn(locked, userId) }
+              : { name, reason: l && !l.problems.length ? 'full' : 'lineup' },
+          );
+        }
         continue;
       }
       const specs = l.bots
@@ -510,14 +543,19 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     }
     if (main.length + fill.length < 2)
       throw conflict('not enough teams and free library bots for a bracket');
-    return { entrants: main, fill };
+    return { entrants: main, fill, dropped };
   }
 
   /**
    * Dream Team tournaments: upcoming and running ones, the last finished ones (`only`: just
    * that one of them, for the sign-ups of the AI and of automatic entries).
    */
-  events(user: User, only?: string) {
+  events(
+    user: User,
+    only?: string,
+    /** The locked tournaments, when the caller reads them once for many managers. */
+    lockedNow?: readonly LockedTournament[],
+  ) {
     this.udt.assertOn();
     const rows = this.db
       .select()
@@ -540,11 +578,17 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     // The roster is the same for every tournament: read once.
     const roster =
       hasTeam && listed.length ? this.udt.roster(user.id, this.udt.season().number) : [];
+    const locked =
+      hasTeam && listed.some((t) => t.phase === 'draft')
+        ? (lockedNow ?? lockedTournaments(this.db, this.log))
+        : [];
     return listed.map((t) => {
       const s = this.settingsOf(t);
       const rules = this.rules(t);
       const who = entries.get(t.id) ?? [];
       const mine = hasTeam ? this.lineup(user.id, s, rules, undefined, roster) : null;
+      const busyIn =
+        mine && t.phase === 'draft' ? this.busyLineup(user.id, t, s, rules, roster, locked) : [];
       return {
         id: t.id,
         name: t.name,
@@ -568,10 +612,52 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         /** Finale: the teams that would play now (top of the table). */
         qualified: rules.finale && t.phase === 'draft' ? this.qualified(t, s) : null,
         lineup: mine
-          ? { bots: mine.bots.map((b) => b.name), value: mine.value, problems: mine.problems }
+          ? {
+              bots: mine.bots.map((b) => b.name),
+              value: mine.value,
+              problems: mine.problems,
+              /**
+               * Tournaments the team's bots play in: drawn now, it would drop out (decision 200);
+               * automatic sign-ups wait.
+               */
+              busyIn,
+            }
           : null,
       };
     });
+  }
+
+  /**
+   * Names of the drawn or running Dream Team tournaments whose bots the manager's lineup for
+   * `t` would miss at a draw now (empty: it can play, or it could not play anyway, or finale).
+   */
+  private busyLineup(
+    userId: string,
+    t: TournamentRow,
+    s: TournamentSettings,
+    rules: UdtEventRules,
+    roster: readonly RosterBot[],
+    locked: readonly LockedTournament[],
+  ): string[] {
+    if (rules.finale) return [];
+    const others = locked.filter((l) => l.id !== t.id);
+    const busy = botsOf(
+      others.map((l) => l.projection),
+      userId,
+    );
+    if (!busy.size) return [];
+    if (this.lineup(userId, s, rules, undefined, roster).problems.length) return [];
+    if (!this.lineup(userId, s, rules, busy, roster).problems.length) return [];
+    return playingIn(others, userId);
+  }
+
+  /** `busyLineup` for one tournament (the tournament page's sign-up). */
+  busyIn(user: User, tournamentId: string): string[] {
+    try {
+      return this.events(user, tournamentId)[0]?.lineup?.busyIn ?? [];
+    } catch {
+      return []; // Dream Team off, no season
+    }
   }
 
   /** Tickets paid into a tournament (high stakes). */

@@ -20,25 +20,41 @@ export function playingBots(
   return botsOf(lockedProjections(db, events, except), userId);
 }
 
+/** A Dream Team tournament with fixed lineups: its name and projection. */
+export interface LockedTournament {
+  id: string;
+  name: string;
+  projection: TournamentProjection;
+}
+
 /**
- * The projections of the Dream Team tournaments with fixed lineups (but `except`): read once for
- * many managers with `botsOf` (the seeding).
+ * The Dream Team tournaments with fixed lineups (but `except`): read once for many managers
+ * with `botsOf` (the seeding) or `playingIn` (the sign-up's warning).
  */
+export function lockedTournaments(
+  db: Db,
+  events: EventLogService,
+  except?: string,
+): LockedTournament[] {
+  const rows = db
+    .select({ id: tournaments.id, name: tournaments.name })
+    .from(tournaments)
+    .where(and(eq(tournaments.kind, 'udt'), inArray(tournaments.phase, LINEUP_LOCKED_PHASES)))
+    .all();
+  return rows.flatMap(({ id, name }) => {
+    if (id === except) return [];
+    const projection = events.projection(id);
+    return projection ? [{ id, name, projection }] : [];
+  });
+}
+
+/** The projections of `lockedTournaments`. */
 export function lockedProjections(
   db: Db,
   events: EventLogService,
   except?: string,
 ): TournamentProjection[] {
-  const rows = db
-    .select({ id: tournaments.id })
-    .from(tournaments)
-    .where(and(eq(tournaments.kind, 'udt'), inArray(tournaments.phase, LINEUP_LOCKED_PHASES)))
-    .all();
-  return rows.flatMap(({ id }) => {
-    if (id === except) return [];
-    const p = events.projection(id);
-    return p ? [p] : [];
-  });
+  return lockedTournaments(db, events, except).map((l) => l.projection);
 }
 
 /** A manager's bots in these tournaments (see `playingBots`). */
@@ -50,4 +66,9 @@ export function botsOf(projections: readonly TournamentProjection[], userId: str
     if (e?.kind === 'team') for (const b of e.bots) if (b.id) out.add(b.id);
   }
   return out;
+}
+
+/** Names of the tournaments in which a manager's team plays. */
+export function playingIn(locked: readonly LockedTournament[], userId: string): string[] {
+  return locked.filter((l) => botsOf([l.projection], userId).size).map((l) => l.name);
 }

@@ -21,6 +21,7 @@ import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
 import { TeamRoster } from '../components/team-roster';
 import { Api } from '../core/api';
+import { Toasts } from '../core/toast';
 import { Loading } from '../core/loading';
 import { copyText, selectText } from '../core/clipboard';
 import { isLocalAddress, joinUrl, linuxStartCommand } from '../core/connect';
@@ -176,6 +177,11 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 }
                 @if (t.udt?.ticket) {
                   <p class="small">{{ 'tp.udtTicket' | t }}</p>
+                }
+                @if (t.signup?.busyIn?.length) {
+                  <p class="small" style="color: var(--hot-text)">
+                    {{ 'udt.events.busyIn' | t: { list: t.signup!.busyIn!.join(', ') } }}
+                  </p>
                 }
                 @if (t.me.registered) {
                   <p>{{ 'tp.udtIn' | t }}</p>
@@ -607,18 +613,18 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                           {{ 'tp.udtSeedAiOff' | t }}
                         }
                       </li>
+                      <li>{{ 'tp.udtSeedBusy' | t }}</li>
                     }
                     <li>{{ 'tp.udtSeedFill' | t }}</li>
                     @if (t.udt?.ticket) {
                       <li>{{ 'tp.udtSeedTicket' | t: { n: t.udt?.minTeams ?? 2 } }}</li>
                     }
+                    @if (t.phase === 'seeded') {
+                      <li>{{ 'tp.seedAgainBets' | t }}</li>
+                    }
                   </ul>
                   <div class="row">
-                    <button
-                      class="primary udt"
-                      (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'random' }))"
-                      [disabled]="busy()"
-                    >
+                    <button class="primary udt" (click)="udtSeed(t.id)" [disabled]="busy()">
                       {{ (t.phase === 'seeded' ? 'tp.udtSeedAgain' : 'tp.udtSeed') | t }}
                     </button>
                     @if (t.phase === 'seeded') {
@@ -979,6 +985,7 @@ export class TournamentPage {
   protected readonly api = inject(Api);
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
+  private readonly toasts = inject(Toasts);
   private readonly stream = inject(TournamentStream);
   private readonly looks = inject(Looks);
   /** Matches that take bets now (from the bets panel). */
@@ -1428,6 +1435,22 @@ export class TournamentPage {
     if (!ok) selectText(el);
     this.copied.set({ which, state: ok ? 'ok' : 'manual' });
     setTimeout(() => this.copied.set({ which: '', state: '' }), ok ? 1500 : 5000);
+  }
+
+  /** Dream Team draw: tells the organizer which teams are not in the bracket and why. */
+  protected udtSeed(id: string) {
+    return this.act(
+      this.api.seed(id, { mode: 'auto', humanOrder: 'random' }).then((d) => {
+        // One toast for all of them (the stack keeps only the latest few).
+        const out = (d.dropped ?? []).map((x) =>
+          this.i18n.t(`tp.udtDropped.${x.reason}`, {
+            name: x.name,
+            list: (x.busyIn ?? []).join(', '),
+          }),
+        );
+        if (out.length) this.toasts.info(this.i18n.t('tp.udtDropped', { list: out.join(' · ') }));
+      }),
+    );
   }
 
   protected async act(p: Promise<unknown>) {

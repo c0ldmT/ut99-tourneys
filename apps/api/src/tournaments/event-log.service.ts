@@ -38,6 +38,7 @@ export type AppendResult =
 export class EventLogService {
   private cache = new Map<string, TournamentEvent[]>();
   private listeners: AppendListener[] = [];
+  private clearListeners: ((tournamentId: string) => void)[] = [];
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -62,6 +63,11 @@ export class EventLogService {
 
   onAppend(listener: AppendListener): void {
     this.listeners.push(listener);
+  }
+
+  /** Called after a log was cleared (back to draft: the bets go). */
+  onClear(listener: (tournamentId: string) => void): void {
+    this.clearListeners.push(listener);
   }
 
   projection(tournamentId: string): TournamentProjection | undefined {
@@ -133,6 +139,13 @@ export class EventLogService {
         .run();
     });
     this.cache.delete(tournamentId);
+    for (const l of this.clearListeners) {
+      try {
+        l(tournamentId);
+      } catch {
+        // A listener must never break the log.
+      }
+    }
     this.hub.publish(tournamentId, { type: 'change', headSeq: 0, phase: 'draft' });
     this.neuro.changedAll();
   }

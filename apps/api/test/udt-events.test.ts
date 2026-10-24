@@ -166,10 +166,31 @@ describe('Unreal Dream Team: events', () => {
     // Signing up for another cup stays possible while Mira plays.
     const c = (await admin.post('/tournaments', udtCup(1))).body.id as string;
     expect((await mario.post(`/udt/events/${c}/enter`)).status).toBe(200);
-    // Mira plays in cup A: cup B goes on without Mario's team (only one bot).
+    // Mario sees it before the draw: on the Dream Team page and on the tournament page.
+    const cupA = (await admin.get(`/tournaments/${a}`)).body.name as string;
+    const ev = (await mario.get('/udt/events')).body as {
+      id: string;
+      lineup: { busyIn: string[]; problems: string[] };
+    }[];
+    expect(ev.find((e) => e.id === b)!.lineup).toMatchObject({ problems: [], busyIn: [cupA] });
+    expect((await mario.get(`/tournaments/${b}`)).body.signup.busyIn).toEqual([cupA]);
+    expect((await tim.get(`/tournaments/${b}`)).body.signup.busyIn).toEqual([cupA]);
+    // Automatic sign-up waits while the bots play elsewhere.
+    await mario.req('PUT', '/udt/auto-enter', { on: true });
+    const d = (await admin.post('/tournaments', udtCup(1))).body.id as string;
+    expect(
+      ((await mario.get('/udt/events')).body as { id: string; entered: boolean }[]).find(
+        (e) => e.id === d,
+      )!.entered,
+    ).toBe(false);
+    // Mira plays in cup A: cup B goes on without Mario's team (only one bot), and the
+    // organizer is told why.
     const second = await seed(b);
     expect(second.status, JSON.stringify(second.body)).toBe(200);
     expect(second.body.projection.entrants[`udt-${marioId}`]).toBeUndefined();
+    expect(second.body.dropped).toEqual(
+      expect.arrayContaining([{ name: '[NX] Nexus', reason: 'busy', busyIn: [cupA] }]),
+    );
     // Simulated bot matches are refused for Dream Team tournaments.
     const sim = await admin.post(
       '/tournaments',
