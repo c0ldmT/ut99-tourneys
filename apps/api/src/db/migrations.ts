@@ -660,4 +660,9 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX league_fixtures_season ON league_fixtures(season, day);
   CREATE INDEX league_fixtures_tournament ON league_fixtures(tournament_id);
   `,
+  // 41: a league tie's games won per side (relegation and final four are best of three).
+  `
+  ALTER TABLE league_fixtures ADD COLUMN home_wins INTEGER;
+  ALTER TABLE league_fixtures ADD COLUMN away_wins INTEGER;
+  `,
 ];

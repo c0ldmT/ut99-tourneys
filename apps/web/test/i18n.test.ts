@@ -28,7 +28,7 @@ describe('translations', () => {
   });
 
   it('has the dynamic keys', () => {
-    for (const t of ['season', 'bets', 'bots', 'udt', 'system'])
+    for (const t of ['season', 'bets', 'bots', 'udt', 'league', 'system'])
       expect(DICT.en[`settings.tab.${t}`]).toBeDefined();
     for (const p of ['draft', 'seeded', 'checkIn', 'running', 'paused', 'finished', 'aborted'])
       expect(DICT.en[`phase.${p}`]).toBeDefined();
@@ -55,6 +55,24 @@ describe('translations', () => {
     for (const w of ['bought', 'mentored', 'skill', 'nominated'])
       for (const lang of ['en', 'de'] as const)
         expect(DICT[lang][`udt.mentor.not.${w}`]).toBeDefined();
+    // The Dream Team league (page and settings).
+    for (const lang of ['en', 'de'] as const) {
+      for (const k of ['league', 'relegation', 'semi', 'final', 'third'])
+        expect(DICT[lang][`league.kind.${k}`]).toBeDefined();
+      for (const z of ['final', 'up', 'relup', 'rel', 'down'])
+        expect(DICT[lang][`league.zone.${z}`]).toBeDefined();
+      for (const v of ['table', 'day', 'plan', 'final', 'history'])
+        expect(DICT[lang][`league.view.${v}`]).toBeDefined();
+      for (const b of ['done', 'doneOt', 'live', 'next', 'later'])
+        expect(DICT[lang][`league.badge.${b}`]).toBeDefined();
+      for (const f of ['W', 'OW', 'OL', 'L']) {
+        expect(DICT[lang][`league.form.${f}`]).toBeDefined();
+        expect(DICT[lang][`league.formShort.${f}`]).toBeDefined();
+      }
+      for (const d of [0, 1, 2]) expect(DICT[lang][`lgs.day.${d}`]).toBeDefined();
+      for (const k of ['tableMoney', 'tierMult', 'keepers', 'factors', 'cupBonus'])
+        expect(DICT[lang][`lgs.${k}`]).toBeDefined();
+    }
     // What an apprentice learns (academy).
     for (const k of ['accuracy', 'alertness', 'strafing', 'combatStyle', 'camping'])
       expect(DICT.en[`udt.academy.lesson.${k}`]).toBeDefined();

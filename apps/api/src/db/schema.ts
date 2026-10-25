@@ -629,6 +629,9 @@ export const leagueFixtures = sqliteTable('league_fixtures', {
   awayFrags: integer('away_frags'),
   overtime: integer('overtime', { mode: 'boolean' }).notNull().default(false),
   winner: text('winner'),
+  /** Games won per side (a best of three; a league game 1:0). */
+  homeWins: integer('home_wins'),
+  awayWins: integer('away_wins'),
   revealAt: text('reveal_at'),
   /** Moved to a later evening this often (the server was not free). */
   postponed: integer('postponed').notNull().default(0),

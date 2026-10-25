@@ -188,6 +188,24 @@ describe('Dream Team league', () => {
     expect(v.myClub).toMatchObject({ name: 'Aces', tier: 1 });
   });
 
+  it('test mode: "matchday now" plays the next evening, "league season end" the rest', async () => {
+    const { admin, mario } = await setup();
+    expect((await admin.post('/udt/test/league/day')).status).toBe(409);
+    await admin.post('/udt/test/advance', { hours: 3 * 24 });
+    const day = await admin.post('/udt/test/league/day');
+    expect(day.status, JSON.stringify(day.body)).toBe(200);
+    const v = (await mario.get('/udt/league')).body;
+    const first = v.fixtures.filter((f: { day: string }) => f.day === day.body.leagueDay);
+    expect(first.length).toBeGreaterThan(0);
+    expect(first.every((f: { winner: string | null }) => f.winner)).toBe(true);
+    const end = await admin.post('/udt/test/league/end');
+    expect(end.status, JSON.stringify(end.body)).toBe(200);
+    expect(end.body.leagueDone).toBe(true);
+    const done = (await mario.get('/udt/league')).body;
+    expect(done.run.status).toBe('done');
+    expect(done.final.map((c: { place: number }) => c.place)).toEqual([1, 2, 3, 4]);
+  });
+
   it('moves a played game that did not happen on its day to the next evening', async () => {
     const { admin, db } = await setup();
     await admin.post('/udt/test/advance', { hours: 3 * 24 + 1 });

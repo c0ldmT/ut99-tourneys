@@ -340,6 +340,7 @@ export function staminaColor(s: number): string {
       <a routerLink="/udt" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">{{
         'udt.nav.team' | t
       }}</a>
+      <a routerLink="/udt/league" routerLinkActive="active">{{ 'udt.nav.league' | t }}</a>
       <a routerLink="/udt/market" routerLinkActive="active">{{ 'udt.nav.market' | t }}</a>
       <a routerLink="/udt/packs" routerLinkActive="active">{{ 'udt.nav.packs' | t }}</a>
       <a routerLink="/udt/trades" routerLinkActive="active"
@@ -380,6 +381,8 @@ export function staminaColor(s: number): string {
           +3 {{ 'udt.test.managers' | t }}
         </button>
         <button type="button" (click)="run('managers/act')">{{ 'udt.test.act' | t }}</button>
+        <button type="button" (click)="run('league/day')">{{ 'udt.test.leagueDay' | t }}</button>
+        <button type="button" (click)="run('league/end')">{{ 'udt.test.leagueEnd' | t }}</button>
         <button type="button" class="danger" (click)="endSeason()">
           {{ 'udt.test.seasonEnd' | t }}
         </button>

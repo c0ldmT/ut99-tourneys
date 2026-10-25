@@ -28,6 +28,10 @@ import type {
   UdtBreeder,
   UdtGraduation,
   UdtKeepers,
+  LeagueAdmin,
+  LeagueEstimate,
+  LeagueHistorySeason,
+  LeagueView,
   UdtYearbook,
   UdtYearbookEntry,
   UdtPartner,
@@ -364,6 +368,31 @@ export class Api {
       ok: 'ok.udt.breakthrough',
     });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');
+  /** The league (quiet: the page's refresh while games run). */
+  udtLeague = (season?: number, quiet = false) =>
+    this.call<LeagueView>('GET', `/udt/league${season ? `?season=${season}` : ''}`, undefined, {
+      quiet,
+    });
+  udtLeagueHistory = () => this.call<LeagueHistorySeason[]>('GET', '/udt/league/history');
+  udtLeagueMap = (fixtureId: string, map: string) =>
+    this.call<LeagueView>(
+      'PUT',
+      `/udt/league/fixtures/${encodeURIComponent(fixtureId)}/map`,
+      { map },
+      { ok: 'ok.league.map' },
+    );
+  udtLeagueAdmin = () => this.call<LeagueAdmin>('GET', '/udt/league/admin');
+  udtLeagueEstimate = (q: Record<string, string | number>) =>
+    this.call<LeagueEstimate>(
+      'GET',
+      `/udt/league/estimate?${new URLSearchParams(Object.entries(q).map(([k, v]) => [k, String(v)]))}`,
+      undefined,
+      { quiet: true, background: true },
+    );
+  udtLeagueTest = (body: Record<string, unknown>) =>
+    this.call<LeagueAdmin>('POST', '/udt/league/test', body, { ok: 'ok.league.test' });
+  udtLeagueTestAbort = () =>
+    this.call<LeagueAdmin>('DELETE', '/udt/league/test', undefined, { ok: 'ok.league.testAbort' });
   /** The keeper choice (quiet: a page without a season shows nothing). */
   udtKeepers = () => this.call<UdtKeepers>('GET', '/udt/keepers', undefined, { quiet: true });
   udtSetKeepers = (botIds: string[]) =>

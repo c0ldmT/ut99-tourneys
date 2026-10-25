@@ -314,7 +314,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The table of each tier (tier 0 = Pro Series) from the shown regular games. */
-  tables(season: number, now = this.clock.now()): TableRow[][] {
+  tables(season: number, now = this.clock.now(), beforeDay?: string): TableRow[][] {
     const run = this.run(season);
     if (!run) return [];
     const members = this.members(season);
@@ -323,7 +323,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       standings(
         members.filter((m) => m.tier === t).map((m) => m.clubId),
         all
-          .filter((f) => f.tier === t)
+          .filter((f) => f.tier === t && (!beforeDay || f.day < beforeDay))
           .map((f) => this.result(f, now))
           .filter((r): r is LeagueResult => !!r),
         `${season}:${t}`,
@@ -920,6 +920,8 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         awayFrags: af,
         overtime: bo === 1 && ot,
         winner: wh > wa ? f.home : f.away,
+        homeWins: wh,
+        awayWins: wa,
         revealAt: new Date(reveal).toISOString(),
       })
       .where(eq(leagueFixtures.id, f.id))
@@ -1129,6 +1131,16 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         awayFrags: af,
         overtime,
         winner: homeWon ? f.home : f.away,
+        homeWins: games.length
+          ? games.filter((g) => g.winnerId === homeId).length
+          : homeWon
+            ? 1
+            : 0,
+        awayWins: games.length
+          ? games.filter((g) => g.winnerId === awayId).length
+          : homeWon
+            ? 0
+            : 1,
       })
       .where(eq(leagueFixtures.id, f.id))
       .run();
@@ -1460,6 +1472,49 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     return this.view(user);
   }
 
+  /**
+   * Test mode (L11): the next league evening of the running season with open games - the day
+   * of the earliest open game, else the relegation or final day still to come - and its slot;
+   * null without a running league.
+   */
+  testNextEvening(): { day: string; slot: number } | null {
+    const season = this.seasons.current();
+    const run = season ? this.run(season.number) : undefined;
+    if (!run || run.status !== 'running') return null;
+    const plan = this.plan(run);
+    const today = this.udt.today();
+    const all = this.fixtures(run.season);
+    const open = all.filter((f) => f.status === 'scheduled').map((f) => f.day);
+    let day = open.sort()[0];
+    if (!day)
+      day =
+        run.tiers > 1 && !all.some((f) => f.kind === 'relegation')
+          ? plan.relegation
+          : !all.some((f) => f.kind === 'semi')
+            ? plan.final
+            : today;
+    if (day < today) day = today;
+    return { day, slot: zonedMs(day, plan.slotTime, this.tz) };
+  }
+
+  /** Test mode: the tournaments of the league's played games up to `day` that are not over. */
+  testTournaments(day: string): string[] {
+    const season = this.seasons.current();
+    if (!season) return [];
+    return this.fixtures(season.number)
+      .filter((f) => f.status === 'scheduled' && f.real && f.tournamentId && f.day <= day)
+      .map((f) => this.tournaments.get(f.tournamentId!))
+      .filter((t) => !!t && ['draft', 'seeded', 'checkIn', 'running'].includes(t.phase))
+      .map((t) => t!.id);
+  }
+
+  /** Test mode: whether the league of the running season is over (or there is none). */
+  testDone(): boolean {
+    const season = this.seasons.current();
+    const run = season ? this.run(season.number) : undefined;
+    return !run || run.status !== 'running';
+  }
+
   // ------------------------------------------------------------------------------------------
   // Test league (L-E9)
   // ------------------------------------------------------------------------------------------
@@ -1507,6 +1562,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       : 0;
     return {
       season: season?.number ?? null,
+      today: this.udt.today(),
       daysLeft: season
         ? Math.round(
             (Date.parse(`${season.endDate}T00:00:00Z`) -
@@ -1568,8 +1624,15 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const season = seasonQ ?? current ?? 0;
     const run = this.run(season);
     const cfg = this.cfg();
-    if (!run) return { season, run: null, enabled: cfg.enabled, seasons: this.runSeasons() };
     const now = this.clock.now();
+    if (!run)
+      return {
+        season,
+        run: null,
+        enabled: cfg.enabled,
+        seasons: this.runSeasons(),
+        now: new Date(now).toISOString(),
+      };
     const clubs = this.clubs();
     const members = new Map(this.members(season).map((m) => [m.clubId, m]));
     const plan = this.plan(run);
@@ -1585,13 +1648,21 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         me: c?.userId === user.id,
       };
     };
+    const today = this.udt.today();
     const tablesNow = this.tables(season, now);
+    // The live table of the evening: moves against the table before today's games.
+    const before = this.tables(season, now, today);
+    const moveOf = (t: number, id: string, place: number) => {
+      const b = before[t]?.find((r) => r.club === id)?.place;
+      return b === undefined ? 0 : b - place;
+    };
     const tables = tablesNow.map((tb, t) => ({
       tier: t,
       rows: tb.map((r) => ({
         ...r,
         ...club(r.club),
         strength: members.get(r.club)?.strength ?? null,
+        move: moveOf(t, r.club, r.place),
       })),
       final: run.status === 'done',
     }));
@@ -1614,20 +1685,35 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         awayFrags: shown?.awayFrags ?? null,
         overtime: shown ? f.overtime : false,
         winner: shown?.winner ?? null,
+        homeWins: shown ? f.homeWins : null,
+        awayWins: shown ? f.awayWins : null,
         postponed: f.postponed,
         tournament: t ? { id: t.id, phase: t.phase } : null,
       };
     };
-    const today = this.udt.today();
-    // The evening of the conference: the next one with league games (today's while it runs).
-    const nextDayWithGames = fixtures
-      .filter((f) => f.kind === 'league' && f.day >= today)
-      .map((f) => f.day)
-      .sort()[0];
-    const currentMatchdays =
-      plan.evenings
-        .find((e) => e.day === (nextDayWithGames ?? plan.evenings.at(-1)!.day))
-        ?.matchdays.map((m) => m + 1) ?? [];
+    // The evening of the conference: the next one with games (today's while it runs), else
+    // the last one.
+    const days = [...new Set(fixtures.map((f) => f.day))].sort();
+    const conferenceDay = days.find((d) => d >= today) ?? days.at(-1) ?? today;
+    const onDay = fixtures.filter((f) => f.day === conferenceDay);
+    const currentMatchdays = [
+      ...new Set(onDay.filter((f) => f.kind === 'league').map((f) => f.matchday)),
+    ].sort((a, b) => a - b);
+    // The server's evening: the league slot and the other tournaments of that day.
+    const slotStart = zonedMs(conferenceDay, plan.slotTime, this.tz);
+    const cups = this.db
+      .select()
+      .from(tournaments)
+      .all()
+      .filter(
+        (t) =>
+          t.scheduledAt &&
+          !this.isLeagueTournament(t) &&
+          ['draft', 'seeded'].includes(t.phase) &&
+          this.udt.today() <= conferenceDay &&
+          Math.abs(Date.parse(t.scheduledAt) - slotStart) < DAY / 2,
+      )
+      .map((t) => ({ name: t.name, scheduledAt: t.scheduledAt! }));
     const next = mine
       ? fixtures.find((f) => (f.home === mine.id || f.away === mine.id) && f.status === 'scheduled')
       : undefined;
@@ -1635,13 +1721,22 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       season,
       enabled: cfg.enabled,
       seasons: this.runSeasons(),
+      today,
+      now: new Date(now).toISOString(),
       run: { ...runView(run), plan, matchdays: matchdaysOf(run.size) },
       myClub: mine ? { ...club(mine.id), tier: members.get(mine.id)?.tier ?? null } : null,
       tables,
       matchdays: currentMatchdays,
-      conference: fixtures
-        .filter((f) => f.kind === 'league' && currentMatchdays.includes(f.matchday))
-        .map(game),
+      conference: onDay.map(game),
+      evening: {
+        day: conferenceDay,
+        slot: new Date(slotStart).toISOString(),
+        games: onDay.filter((f) => f.real).length,
+        until: new Date(
+          slotStart + Math.max(1, onDay.filter((f) => f.real).length) * GAME_MINUTES * 60_000,
+        ).toISOString(),
+        cups,
+      },
       fixtures: fixtures.map(game),
       next: next
         ? {

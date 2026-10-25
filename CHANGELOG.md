@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team league page: the table of every tier with zones, form and the season's timeline; the matchday with the games on the server and the AI games as a conference, a live table with moves; the fixtures (only yours at a tap); the season finale with final four, relegation and who goes up and down; the history. My team shows the next league game, the home team picks its map. Settings: tab "UDT Liga" with the server time per league evening and the test league.
+- Dream Team test mode: "Matchday now" plays the next league evening, "League season end" the rest of the league.
 - Dream Team league: managers' teams and AI clubs play a double round robin in tiers (Pro Series, Division 1 ...) on league evenings, games with a manager on the server, AI against AI simulated and shown during the evening; table with overtime points, weekly table money and cup bonus, relegation and the Pro Series final four as the season's finale, promotion and relegation into the next season, a test league in a running season (admin settings).
 - League simulation for the Dream Team league: `pnpm --filter @tourney/api udt:league-sim [export.db]` plays several seasons with the league and keepers against today (index, money, keepers, strikes, wins against AI clubs, champions).
 - Dream Team keepers: on the last two days of a season (and until the next one starts) every manager picks up to two bots the team made on My team; next season they play again - one skill step lower (not below Skilled), with their potential and values, without traits, experience or salary. The founding form takes last season's team name and tag.
@@ -205,6 +207,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team navigation: "Table" is now "Cup ranking", the league has its own tab.
 - Ratings: a bot's difficulty step is worth 200 rating points by default (was 100), which predicts real games best; saved settings and running seasons keep their value.
 - Dream Team game model calibrated on real games: simulated games (season simulator `udt:sim`, the test mode's simulated matches) use `p = sA^k / (sA^k + sB^k)` with k = 3 in 1v1 and 4.5 in teams instead of 2, so a favourite wins as often as in the games (one skill step: about three of four duels). `pnpm --filter @tourney/api udt:calibrate <tourney.db>` checks the model on a database (log loss per k, favourite's win rate per skill gap) and fits the rating setting "rating points per bot level" to the same games (the owner's export: 200 instead of the default 100).
 - Settings (admins) in tabs: Season, Bets & shop, Bots & live, Dream Team, System. The tab is in the address (`?tab=`), so links and the back button work; every tab saves its own forms, a tab with unsaved changes shows a dot and asks before another tab opens.

@@ -1321,6 +1321,176 @@ export interface UdtSettings {
   aiEnabled: boolean;
   aiCount: number;
   aiStrength: 'calm' | 'normal' | 'ambitious';
+  keepers: { max: number; skillLoss: number; days: number };
+  league: LeagueSettings;
+  /** Weekly cup bonus (index 1) for places 1-3 of the cup ranking. */
+  cupBonus: number[];
+}
+
+export type LeagueLength = 'short' | 'medium' | 'long';
+export type LeagueAiGames = 'simulate' | 'topGame' | 'all';
+
+/** The Dream Team league's settings (sent as a whole block). */
+export interface LeagueSettings {
+  enabled: boolean;
+  tiers: number;
+  size: number;
+  startDay: number;
+  /** 0 = Monday. */
+  slotDays: number[];
+  slotTime: string;
+  length: LeagueLength;
+  aiGames: LeagueAiGames;
+  agentId: string | null;
+  profileId: string | null;
+  mapPool: string[];
+  fragLimit: number;
+  timeLimitMin: number;
+  factors: number[];
+  aiFloor: number[];
+  tableMoney: number[];
+  tierMult: number[];
+  betBots: number;
+  joinUntil: number;
+  keepTestTiers: boolean;
+}
+
+export interface LeagueClubRef {
+  id: string;
+  name: string;
+  tag: string;
+  /** A manager's club (else an AI club). */
+  manager: boolean;
+  me: boolean;
+}
+
+export type LeagueFormMark = 'W' | 'OW' | 'OL' | 'L';
+
+export interface LeagueRow extends LeagueClubRef {
+  club: string;
+  place: number;
+  played: number;
+  won: number;
+  wonOt: number;
+  lostOt: number;
+  lost: number;
+  fragsFor: number;
+  fragsAgainst: number;
+  points: number;
+  form: LeagueFormMark[];
+  strength: number | null;
+  /** Places gained (+) or lost (−) tonight. */
+  move: number;
+}
+
+export type LeagueKind = 'league' | 'relegation' | 'semi' | 'final' | 'third';
+
+export interface LeagueGame {
+  id: string;
+  tier: number;
+  matchday: number;
+  kind: LeagueKind;
+  day: string;
+  scheduledAt: string;
+  home: LeagueClubRef;
+  away: LeagueClubRef;
+  /** Played on the server (else simulated). */
+  real: boolean;
+  map: string | null;
+  status: 'scheduled' | 'played' | 'simulated' | 'forfeit' | 'void';
+  homeFrags: number | null;
+  awayFrags: number | null;
+  overtime: boolean;
+  winner: string | null;
+  homeWins: number | null;
+  awayWins: number | null;
+  postponed: number;
+  tournament: { id: string; phase: Phase } | null;
+}
+
+export interface LeaguePlan {
+  slotTime: string;
+  evenings: { day: string; matchdays: number[] }[];
+  relegation: string;
+  final: string;
+}
+
+export interface LeagueRunInfo {
+  season: number;
+  test: boolean;
+  status: 'running' | 'done' | 'aborted';
+  tiers: number;
+  size: number;
+  perEvening: number;
+  tableMoney: boolean;
+  startedAt: string;
+  endedAt: string | null;
+  plan: LeaguePlan;
+  matchdays?: number;
+}
+
+export interface LeagueView {
+  season: number;
+  enabled: boolean;
+  seasons: number[];
+  /** The website's day (test mode: the shifted clock). */
+  today?: string;
+  /** The website's time (test mode: the shifted clock). */
+  now?: string;
+  run: LeagueRunInfo | null;
+  myClub?: (LeagueClubRef & { tier: number | null }) | null;
+  tables?: { tier: number; rows: LeagueRow[]; final: boolean }[];
+  matchdays?: number[];
+  conference?: LeagueGame[];
+  evening?: {
+    day: string;
+    slot: string;
+    until: string;
+    games: number;
+    cups: { name: string; scheduledAt: string }[];
+  };
+  fixtures?: LeagueGame[];
+  next?:
+    (LeagueGame & { place: number | null; awayPlace: number | null; canPickMap: boolean }) | null;
+  mapPool?: string[];
+  rules?: { fragLimit: number; timeLimitMin: number; tableMoney: number[]; tierMult: number[] };
+  final?: (LeagueClubRef & { place: number })[];
+}
+
+export interface LeagueHistorySeason {
+  season: number;
+  test: boolean;
+  champion: { name: string; tag: string; manager: boolean } | null;
+  tiers: {
+    name: string;
+    tag: string;
+    manager: boolean;
+    place: number | null;
+    points: number;
+    nextTier: number | null;
+    finalPlace: number | null;
+  }[][];
+}
+
+export interface LeagueAdmin {
+  season: number | null;
+  /** The website's day (test mode: the shifted clock). */
+  today: string;
+  daysLeft: number | null;
+  run: LeagueRunInfo | null;
+  fits: boolean | null;
+  managers: number;
+  estimate: { minutes: number; realPerMatchday: number };
+  evenings: number;
+  server: { agentId: string; profileId: string } | null;
+  mapPool: string[];
+}
+
+export interface LeagueEstimate {
+  minutes: number;
+  realPerMatchday: number;
+  evenings: number;
+  managers: number;
 }
 
 export interface UdtTradeBot {

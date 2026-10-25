@@ -32,6 +32,16 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/udt-team').then((m) => m.UdtTeamPage),
       },
       {
+        path: 'udt/league',
+        title: 'udt.nav.league',
+        loadComponent: () => import('./pages/udt-league').then((m) => m.UdtLeaguePage),
+      },
+      {
+        path: 'udt/league/:view',
+        title: 'udt.nav.league',
+        loadComponent: () => import('./pages/udt-league').then((m) => m.UdtLeaguePage),
+      },
+      {
         path: 'udt/market',
         title: 'udt.nav.market',
         loadComponent: () => import('./pages/udt-market').then((m) => m.UdtMarketPage),

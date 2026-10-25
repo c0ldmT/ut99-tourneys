@@ -286,6 +286,7 @@ export const ERRORS_DE: Record<string, string> = {
   'the test league cannot start in the past':
     'Die Testliga kann nicht in der Vergangenheit starten.',
   'only a test league can be called off': 'Nur eine Testliga kann abgebrochen werden.',
+  'no league is running': 'Es läuft keine Liga.',
   'no admin to make the league games': 'Kein Admin, der die Ligaspiele anlegt.',
   'a keeper graduates in a later season':
     'Ein Keeper kann erst in einer späteren Season abschließen, nicht in seiner ersten als Keeper.',

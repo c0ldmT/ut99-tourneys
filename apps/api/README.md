@@ -63,7 +63,10 @@ DATA_DIR=./data-test DEV_LOGIN=true TEST_MODE=true PORT=8099 pnpm --filter @tour
 Admin endpoints (`/api/udt/test`, 404 without `TEST_MODE`): `GET` state; `POST advance {hours}` moves the clock
 (market days on the way run), `POST market-day`, `POST season-end`, `POST simulate/:id` plays a Dream Team
 tournament without a game server (results by the bots' strength), `POST managers {count}` creates test managers
-with a team, `POST managers/act` lets them bid, line up and enter open tournaments.
+with a team, `POST managers/act` lets them bid, line up and enter open tournaments. `POST league/day` plays the next
+league evening ("Matchday now": the clock goes to its slot, the games on the server are simulated, the clock
+moves past the evening so every result shows), `POST league/end` plays every evening left with the relegation
+and the final four ("League season end"). The clock offset lives in memory: a restart starts at the real time.
 
 ### Discord notifications (optional)
 

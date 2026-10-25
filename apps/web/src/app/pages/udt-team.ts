@@ -1,6 +1,7 @@
 import { emptyLook, lookBody, UdtBotLook, type UdtLooks } from '../components/udt-bot-look';
 import { UdtBotPanel } from '../components/udt-bot-panel';
 import { UdtKeepersPanel } from '../components/udt-keepers';
+import { UdtLeagueNext } from '../components/udt-league-next';
 import { UdtLineupBoard, type TraitDrop } from '../components/udt-lineup-board';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -38,6 +39,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
     UdtLineupBoard,
     UdtBotPanel,
     UdtKeepersPanel,
+    UdtLeagueNext,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -155,6 +157,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           </div>
         </div>
 
+        <app-udt-league-next />
         <section class="card">
           <udt-lineup-board
             [roster]="v.roster"

@@ -16,6 +16,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
+import { UdtLeagueService } from './udt-league.service.js';
 import { UdtMarketService } from './udt-market.service.js';
 import { UdtAiService } from './udt-ai.service.js';
 import { UdtTradesService } from './udt-trades.service.js';
@@ -54,6 +55,7 @@ export class UdtTestService {
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
     @Inject(UdtAiService) private readonly ai: UdtAiService,
+    @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
   ) {}
 
   /** 404 outside the test mode (the endpoints do not exist then). */
@@ -104,6 +106,56 @@ export class UdtTestService {
       this.market.tick();
     }
     return this.state();
+  }
+
+  /** Moves the clock to `at` hour by hour (market days and the league on the way run). */
+  private moveTo(at: number): void {
+    while (this.clock.now() < at) {
+      this.move(Math.min(HOUR, at - this.clock.now()));
+      this.market.tick();
+    }
+    this.market.tick();
+  }
+
+  /**
+   * The next league evening now (L11): the clock goes to its slot, the games on the server are
+   * played by the simulator, the clock moves past the evening so every result is shown.
+   * Returns the day played (null: no league running or nothing left).
+   */
+  private leagueEvening(by: User): string | null {
+    const next = this.league.testNextEvening();
+    if (!next) return null;
+    this.moveTo(next.slot + 60_000);
+    // Games made by the tick (also a final after the semi-finals) are played in turn.
+    for (let i = 0; i < 4; i++) {
+      const ids = this.league.testTournaments(next.day);
+      if (!ids.length) break;
+      for (const id of ids) this.simulate(id, by);
+      this.market.tick();
+    }
+    this.moveTo(Math.max(this.clock.now() + HOUR, next.slot + 4 * HOUR));
+    return next.day;
+  }
+
+  /** "Matchday now": the next league evening. */
+  leagueDay(by: User) {
+    this.assertTestMode();
+    const day = this.leagueEvening(by);
+    if (!day) throw conflict('no league is running');
+    return { ...this.state(), leagueDay: day };
+  }
+
+  /** "League season end": every evening left, the relegation and the final four. */
+  leagueEnd(by: User) {
+    this.assertTestMode();
+    if (this.league.testDone()) throw conflict('no league is running');
+    const days: string[] = [];
+    for (let i = 0; i < 80 && !this.league.testDone(); i++) {
+      const day = this.leagueEvening(by);
+      if (!day) break;
+      days.push(day);
+    }
+    return { ...this.state(), leagueDays: days.length, leagueDone: this.league.testDone() };
   }
 
   /** Ends the running season now (Dream Team rosters start anew with the next one). */

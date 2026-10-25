@@ -33,6 +33,18 @@ export class UdtTestController {
     return this.test.endSeason();
   }
 
+  @Post('league/day')
+  @HttpCode(200)
+  leagueDay(@CurrentUser() user: User) {
+    return this.test.leagueDay(user);
+  }
+
+  @Post('league/end')
+  @HttpCode(200)
+  leagueEnd(@CurrentUser() user: User) {
+    return this.test.leagueEnd(user);
+  }
+
   @Post('simulate/:id')
   @HttpCode(200)
   simulate(@CurrentUser() user: User, @Param('id') id: string) {

@@ -12,13 +12,15 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { SettingsBets } from '../components/settings-bets';
 import { SettingsBots } from '../components/settings-bots';
+import { SettingsLeague } from '../components/settings-league';
 import { SettingsSeason } from '../components/settings-season';
 import type { SettingsForm } from '../components/settings-shared';
 import { SettingsSystem } from '../components/settings-system';
 import { SettingsUdt } from '../components/settings-udt';
+import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 
-const TABS = ['season', 'bets', 'bots', 'udt', 'system'] as const;
+const TABS = ['season', 'bets', 'bots', 'udt', 'league', 'system'] as const;
 export type SettingsTab = (typeof TABS)[number];
 
 /**
@@ -29,7 +31,15 @@ export type SettingsTab = (typeof TABS)[number];
  */
 @Component({
   selector: 'app-settings',
-  imports: [TPipe, SettingsSeason, SettingsBets, SettingsBots, SettingsUdt, SettingsSystem],
+  imports: [
+    TPipe,
+    SettingsSeason,
+    SettingsBets,
+    SettingsBots,
+    SettingsUdt,
+    SettingsLeague,
+    SettingsSystem,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
@@ -44,6 +54,8 @@ export type SettingsTab = (typeof TABS)[number];
           [attr.aria-controls]="tab() === t ? 'st-panel' : null"
           [attr.tabindex]="tab() === t ? 0 : -1"
           [class.active]="tab() === t"
+          [attr.aria-disabled]="off(t) || null"
+          [title]="off(t) ? ('settings.leagueOff' | t) : ''"
           (click)="open(t)"
           (keydown)="key($event, t)"
         >
@@ -79,6 +91,9 @@ export type SettingsTab = (typeof TABS)[number];
         @case ('udt') {
           <app-settings-udt (saved)="saved($event)" />
         }
+        @case ('league') {
+          <app-settings-league (saved)="saved($event)" />
+        }
         @case ('system') {
           <app-settings-system />
         }
@@ -90,6 +105,10 @@ export type SettingsTab = (typeof TABS)[number];
       display: inline-flex;
       align-items: center;
       gap: 6px;
+    }
+    .tabs button[aria-disabled] {
+      color: var(--faint);
+      cursor: not-allowed;
     }
     .dot {
       width: 7px;
@@ -111,13 +130,15 @@ export class SettingsPage {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly i18n = inject(I18n);
+  private readonly auth = inject(Auth);
   protected readonly tabs = TABS;
   private readonly query = toSignal(this.route.queryParamMap.pipe(map((q) => q.get('tab'))), {
     initialValue: this.route.snapshot.queryParamMap.get('tab'),
   });
   protected readonly tab = computed<SettingsTab>(() => {
     const q = this.query();
-    return (TABS as readonly string[]).includes(q ?? '') ? (q as SettingsTab) : 'season';
+    const t = (TABS as readonly string[]).includes(q ?? '') ? (q as SettingsTab) : 'season';
+    return this.off(t) ? 'season' : t;
   });
   /** Forms of the open tab with changes not saved yet. */
   private readonly dirty = signal<ReadonlySet<string>>(new Set());
@@ -134,6 +155,7 @@ export class SettingsPage {
   /** Opens tab `t`; false when the admin keeps the unsaved changes of the open tab. */
   protected open(t: SettingsTab): boolean {
     if (t === this.tab()) return true;
+    if (this.off(t)) return false;
     if (this.unsaved() && !confirm(this.i18n.t('settings.unsavedConfirm'))) return false;
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -145,21 +167,27 @@ export class SettingsPage {
 
   /** Arrow keys, Home and End move between the tabs (the tab pattern of ARIA). */
   protected key(e: KeyboardEvent, t: SettingsTab) {
-    const i = TABS.indexOf(t);
+    const tabs = TABS.filter((x) => !this.off(x) || x === t);
+    const i = tabs.indexOf(t);
     const next =
       e.key === 'ArrowRight'
-        ? TABS[(i + 1) % TABS.length]
+        ? tabs[(i + 1) % tabs.length]
         : e.key === 'ArrowLeft'
-          ? TABS[(i - 1 + TABS.length) % TABS.length]
+          ? tabs[(i - 1 + tabs.length) % tabs.length]
           : e.key === 'Home'
-            ? TABS[0]
+            ? tabs[0]
             : e.key === 'End'
-              ? TABS[TABS.length - 1]
+              ? tabs[tabs.length - 1]
               : null;
     if (!next) return;
     e.preventDefault();
     // Focus follows only when the tab really changes (not when the admin keeps the changes).
     if (this.open(next)) document.getElementById(`st-tab-${next}`)?.focus();
+  }
+
+  /** The league tab needs the Dream Team module (switched on in the tab "Dream Team"). */
+  protected off(t: SettingsTab): boolean {
+    return t === 'league' && !this.auth.config().udt;
   }
 
   /** A field of a saving form changed. */
