@@ -1401,8 +1401,28 @@ export interface UdtMentor {
   mentorTrait: boolean;
   ready: boolean;
   used: boolean;
-  /** What the apprentice would get (values and the inherited trait are drawn). */
-  apprentice?: { skill: number; potential: number; traits: string[]; inheritChance: number };
+  /** Traits that can be passed on and the chance that one is. */
+  traits: string[];
+  inheritChance: number;
+  /** Bots the team made that could learn from it: their values before and after. */
+  pupils: UdtPupil[];
+}
+
+export interface UdtLessonValues {
+  accuracy: number;
+  alertness: number;
+  strafing: number;
+  combatStyle: number;
+  camping: number;
+}
+
+export interface UdtPupil {
+  botId: string;
+  name: string;
+  skill: number;
+  level: number;
+  before: UdtLessonValues;
+  after: UdtLessonValues;
 }
 
 export interface UdtAcademy {

@@ -203,50 +203,48 @@ export const STARTER_SKILL = 3;
 /** Potential of a starter bot: two skill steps above (at most Godlike). */
 export const starterPotential = (skill: number): number => Math.min(7, Math.round(skill) + 2);
 
-/** An apprentice's skill: three steps below its mentor's (at least 1). */
-export const apprenticeSkill = (mentorSkill: number): number =>
-  Math.max(1, Math.round(mentorSkill) - 3);
-
-/** An apprentice's potential: one step below its mentor's skill (at most 6, never below its skill). */
-export const apprenticePotential = (mentorSkill: number): number =>
-  Math.max(apprenticeSkill(mentorSkill), Math.min(6, Math.round(mentorSkill) - 1));
-
 /** The chance that an apprentice inherits one of its mentor's traits (the mentor trait: 50 %). */
 export const apprenticeTraitChance = (hasMentorTrait: boolean): number =>
   hasMentorTrait ? 0.5 : 0.25;
 
+/** How far an apprentice moves towards its mentor: half the way, three quarters with the trait. */
+export const mentorLean = (hasMentorTrait: boolean): number => (hasMentorTrait ? 0.75 : 0.5);
+
 /**
- * An apprentice of a mentor: skill three steps below the mentor (at least 1), potential one step
- * below the mentor's skill (owner, 23.10.: a Godlike mentor made a salary-free Godlike); the values lean towards the mentor's (70 %, all of them with the mentor
- * trait); one of the mentor's traits is passed on by chance (25 %, 50 % with the mentor trait).
+ * What a bot the team made learns as the apprentice of a mentor (owner, 25.10.: a mentor takes
+ * an existing own bot, no new bot): accuracy, alertness and strafing rise towards the mentor's in
+ * steps of 5 (never down, never above the mentor), the play style (combat style, camping) moves
+ * towards the mentor's. Skill and potential stay.
  */
-export function apprentice(
-  mentor: { skill: number; values: Partial<TalentValues>; traitCodes: readonly string[] },
-  name: string,
+export function mentorLesson(
+  mentor: Partial<TalentValues>,
+  pupil: Partial<TalentValues>,
+  hasMentorTrait: boolean,
+): TalentValues {
+  const lean = mentorLean(hasMentorTrait);
+  const up = (p = 0, m = 0) =>
+    m <= p ? p : r3(clamp(p + Math.floor((m - p) * lean * 10 + 1e-9) / 10, -1, 1));
+  const toward = (p = 0, m = 0, lo = -1) => r3(clamp(p + (m - p) * lean, lo, 1));
+  return {
+    accuracy: up(pupil.accuracy, mentor.accuracy),
+    alertness: up(pupil.alertness, mentor.alertness),
+    strafing: up(pupil.strafing, mentor.strafing),
+    combatStyle: toward(pupil.combatStyle, mentor.combatStyle),
+    camping: toward(pupil.camping, mentor.camping, 0),
+  };
+}
+
+/** The mentor's trait an apprentice inherits by chance (not one it has, never the mentor trait). */
+export function inheritedTrait(
+  mentorTraits: readonly string[],
+  pupilTraits: readonly string[],
   hasMentorTrait: boolean,
   rng: () => number,
-): Talent & { inherited: string | null } {
-  const lean = hasMentorTrait ? 1 : 0.7;
-  const v = (m: number | undefined) =>
-    r3(clamp(lean * (m ?? 0) + (1 - lean) * (rng() * 2 - 1) * 0.6, -1, 1));
-  const passable = mentor.traitCodes.filter((c) => c !== 'mentor');
-  const chance = apprenticeTraitChance(hasMentorTrait);
-  const inherited =
-    passable.length && rng() < chance ? passable[Math.floor(rng() * passable.length)]! : null;
-  const skill = apprenticeSkill(mentor.skill);
-  return {
-    name,
-    skill,
-    values: {
-      accuracy: v(mentor.values.accuracy),
-      alertness: v(mentor.values.alertness),
-      strafing: v(mentor.values.strafing),
-      combatStyle: v(mentor.values.combatStyle),
-      camping: r3(clamp(lean * (mentor.values.camping ?? 0) + (1 - lean) * rng() * 0.5, 0, 1)),
-    },
-    potential: apprenticePotential(mentor.skill),
-    inherited,
-  };
+): string | null {
+  const passable = mentorTraits.filter((c) => c !== 'mentor' && !pupilTraits.includes(c));
+  return passable.length && rng() < apprenticeTraitChance(hasMentorTrait)
+    ? passable[Math.floor(rng() * passable.length)]!
+    : null;
 }
 
 // ---------- licences ----------

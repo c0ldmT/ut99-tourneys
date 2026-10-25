@@ -346,7 +346,7 @@ export class UdtController {
   @HttpCode(200)
   takeApprentice(
     @CurrentUser() user: User,
-    @Body(new ZodPipe(MentorBody)) body: { mentorId: string; name: string },
+    @Body(new ZodPipe(MentorBody)) body: { mentorId: string; apprenticeId: string },
   ) {
     return this.academy.mentor(user, body);
   }

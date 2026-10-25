@@ -307,11 +307,11 @@ export class Api {
     this.call<UdtAcademy>('POST', '/udt/academy/scout', undefined, { ok: 'ok.udt.scouted' });
   udtSign = (pick: number, name: string) =>
     this.call<UdtAcademy>('POST', '/udt/academy/sign', { pick, name }, { ok: 'ok.udt.signed' });
-  udtApprentice = (mentorId: string, name: string) =>
+  udtApprentice = (mentorId: string, apprenticeId: string) =>
     this.call<UdtAcademy>(
       'POST',
       '/udt/academy/mentor',
-      { mentorId, name },
+      { mentorId, apprenticeId },
       { ok: 'ok.udt.apprentice' },
     );
   udtBuild = (body: {

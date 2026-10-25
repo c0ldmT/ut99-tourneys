@@ -45,6 +45,9 @@ describe('translations', () => {
     // Origins of own Dream Team bots (badges on My team, squads, yearbook).
     for (const o of ['starter', 'academy', 'apprentice', 'blueprint'])
       expect(DICT.en[`udt.academy.origin.${o}`]).toBeDefined();
+    // What an apprentice learns (academy).
+    for (const k of ['accuracy', 'alertness', 'strafing', 'combatStyle', 'camping'])
+      expect(DICT.en[`udt.academy.lesson.${k}`]).toBeDefined();
     // Teams left out at a Dream Team draw (toast after the draw).
     for (const r of ['busy', 'lineup', 'full'])
       for (const lang of ['en', 'de'] as const)

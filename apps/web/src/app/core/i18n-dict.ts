@@ -1350,7 +1350,7 @@ const en = {
   'udt.traitE.mentor': 'Its apprentice inherits its play style for sure, double chance for a trait',
   'udt.academy.title': 'Academy',
   'udt.academy.intro':
-    'Make your own bots: scout talents or let a mentor train an apprentice, develop them with points from their levels and graduate them into the library.',
+    'Make your own bots: scout talents or build them from blueprints, let an experienced bot teach one of them as its apprentice, develop them with points from their levels and graduate them into the library.',
   'udt.academy.made': 'Own bots this season',
   'udt.academy.nextLicence': 'Next licence',
   'udt.academy.scouting': 'Scouting',
@@ -1366,16 +1366,22 @@ const en = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentors',
   'udt.academy.mentorText':
-    "Every bot of your roster from level {lv} – bought or made by you – can take one apprentice per season (needs a licence): three skill steps lower, its potential one step below the mentor's skill, the play style leans towards the mentor and a trait may be passed on.",
+    "Every bot of your roster from level {lv} – bought or made by you – can teach one apprentice per season: a bot your team made with a lower skill that never had a mentor. Its accuracy, alertness and strafing rise half the way to the mentor's (never down), its play style moves towards the mentor's, and a trait may be passed on. Free, no new bot.",
   'udt.academy.hasApprentice': 'has an apprentice',
   'udt.academy.takeApprentice': 'Take an apprentice',
   'udt.academy.noMentors': 'No bots in your roster yet.',
   'udt.academy.mentorPick': 'Mentor',
-  'udt.academy.pupil':
-    'The apprentice: {skill}, potential up to {pot}; its play style leans towards the mentor.',
+  'udt.academy.pupilPick': 'Apprentice',
+  'udt.academy.lesson': 'What it learns (0–100):',
+  'udt.academy.lesson.accuracy': 'Accuracy',
+  'udt.academy.lesson.alertness': 'Alertness',
+  'udt.academy.lesson.strafing': 'Strafing',
+  'udt.academy.lesson.combatStyle': 'Combat style',
+  'udt.academy.lesson.camping': 'Camping',
+  'udt.academy.noPupils':
+    'No bot your team made can learn from it: it needs a lower skill and must never have had a mentor.',
   'udt.academy.pupilTrait': '{pct} % chance to inherit one of: {list}.',
   'udt.academy.pupilNoTrait': 'No trait to pass on.',
-  'udt.academy.pupilName': 'Name of the apprentice',
   'udt.academy.inherited': 'The apprentice inherited the trait {trait}!',
   'udt.academy.own': 'Own bots',
   'udt.academy.gradText':
@@ -1745,7 +1751,7 @@ const en = {
   'ok.udt.renamed': 'Renamed: the bot is called {name} now.',
   'ok.udt.signed':
     'Talent signed: it is in your roster now. You can rename it once for free (Academy › Own bots).',
-  'ok.udt.apprentice': 'Apprentice taken on. You can rename it once for free.',
+  'ok.udt.apprentice': 'Apprentice taken on: it learned from its mentor.',
   'ok.udt.built': 'Bot built from the blueprint. You can rename it once for free.',
   'ok.udt.breakthrough': 'Breakthrough! Skill and potential +1.',
   'udt.help.button': 'How it works',
@@ -1762,7 +1768,7 @@ const en = {
     'Every market day brings new bots at a fixed price. Buy one and it joins your roster right away; first come, first served.',
   'udt.help.way.academy.title': 'Academy: raise your own',
   'udt.help.way.academy.text':
-    'Scout three talents and sign one with a licence, let an experienced bot (from level 3) take an apprentice, or build a bot from a blueprint. Bots you made draw no salary, develop with points and can be renamed once for free.',
+    'Scout three talents and sign one with a licence, or build a bot from a blueprint; an experienced bot (from level 3) can teach one of them as its apprentice. Bots you made draw no salary, develop with points and can be renamed once for free.',
   'udt.help.way.packs.title': 'Packs: traits and blueprints',
   'udt.help.way.packs.text':
     'Packs bring traits that make your bots stronger, and now and then a blueprint for the academy.',
@@ -3290,7 +3296,7 @@ const de: Record<TKey, string> = {
   'udt.traitE.mentor': 'Sein Lehrling erbt die Spielweise sicher, doppelte Chance auf einen Trait',
   'udt.academy.title': 'Akademie',
   'udt.academy.intro':
-    'Erschaffe eigene Bots: Scoute Talente oder lass einen Mentor einen Lehrling ausbilden, entwickle sie mit Punkten aus ihren Leveln und bring sie zum Abschluss in die Bibliothek.',
+    'Erschaffe eigene Bots: Scoute Talente oder bau sie aus Bauplänen, lass einen erfahrenen Bot einen von ihnen als Lehrling ausbilden, entwickle sie mit Punkten aus ihren Leveln und bring sie zum Abschluss in die Bibliothek.',
   'udt.academy.made': 'Eigene Bots diese Season',
   'udt.academy.nextLicence': 'Nächste Lizenz',
   'udt.academy.scouting': 'Scouting',
@@ -3306,16 +3312,22 @@ const de: Record<TKey, string> = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentoren',
   'udt.academy.mentorText':
-    'Jeder Bot deines Kaders ab Level {lv} – gekauft oder selbst gemacht – kann pro Season einen Lehrling aufnehmen (braucht eine Lizenz): drei Skill-Stufen tiefer, Potenzial eine Stufe unter dem Skill des Mentors, der Spielstil lehnt sich an den Mentor an, ein Trait kann übergehen.',
+    'Jeder Bot deines Kaders ab Level {lv} – gekauft oder selbst gemacht – kann pro Season einen Lehrling ausbilden: einen selbst gemachten Bot mit niedrigerem Skill, der noch keinen Mentor hatte. Seine Accuracy, Alertness und Strafing steigen den halben Weg zum Mentor (nie nach unten), sein Spielstil rückt zum Mentor, ein Trait kann übergehen. Kostenlos, kein neuer Bot.',
   'udt.academy.hasApprentice': 'hat einen Lehrling',
   'udt.academy.takeApprentice': 'Lehrling aufnehmen',
   'udt.academy.noMentors': 'Noch keine Bots im Kader.',
   'udt.academy.mentorPick': 'Mentor',
-  'udt.academy.pupil':
-    'Der Lehrling: {skill}, Potenzial bis {pot}; sein Spielstil lehnt sich an den Mentor an.',
+  'udt.academy.pupilPick': 'Lehrling',
+  'udt.academy.lesson': 'Was er lernt (0–100):',
+  'udt.academy.lesson.accuracy': 'Accuracy',
+  'udt.academy.lesson.alertness': 'Alertness',
+  'udt.academy.lesson.strafing': 'Strafing',
+  'udt.academy.lesson.combatStyle': 'Kampfstil',
+  'udt.academy.lesson.camping': 'Camping',
+  'udt.academy.noPupils':
+    'Kein selbst gemachter Bot kann von ihm lernen: Er braucht einen niedrigeren Skill und darf noch keinen Mentor gehabt haben.',
   'udt.academy.pupilTrait': '{pct} % Chance, eins davon zu erben: {list}.',
   'udt.academy.pupilNoTrait': 'Kein Trait zum Vererben.',
-  'udt.academy.pupilName': 'Name des Lehrlings',
   'udt.academy.inherited': 'Der Lehrling hat den Trait {trait} geerbt!',
   'udt.academy.own': 'Eigene Bots',
   'udt.academy.gradText':
@@ -3687,7 +3699,7 @@ const de: Record<TKey, string> = {
   'ok.udt.renamed': 'Umbenannt: Der Bot heißt jetzt {name}.',
   'ok.udt.signed':
     'Talent verpflichtet: Es ist jetzt in deinem Kader. Einmal umbenennen kannst du es kostenlos (Akademie › Eigene Bots).',
-  'ok.udt.apprentice': 'Lehrling aufgenommen. Einmal umbenennen kannst du ihn kostenlos.',
+  'ok.udt.apprentice': 'Lehrling aufgenommen: Er hat von seinem Mentor gelernt.',
   'ok.udt.built': 'Bot aus dem Bauplan gebaut. Einmal umbenennen kannst du ihn kostenlos.',
   'ok.udt.breakthrough': 'Durchbruch! Skill und Potenzial +1.',
   'udt.help.button': "So funktioniert's",
@@ -3704,7 +3716,7 @@ const de: Record<TKey, string> = {
     'Jeder Markttag bringt neue Bots zum Festpreis. Kaufst du einen, ist er sofort in deinem Kader; wer zuerst kommt, bekommt ihn.',
   'udt.help.way.academy.title': 'Akademie: eigene Bots hochziehen',
   'udt.help.way.academy.text':
-    'Scoute drei Talente und verpflichte eins mit einer Lizenz, lass einen erfahrenen Bot (ab Level 3) einen Lehrling aufnehmen oder bau einen Bot aus einem Bauplan. Selbst gemachte Bots bekommen kein Gehalt, entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen.',
+    'Scoute drei Talente und verpflichte eins mit einer Lizenz oder bau einen Bot aus einem Bauplan; ein erfahrener Bot (ab Level 3) kann einen davon als Lehrling ausbilden. Selbst gemachte Bots bekommen kein Gehalt, entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen.',
   'udt.help.way.packs.title': 'Packs: Traits und Baupläne',
   'udt.help.way.packs.text':
     'Packs bringen Traits, die deine Bots stärker machen, und ab und zu einen Bauplan für die Akademie.',

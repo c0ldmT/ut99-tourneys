@@ -231,6 +231,12 @@ export const ERRORS_DE: Record<string, string> = {
   'at most {max} bots: make room first': 'Höchstens {max} Bots: Mach zuerst Platz im Kader.',
   'blueprint not found': 'Bauplan nicht gefunden.',
   'mentor in your roster not found': 'Der Mentor ist nicht in deinem Kader.',
+  'apprentice in your roster not found': 'Der Lehrling ist nicht in deinem Kader.',
+  'mentor and apprentice are two bots': 'Mentor und Lehrling müssen zwei verschiedene Bots sein.',
+  'an apprentice is a bot your team made': 'Ein Lehrling ist ein Bot, den dein Team gemacht hat.',
+  '{name} had a mentor already': '{name} hatte schon einen Mentor.',
+  'the apprentice needs a lower skill than its mentor':
+    'Der Lehrling braucht einen niedrigeren Skill als sein Mentor.',
   'not enough development points (one per level)':
     'Nicht genug Entwicklungspunkte (einer pro Level).',
   'own bot in your roster not found': 'Der eigene Bot ist nicht in deinem Kader.',

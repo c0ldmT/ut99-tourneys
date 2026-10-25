@@ -97,44 +97,52 @@ describe('Unreal Dream Team: academy', () => {
     ); // 3 points needed
   });
 
-  it('a mentor of level 3 takes one apprentice per season', async () => {
+  it('a mentor of level 3 teaches a bot the team made, once per season', async () => {
     const { admin, mario, marioId, db } = await setup();
-    const lib = (await admin.post('/bots', { name: 'Sensei', skill: 6, traits: { accuracy: 0.8 } }))
-      .body.id as string;
-    db.insert(udtRoster)
-      .values({ season: 1, botId: lib, userId: marioId, price: 9000, acquiredAt: 'x', xp: 0 })
-      .run();
+    const lib = (
+      await admin.post('/bots', {
+        name: 'Sensei',
+        skill: 6,
+        traits: { accuracy: 0.8, combatStyle: 1 },
+      })
+    ).body.id as string;
+    const other = (await admin.post('/bots', { name: 'Hired', skill: 2 })).body.id as string;
+    for (const botId of [lib, other])
+      db.insert(udtRoster)
+        .values({ season: 1, botId, userId: marioId, price: 9000, acquiredAt: 'x', xp: 0 })
+        .run();
     let v = (await mario.get('/udt/academy')).body;
     const of = (name: string) => v.mentors.find((m: { name: string }) => m.name === name);
-    // Every roster bot is listed, also the ones made by the team (decision 207).
-    expect(of('Sensei')).toMatchObject({
-      ready: false,
-      own: false,
-      apprentice: { skill: 3, potential: 5, inheritChance: 0.25 },
-    });
+    // Every roster bot is listed; Sensei could teach the starter Mira (made by the team, lower
+    // skill), not the bought Hired.
+    expect(of('Sensei')).toMatchObject({ ready: false, own: false, inheritChance: 0.25 });
+    expect(of('Sensei').pupils).toEqual([
+      expect.objectContaining({
+        name: 'Mira',
+        before: expect.objectContaining({ accuracy: 0, combatStyle: 0 }),
+        after: expect.objectContaining({ accuracy: 0.4, combatStyle: 0.5 }),
+      }),
+    ]);
     expect(of('Mira')).toMatchObject({ ready: false, own: true });
-    expect((await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil' })).status).toBe(
-      409,
-    );
-    db.update(udtRoster).set({ xp: 70 }).run(); // level 3
-    const ok = await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil' });
-    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
-    const pupil = ok.body.own.find((b: { name: string }) => b.name === 'Pupil');
-    expect(pupil).toMatchObject({ skill: 3, own: { origin: 'apprentice' } });
-    expect(pupil.traits.accuracy).toBeGreaterThan(0.3);
-    v = ok.body;
-    expect(of('Sensei')).toMatchObject({ used: true, ready: false });
-    expect(
-      (await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil2' })).status,
-    ).toBe(409);
-    // The starter (made by the team, level 3 too) can be a mentor as well.
-    expect(of('Mira')).toMatchObject({ ready: true, own: true });
     const mira = of('Mira').botId as string;
-    const second = await mario.post('/udt/academy/mentor', { mentorId: mira, name: 'Pupil3' });
-    expect(second.status, JSON.stringify(second.body)).toBe(200);
-    expect(second.body.own.find((b: { name: string }) => b.name === 'Pupil3').own.origin).toBe(
-      'apprentice',
-    );
+    const teach = (mentorId: string, apprenticeId: string) =>
+      mario.post('/udt/academy/mentor', { mentorId, apprenticeId });
+    expect((await teach(lib, mira)).status).toBe(409); // level 1
+    db.update(udtRoster).set({ xp: 70 }).run(); // level 3
+    expect((await teach(lib, other)).status).toBe(409); // bought: not made by the team
+    expect((await teach(lib, lib)).status).toBe(400);
+    const ok = await teach(lib, mira);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    const learned = ok.body.own.find((b: { name: string }) => b.name === 'Mira');
+    expect(learned.traits).toMatchObject({ accuracy: 0.4, combatStyle: 0.5 });
+    expect(db.select().from(udtBots).where(eq(udtBots.botId, mira)).get()?.mentorId).toBe(lib);
+    v = ok.body;
+    // No new bot, no licence used.
+    expect(v.licence.made).toBe(1);
+    expect(of('Sensei')).toMatchObject({ used: true, ready: false });
+    expect((await teach(lib, mira)).status).toBe(409);
+    // Mira had her mentor; a mentor needs a higher skill than its apprentice.
+    expect(of('Mira')).toMatchObject({ ready: true, pupils: [] });
   });
 
   it('graduates an own bot with 15 games and level 5 after an admin approved', async () => {

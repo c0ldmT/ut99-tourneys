@@ -10,6 +10,7 @@ import type {
   UdtAcademy,
   UdtGraduation,
   UdtMentor,
+  UdtPupil,
   UdtRosterBot,
   UdtTalentReport,
 } from '../core/types';
@@ -226,41 +227,51 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                   }
                 </span>
               </div>
-              @if (m.ready && m.apprentice; as p) {
-                <p class="small">
-                  {{
-                    'udt.academy.pupil'
-                      | t: { skill: skillName(p.skill), pot: skillName(p.potential) }
-                  }}
-                  @if (p.traits.length) {
-                    {{
-                      'udt.academy.pupilTrait'
-                        | t: { pct: p.inheritChance * 100, list: traitNames(p.traits) }
-                    }}
-                  } @else {
-                    {{ 'udt.academy.pupilNoTrait' | t }}
-                  }
-                </p>
-                <div class="row">
-                  <input
-                    type="text"
-                    maxlength="20"
-                    [name]="'m' + m.botId"
-                    [placeholder]="'udt.academy.pupilName' | t"
-                    [attr.aria-label]="'udt.academy.pupilName' | t"
-                    [ngModel]="mentorNames()[m.botId] ?? ''"
-                    (ngModelChange)="setMentorName(m.botId, $event)"
-                  />
-                  <button
-                    type="button"
-                    [disabled]="
-                      busy() || v.rosterFull || v.licence.nextPrice === null || !mentorName(m)
-                    "
-                    (click)="apprentice(m)"
+              @if (m.ready && m.pupils.length) {
+                <label class="mpick"
+                  >{{ 'udt.academy.pupilPick' | t }}
+                  <select
+                    name="pupil"
+                    [ngModel]="pupil()?.botId ?? ''"
+                    (ngModelChange)="pupilId.set($event)"
                   >
+                    @for (p of m.pupils; track p.botId) {
+                      <option [value]="p.botId">
+                        {{ p.name }} · {{ skillName(p.skill) }} · {{ 'udt.level' | t }}
+                        {{ p.level }}
+                      </option>
+                    }
+                  </select>
+                </label>
+                @if (pupil(); as p) {
+                  <p class="small muted">{{ 'udt.academy.lesson' | t }}</p>
+                  <ul class="lesson small">
+                    @for (k of lessonKeys; track k) {
+                      <li [class.up]="p.after[k] !== p.before[k]">
+                        {{ 'udt.academy.lesson.' + k | t }}:
+                        <span class="mono">{{ pct(p.before[k], k) }}</span>
+                        @if (p.after[k] !== p.before[k]) {
+                          → <b class="mono">{{ pct(p.after[k], k) }}</b>
+                        }
+                      </li>
+                    }
+                  </ul>
+                  <p class="small">
+                    @if (m.traits.length) {
+                      {{
+                        'udt.academy.pupilTrait'
+                          | t: { pct: m.inheritChance * 100, list: traitNames(m.traits) }
+                      }}
+                    } @else {
+                      {{ 'udt.academy.pupilNoTrait' | t }}
+                    }
+                  </p>
+                  <button type="button" [disabled]="busy()" (click)="apprentice(m, p)">
                     {{ 'udt.academy.takeApprentice' | t }}
                   </button>
-                </div>
+                }
+              } @else if (m.ready) {
+                <p class="muted small">{{ 'udt.academy.noPupils' | t }}</p>
               } @else {
                 <p class="muted small">{{ mentorBlocked(m, v.mentorLevel) }}</p>
               }
@@ -372,6 +383,13 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       justify-content: space-between;
       font-size: 0.85rem;
     }
+    .lesson {
+      margin: 4px 0;
+      padding-left: 18px;
+    }
+    .lesson li.up b {
+      color: var(--live);
+    }
     .mpick select {
       display: block;
       width: 100%;
@@ -417,7 +435,19 @@ export class UdtAcademyPage {
   protected readonly grad = signal<UdtGraduation | null>(null);
   protected readonly busy = signal(false);
   protected readonly names = signal<Partial<Record<number, string>>>({});
-  protected readonly mentorNames = signal<Partial<Record<string, string>>>({});
+  /** The chosen apprentice (default: the first bot that can learn from the mentor). */
+  protected readonly pupilId = signal<string | null>(null);
+  protected readonly pupil = computed((): UdtPupil | null => {
+    const list = this.mentor()?.pupils ?? [];
+    return list.find((p) => p.botId === this.pupilId()) ?? list[0] ?? null;
+  });
+  protected readonly lessonKeys = [
+    'accuracy',
+    'alertness',
+    'strafing',
+    'combatStyle',
+    'camping',
+  ] as const;
   /** The chosen mentor (default: the first that can take an apprentice). */
   protected readonly mentorId = signal<string | null>(null);
   protected readonly mentor = computed((): UdtMentor | null => {
@@ -532,10 +562,6 @@ export class UdtAcademyPage {
     this.names.update((n) => ({ ...n, [i]: v }));
   }
 
-  protected setMentorName(id: string, v: string) {
-    this.mentorNames.update((n) => ({ ...n, [id]: v }));
-  }
-
   /** Why a bot cannot take an apprentice now. */
   protected mentorBlocked(m: UdtMentor, lv: number): string {
     return m.used
@@ -547,8 +573,9 @@ export class UdtAcademyPage {
     return codes.map((c) => this.i18n.t(`udt.trait.${c}`)).join(', ');
   }
 
-  protected mentorName(m: UdtMentor) {
-    return (this.mentorNames()[m.botId] ?? '').trim();
+  /** A value on the page's 0..100 scale (camping 0..1 as 0..100 too). */
+  protected pct(v: number, k: (typeof this.lessonKeys)[number]): number {
+    return Math.round(k === 'camping' ? v * 100 : (v + 1) * 50);
   }
 
   protected async scout() {
@@ -566,9 +593,9 @@ export class UdtAcademyPage {
     });
   }
 
-  protected async apprentice(m: UdtMentor) {
+  protected async apprentice(m: UdtMentor, p: UdtPupil) {
     await this.act(async () => {
-      const v = await this.api.udtApprentice(m.botId, this.mentorName(m));
+      const v = await this.api.udtApprentice(m.botId, p.botId);
       this.a.set(v);
       this.grad.set(await this.api.udtGraduation());
       if (v.apprentice?.inherited)

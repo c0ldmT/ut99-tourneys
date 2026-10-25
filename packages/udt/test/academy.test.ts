@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  apprentice,
+  inheritedTrait,
+  mentorLesson,
   cannotDevelop,
   developPoints,
   licencePrice,
@@ -46,20 +47,22 @@ describe('academy', () => {
     expect(starterPotential(6)).toBe(7);
   });
 
-  it('makes apprentices that lean towards the mentor', () => {
-    const m = { skill: 6, values: { accuracy: 0.8, strafing: -0.5 }, traitCodes: ['eagle-eye'] };
-    const a = apprentice(m, 'Pip', true, seq(0.1));
-    // Potential one step below the mentor (a Godlike mentor no longer makes a Godlike).
-    expect(a).toMatchObject({ name: 'Pip', skill: 3, potential: 5, inherited: 'eagle-eye' });
-    expect(apprentice({ ...m, skill: 7 }, 'Top', false, seq(0.5)).potential).toBe(6);
-    expect(apprentice({ ...m, skill: 3 }, 'Low', false, seq(0.5))).toMatchObject({
-      skill: 1,
-      potential: 2,
+  it('apprentices learn from their mentor: values up to it, the play style towards it', () => {
+    const m = { accuracy: 0.8, alertness: -0.2, strafing: 0.5, combatStyle: 1, camping: 0.8 };
+    const p = { accuracy: 0, alertness: 0.3, strafing: 0.45, combatStyle: -1, camping: 0 };
+    // Half the way in steps of 5 (0.1 here), never down, never above the mentor.
+    expect(mentorLesson(m, p, false)).toEqual({
+      accuracy: 0.4,
+      alertness: 0.3,
+      strafing: 0.45,
+      combatStyle: 0,
+      camping: 0.4,
     });
-    expect(a.values.accuracy).toBe(0.8);
-    const b = apprentice(m, 'Pop', false, seq(0.9));
-    expect(b.inherited).toBeNull();
-    expect(b.values.accuracy).toBeGreaterThan(0.5);
+    expect(mentorLesson(m, p, true)).toMatchObject({ accuracy: 0.6, combatStyle: 0.5 });
+    expect(mentorLesson({ accuracy: 1 }, { accuracy: 0.95 }, true).accuracy).toBe(0.95);
+    expect(inheritedTrait(['eagle-eye', 'mentor'], [], true, seq(0.1))).toBe('eagle-eye');
+    expect(inheritedTrait(['eagle-eye'], ['eagle-eye'], true, seq(0.1))).toBeNull();
+    expect(inheritedTrait(['eagle-eye'], [], false, seq(0.3))).toBeNull();
   });
 
   it('develops with points up to the potential', () => {

@@ -3,10 +3,9 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   drawPotentialWindow,
-  apprentice,
-  apprenticePotential,
-  apprenticeSkill,
   apprenticeTraitChance,
+  inheritedTrait,
+  mentorLesson,
   BLUEPRINTS,
   blueprintPotential,
   BREAKTHROUGH_LEVEL,
@@ -48,6 +47,7 @@ import {
   UdtService,
   windowOf,
   type BotLook,
+  type RosterBot,
 } from './udt.service.js';
 
 export const BotName = z
@@ -64,8 +64,8 @@ export const SignBody = z.object({
 });
 export const MentorBody = z.object({
   mentorId: z.string().min(1).max(40),
-  name: BotName,
-  look: BotLookBody.optional(),
+  /** A bot the team made: it learns from the mentor (no new bot, decision 208). */
+  apprenticeId: z.string().min(1).max(40),
 });
 const Value = z.number().min(-1).max(1);
 export const BuildBody = z.object({
@@ -140,6 +140,7 @@ export class UdtAcademyService {
     const made = this.made(season, user.id);
     const roster = team ? this.udt.roster(user.id, season) : [];
     const used = this.mentorsUsed(season);
+    const own = this.udt.ownBots(season, user.id);
     const s = this.scout(season, user.id);
     return {
       hasTeam: !!team,
@@ -160,14 +161,20 @@ export class UdtAcademyService {
           mentorTrait,
           ready: r.level >= MENTOR_LEVEL && !used.has(r.botId),
           used: used.has(r.botId),
-          /** What the apprentice would get (its values and the inherited trait are drawn). */
-          apprentice: {
-            skill: apprenticeSkill(r.skill),
-            potential: apprenticePotential(r.skill),
-            /** Traits that can be passed on and the chance that one is. */
-            traits: r.udtTraits.filter((x) => x.code !== 'mentor').map((x) => x.code),
-            inheritChance: apprenticeTraitChance(mentorTrait),
-          },
+          /** Traits that can be passed on and the chance that one is. */
+          traits: r.udtTraits.filter((x) => x.code !== 'mentor').map((x) => x.code),
+          inheritChance: apprenticeTraitChance(mentorTrait),
+          /** Bots the team made that could learn from it, with their values before and after. */
+          pupils: roster
+            .filter((p) => canLearn(p, r, own))
+            .map((p) => ({
+              botId: p.botId,
+              name: p.name,
+              skill: p.skill,
+              level: p.level,
+              before: pick(p.traits),
+              after: mentorLesson(r.traits, p.traits, mentorTrait),
+            })),
         };
       }),
       own: roster.filter((r) => r.own),
@@ -338,56 +345,56 @@ export class UdtAcademyService {
     return this.view(user);
   }
 
-  /** A mentor (any roster bot of level 3+) takes an apprentice: leaning values, maybe a trait. */
+  /**
+   * A mentor (any roster bot of level 3+, one apprentice per season) takes a bot the team made
+   * as its apprentice (owner, 25.10.): the apprentice's values rise towards the mentor's, its
+   * play style moves towards it, a trait may be passed on. Each bot is an apprentice once.
+   */
   mentor(user: User, body: z.infer<typeof MentorBody>) {
     this.udt.assertOn();
     const season = this.udt.season().number;
-    const m = this.udt.roster(user.id, season).find((r) => r.botId === body.mentorId);
+    const roster = this.udt.roster(user.id, season);
+    const m = roster.find((r) => r.botId === body.mentorId);
     if (!m) throw notFound('mentor in your roster');
     if (m.level < MENTOR_LEVEL)
       throw conflict('a mentor needs level {level}', { level: MENTOR_LEVEL });
     if (this.mentorsUsed(season).has(m.botId))
       throw conflict('{name} has an apprentice this season', { name: m.name });
-    if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
-      throw conflict('a bot is called {name} already', { name: body.name });
-    this.checkLook(undefined, body.look);
-    this.licence(user, season, body.name);
-    const t = apprentice(
-      {
-        skill: m.skill,
-        values: { ...m.traits },
-        traitCodes: m.udtTraits.map((x) => x.code),
-      },
-      body.name,
-      m.udtTraits.some((x) => x.code === 'mentor'),
+    const p = roster.find((r) => r.botId === body.apprenticeId);
+    if (!p) throw notFound('apprentice in your roster');
+    const own = this.udt.ownBots(season, user.id);
+    const row = own.get(p.botId);
+    if (p.botId === m.botId) throw badRequest('mentor and apprentice are two bots');
+    if (!row || row.status !== 'own') throw conflict('an apprentice is a bot your team made');
+    if (row.mentorId) throw conflict('{name} had a mentor already', { name: p.name });
+    if (p.skill >= m.skill) throw conflict('the apprentice needs a lower skill than its mentor');
+    const mentorTrait = m.udtTraits.some((x) => x.code === 'mentor');
+    const lesson = mentorLesson(m.traits, p.traits, mentorTrait);
+    const inherited = inheritedTrait(
+      m.udtTraits.map((x) => x.code),
+      p.udtTraits.map((x) => x.code),
+      mentorTrait,
       rng,
     );
-    const id = this.create(
-      user,
-      season,
-      t,
-      body.name,
-      'apprentice',
-      m.botId,
-      drawPotentialWindow(t.potential, t.skill, [t.skill, 7], rng),
-      undefined,
-      body.look,
-    );
-    if (t.inherited)
-      this.db
-        .insert(udtTraits)
-        .values({
-          id: `t${randomId(12)}`,
-          season,
-          userId: user.id,
-          code: t.inherited,
-          botId: id,
-          source: 'mentor',
-          createdAt: this.now(),
-          assignedAt: this.now(),
-        })
-        .run();
-    return { ...this.view(user), apprentice: { botId: id, inherited: t.inherited } };
+    this.db.transaction(() => {
+      this.bots.update(p.botId, { traits: { ...p.traits, ...lesson } });
+      this.db.update(udtBots).set({ mentorId: m.botId }).where(eq(udtBots.botId, p.botId)).run();
+      if (inherited)
+        this.db
+          .insert(udtTraits)
+          .values({
+            id: `t${randomId(12)}`,
+            season,
+            userId: user.id,
+            code: inherited,
+            botId: p.botId,
+            source: 'mentor',
+            createdAt: this.now(),
+            assignedAt: this.now(),
+          })
+          .run();
+    });
+    return { ...this.view(user), apprentice: { botId: p.botId, inherited } };
   }
 
   private blueprintsOf(season: number, userId: string) {
@@ -552,4 +559,31 @@ export class UdtAcademyService {
     });
     return this.udt.view(user);
   }
+}
+
+/** The values a mentor teaches (the rest of a bot's play style stays). */
+function pick(t: RosterBot['traits']) {
+  return {
+    accuracy: t.accuracy ?? 0,
+    alertness: t.alertness ?? 0,
+    strafing: t.strafing ?? 0,
+    combatStyle: t.combatStyle ?? 0,
+    camping: t.camping ?? 0,
+  };
+}
+
+/** Whether a roster bot can be the apprentice of `mentor` (made by the team, never taught). */
+function canLearn(
+  p: RosterBot,
+  mentor: RosterBot,
+  own: ReadonlyMap<string, { status: string; mentorId: string | null }>,
+): boolean {
+  const row = own.get(p.botId);
+  return (
+    p.botId !== mentor.botId &&
+    !!row &&
+    row.status === 'own' &&
+    !row.mentorId &&
+    p.skill < mentor.skill
+  );
 }
