@@ -5,7 +5,7 @@ import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
 import { udtBlueprints, udtBots, udtRoster } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
-import { Client, startApi, startSeason } from './helpers.js';
+import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
 afterEach(async () => {
@@ -123,7 +123,7 @@ describe('Unreal Dream Team: academy', () => {
         after: expect.objectContaining({ accuracy: 0.4, combatStyle: 0.5 }),
       }),
     ]);
-    expect(of('Mira')).toMatchObject({ ready: false, own: true });
+    expect(of('Mira')).toMatchObject({ ready: false, own: true, why: 'skill' });
     const mira = of('Mira').botId as string;
     const teach = (mentorId: string, apprenticeId: string) =>
       mario.post('/udt/academy/mentor', { mentorId, apprenticeId });
@@ -141,8 +141,12 @@ describe('Unreal Dream Team: academy', () => {
     expect(v.licence.made).toBe(1);
     expect(of('Sensei')).toMatchObject({ used: true, ready: false });
     expect((await teach(lib, mira)).status).toBe(409);
-    // Mira had her mentor; a mentor needs a higher skill than its apprentice.
-    expect(of('Mira')).toMatchObject({ ready: true, pupils: [] });
+    // A mentor needs skill 6 (Mira has 3) besides level 3.
+    expect(of('Mira')).toMatchObject({ ready: false, why: 'skill' });
+    expect((await teach(mira, lib)).status).toBe(409);
+    // Mira learns faster while Sensei is in the team (shown on her card).
+    const r = ok.body.own.find((b: { name: string }) => b.name === 'Mira');
+    expect(r.own.mentor).toEqual({ botId: lib, name: 'Sensei', here: true });
   });
 
   it('graduates an own bot with 15 games and level 5 after an admin approved', async () => {
@@ -332,5 +336,54 @@ describe('Unreal Dream Team: academy', () => {
     // The roster shows the career of its bots.
     const v = (await mario.get('/udt')).body;
     expect(v.roster[0].career).toMatchObject({ phase: 'rookie' });
+  });
+
+  it('an apprentice gains experience 50 % faster while its mentor is in the roster', async () => {
+    ({ api } = await startApi({ TEST_MODE: 'true' }));
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    const tim = await Client.login(api, 'Tim');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    for (let i = 0; i < 6; i++) await admin.post('/bots', { name: `Lib${i}`, skill: 3 });
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    for (const [c, n, tag] of [
+      [mario, 'Nexus', '[NX]'],
+      [tim, 'Iron', '[IG]'],
+    ] as const)
+      await c.post('/udt/team', { name: n, tag, starter: { name: `${tag.slice(1, 3)}bot` } });
+    const marioId = (await mario.get('/me')).body.id as string;
+    const db = api.app.get<Db>(DB);
+    const sensei = (await admin.post('/bots', { name: 'Sensei', skill: 6 })).body.id as string;
+    db.insert(udtRoster)
+      .values({ season: 1, botId: sensei, userId: marioId, price: 9000, acquiredAt: 'x', bench: 1 })
+      .run();
+    const nx = (await mario.get('/udt')).body.roster.find((r: { starter: boolean }) => r.starter)
+      .botId as string;
+    db.update(udtBots).set({ mentorId: sensei }).where(eq(udtBots.botId, nx)).run();
+    const cup = await admin.post(
+      '/tournaments',
+      tournamentBody(
+        { name: 'Cup', botPool: [], kind: 'udt', udt: {} },
+        { size: 4, format: 'single', teamSize: 1, botMatchMode: 'watch' },
+      ),
+    );
+    for (const c of [mario, tim]) await c.post(`/udt/events/${cup.body.id}/enter`);
+    const sim = await admin.post(`/udt/test/simulate/${cup.body.id}`);
+    expect(sim.status, JSON.stringify(sim.body)).toBe(200);
+    // Expected XP from the matches the team played: (10 per game + 15 for a win) × 1.5.
+    const proj = (await admin.get(`/tournaments/${cup.body.id}`)).body.projection;
+    const me = `udt-${marioId}`;
+    const xp = (proj.results as { entrants: string[]; winnerId: string; games?: unknown[] }[])
+      .filter((r) => r.entrants.includes(me))
+      .reduce(
+        (n, r) =>
+          n +
+          Math.round((Math.max(1, r.games?.length ?? 1) * 10 + (r.winnerId === me ? 15 : 0)) * 1.5),
+        0,
+      );
+    expect(xp).toBeGreaterThan(0);
+    const row = db.select().from(udtRoster).where(eq(udtRoster.botId, nx)).get()!;
+    expect(row.xp).toBe(xp);
   });
 });

@@ -194,7 +194,17 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
 
         <section class="card">
           <h2>{{ 'udt.academy.mentors' | t }}</h2>
-          <p class="muted small">{{ 'udt.academy.mentorText' | t: { lv: v.mentorLevel } }}</p>
+          <p class="muted small">
+            {{
+              'udt.academy.mentorText'
+                | t
+                  : {
+                      lv: v.mentorLevel,
+                      skill: skillName(v.mentorSkill ?? 6),
+                      xp: xpBonus(v),
+                    }
+            }}
+          </p>
           @if (v.mentors.length) {
             <label class="mpick"
               >{{ 'udt.academy.mentorPick' | t }}
@@ -206,7 +216,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                 @for (m of v.mentors; track m.botId) {
                   <option [value]="m.botId">
                     {{ m.name }} · {{ skillName(m.skill) }} · {{ 'udt.level' | t }} {{ m.level
-                    }}{{ m.ready ? '' : ' – ' + mentorBlocked(m, v.mentorLevel) }}
+                    }}{{ m.ready ? '' : ' – ' + mentorBlocked(m, v) }}
                   </option>
                 }
               </select>
@@ -257,6 +267,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                     }
                   </ul>
                   <p class="small">
+                    {{ 'udt.academy.pupilXp' | t: { xp: xpBonus(v), mentor: m.name } }}
                     @if (m.traits.length) {
                       {{
                         'udt.academy.pupilTrait'
@@ -273,7 +284,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
               } @else if (m.ready) {
                 <p class="muted small">{{ 'udt.academy.noPupils' | t }}</p>
               } @else {
-                <p class="muted small">{{ mentorBlocked(m, v.mentorLevel) }}</p>
+                <p class="muted small">{{ mentorBlocked(m, v) }}</p>
               }
             }
           } @else {
@@ -563,10 +574,16 @@ export class UdtAcademyPage {
   }
 
   /** Why a bot cannot take an apprentice now. */
-  protected mentorBlocked(m: UdtMentor, lv: number): string {
-    return m.used
-      ? this.i18n.t('udt.academy.hasApprentice')
-      : this.i18n.t('udt.academy.fromLevel', { lv });
+  protected mentorBlocked(m: UdtMentor, v: UdtAcademy): string {
+    if (m.used || m.why === 'used') return this.i18n.t('udt.academy.hasApprentice');
+    if (m.why === 'skill')
+      return this.i18n.t('udt.academy.fromSkill', { skill: this.skillName(v.mentorSkill ?? 6) });
+    return this.i18n.t('udt.academy.fromLevel', { lv: v.mentorLevel });
+  }
+
+  /** The apprentice's XP bonus in per cent (50). */
+  protected xpBonus(v: UdtAcademy): number {
+    return Math.round(((v.apprenticeXp ?? 1.5) - 1) * 100);
   }
 
   protected traitNames(codes: readonly string[]): string {

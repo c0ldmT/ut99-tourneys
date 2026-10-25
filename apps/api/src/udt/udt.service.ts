@@ -517,11 +517,16 @@ export class UdtService {
     const plainValue = (skill: number, traits: LibraryBot['traits'] = {}) =>
       marketValue(baseValue(skill, valueScore(traits)), 1, 1, index);
     const starterBase = plainValue(STARTER_SKILL);
-    return this.db
+    const rows = this.db
       .select()
       .from(udtRoster)
       .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
-      .all()
+      .all();
+    const here = new Set(rows.map((r) => r.botId));
+    /** An apprentice's mentor: its name and whether it is in this roster (faster XP). */
+    const mentorOf = (id: string | null | undefined) =>
+      id ? { botId: id, name: lib.get(id)?.name ?? '?', here: here.has(id) } : null;
+    return rows
       .flatMap((r) => {
         const b = lib.get(r.botId);
         if (!b) return [];
@@ -560,7 +565,7 @@ export class UdtService {
             striking: r.striking,
             salaryDue: r.salaryDue,
             games: r.games,
-            own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}),
+            own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}, mentorOf),
           },
         ];
       })
@@ -805,6 +810,8 @@ function ownView(
   level: number,
   skill: number,
   values: LibraryBot['traits'],
+  mentorOf: (id: string | null) => { botId: string; name: string; here: boolean } | null = () =>
+    null,
 ) {
   if (!b) return null;
   const p = b.potential;
@@ -819,6 +826,8 @@ function ownView(
     points: developPoints(level, b.pointsSpent),
     spent: b.pointsSpent,
     canRename: !b.renamed && b.status === 'own',
+    /** The mentor it learned from (it gains XP faster while the mentor is in the roster). */
+    mentor: mentorOf(b.mentorId),
     breakthrough: b.breakthrough,
     maxed: level >= 5 && full && Math.round(skill) >= p && (b.breakthrough || p >= 7),
   };

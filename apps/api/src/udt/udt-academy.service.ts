@@ -3,8 +3,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, eq, isNull } from 'drizzle-orm';
 import {
   drawPotentialWindow,
+  APPRENTICE_XP,
   apprenticeTraitChance,
   inheritedTrait,
+  MENTOR_SKILL,
   mentorLesson,
   BLUEPRINTS,
   blueprintPotential,
@@ -159,8 +161,17 @@ export class UdtAcademyService {
           level: r.level,
           own: !!r.own,
           mentorTrait,
-          ready: r.level >= MENTOR_LEVEL && !used.has(r.botId),
+          ready:
+            Math.round(r.skill) >= MENTOR_SKILL && r.level >= MENTOR_LEVEL && !used.has(r.botId),
           used: used.has(r.botId),
+          /** Why it cannot teach now (null: it can). */
+          why: used.has(r.botId)
+            ? ('used' as const)
+            : Math.round(r.skill) < MENTOR_SKILL
+              ? ('skill' as const)
+              : r.level < MENTOR_LEVEL
+                ? ('level' as const)
+                : null,
           /** Traits that can be passed on and the chance that one is. */
           traits: r.udtTraits.filter((x) => x.code !== 'mentor').map((x) => x.code),
           inheritChance: apprenticeTraitChance(mentorTrait),
@@ -187,6 +198,9 @@ export class UdtAcademyService {
       botClasses: this.bots.assets().botClasses,
       developCost: DEVELOP_COST,
       mentorLevel: MENTOR_LEVEL,
+      mentorSkill: MENTOR_SKILL,
+      /** XP factor of an apprentice while its mentor is in the roster. */
+      apprenticeXp: APPRENTICE_XP,
     };
   }
 
@@ -356,6 +370,8 @@ export class UdtAcademyService {
     const roster = this.udt.roster(user.id, season);
     const m = roster.find((r) => r.botId === body.mentorId);
     if (!m) throw notFound('mentor in your roster');
+    if (Math.round(m.skill) < MENTOR_SKILL)
+      throw conflict('a mentor needs skill {skill}', { skill: MENTOR_SKILL });
     if (m.level < MENTOR_LEVEL)
       throw conflict('a mentor needs level {level}', { level: MENTOR_LEVEL });
     if (this.mentorsUsed(season).has(m.botId))

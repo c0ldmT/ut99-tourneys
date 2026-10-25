@@ -80,6 +80,14 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 {{ 'udt.paid' | t }} {{ b.price | neuro }}
               }
             </span>
+            @if (b.own?.mentor; as mt) {
+              <span class="small" [class.muted]="!mt.here">
+                {{
+                  (mt.here ? 'udt.academy.mentorHere' : 'udt.academy.mentorAway')
+                    | t: { name: mt.name }
+                }}
+              </span>
+            }
             <a class="small" [routerLink]="['/udt/bot', b.botId]" (click)="close()">{{
               'udt.bot.statsLink' | t
             }}</a>

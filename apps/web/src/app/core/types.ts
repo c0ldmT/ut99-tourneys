@@ -1061,6 +1061,8 @@ export interface UdtRosterBot {
     breakthrough?: boolean;
     /** Fully developed for good: points have nothing left to buy (no plaque). */
     maxed?: boolean;
+    /** The mentor it learned from; `here`: in the roster (faster XP). */
+    mentor?: { botId: string; name: string; here: boolean } | null;
   } | null;
   career?: UdtCareer | null;
 }
@@ -1401,6 +1403,8 @@ export interface UdtMentor {
   mentorTrait: boolean;
   ready: boolean;
   used: boolean;
+  /** Why it cannot teach now. */
+  why?: 'used' | 'skill' | 'level' | null;
   /** Traits that can be passed on and the chance that one is. */
   traits: string[];
   inheritChance: number;
@@ -1437,6 +1441,10 @@ export interface UdtAcademy {
   own: UdtRosterBot[];
   developCost: Record<'accuracy' | 'alertness' | 'strafing' | 'skill', number>;
   mentorLevel: number;
+  /** A mentor needs this skill (6). */
+  mentorSkill?: number;
+  /** XP factor of an apprentice while its mentor is in the roster (1.5). */
+  apprenticeXp?: number;
   apprentice?: { botId: string; inherited: string | null };
   blueprints: UdtBlueprint[];
   botClasses: AssetItem[];

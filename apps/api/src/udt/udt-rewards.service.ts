@@ -3,6 +3,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { ADAPTER_MH } from '@tourney/adapter-ut99';
 import { udtManagerOf, type TournamentEvent, type TournamentProjection } from '@tourney/protocol';
 import {
+  APPRENTICE_XP,
   DEFAULT_ECONOMY,
   managerEffects,
   matchReward,
@@ -12,7 +13,7 @@ import {
 } from '@tourney/udt';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { DB, type Db } from '../db/database.js';
-import { tournaments, udtRoster } from '../db/schema.js';
+import { tournaments, udtBots, udtRoster } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { AWARDS } from '../shop/catalog.js';
@@ -161,6 +162,8 @@ export class UdtRewardsService implements OnModuleInit {
       });
       if (!first) continue; // booked before: stamina and experience too
       if (!ids.length) continue;
+      // Apprentices learn faster while their mentor is in the same roster (decision 209).
+      const mentors = this.mentorsIn(season, userId, ids);
       // Only while the bot is still this manager's (never another roster's row of the same bot).
       for (const r of this.db
         .select()
@@ -174,18 +177,39 @@ export class UdtRewardsService implements OnModuleInit {
         )
         .all()) {
         const fx = managerEffects(onBots.get(r.botId) ?? []);
+        const taught = mentors.has(r.botId) ? APPRENTICE_XP : 1;
         const lost = Math.round(games * DEFAULT_ECONOMY.stamina.perGame * fx.fatigue);
         this.db
           .update(udtRoster)
           .set({
             stamina: Math.max(0, r.stamina - lost),
             games: r.games + games,
-            xp: r.xp + Math.round((games * XP_GAME + (won ? XP_WIN : 0)) * fx.xp),
+            xp: r.xp + Math.round((games * XP_GAME + (won ? XP_WIN : 0)) * fx.xp * taught),
           })
           .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))
           .run();
       }
     }
+  }
+
+  /** The bots among `ids` whose mentor is in the manager's roster now. */
+  private mentorsIn(season: number, userId: string, ids: readonly string[]): Set<string> {
+    const taught = this.db
+      .select({ botId: udtBots.botId, mentorId: udtBots.mentorId })
+      .from(udtBots)
+      .where(and(eq(udtBots.season, season), inArray(udtBots.botId, [...ids])))
+      .all()
+      .filter((b) => b.mentorId);
+    if (!taught.length) return new Set();
+    const roster = new Set(
+      this.db
+        .select({ botId: udtRoster.botId })
+        .from(udtRoster)
+        .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
+        .all()
+        .map((r) => r.botId),
+    );
+    return new Set(taught.filter((b) => roster.has(b.mentorId!)).map((b) => b.botId));
   }
 
   private finished(tournamentId: string, season: number, proj: TournamentProjection): void {

@@ -207,6 +207,12 @@ export const starterPotential = (skill: number): number => Math.min(7, Math.roun
 export const apprenticeTraitChance = (hasMentorTrait: boolean): number =>
   hasMentorTrait ? 0.5 : 0.25;
 
+/** A mentor needs skill 6 (Inhuman) or more (owner, 25.10.) and level 3 in its team. */
+export const MENTOR_SKILL = 6;
+
+/** An apprentice gains experience 50 % faster while its mentor is in the same roster. */
+export const APPRENTICE_XP = 1.5;
+
 /** How far an apprentice moves towards its mentor: half the way, three quarters with the trait. */
 export const mentorLean = (hasMentorTrait: boolean): number => (hasMentorTrait ? 0.75 : 0.5);
 

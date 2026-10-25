@@ -1366,7 +1366,7 @@ const en = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentors',
   'udt.academy.mentorText':
-    "Every bot of your roster from level {lv} – bought or made by you – can teach one apprentice per season: a bot your team made with a lower skill that never had a mentor. Its accuracy, alertness and strafing rise half the way to the mentor's (never down), its play style moves towards the mentor's, and a trait may be passed on. Free, no new bot.",
+    "A bot of your roster from skill {skill} and level {lv} – bought or made by you – can teach one apprentice per season: a bot your team made with a lower skill that never had a mentor. Its accuracy, alertness and strafing rise half the way to the mentor's (never down), its play style moves towards the mentor's, a trait may be passed on, and it gains {xp} % more experience while the mentor is in your team. Free, no new bot.",
   'udt.academy.hasApprentice': 'has an apprentice',
   'udt.academy.takeApprentice': 'Take an apprentice',
   'udt.academy.noMentors': 'No bots in your roster yet.',
@@ -1380,6 +1380,10 @@ const en = {
   'udt.academy.lesson.camping': 'Camping',
   'udt.academy.noPupils':
     'No bot your team made can learn from it: it needs a lower skill and must never have had a mentor.',
+  'udt.academy.fromSkill': 'from skill {skill}',
+  'udt.academy.pupilXp': '+{xp} % experience while {mentor} is in your team.',
+  'udt.academy.mentorHere': 'Apprentice of {name}: +50 % experience',
+  'udt.academy.mentorAway': 'Apprentice of {name} (not in the team: no bonus)',
   'udt.academy.pupilTrait': '{pct} % chance to inherit one of: {list}.',
   'udt.academy.pupilNoTrait': 'No trait to pass on.',
   'udt.academy.inherited': 'The apprentice inherited the trait {trait}!',
@@ -3312,7 +3316,7 @@ const de: Record<TKey, string> = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentoren',
   'udt.academy.mentorText':
-    'Jeder Bot deines Kaders ab Level {lv} – gekauft oder selbst gemacht – kann pro Season einen Lehrling ausbilden: einen selbst gemachten Bot mit niedrigerem Skill, der noch keinen Mentor hatte. Seine Accuracy, Alertness und Strafing steigen den halben Weg zum Mentor (nie nach unten), sein Spielstil rückt zum Mentor, ein Trait kann übergehen. Kostenlos, kein neuer Bot.',
+    'Ein Bot deines Kaders ab Skill {skill} und Level {lv} – gekauft oder selbst gemacht – kann pro Season einen Lehrling ausbilden: einen selbst gemachten Bot mit niedrigerem Skill, der noch keinen Mentor hatte. Seine Accuracy, Alertness und Strafing steigen den halben Weg zum Mentor (nie nach unten), sein Spielstil rückt zum Mentor, ein Trait kann übergehen, und er sammelt {xp} % mehr Erfahrung, solange der Mentor in deinem Team ist. Kostenlos, kein neuer Bot.',
   'udt.academy.hasApprentice': 'hat einen Lehrling',
   'udt.academy.takeApprentice': 'Lehrling aufnehmen',
   'udt.academy.noMentors': 'Noch keine Bots im Kader.',
@@ -3326,6 +3330,10 @@ const de: Record<TKey, string> = {
   'udt.academy.lesson.camping': 'Camping',
   'udt.academy.noPupils':
     'Kein selbst gemachter Bot kann von ihm lernen: Er braucht einen niedrigeren Skill und darf noch keinen Mentor gehabt haben.',
+  'udt.academy.fromSkill': 'ab Skill {skill}',
+  'udt.academy.pupilXp': '+{xp} % Erfahrung, solange {mentor} in deinem Team ist.',
+  'udt.academy.mentorHere': 'Lehrling von {name}: +50 % Erfahrung',
+  'udt.academy.mentorAway': 'Lehrling von {name} (nicht im Team: kein Bonus)',
   'udt.academy.pupilTrait': '{pct} % Chance, eins davon zu erben: {list}.',
   'udt.academy.pupilNoTrait': 'Kein Trait zum Vererben.',
   'udt.academy.inherited': 'Der Lehrling hat den Trait {trait} geerbt!',
