@@ -14,7 +14,7 @@ import type { LineupDraft } from '../core/udt-lineup';
 import {
   baseValue,
   botRarity,
-  salaryOf,
+  rosterSalary,
   SKILL_NAMES,
   UdtCard,
   UdtNav,
@@ -299,10 +299,8 @@ export class UdtTeamPage {
     (this.view()?.roster ?? []).reduce((s, b) => s + b.value, 0),
   );
   protected readonly salary = computed(() =>
-    // Bots a team made (also traded ones) draw no salary.
-    (this.view()?.roster ?? [])
-      .filter((b) => !b.starter && !b.own)
-      .reduce((s, b) => s + salaryOf(b), 0),
+    // Bots a team made draw none, blueprint bots a share (also traded ones).
+    (this.view()?.roster ?? []).reduce((s, b) => s + rosterSalary(b), 0),
   );
 
   constructor() {

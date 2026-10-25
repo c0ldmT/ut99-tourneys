@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
+  madeSalaryShare,
   baseValue,
   botRarity,
   bracketOf,
@@ -44,9 +45,26 @@ export {
 };
 
 /** Salary of a roster bot with its manager traits (the penny pincher). */
-export function salaryOf(b: { value: number; skill: number; udtTraits?: { code: string }[] }) {
+export function salaryOf(
+  b: { value: number; skill: number; udtTraits?: { code: string }[] },
+  /** Share of the full salary (bots a team made: `madeSalaryShare` of their origin). */
+  share = 1,
+) {
   const f = managerEffects((b.udtTraits ?? []) as Parameters<typeof managerEffects>[0]).salary;
-  return Math.round((weeklySalary(b.value, b.skill) * f) / 10) * 10;
+  return Math.round((weeklySalary(b.value, b.skill) * f * share) / 10) * 10;
+}
+
+/** A roster bot's weekly salary: bought in full, blueprint bots a share, other own bots none. */
+export function rosterSalary(b: {
+  value: number;
+  skill: number;
+  starter: boolean;
+  udtTraits?: { code: string }[];
+  own?: { origin: string } | null;
+}): number {
+  if (b.starter) return 0;
+  const share = madeSalaryShare(b.own?.origin);
+  return share ? salaryOf(b, share) : 0;
 }
 
 /** UT99 skill names 0..7. */

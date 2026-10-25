@@ -277,8 +277,8 @@ export class UdtAcademyService {
     if (gameName(team.tag, name).length < `${team.tag}${name}`.length)
       throw badRequest('{tag}{name} is too long for the game', { tag: team.tag, name });
     const made = this.made(season, user.id);
+    // As many licences as the manager pays for, each twice the one before (owner, 25.10.).
     const price = licencePrice(made, this.udt.index(season));
-    if (price === null) throw conflict('at most {made} own bots per season', { made });
     if (price > 0)
       this.ledger.charge({
         userId: user.id,

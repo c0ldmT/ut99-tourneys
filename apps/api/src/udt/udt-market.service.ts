@@ -8,6 +8,7 @@ import {
   demandFactor,
   economyIndex,
   formFactor,
+  madeSalaryShare,
   managerEffects,
   PHASE_EFFECT,
   marketValue,
@@ -365,8 +366,10 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   ) {
     const own = this.udt.ownBots(season);
     for (const r of roster) {
-      // Bots the managers made (starter, talents, apprentices) play for free.
-      if (r.starter || own.has(r.botId)) continue;
+      // Bots the managers made play for free (starter, talents, apprentices) or for a share of
+      // the salary (blueprint bots, owner 25.10.).
+      const share = r.starter ? 0 : madeSalaryShare(own.get(r.botId)?.origin);
+      if (!share) continue;
       const b = byId.get(r.botId);
       const traits = onBots.get(r.botId) ?? [];
       const value = values.get(r.botId);
@@ -376,7 +379,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             value !== undefined && b ? withTraits(value, b, traits) : r.price,
             b?.skill ?? 4,
           ) *
-            managerEffects(traits).salary) /
+            managerEffects(traits).salary *
+            share) /
             10,
         ) * 10;
       // A strike from before the owed salaries (migration 33) still owes that week.

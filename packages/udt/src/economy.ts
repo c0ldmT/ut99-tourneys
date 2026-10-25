@@ -69,8 +69,15 @@ export interface EconomyConfig {
   /** A 10-pull costs this many boxes. */
   tenPullBoxes: number;
   scouting: number;
-  /** Creation licenses of a season: the first is free, then these prices. */
-  licenses: readonly number[];
+  /**
+   * Creation licences of a season, as many as a manager pays for (owner, 25.10.): the first (the
+   * starter) is free, the second costs `licenceBase`, each further one `licenceGrowth` times the
+   * one before (× index).
+   */
+  licenceBase: number;
+  licenceGrowth: number;
+  /** Bots built from blueprints draw this share of a bought bot's salary (others made: none). */
+  blueprintSalary: number;
 }
 
 export const DEFAULT_ECONOMY: EconomyConfig = {
@@ -135,7 +142,9 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   },
   tenPullBoxes: 9,
   scouting: 1200,
-  licenses: [0, 2000, 4000, 8000],
+  licenceBase: 2000,
+  licenceGrowth: 2,
+  blueprintSalary: 0.75,
 };
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));

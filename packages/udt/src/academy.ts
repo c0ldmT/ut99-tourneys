@@ -256,10 +256,19 @@ export function inheritedTrait(
 // ---------- licences ----------
 
 /** Price of the next creation licence of a season (`made` bots so far, the starter is the first). */
-export function licencePrice(made: number, index: number, cfg = DEFAULT_ECONOMY): number | null {
-  const p = cfg.licenses[made];
-  if (p === undefined) return null;
-  return roundNeuro(p * index);
+export function licencePrice(made: number, index: number, cfg = DEFAULT_ECONOMY): number {
+  if (made <= 0) return 0;
+  return roundNeuro(cfg.licenceBase * cfg.licenceGrowth ** (made - 1) * index);
+}
+
+/**
+ * Share of the normal salary a roster bot draws by how it came to the team: bought ones (no
+ * origin) in full, blueprint bots `blueprintSalary` (owner, 25.10.), starter, talents and
+ * apprentices nothing.
+ */
+export function madeSalaryShare(origin: string | null | undefined, cfg = DEFAULT_ECONOMY): number {
+  if (!origin) return 1;
+  return origin === 'blueprint' ? cfg.blueprintSalary : 0;
 }
 
 export const scoutPrice = (index: number, cfg = DEFAULT_ECONOMY): number =>

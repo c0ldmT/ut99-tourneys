@@ -455,7 +455,7 @@ export class UdtAiService implements OnModuleInit {
   /** Breeders (and now and then others) scout and sign the talent with the best potential. */
   private scoutAndSign(user: User, rng: () => number) {
     const v = this.academy.view(user);
-    if (v.rosterFull || v.licence.nextPrice === null) return;
+    if (v.rosterFull) return;
     const need = v.scoutPrice + v.licence.nextPrice;
     if (this.spendable(user) < need * 2) return;
     const r = (v.report ?? this.academy.scoutNow(user).report)!;

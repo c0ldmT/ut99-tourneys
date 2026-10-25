@@ -228,7 +228,6 @@ export const ERRORS_DE: Record<string, string> = {
   'a bot is called {name} already': 'Ein Bot heißt schon {name}.',
   'a mentor needs level {level}': 'Ein Mentor braucht Level {level}.',
   'a mentor needs skill {skill}': 'Ein Mentor braucht Skill {skill}.',
-  'at most {made} own bots per season': 'Höchstens {made} eigene Bots pro Season.',
   'at most {max} bots: make room first': 'Höchstens {max} Bots: Mach zuerst Platz im Kader.',
   'blueprint not found': 'Bauplan nicht gefunden.',
   'mentor in your roster not found': 'Der Mentor ist nicht in deinem Kader.',

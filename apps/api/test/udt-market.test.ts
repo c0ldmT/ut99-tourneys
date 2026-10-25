@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { FakeClock } from '@tourney/bridge';
 import type { RunningApi } from '../src/app.js';
-import { buyPrice } from '@tourney/udt';
+import { buyPrice, weeklySalary } from '@tourney/udt';
+import { desc, eq } from 'drizzle-orm';
 import { DB, type Db } from '../src/db/database.js';
-import { udtBids, udtValues } from '../src/db/schema.js';
+import { bots, udtBids, udtBots, udtRoster, udtValues } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtMarketService } from '../src/udt/udt-market.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -163,6 +164,53 @@ describe('Unreal Dream Team: transfer market', () => {
       expect(salary.amount).toBeLessThan(0);
       expect(r.striking).toBe(false);
     } else expect(r.striking).toBe(true);
+  });
+
+  it('blueprint bots draw 75 % of the salary; starter and talents none', async () => {
+    const { clock, admin, mario, market, ledger } = await setup();
+    const marioId = (await mario.get('/me')).body.id as string;
+    const db = api!.app.get<Db>(DB);
+    const made = async (name: string, origin: string) => {
+      const id = (await admin.post('/bots', { name, skill: 5 })).body.id as string;
+      db.update(bots).set({ udtOwner: marioId, udtOrigin: origin }).where(eq(bots.id, id)).run();
+      db.insert(udtRoster)
+        .values({ season: 1, botId: id, userId: marioId, price: 0, acquiredAt: 'x' })
+        .run();
+      db.insert(udtBots)
+        .values({
+          botId: id,
+          season: 1,
+          userId: marioId,
+          madeBy: marioId,
+          origin,
+          potential: 6,
+          createdAt: 'x',
+        })
+        .run();
+      return id;
+    };
+    const bp = await made('Blue', 'blueprint');
+    const talent = await made('Tal', 'academy');
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_reward', amount: 50_000, ref: 'gift' });
+    market.tick(); // Monday 19.10.: the first market day charges nothing yet
+    for (let d = 0; d < 7; d++) {
+      clock.advance(DAY);
+      market.tick();
+    }
+    const paid = (botId: string) =>
+      ledger
+        .entries(marioId, 1)
+        .filter((e) => e.kind === 'udt_salary' && (e.meta as { botId?: string })?.botId === botId)
+        .reduce((n, e) => n + e.amount, 0);
+    const value = db
+      .select()
+      .from(udtValues)
+      .where(eq(udtValues.botId, bp))
+      .orderBy(desc(udtValues.day))
+      .get()!.value;
+    expect(paid(bp)).toBe(-Math.round((weeklySalary(value, 5) * 0.75) / 10) * 10);
+    expect(paid(bp)).toBeLessThan(0);
+    expect(paid(talent)).toBe(0);
   });
 
   it('owes salaries it cannot pay (missed Mondays too) until a market day or a sale pays them', async () => {

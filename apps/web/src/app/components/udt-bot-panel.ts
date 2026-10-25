@@ -27,7 +27,15 @@ import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import type { UdtRosterBot, UdtTraitOnBot } from '../core/types';
-import { rosterCard, SCRAP, staminaColor, UdtCard, xpStep, type CardBot } from '../core/udt';
+import {
+  rosterCard,
+  rosterSalary,
+  SCRAP,
+  staminaColor,
+  UdtCard,
+  xpStep,
+  type CardBot,
+} from '../core/udt';
 import { lookBody, lookFromBot, UdtBotLook, type LookDraft, type UdtLooks } from './udt-bot-look';
 import { UdtPotential } from './udt-potential';
 import { UdtRename } from './udt-rename';
@@ -80,6 +88,14 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 {{ 'udt.paid' | t }} {{ b.price | neuro }}
               }
             </span>
+            @if (salary(b); as sal) {
+              <span class="small muted">
+                {{ 'udt.bot.salary' | t: { amount: (sal | neuro) } }}
+                @if (b.own?.origin === 'blueprint') {
+                  {{ 'udt.bot.salaryBlueprint' | t: { pct: blueprintPct } }}
+                }
+              </span>
+            }
             @if (b.own?.mentor; as mt) {
               <span class="small" [class.muted]="!mt.here">
                 {{
@@ -426,6 +442,11 @@ export class UdtBotPanel {
   protected readonly stats = STATS;
   protected readonly cost = DEVELOP_COST;
   protected readonly restPrice = DEFAULT_ECONOMY.restPrice;
+  protected readonly blueprintPct = Math.round(DEFAULT_ECONOMY.blueprintSalary * 100);
+  /** Weekly salary of the bot (0: none). */
+  protected salary(b: UdtRosterBot): number {
+    return rosterSalary(b);
+  }
   protected readonly xp = computed(() => {
     const b = this.bot();
     return b ? xpStep(b.xp, b.level) : null;

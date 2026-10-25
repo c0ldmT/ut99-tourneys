@@ -5,6 +5,7 @@ import {
   cannotDevelop,
   developPoints,
   licencePrice,
+  madeSalaryShare,
   scoutPrice,
   scoutTalents,
   starterPotential,
@@ -41,7 +42,13 @@ describe('academy', () => {
     expect(licencePrice(0, 1)).toBe(0);
     expect(licencePrice(1, 1)).toBe(2000);
     expect(licencePrice(3, 0.5)).toBe(4000);
-    expect(licencePrice(4, 1)).toBeNull();
+    // As many as a manager pays for, each twice the one before (owner, 25.10.).
+    expect(licencePrice(4, 1)).toBe(16000);
+    expect(licencePrice(6, 0.5)).toBe(32000);
+    expect(madeSalaryShare('blueprint')).toBe(0.75);
+    expect(madeSalaryShare('starter')).toBe(0);
+    expect(madeSalaryShare('academy')).toBe(0);
+    expect(madeSalaryShare(null)).toBe(1);
     expect(scoutPrice(2)).toBe(2400);
     expect(starterPotential(3)).toBe(5);
     expect(starterPotential(6)).toBe(7);

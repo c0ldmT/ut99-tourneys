@@ -1244,6 +1244,8 @@ const en = {
   'udt.value.strafing': 'Strafing',
   'udt.spendable': 'To spend',
   'udt.teamValue': 'Team value',
+  'udt.bot.salary': 'Salary {amount} / week',
+  'udt.bot.salaryBlueprint': '({pct} % as a blueprint bot)',
   'udt.salary': 'Salaries / week',
   'udt.index': 'Index',
   'udt.lineup': 'Lineup',
@@ -1335,7 +1337,7 @@ const en = {
   'udt.packs.blueprints': 'Blueprints',
   'udt.academy.blueprints': 'Blueprints',
   'udt.academy.blueprintText':
-    'Blueprints come from packs. Build an own skill 3 bot from one with a creation licence: its points go into the values, its rarity sets the potential (drawn when you build, exact from level 5).',
+    'Blueprints come from packs. Build an own skill 3 bot from one with a creation licence: its points go into the values, its rarity sets the potential (drawn when you build, exact from level 5). Blueprint bots draw 75 % of the salary of a bought bot.',
   'udt.academy.blueprint': 'Blueprint',
   'udt.academy.bpTrait': 'Starts with a {r} trait.',
   'udt.academy.model': 'Model',
@@ -1769,9 +1771,9 @@ const en = {
   'udt.market.full': 'Your roster is full ({max} bots): sell a bot first.',
   'udt.market.roster': 'Roster',
   'udt.trades.rules':
-    'Bought bots and the bots you made (also the starter) can be traded, from {lock} days after buying, making or trading; bots you made stay bots of their own at the new team (no salary, they keep developing) and you remain their breeder. Not while a bot plays in a drawn or running tournament or is nominated for the graduation. Fee {fee} % on what you receive · the smaller side is worth at least {bal} % of the other · every roster keeps at least one bot · offers run {h} h.',
+    'Bought bots and the bots you made (also the starter) can be traded, from {lock} days after buying, making or trading; bots you made stay bots of their own at the new team (no salary – blueprint bots 75 % –, they keep developing) and you remain their breeder. Not while a bot plays in a drawn or running tournament or is nominated for the graduation. Fee {fee} % on what you receive · the smaller side is worth at least {bal} % of the other · every roster keeps at least one bot · offers run {h} h.',
   'udt.trades.blocked.nominated': 'nominated for the graduation',
-  'udt.trades.own': 'made by its team: no salary, keeps developing',
+  'udt.trades.own': 'made by its team: keeps developing, no or less salary',
   'udt.trades.noneTradable':
     'None of your bots can be traded now: a bot can be traded {lock} days after buying, making or trading, not while it plays or is nominated. You can still offer Neuro for a bot.',
   'udt.rename.label': 'New name',
@@ -1797,7 +1799,7 @@ const en = {
     'Every market day brings new bots at a fixed price. Buy one and it joins your roster right away; first come, first served.',
   'udt.help.way.academy.title': 'Academy: raise your own',
   'udt.help.way.academy.text':
-    'Scout three talents and sign one with a licence, or build a bot from a blueprint; an experienced bot (from level 3) can teach one of them as its apprentice. Bots you made draw no salary, develop with points and can be renamed once for free.',
+    'Scout three talents and sign one with a licence, or build a bot from a blueprint; an experienced bot (from level 3) can teach one of them as its apprentice. Starter, talents and apprentices draw no salary, blueprint bots 75 % of the normal one; bots you made develop with points and can be renamed once for free. Licences: as many as you like, each twice the price of the one before.',
   'udt.help.way.packs.title': 'Packs: traits and blueprints',
   'udt.help.way.packs.text':
     'Packs bring traits that make your bots stronger, and now and then a blueprint for the academy.',
@@ -3219,6 +3221,8 @@ const de: Record<TKey, string> = {
   'udt.value.strafing': 'Strafing',
   'udt.spendable': 'Verfügbar',
   'udt.teamValue': 'Teamwert',
+  'udt.bot.salary': 'Gehalt {amount} / Woche',
+  'udt.bot.salaryBlueprint': '({pct} % als Bauplan-Bot)',
   'udt.salary': 'Gehälter / Woche',
   'udt.index': 'Index',
   'udt.lineup': 'Aufstellung',
@@ -3310,7 +3314,7 @@ const de: Record<TKey, string> = {
   'udt.packs.blueprints': 'Baupläne',
   'udt.academy.blueprints': 'Baupläne',
   'udt.academy.blueprintText':
-    'Baupläne kommen aus Packs. Baue daraus mit einer Erschaffungs-Lizenz einen eigenen Skill-3-Bot: Die Punkte gehen in die Werte, die Seltenheit bestimmt das Potenzial (beim Bauen gezogen, genau ab Level 5).',
+    'Baupläne kommen aus Packs. Baue daraus mit einer Erschaffungs-Lizenz einen eigenen Skill-3-Bot: Die Punkte gehen in die Werte, die Seltenheit bestimmt das Potenzial (beim Bauen gezogen, genau ab Level 5). Bauplan-Bots bekommen 75 % des Gehalts eines gekauften Bots.',
   'udt.academy.blueprint': 'Bauplan',
   'udt.academy.bpTrait': 'Startet mit einem Trait ({r}).',
   'udt.academy.model': 'Modell',
@@ -3748,9 +3752,9 @@ const de: Record<TKey, string> = {
   'udt.market.full': 'Dein Kader ist voll ({max} Bots): Verkauf zuerst einen Bot.',
   'udt.market.roster': 'Kader',
   'udt.trades.rules':
-    'Handelbar sind gekaufte und selbst gemachte Bots (auch der Starter), ab {lock} Tagen nach Kauf, Erstellen oder Tausch; selbst gemachte bleiben beim neuen Team eigene Bots (kein Gehalt, entwickeln sich weiter), du bleibst ihr Züchter. Nicht, solange ein Bot in einem ausgelosten oder laufenden Turnier spielt oder für den Abschluss nominiert ist. Gebühr {fee} % auf das, was du bekommst · die kleinere Seite ist mindestens {bal} % der anderen wert · jeder Kader behält mindestens einen Bot · Angebote laufen {h} h.',
+    'Handelbar sind gekaufte und selbst gemachte Bots (auch der Starter), ab {lock} Tagen nach Kauf, Erstellen oder Tausch; selbst gemachte bleiben beim neuen Team eigene Bots (kein Gehalt – Bauplan-Bots 75 % –, entwickeln sich weiter), du bleibst ihr Züchter. Nicht, solange ein Bot in einem ausgelosten oder laufenden Turnier spielt oder für den Abschluss nominiert ist. Gebühr {fee} % auf das, was du bekommst · die kleinere Seite ist mindestens {bal} % der anderen wert · jeder Kader behält mindestens einen Bot · Angebote laufen {h} h.',
   'udt.trades.blocked.nominated': 'für den Abschluss nominiert',
-  'udt.trades.own': 'selbst gemacht: kein Gehalt, entwickelt sich weiter',
+  'udt.trades.own': 'selbst gemacht: entwickelt sich weiter, kein oder weniger Gehalt',
   'udt.trades.noneTradable':
     'Gerade ist keiner deiner Bots handelbar: Ein Bot ist {lock} Tage nach Kauf, Erstellen oder Tausch handelbar, nicht während er spielt oder nominiert ist. Neuro für einen Bot bieten kannst du trotzdem.',
   'udt.rename.label': 'Neuer Name',
@@ -3776,7 +3780,7 @@ const de: Record<TKey, string> = {
     'Jeder Markttag bringt neue Bots zum Festpreis. Kaufst du einen, ist er sofort in deinem Kader; wer zuerst kommt, bekommt ihn.',
   'udt.help.way.academy.title': 'Akademie: eigene Bots hochziehen',
   'udt.help.way.academy.text':
-    'Scoute drei Talente und verpflichte eins mit einer Lizenz oder bau einen Bot aus einem Bauplan; ein erfahrener Bot (ab Level 3) kann einen davon als Lehrling ausbilden. Selbst gemachte Bots bekommen kein Gehalt, entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen.',
+    'Scoute drei Talente und verpflichte eins mit einer Lizenz oder bau einen Bot aus einem Bauplan; ein erfahrener Bot (ab Level 3) kann einen davon als Lehrling ausbilden. Starter, Talente und Lehrlinge bekommen kein Gehalt, Bauplan-Bots 75 % des normalen; selbst gemachte Bots entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen. Lizenzen: so viele du willst, jede kostet das Doppelte der vorigen.',
   'udt.help.way.packs.title': 'Packs: Traits und Baupläne',
   'udt.help.way.packs.text':
     'Packs bringen Traits, die deine Bots stärker machen, und ab und zu einen Bauplan für die Akademie.',
