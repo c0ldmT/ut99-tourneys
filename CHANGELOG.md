@@ -202,6 +202,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Ratings: a bot's difficulty step is worth 200 rating points by default (was 100), which predicts real games best; saved settings and running seasons keep their value.
 - Dream Team game model calibrated on real games: simulated games (season simulator `udt:sim`, the test mode's simulated matches) use `p = sA^k / (sA^k + sB^k)` with k = 3 in 1v1 and 4.5 in teams instead of 2, so a favourite wins as often as in the games (one skill step: about three of four duels). `pnpm --filter @tourney/api udt:calibrate <tourney.db>` checks the model on a database (log loss per k, favourite's win rate per skill gap) and fits the rating setting "rating points per bot level" to the same games (the owner's export: 200 instead of the default 100).
 - Settings (admins) in tabs: Season, Bets & shop, Bots & live, Dream Team, System. The tab is in the address (`?tab=`), so links and the back button work; every tab saves its own forms, a tab with unsaved changes shows a dot and asks before another tab opens.
 - Dream Team: a bot plays one tournament at a time (a second drawn cup goes on without it); pack pity comes later (epic after 30/15/6 boxes, legendary after 150/75/20), so the shown rates hold and the 10-pull promises count; Dream Team matches cannot be simulated.

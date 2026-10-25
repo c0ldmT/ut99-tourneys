@@ -224,7 +224,7 @@ export class SettingsSeason {
   /** A form was saved (the page drops its "unsaved" mark). */
   readonly saved = output<SettingsForm>();
   protected readonly botGames = signal(true);
-  protected readonly levelPoints = signal(100);
+  protected readonly levelPoints = signal(200);
   protected readonly busy = signal(false);
   protected readonly o = signal<SeasonsOverview | null>(null);
   protected readonly editing = signal<number | null>(null);

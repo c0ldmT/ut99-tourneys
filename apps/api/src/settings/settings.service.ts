@@ -16,7 +16,7 @@ export const RatingSettingsSchema = z.object({
   /** Games with bots count for the ratings. Off: only games between humans. */
   botGames: z.boolean().default(true),
   /** Rating points per bot difficulty step above or below Adept. */
-  levelPoints: z.number().int().min(0).max(300).default(100),
+  levelPoints: z.number().int().min(0).max(300).default(200),
 });
 export type RatingSettings = z.infer<typeof RatingSettingsSchema>;
 
