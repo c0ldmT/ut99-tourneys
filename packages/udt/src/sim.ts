@@ -18,9 +18,22 @@ import {
   sellPrice,
   staminaAfterGames,
   staminaRecovered,
+  packPrice,
+  rollBox,
   weeklySalary,
   type EconomyConfig,
+  type Pity,
+  type Rarity,
 } from './economy.js';
+import {
+  BLUEPRINT_CHANCE,
+  BLUEPRINTS,
+  BLUEPRINTS_MAX,
+  blueprintPotential,
+  blueprintRarity,
+  developPoints,
+} from './academy.js';
+import { levelOf } from './traits.js';
 
 export interface SimBot {
   id: string;
@@ -71,6 +84,24 @@ export interface SimOptions {
   starterSkill?: number;
   /** Daily Cups (1v1) per day; more make stamina (and rest) matter. Default 1. */
   dailyCups?: number;
+  /**
+   * Own bots from blueprints (off without): managers open standard boxes, a box brings a
+   * blueprint by `BLUEPRINT_CHANCE`, a build needs a licence; own bots (and the starter) gain
+   * experience and develop up to their potential.
+   */
+  academy?: SimAcademy;
+}
+
+export interface SimAcademy {
+  /**
+   * Reference price (index 1) of the licence for the `made`-th own bot of the season (the
+   * starter is the first, so `made` starts at 1); null: no more licences.
+   */
+  licence: (made: number) => number | null;
+  /** Blueprint bots draw this share of a bought bot's salary (0: none, as today). */
+  blueprintSalary: number;
+  /** Standard boxes per week by habit (default saver 1, casual 2, gambler 4, shark 3). */
+  boxesPerWeek?: Partial<Record<Strategy, number>>;
 }
 
 export interface ManagerDay {
@@ -114,6 +145,16 @@ export interface SimResult {
     rested: number;
     /** Bot-weeks on strike (salary not paid). */
     strikes: number;
+    /** Academy: boxes bought, blueprints found, bots built, Neuro on boxes / licences / own salaries. */
+    boxes: number;
+    blueprints: number;
+    built: number;
+    boxSpend: number;
+    licences: number;
+    ownSalaries: number;
+    /** Own bots (built, not the starter) in the roster at the season's end and their best skill. */
+    ownAtEnd: number;
+    ownBestSkill: number;
     finalNet: number;
     firstStrong: number | null;
     first5v5: number | null;
@@ -140,6 +181,8 @@ interface Owned {
   stamina: number;
   starter: boolean;
   striking: boolean;
+  /** Made by the team (academy): no market sale, develops with experience. */
+  own?: { xp: number; spent: number; potential: number };
 }
 
 interface Manager {
@@ -149,6 +192,9 @@ interface Manager {
   cash: number;
   roster: Owned[];
   t: SimResult['totals'][number];
+  blueprints: Rarity[];
+  pity: Pity;
+  made: number;
 }
 
 interface Team {
@@ -227,8 +273,14 @@ export function simulateSeason(o: SimOptions): SimResult {
         stamina: 100,
         starter: true,
         striking: false,
+        ...(o.academy
+          ? { own: { xp: 0, spent: 0, potential: Math.min(7, (o.starterSkill ?? 3) + 2) } }
+          : {}),
       },
     ],
+    blueprints: [],
+    pity: { sinceEpic: 0, sinceLegendary: 0 },
+    made: 1,
     t: {
       strategy,
       betProfit: 0,
@@ -238,6 +290,14 @@ export function simulateSeason(o: SimOptions): SimResult {
       titles: 0,
       rested: 0,
       strikes: 0,
+      boxes: 0,
+      blueprints: 0,
+      built: 0,
+      boxSpend: 0,
+      licences: 0,
+      ownSalaries: 0,
+      ownAtEnd: 0,
+      ownBestSkill: 0,
       finalNet: 0,
       firstStrong: null,
       first5v5: null,
@@ -258,10 +318,12 @@ export function simulateSeason(o: SimOptions): SimResult {
         for (const m of managers) {
           for (const x of m.roster) {
             if (x.starter) continue;
-            const s = weeklySalary(value(x.bot), x.bot.skill, cfg);
+            const s = salaryOf(x);
+            if (s <= 0) continue;
             if (m.cash - s >= floor) {
               m.cash -= s;
               m.t.salaries += s;
+              if (x.own) m.t.ownSalaries += s;
               x.striking = false;
             } else {
               x.striking = true;
@@ -295,6 +357,7 @@ export function simulateSeason(o: SimOptions): SimResult {
       }
     }
     sales = sold;
+    if (o.academy) for (const m of shuffle(managers)) academyDay(m, day, o.academy);
 
     // --- Betting during the day.
     for (const m of managers) {
@@ -342,8 +405,114 @@ export function simulateSeason(o: SimOptions): SimResult {
   }
 
   out.rescued = rescued;
-  out.totals = managers.map((m) => ({ ...m.t, finalNet: net(m) }));
+  out.totals = managers.map((m) => {
+    const own = m.roster.filter((x) => x.own && !x.starter);
+    return {
+      ...m.t,
+      ownAtEnd: own.length,
+      ownBestSkill: own.length ? Math.max(...own.map((x) => x.bot.skill)) : 0,
+      finalNet: net(m),
+    };
+  });
   return out;
+
+  /** Weekly salary of a roster bot: bought ones in full, blueprint bots by the share. */
+  function salaryOf(x: Owned): number {
+    if (x.starter) return 0;
+    const full = weeklySalary(value(x.bot), x.bot.skill, cfg);
+    return x.own ? Math.round(full * (o.academy?.blueprintSalary ?? 0)) : full;
+  }
+
+  /** Boxes (blueprints) and builds of a manager on a day. */
+  function academyDay(m: Manager, day: number, a: SimAcademy) {
+    const per = { saver: 1, casual: 2, gambler: 4, shark: 3, ...a.boxesPerWeek }[m.strategy];
+    // Boxes spread over the week (deterministic share of the weekly number).
+    const boxes = Math.floor((((day % 7) + 1) * per) / 7) - Math.floor(((day % 7) * per) / 7);
+    const salaries = m.roster.reduce((s, x) => s + salaryOf(x), 0);
+    for (let i = 0; i < boxes; i++) {
+      const price = packPrice('standard', index, false, cfg);
+      if ((m.cash - floor - 2 * salaries) * m.p.spend < price) break;
+      m.cash -= price;
+      m.t.boxSpend += price;
+      m.t.boxes++;
+      const r = rollBox('standard', m.pity, rng, cfg);
+      m.pity = r.pity;
+      if (rng() < BLUEPRINT_CHANCE && m.blueprints.length < BLUEPRINTS_MAX) {
+        m.blueprints.push(blueprintRarity(r.rarity));
+        m.t.blueprints++;
+      }
+    }
+    // Build the best blueprint when a licence is affordable and there is room (a full roster
+    // sells its weakest bought bot when the new one will be stronger at its potential).
+    m.blueprints.sort((x, y) => BLUEPRINTS[y].extra - BLUEPRINTS[x].extra);
+    const rarity = m.blueprints[0];
+    if (!rarity) return;
+    const ref = a.licence(m.made);
+    if (ref === null) return;
+    const licence = Math.round(ref * index);
+    const rule = BLUEPRINTS[rarity];
+    const potential = blueprintPotential(rarity, rng);
+    const score = scoreFor(rule.skill, rule.budget);
+    const bot: SimBot = { id: `own-${m.name}-${m.made}`, name: 'own', skill: rule.skill, score };
+    const future = STRENGTH[potential]! * (0.85 + 0.3 * score);
+    const newSalary = Math.round(
+      weeklySalary(baseValue(rule.skill, score, cfg) * index, rule.skill, cfg) * a.blueprintSalary,
+    );
+    if ((m.cash - floor - 2 * (salaries + newSalary)) * m.p.spend < licence) return;
+    if (m.roster.length >= 7) {
+      const sellable = m.roster.filter((x) => !x.starter && !x.own);
+      if (!sellable.length) return;
+      const worst = sellable.reduce((w, x) => (strength(x) < strength(w) ? x : w), sellable[0]!);
+      if (strength(worst) * 1.2 > future) return;
+      m.cash += Math.min(sellPrice(value(worst.bot), cfg), worst.price);
+      m.roster = m.roster.filter((x) => x !== worst);
+      owner.delete(worst.bot.id);
+    }
+    m.blueprints.shift();
+    m.cash -= licence;
+    m.t.licences += licence;
+    m.t.built++;
+    m.made++;
+    m.roster.push({
+      bot,
+      price: licence,
+      stamina: 100,
+      starter: false,
+      striking: false,
+      own: { xp: 0, spent: 0, potential },
+    });
+  }
+
+  /** The value score a build reaches with the blueprint's points at its skill. */
+  function scoreFor(skill: number, budget: number): number {
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 20; i++) {
+      const mid = (lo + hi) / 2;
+      if (baseValue(skill, mid, cfg) <= budget) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  }
+
+  /** Experience after a game; points go into the skill (3) up to the potential, else accuracy. */
+  function gainXp(x: Owned, won: boolean) {
+    if (!x.own) return;
+    x.own.xp += 10 + (won ? 15 : 0);
+    let points = developPoints(levelOf(x.own.xp), x.own.spent);
+    while (points >= 3 && Math.round(x.bot.skill) < x.own.potential) {
+      x.bot = { ...x.bot, skill: x.bot.skill + 1 };
+      x.own.spent += 3;
+      points -= 3;
+    }
+    // At the potential the points go into the values (accuracy weighs most).
+    if (Math.round(x.bot.skill) >= x.own.potential)
+      while (points >= 1 && x.bot.score < 1) {
+        x.bot = { ...x.bot, score: Math.min(1, x.bot.score + 0.0275) };
+        x.own.spent += 1;
+        points -= 1;
+      }
+  }
 
   // Whether a manager buys an offer at its price: fills the roster towards its target size,
   // keeps a reserve of two weeks of salaries.
@@ -464,6 +633,7 @@ export function simulateSeason(o: SimOptions): SimResult {
             if (t === w) g.wins++;
             games.set(x.bot.id, g);
             x.stamina = staminaAfterGames(x.stamina, 1, cfg);
+            gainXp(x, t === w);
           }
           if (t.manager) {
             const other = t === w ? l : w;

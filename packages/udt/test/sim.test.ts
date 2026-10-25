@@ -34,4 +34,35 @@ describe('season simulator', () => {
     const last = a.days.at(-1)!;
     expect(last.managers.reduce((s, m) => s + m.roster - 1, 0)).toBeLessThanOrEqual(library.length);
   });
+
+  it('models blueprints, licences and own salaries when asked (academy)', () => {
+    const opts = {
+      managers: ['casual', 'gambler', 'shark', 'saver'] as const,
+      library,
+      betMultiples: [0, 0, 1.4, 1.8, 2.5],
+      topMultiples: [0, 1.4, 1.8, 2.5],
+      seed: 3,
+    };
+    const plain = simulateSeason({ ...opts, managers: [...opts.managers] });
+    const capped = simulateSeason({
+      ...opts,
+      managers: [...opts.managers],
+      academy: {
+        licence: (n) => [0, 2000, 4000, 8000][n] ?? null,
+        blueprintSalary: 1,
+        boxesPerWeek: { saver: 10, casual: 10, gambler: 10, shark: 10 },
+      },
+    });
+    expect(plain.totals.every((t) => t.built === 0 && t.boxes === 0)).toBe(true);
+    expect(capped.totals.some((t) => t.built > 0)).toBe(true);
+    // At most three licences after the starter; own bots pay salaries with the full share.
+    expect(capped.totals.every((t) => t.built <= 3)).toBe(true);
+    expect(capped.totals.some((t) => t.ownSalaries > 0)).toBe(true);
+    const free = simulateSeason({
+      ...opts,
+      managers: [...opts.managers],
+      academy: { licence: () => 0, blueprintSalary: 0, boxesPerWeek: { casual: 10 } },
+    });
+    expect(free.totals.every((t) => t.ownSalaries === 0)).toBe(true);
+  });
 });
