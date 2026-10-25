@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { Entrant, NewTournamentEvent } from '@tourney/protocol';
-import { valueScore } from '@tourney/udt';
+import { botStrength, gameChance, valueScore } from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
@@ -30,8 +30,6 @@ export const AdvanceBody = z.object({
 });
 export const ManagersBody = z.object({ count: z.number().int().min(1).max(16) });
 
-/** Strength per skill (the owner's brackets), as in the season simulator. */
-const STRENGTH = [1, 1.25, 1.6, 2.1, 3.4, 4.6, 7.2, 9.5];
 const HOUR = 3_600_000;
 
 /**
@@ -149,8 +147,7 @@ export class UdtTestService {
         const score = valueScore(b.traits ?? (b.id ? lib.get(b.id)?.traits : undefined));
         return (
           sum +
-          STRENGTH[Math.round(Math.min(7, Math.max(0, b.skill)))]! *
-            (0.85 + 0.3 * score) *
+          botStrength(b.skill, score) *
             // Body traits (played by the mod): a little stronger each.
             (1 + 0.06 * (b.gameTraits?.length ?? 0))
         );
@@ -163,9 +160,9 @@ export class UdtTestService {
       );
       if (!ready) break;
       const [a, b] = ready.entrants as [string, string];
-      const sa = strength(p.entrants[a]) ** 2;
-      const sb = strength(p.entrants[b]) ** 2;
-      const winnerId = Math.random() < sa / (sa + sb) ? a : b;
+      // The calibrated game model of the simulator (k = 3 in 1v1, 4.5 in teams).
+      const pa = gameChance(strength(p.entrants[a]), strength(p.entrants[b]), p.settings.teamSize);
+      const winnerId = Math.random() < pa ? a : b;
       last = winnerId;
       p = append([
         {

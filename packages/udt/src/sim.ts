@@ -34,6 +34,7 @@ import {
   developPoints,
 } from './academy.js';
 import { levelOf } from './traits.js';
+import { SKILL_STRENGTH as STRENGTH, gameChance } from './model.js';
 
 export interface SimBot {
   id: string;
@@ -160,9 +161,6 @@ export interface SimResult {
     first5v5: number | null;
   }[];
 }
-
-/** Strength per skill: the owner's brackets (0-3 weak, 4-5 middle, 6-7 far above). */
-const STRENGTH = [1, 1.25, 1.6, 2.1, 3.4, 4.6, 7.2, 9.5];
 
 function rngOf(seed: number): () => number {
   let a = seed >>> 0;
@@ -624,7 +622,8 @@ export function simulateSeason(o: SimOptions): SimResult {
           next.push(a);
           continue;
         }
-        const pa = a.strength ** 2 / (a.strength ** 2 + b.strength ** 2);
+        // The calibrated game model (model.ts): k = 3 in 1v1, 4.5 in teams.
+        const pa = gameChance(a.strength, b.strength, ev.teamSize);
         const [w, l] = rng() < pa ? [a, b] : [b, a];
         for (const t of [w, l]) {
           for (const x of t.bots) {
