@@ -250,13 +250,17 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                     </div>
                     @switch (gb.status) {
                       @case ('own') {
-                        <button
-                          type="button"
-                          [disabled]="busy() || !gb.ready || grad()!.left <= 0"
-                          (click)="nominate(gb.botId)"
-                        >
-                          {{ 'udt.academy.nominate' | t }}
-                        </button>
+                        @if (gb.keeper) {
+                          <span class="muted small">{{ 'udt.keep.noGrad' | t }}</span>
+                        } @else {
+                          <button
+                            type="button"
+                            [disabled]="busy() || !gb.ready || grad()!.left <= 0"
+                            (click)="nominate(gb.botId)"
+                          >
+                            {{ 'udt.academy.nominate' | t }}
+                          </button>
+                        }
                       }
                       @case ('nominated') {
                         <span class="udt-mark own">{{ 'udt.academy.st.nominated' | t }}</span>

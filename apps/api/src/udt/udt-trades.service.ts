@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or } from 'drizzle-orm';
 import { roundNeuro } from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
@@ -10,7 +10,7 @@ import { randomId } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, udtBots, udtRoster, udtTrades, udtTraits } from '../db/schema.js';
+import { bots, udtBots, udtKeepers, udtRoster, udtTrades, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
@@ -491,6 +491,17 @@ export class UdtTradesService {
           .map((b) => b.id);
         if (own.length)
           this.db.update(bots).set({ udtOwner: to }).where(inArray(bots.id, own)).run();
+        // A chosen keeper leaves its old team's choice (the new owner may choose it).
+        this.db
+          .delete(udtKeepers)
+          .where(
+            and(
+              eq(udtKeepers.season, season),
+              inArray(udtKeepers.botId, botIds),
+              isNull(udtKeepers.appliedAt),
+            ),
+          )
+          .run();
         // The traits go with the bot.
         this.db
           .update(udtTraits)

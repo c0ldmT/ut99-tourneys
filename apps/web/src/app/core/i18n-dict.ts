@@ -1971,6 +1971,33 @@ const en = {
   'look.team.1': 'Blue team',
   'look.team.2': 'Green team',
   'look.team.3': 'Gold team',
+  'udt.keep.title': 'Choose keepers',
+  'udt.keep.intro':
+    'Up to {n} bots your team made play for you again next season. Bought bots go back to the market, all others into the yearbook. Tap to keep.',
+  'udt.keep.chosen': 'chosen',
+  'udt.keep.until': 'Season end · until {day} 23:59',
+  'udt.keep.untilNext': 'Season over · until the next season starts',
+  'udt.keep.ariaOn': '{name} stays in the team',
+  'udt.keep.ariaOff': 'Keep {name}',
+  'udt.keep.badge': 'Keeper',
+  'udt.keep.notOk': 'cannot be kept',
+  'udt.keep.next': 'Season {s}: {skill} {name}',
+  'udt.keep.nextOn': 'Season {s}: {skill} {name}, level 1, no salary',
+  'udt.keep.rule1':
+    'Skill drops by {n} (not below Skilled); potential and values stay, traits go like for every bot.',
+  'udt.keep.rule2': 'Experience starts anew (level 1); the bot can train the lost step back up.',
+  'udt.keep.rule3':
+    'No salary, but it counts against the team value caps. Graduation only in a later season.',
+  'udt.keep.save': 'Set keepers',
+  'udt.keep.why.bought': 'bought · back to the market',
+  'udt.keep.why.nominated': 'graduation requested',
+  'udt.keep.why.graduated': 'graduated',
+  'udt.keep.why.rejected': 'graduation refused',
+  'udt.keep.coming': 'Your keepers from season {n} come along: {list}.',
+  'udt.keep.kept': 'Keeper from season {n}: no salary',
+  'udt.keep.keptTo': 'Keeper in season {n}',
+  'udt.keep.noGrad': 'Keeper: graduation in a later season',
+  'ok.udt.keepers': 'Keepers set.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3964,6 +3991,34 @@ const de: Record<TKey, string> = {
   'look.team.1': 'Blaues Team',
   'look.team.2': 'Grünes Team',
   'look.team.3': 'Goldenes Team',
+  'udt.keep.title': 'Keeper wählen',
+  'udt.keep.intro':
+    'Bis zu {n} Bots, die dein Team gemacht hat, spielen nächste Season wieder für dich. Gekaufte Bots gehen zurück auf den Markt, alle anderen ins Jahrbuch. Antippen zum Behalten.',
+  'udt.keep.chosen': 'gewählt',
+  'udt.keep.until': 'Season-Ende · bis {day} 23:59',
+  'udt.keep.untilNext': 'Season vorbei · bis die nächste Season startet',
+  'udt.keep.ariaOn': '{name} bleibt im Team',
+  'udt.keep.ariaOff': '{name} behalten',
+  'udt.keep.badge': 'Keeper',
+  'udt.keep.notOk': 'nicht wählbar',
+  'udt.keep.next': 'Season {s}: {skill} {name}',
+  'udt.keep.nextOn': 'Season {s}: {skill} {name}, Level 1, kein Gehalt',
+  'udt.keep.rule1':
+    'Skill sinkt um {n} (mindestens Skilled), Potenzial und Werte bleiben, Traits fallen wie bei allen weg.',
+  'udt.keep.rule2':
+    'Erfahrung fängt neu an (Level 1); den verlorenen Schritt kann der Bot wieder hochtrainieren.',
+  'udt.keep.rule3':
+    'Kein Gehalt, zählt aber zur Teamwert-Grenze. Abschluss erst in einer späteren Season.',
+  'udt.keep.save': 'Keeper festlegen',
+  'udt.keep.why.bought': 'gekauft · zurück auf den Markt',
+  'udt.keep.why.nominated': 'Abschluss beantragt',
+  'udt.keep.why.graduated': 'abgeschlossen',
+  'udt.keep.why.rejected': 'Abschluss abgelehnt',
+  'udt.keep.coming': 'Deine Keeper aus Season {n} kommen mit: {list}.',
+  'udt.keep.kept': 'Keeper aus Season {n}: kein Gehalt',
+  'udt.keep.keptTo': 'Keeper in Season {n}',
+  'udt.keep.noGrad': 'Keeper: Abschluss erst in einer späteren Season',
+  'ok.udt.keepers': 'Keeper festgelegt.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

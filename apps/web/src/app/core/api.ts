@@ -27,6 +27,7 @@ import type {
   UdtAcademy,
   UdtBreeder,
   UdtGraduation,
+  UdtKeepers,
   UdtYearbook,
   UdtYearbookEntry,
   UdtPartner,
@@ -363,6 +364,10 @@ export class Api {
       ok: 'ok.udt.breakthrough',
     });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');
+  /** The keeper choice (quiet: a page without a season shows nothing). */
+  udtKeepers = () => this.call<UdtKeepers>('GET', '/udt/keepers', undefined, { quiet: true });
+  udtSetKeepers = (botIds: string[]) =>
+    this.call<UdtKeepers>('PUT', '/udt/keepers', { botIds }, { ok: 'ok.udt.keepers' });
   udtNominate = (botId: string) =>
     this.call<UdtGraduation>('POST', `/udt/graduation/${encodeURIComponent(botId)}`, undefined, {
       ok: 'ok.udt.nominated',

@@ -91,6 +91,9 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
                   (b.honours ? 'udt.yearbook.withHonours' : 'udt.yearbook.graduated') | t
                 }}</span>
               }
+              @if (b.keptTo; as kt) {
+                <span class="udt-mark own">{{ 'udt.keep.keptTo' | t: { n: kt } }}</span>
+              }
               <div class="small">{{ b.tag }} {{ b.team }}</div>
               <div class="muted small">
                 {{ 'udt.yearbook.breeder' | t }} {{ b.breeder }} ·

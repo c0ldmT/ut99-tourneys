@@ -60,9 +60,10 @@ export function rosterSalary(b: {
   skill: number;
   starter: boolean;
   udtTraits?: { code: string }[];
-  own?: { origin: string } | null;
+  own?: { origin: string; keptFrom?: number | null } | null;
 }): number {
-  if (b.starter) return 0;
+  // The starter and keepers play for free.
+  if (b.starter || b.own?.keptFrom) return 0;
   const share = madeSalaryShare(b.own?.origin);
   return share ? salaryOf(b, share) : 0;
 }
@@ -162,6 +163,9 @@ export function rosterCard(
     @let v = b.effective?.traits ?? b.traits;
     @let sk = b.effective?.skill ?? b.skill;
     <div class="udt-card r-{{ b.rarity }}" [class.small]="small()" [class.dim]="dim()">
+      @if (badge()) {
+        <span class="udt-cbadge">{{ badge() }}</span>
+      }
       @if (points() > 0) {
         <button
           type="button"
@@ -288,6 +292,8 @@ export class UdtCard {
   readonly dim = input(false);
   /** A short line in the foot (e.g. why the bot cannot be traded). */
   readonly note = input<string | null>(null);
+  /** A pill on top of the card (e.g. "Keeper"). */
+  readonly badge = input<string | null>(null);
   /** Development points to give (own bots): a gold plaque, a click opens them. */
   readonly points = input(0);
   readonly pointsClick = output<void>();

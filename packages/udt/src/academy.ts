@@ -200,6 +200,18 @@ export function potentialWindow(potential: number, skill: number, seed: string):
 /** Every starter bot has skill 3, like the blueprints (a lower skill would make the values cheap). */
 export const STARTER_SKILL = 3;
 
+/** A keeper never drops below this skill (Skilled, the starter's); a lower skill stays. */
+export const KEEPER_MIN_SKILL = 3;
+
+/**
+ * A keeper's skill in the next season (league plan L-E7, keeper variant V6 of the simulation):
+ * `loss` steps lower, not below Skilled; a bot at or below Skilled keeps its skill.
+ */
+export function keeperSkill(skill: number, loss = 1): number {
+  if (skill <= KEEPER_MIN_SKILL) return skill;
+  return Math.max(KEEPER_MIN_SKILL, skill - loss);
+}
+
 /** Potential of a starter bot: two skill steps above (at most Godlike). */
 export const starterPotential = (skill: number): number => Math.min(7, Math.round(skill) + 2);
 

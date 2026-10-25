@@ -368,7 +368,9 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     for (const r of roster) {
       // Bots the managers made play for free (starter, talents, apprentices) or for a share of
       // the salary (blueprint bots, owner 25.10.).
-      const share = r.starter ? 0 : madeSalaryShare(own.get(r.botId)?.origin);
+      // Keepers play for free (league plan L-E7).
+      const o = own.get(r.botId);
+      const share = r.starter || (o?.keptFrom ?? null) !== null ? 0 : madeSalaryShare(o?.origin);
       if (!share) continue;
       const b = byId.get(r.botId);
       const traits = onBots.get(r.botId) ?? [];

@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { udtManagerOf } from '@tourney/protocol';
 import { career, levelOf, roundNeuro, type Career } from '@tourney/udt';
 import { z } from 'zod';
@@ -10,7 +10,15 @@ import { conflict, notFound } from '../common/http.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { bots, neuroLedger, udtBots, udtHall, udtRoster, udtTeams } from '../db/schema.js';
+import {
+  bots,
+  neuroLedger,
+  udtBots,
+  udtHall,
+  udtKeepers,
+  udtRoster,
+  udtTeams,
+} from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { botKey } from '../stats/facts.js';
@@ -146,6 +154,8 @@ export class UdtCareerService implements OnModuleInit {
       bots: [...own.values()].map((b) => {
         const r = rows.get(b.botId);
         const level = levelOf(r?.xp ?? 0);
+        // A keeper graduates in a later season, not in its first one as a keeper (L-E7).
+        const keeper = b.keptFrom !== null && this.udt.keeperSeasons(b.botId) <= 1;
         return {
           botId: b.botId,
           name: lib.get(b.botId)?.name ?? '?',
@@ -153,7 +163,8 @@ export class UdtCareerService implements OnModuleInit {
           status: b.status,
           games: r?.games ?? 0,
           level,
-          ready: (r?.games ?? 0) >= GRADUATE_GAMES && level >= GRADUATE_LEVEL,
+          keeper,
+          ready: !keeper && (r?.games ?? 0) >= GRADUATE_GAMES && level >= GRADUATE_LEVEL,
           honours: level >= HONOURS_LEVEL,
         };
       }),
@@ -166,6 +177,16 @@ export class UdtCareerService implements OnModuleInit {
     const b = g.bots.find((x) => x.botId === botId);
     if (!b) throw notFound('own bot of this season');
     if (b.status !== 'own') throw conflict('the bot is {status}', { status: b.status });
+    if (b.keeper) throw conflict('a keeper graduates in a later season');
+    const season = this.udt.season().number;
+    if (
+      this.db
+        .select()
+        .from(udtKeepers)
+        .where(and(eq(udtKeepers.season, season), eq(udtKeepers.botId, botId)))
+        .get()
+    )
+      throw conflict('{name} is a keeper for next season: take it out first', { name: b.name });
     if (!b.ready)
       throw conflict('a graduation needs {games} Dream Team games and level {level}', {
         games: GRADUATE_GAMES,
@@ -238,7 +259,17 @@ export class UdtCareerService implements OnModuleInit {
     return this.nominations();
   }
 
-  private entry(b: typeof udtBots.$inferSelect) {
+  /** Whether an own bot was chosen as a keeper at the end of `season` (not yet moved over). */
+  private keptLater(botId: string, season: number): boolean {
+    return !!this.db
+      .select()
+      .from(udtKeepers)
+      .where(and(eq(udtKeepers.season, season), eq(udtKeepers.botId, botId)))
+      .get();
+  }
+
+  /** A yearbook entry; `keptTo`: the bot was kept for that season (the row is of the old one). */
+  private entry(b: typeof udtBots.$inferSelect, keptTo: number | null = null) {
     const lib = this.bots.list().find((x) => x.id === b.botId);
     const r = this.db
       .select()
@@ -252,8 +283,16 @@ export class UdtCareerService implements OnModuleInit {
       .get();
     const level = levelOf(r?.xp ?? 0);
     // The yearbook is open to everybody: the potential only once the roster shows it too
-    // (level 5) or the season is over.
-    const shown = level >= 5 || b.season !== this.seasons.current()?.number;
+    // (level 5) or the bot's time in a team is over (a keeper plays on: its row moved on).
+    const row =
+      keptTo === null ? b : this.db.select().from(udtBots).where(eq(udtBots.botId, b.botId)).get();
+    const newest = this.seasons.latestStarted()?.number;
+    const over =
+      !row ||
+      row.status !== 'own' ||
+      (row.season !== this.seasons.current()?.number &&
+        !(row.season === newest && this.keptLater(row.botId, row.season)));
+    const shown = level >= 5 || over;
     return {
       botId: b.botId,
       season: b.season,
@@ -271,6 +310,7 @@ export class UdtCareerService implements OnModuleInit {
       team: team?.name ?? '?',
       tag: team?.tag ?? '',
       active: lib?.active ?? false,
+      keptTo,
     };
   }
 
@@ -281,25 +321,43 @@ export class UdtCareerService implements OnModuleInit {
   yearbook(season?: number) {
     this.udt.assertOn();
     const seasons = [
-      ...new Set(
-        this.db
+      ...new Set([
+        ...this.db
           .select({ s: udtBots.season })
           .from(udtBots)
           .all()
           .map((x) => x.s),
-      ),
+        // A season whose own bots were all kept for the next one.
+        ...this.db
+          .select({ s: udtKeepers.season })
+          .from(udtKeepers)
+          .where(isNotNull(udtKeepers.appliedAt))
+          .all()
+          .map((x) => x.s),
+      ]),
     ].sort((a, b) => b - a);
     const s = season ?? seasons[0] ?? this.udt.season().number;
     const rows = this.db.select().from(udtBots).where(eq(udtBots.season, s)).all();
+    // Keepers moved on to a later season: they belong to this class too (with that season's
+    // roster row: games and experience of this season).
+    const kept = this.db
+      .select()
+      .from(udtKeepers)
+      .where(and(eq(udtKeepers.season, s), isNotNull(udtKeepers.appliedAt)))
+      .all()
+      .flatMap((k) => {
+        const b = this.db.select().from(udtBots).where(eq(udtBots.botId, k.botId)).get();
+        return b && b.season !== s
+          ? [this.entry({ ...b, season: s, userId: k.userId }, s + 1)]
+          : [];
+      });
     return {
       season: s,
       seasons,
-      bots: rows
-        .map((b) => this.entry(b))
-        .sort(
-          (a, b) =>
-            Number(b.status === 'graduated') - Number(a.status === 'graduated') || b.xp - a.xp,
-        ),
+      bots: [...rows.map((b) => this.entry(b)), ...kept].sort(
+        (a, b) =>
+          Number(b.status === 'graduated') - Number(a.status === 'graduated') || b.xp - a.xp,
+      ),
     };
   }
 

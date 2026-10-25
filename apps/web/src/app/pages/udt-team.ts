@@ -1,5 +1,6 @@
 import { emptyLook, lookBody, UdtBotLook, type UdtLooks } from '../components/udt-bot-look';
 import { UdtBotPanel } from '../components/udt-bot-panel';
+import { UdtKeepersPanel } from '../components/udt-keepers';
 import { UdtLineupBoard, type TraitDrop } from '../components/udt-lineup-board';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -36,6 +37,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
     UdtBotLook,
     UdtLineupBoard,
     UdtBotPanel,
+    UdtKeepersPanel,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -49,6 +51,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
         <div class="card">
           <p class="muted">{{ 'udt.noSeason' | t }}</p>
         </div>
+        <app-udt-keepers />
       } @else if (!v.team) {
         <div class="udt-head">
           <div>
@@ -58,6 +61,11 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           </div>
         </div>
         <form class="card found" (ngSubmit)="found()">
+          @if (v.keepers?.length) {
+            <p class="udt-keep-coming">
+              {{ 'udt.keep.coming' | t: { n: v.season - 1, list: keeperList(v) } }}
+            </p>
+          }
           <div class="cols">
             <div class="fields">
               <div class="row gap">
@@ -175,6 +183,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           (changed)="load()"
           (closed)="panelId.set(null)"
         />
+        <app-udt-keepers (changed)="load()" />
 
         <section class="card">
           <h2>{{ 'udt.ledger' | t }}</h2>
@@ -212,6 +221,13 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+    .udt-keep-coming {
+      margin: 0 0 16px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--udt);
+      background: rgba(178, 107, 255, 0.08);
     }
     .lrow {
       display: flex;
@@ -314,6 +330,11 @@ export class UdtTeamPage {
     try {
       const v = await this.api.udt();
       this.view.set(v);
+      // Founding again: last season's name and tag as a start.
+      if (!v.team && v.lastTeam && !this.teamName && !this.teamTag) {
+        this.teamName = v.lastTeam.name;
+        this.teamTag = v.lastTeam.tag;
+      }
       // While lineup saves run, the board shows the newest change (synced when they are done).
       if (!this.pending) this.resetDraft(v);
       if (v.enabled && v.season !== null && !this.looks())
@@ -331,6 +352,15 @@ export class UdtTeamPage {
     const at = (key: 'dmSlot' | 'mhSlot' | 'bench', n: number) =>
       Array.from({ length: n }, (_, i) => v.roster.find((b) => b[key] === i + 1)?.botId ?? null);
     this.draft.set({ dm: at('dmSlot', 5), mh: at('mhSlot', 5), bench: at('bench', 2) });
+  }
+
+  /** "Mira (Skill 5 → 4), Vex (3)" for the founding form. */
+  protected keeperList(v: UdtView): string {
+    return (v.keepers ?? [])
+      .map(
+        (k) => `${k.name} (${k.skill === k.nextSkill ? k.skill : `${k.skill} → ${k.nextSkill}`})`,
+      )
+      .join(', ');
   }
 
   protected tick() {

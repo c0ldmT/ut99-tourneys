@@ -195,11 +195,12 @@ export class UdtRewardsService implements OnModuleInit {
   /** The bots among `ids` whose mentor is in the manager's roster now. */
   private mentorsIn(season: number, userId: string, ids: readonly string[]): Set<string> {
     const taught = this.db
-      .select({ botId: udtBots.botId, mentorId: udtBots.mentorId })
+      .select({ botId: udtBots.botId, mentorId: udtBots.mentorId, ms: udtBots.mentorSeason })
       .from(udtBots)
       .where(and(eq(udtBots.season, season), inArray(udtBots.botId, [...ids])))
       .all()
-      .filter((b) => b.mentorId);
+      // A keeper's apprenticeship of an earlier season gives no bonus any more.
+      .filter((b) => b.mentorId && b.ms === season);
     if (!taught.length) return new Set();
     const roster = new Set(
       this.db

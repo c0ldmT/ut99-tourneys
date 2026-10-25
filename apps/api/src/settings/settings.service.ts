@@ -109,6 +109,19 @@ export const UdtSettingsSchema = z.object({
   aiEnabled: z.boolean().default(false),
   aiCount: z.number().int().min(0).max(8).default(4),
   aiStrength: z.enum(['calm', 'normal', 'ambitious']).default('normal'),
+  /**
+   * Keepers (league plan L-E7): at the end of a season a manager keeps up to `max` own bots
+   * (never bought or nominated ones) for the next season; they lose `skillLoss` skill steps (not
+   * below Skilled), their traits, experience and points, and draw no salary. The choice is open
+   * on the season's last `days` days and between two seasons.
+   */
+  keepers: z
+    .object({
+      max: z.number().int().min(0).max(5).default(2),
+      skillLoss: z.number().int().min(0).max(3).default(1),
+      days: z.number().int().min(1).max(14).default(2),
+    })
+    .default({ max: 2, skillLoss: 1, days: 2 }),
 });
 export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
 
@@ -200,7 +213,12 @@ export class SettingsService {
   }
 
   setUdt(value: Partial<UdtSettings>): WebsiteSettings {
-    const next = UdtSettingsSchema.safeParse({ ...this.get().udt, ...value });
+    const now = this.get().udt as Record<string, unknown>;
+    const merged: Record<string, unknown> = { ...now };
+    // Blocks (keepers, league) merge field by field: what is left out stays as it is.
+    for (const [k, v] of Object.entries(value))
+      merged[k] = isBlock(v) && isBlock(now[k]) ? { ...now[k], ...v } : v;
+    const next = UdtSettingsSchema.safeParse(merged);
     if (!next.success) throw invalidInput(next.error);
     this.put('udt', next.data);
     return this.get();
@@ -231,3 +249,6 @@ export class SettingsService {
     return new Date(this.clock.now()).toISOString();
   }
 }
+
+const isBlock = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);

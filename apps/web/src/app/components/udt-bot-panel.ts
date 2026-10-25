@@ -96,6 +96,12 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 }
               </span>
             }
+            @if (b.own?.keptFrom; as kf) {
+              <span class="small"
+                ><span class="udt-mark own">{{ 'udt.keep.badge' | t }}</span>
+                {{ 'udt.keep.kept' | t: { n: kf } }}</span
+              >
+            }
             @if (b.own?.mentor; as mt) {
               <span class="small" [class.muted]="!mt.here">
                 {{

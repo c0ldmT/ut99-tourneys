@@ -4,6 +4,8 @@ import { BotTraitsSchema } from '@tourney/protocol';
 import {
   baseValue,
   botRarity,
+  botStrength,
+  keeperSkill,
   DEFAULT_ECONOMY,
   economyIndex,
   effectiveValues,
@@ -39,6 +41,7 @@ import {
   udtDays,
   udtEntries,
   udtHall,
+  udtKeepers,
   udtOffers,
   udtPity,
   udtRoster,
@@ -165,7 +168,27 @@ export interface RosterBot {
     breakthrough: boolean;
     /** Fully developed for good (from level 5): points have nothing left to buy. */
     maxed: boolean;
+    /** A keeper: the season it came from (no salary, no graduation in its first keeper season). */
+    keptFrom: number | null;
   } | null;
+}
+
+/** An own bot at a season's end: can it be kept, and its skill in the next season. */
+export interface KeeperCandidate {
+  botId: string;
+  name: string;
+  /** null: a bought bot. */
+  origin: string | null;
+  skill: number;
+  nextSkill: number;
+  rarity: ReturnType<typeof botRarity>;
+  traits: LibraryBot['traits'];
+  level: number;
+  potential: [number, number] | null;
+  keptFrom: number | null;
+  ok: boolean;
+  /** Why not: "bought", "nominated", "graduated", "rejected". */
+  why: string | null;
 }
 
 export interface UdtTeam {
@@ -230,6 +253,7 @@ export class UdtService {
         udtScouts,
         udtBlueprints,
         udtHall,
+        udtKeepers,
         udtAi,
         udtTeams,
       ])
@@ -327,6 +351,8 @@ export class UdtService {
       .where(
         and(
           eq(udtBots.season, season),
+          // Keepers were made in an earlier season (they cost no licence now).
+          isNull(udtBots.keptFrom),
           or(eq(udtBots.madeBy, userId), and(isNull(udtBots.madeBy), eq(udtBots.userId, userId))),
         ),
       )
@@ -644,6 +670,16 @@ export class UdtService {
     const team = this.team(user.id, season.number);
     return {
       enabled,
+      // Founding again: last season's name and tag, and the keepers that come along.
+      lastTeam: team ? null : this.team(user.id, season.number - 1),
+      keepers: team
+        ? []
+        : this.keepersFor(user.id, season.number).map((c) => ({
+            botId: c.botId,
+            name: c.name,
+            skill: c.skill,
+            nextSkill: c.nextSkill,
+          })),
       season: season.number,
       today: this.today(),
       index: this.index(season.number),
@@ -694,61 +730,188 @@ export class UdtService {
       face: body.starter.face,
       voice: body.starter.traits?.voice,
     });
-    const bot = this.bots.create({
-      name: body.starter.name,
-      skill,
-      ...(body.starter.botClass ? { botClass: body.starter.botClass } : {}),
-      ...(body.starter.skin ? { skin: body.starter.skin } : {}),
-      ...(body.starter.face ? { face: body.starter.face } : {}),
-      ...(body.starter.traits ? { traits: body.starter.traits } : {}),
-      ...(body.starter.personality ? { personality: body.starter.personality } : {}),
-      active: false,
+    // One transaction: a team without its starter or keepers could not be founded again.
+    this.db.transaction(() => {
+      const bot = this.bots.create({
+        name: body.starter.name,
+        skill,
+        ...(body.starter.botClass ? { botClass: body.starter.botClass } : {}),
+        ...(body.starter.skin ? { skin: body.starter.skin } : {}),
+        ...(body.starter.face ? { face: body.starter.face } : {}),
+        ...(body.starter.traits ? { traits: body.starter.traits } : {}),
+        ...(body.starter.personality ? { personality: body.starter.personality } : {}),
+        active: false,
+      });
+      this.db
+        .update(bots)
+        .set({ udtOwner: user.id, udtOrigin: 'starter' })
+        .where(eq(bots.id, bot.id))
+        .run();
+      const now = new Date(this.clock.now()).toISOString();
+      this.db
+        .insert(udtTeams)
+        .values({
+          season: season.number,
+          userId: user.id,
+          name: body.name,
+          nameKey,
+          tag: body.tag,
+          tagKey,
+          createdAt: now,
+        })
+        .run();
+      this.db
+        .insert(udtRoster)
+        .values({
+          season: season.number,
+          botId: bot.id,
+          userId: user.id,
+          price: 0,
+          acquiredAt: now,
+          starter: true,
+          dmSlot: 1,
+          mhSlot: 1,
+        })
+        .run();
+      this.db
+        .insert(udtBots)
+        .values({
+          botId: bot.id,
+          season: season.number,
+          userId: user.id,
+          madeBy: user.id,
+          origin: 'starter',
+          potential: starterPotential(skill),
+          ...windowOf(drawPotentialWindow(starterPotential(skill), skill, [skill, 7], Math.random)),
+          createdAt: now,
+        })
+        .run();
+      this.takeKeepers(user.id, season.number, this.aiIds().has(user.id), now);
     });
-    this.db
-      .update(bots)
-      .set({ udtOwner: user.id, udtOrigin: 'starter' })
-      .where(eq(bots.id, bot.id))
-      .run();
-    const now = new Date(this.clock.now()).toISOString();
-    this.db
-      .insert(udtTeams)
-      .values({
-        season: season.number,
-        userId: user.id,
-        name: body.name,
-        nameKey,
-        tag: body.tag,
-        tagKey,
-        createdAt: now,
-      })
-      .run();
-    this.db
-      .insert(udtRoster)
-      .values({
-        season: season.number,
-        botId: bot.id,
-        userId: user.id,
-        price: 0,
-        acquiredAt: now,
-        starter: true,
-        dmSlot: 1,
-        mhSlot: 1,
-      })
-      .run();
-    this.db
-      .insert(udtBots)
-      .values({
-        botId: bot.id,
-        season: season.number,
-        userId: user.id,
-        madeBy: user.id,
-        origin: 'starter',
-        potential: starterPotential(skill),
-        ...windowOf(drawPotentialWindow(starterPotential(skill), skill, [skill, 7], Math.random)),
-        createdAt: now,
-      })
-      .run();
     return this.team(user.id, season.number)!;
+  }
+
+  /**
+   * The roster bots of a manager's season that could be kept for the next one (L-E7): own bots
+   * (starter, talents, apprentices, blueprint bots, also traded ones) that are not nominated;
+   * bought bots go back to the market. With their skill in the next season.
+   */
+  keeperCandidates(userId: string, season: number): KeeperCandidate[] {
+    const own = this.ownBots(season, userId);
+    const loss = this.settings.get().udt.keepers.skillLoss;
+    return this.roster(userId, season).map((r) => {
+      const o = own.get(r.botId);
+      const why = !o ? 'bought' : o.status !== 'own' ? o.status : null;
+      return {
+        botId: r.botId,
+        name: r.name,
+        origin: o?.origin ?? null,
+        skill: r.skill,
+        nextSkill: keeperSkill(r.skill, loss),
+        rarity: r.rarity,
+        traits: r.traits,
+        level: r.level,
+        potential: r.own?.potential ?? null,
+        keptFrom: o?.keptFrom ?? null,
+        ok: !why,
+        why,
+      };
+    });
+  }
+
+  /** The keepers chosen at the end of the season before `season` that still wait to come over. */
+  keepersFor(userId: string, season: number): KeeperCandidate[] {
+    const picked = new Set(
+      this.db
+        .select({ id: udtKeepers.botId })
+        .from(udtKeepers)
+        .where(
+          and(
+            eq(udtKeepers.season, season - 1),
+            eq(udtKeepers.userId, userId),
+            isNull(udtKeepers.appliedAt),
+          ),
+        )
+        .all()
+        .map((k) => k.id),
+    );
+    if (!picked.size) return [];
+    return this.keeperCandidates(userId, season - 1).filter((c) => c.ok && picked.has(c.botId));
+  }
+
+  /**
+   * Founding a team in `season`: the keepers chosen at the end of the season before come over
+   * (AI managers keep their strongest own bots by themselves). Skill down by the setting (not
+   * below Skilled), potential, values, look and name stay; traits (cards of the old season),
+   * experience and spent points start anew; they play for free (no salary) but count against
+   * the team value caps like every own bot. Returns the bot ids.
+   */
+  private takeKeepers(userId: string, season: number, auto: boolean, now: string): string[] {
+    const cfg = this.settings.get().udt.keepers;
+    const from = season - 1;
+    if (from < 1 || cfg.max <= 0) return [];
+    let picks = this.keepersFor(userId, season);
+    if (!picks.length && auto) {
+      picks = this.keeperCandidates(userId, from)
+        .filter((c) => c.ok)
+        .sort(
+          (a, b) =>
+            botStrength(b.skill, valueScore(b.traits)) - botStrength(a.skill, valueScore(a.traits)),
+        )
+        .slice(0, cfg.max);
+      for (const c of picks)
+        this.db
+          .insert(udtKeepers)
+          .values({ season: from, userId, botId: c.botId, chosenAt: now })
+          .onConflictDoNothing()
+          .run();
+    }
+    const kept: string[] = [];
+    this.db.transaction((tx) => {
+      for (const c of picks.slice(0, cfg.max)) {
+        const b = tx.select().from(udtBots).where(eq(udtBots.botId, c.botId)).get();
+        if (!b || b.season !== from || b.userId !== userId || b.status !== 'own') continue;
+        // A potential the roster showed exactly (level 5) stays known.
+        const known = c.level >= 5;
+        tx.update(bots).set({ skill: c.nextSkill }).where(eq(bots.id, c.botId)).run();
+        tx.update(udtBots)
+          .set({
+            season,
+            keptFrom: from,
+            pointsSpent: 0,
+            ...(known ? windowOf([b.potential, b.potential]) : {}),
+          })
+          .where(eq(udtBots.botId, c.botId))
+          .run();
+        const slot = kept.length + 2 <= 5 ? kept.length + 2 : null;
+        tx.insert(udtRoster)
+          .values({
+            season,
+            botId: c.botId,
+            userId,
+            price: 0,
+            acquiredAt: now,
+            dmSlot: slot,
+            mhSlot: slot,
+          })
+          .run();
+        tx.update(udtKeepers)
+          .set({ appliedAt: now })
+          .where(and(eq(udtKeepers.season, from), eq(udtKeepers.botId, c.botId)))
+          .run();
+        kept.push(c.botId);
+      }
+    });
+    return kept;
+  }
+
+  /** How often a bot came over as a keeper (its first keeper season cannot graduate). */
+  keeperSeasons(botId: string): number {
+    return this.db
+      .select({ s: udtKeepers.season })
+      .from(udtKeepers)
+      .where(and(eq(udtKeepers.botId, botId), isNotNull(udtKeepers.appliedAt)))
+      .all().length;
   }
 
   /** Lineups for deathmatch and Monster Hunt (slots 1..5) and the bench order (1..2). */
@@ -827,8 +990,9 @@ function ownView(
     spent: b.pointsSpent,
     canRename: !b.renamed && b.status === 'own',
     /** The mentor it learned from (it gains XP faster while the mentor is in the roster). */
-    mentor: mentorOf(b.mentorId),
+    mentor: b.mentorSeason === b.season ? mentorOf(b.mentorId) : null,
     breakthrough: b.breakthrough,
+    keptFrom: b.keptFrom,
     maxed: level >= 5 && full && Math.round(skill) >= p && (b.breakthrough || p >= 7),
   };
 }

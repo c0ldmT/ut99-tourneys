@@ -17,6 +17,7 @@ import { notFound, ZodPipe } from '../common/http.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
 import { ApproveBody, UdtCareerService } from './udt-career.service.js';
+import { KeepersBody, UdtKeepersService } from './udt-keepers.service.js';
 import { UdtAiService } from './udt-ai.service.js';
 import {
   BuildBody,
@@ -61,6 +62,7 @@ export class UdtController {
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
     @Inject(UdtAiService) private readonly ai: UdtAiService,
     @Inject(UsersService) private readonly users: UsersService,
+    @Inject(UdtKeepersService) private readonly keepers: UdtKeepersService,
   ) {}
 
   @Get()
@@ -391,6 +393,21 @@ export class UdtController {
   @Delete('graduation/:botId')
   unnominate(@CurrentUser() user: User, @Param('botId') botId: string) {
     return this.career.withdraw(user, botId);
+  }
+
+  /** The keeper choice at the season's end (open or not, bots that can be kept, the chosen). */
+  @Get('keepers')
+  keepersView(@CurrentUser() user: User) {
+    return this.keepers.view(user);
+  }
+
+  /** Chooses the keepers for the next season (replaces the choice; empty list: none). */
+  @Put('keepers')
+  chooseKeepers(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(KeepersBody)) body: { botIds: string[] },
+  ) {
+    return this.keepers.choose(user, body.botIds);
   }
 
   /** Graduations waiting for an admin. */

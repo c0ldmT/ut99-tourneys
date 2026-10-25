@@ -268,6 +268,14 @@ export const ERRORS_DE: Record<string, string> = {
   'own bot of this season not found': 'Eigener Bot dieser Season nicht gefunden.',
   'retired already': 'Schon abgetreten.',
   'the bot is {status}': 'Der Bot ist schon weiter ({status}).',
+  'a keeper graduates in a later season':
+    'Ein Keeper kann erst in einer späteren Season abschließen, nicht in seiner ersten als Keeper.',
+  '{name} is a keeper for next season: take it out first':
+    '{name} ist als Keeper für die nächste Season gewählt: Nimm ihn dort zuerst heraus.',
+  'keepers are chosen at the end of the season': 'Keeper wählst du am Ende der Season.',
+  'at most {n} keepers': 'Höchstens {n} Keeper.',
+  '{name} was bought: only bots your team made can be kept':
+    '{name} wurde gekauft: Behalten kannst du nur Bots, die dein Team gemacht hat.',
   'the bot plays in a Dream Team roster this season':
     'Der Bot spielt diese Season in einem Dream-Team-Kader.',
 

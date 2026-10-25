@@ -377,7 +377,10 @@ describe('Unreal Dream Team: academy', () => {
       .run();
     const nx = (await mario.get('/udt')).body.roster.find((r: { starter: boolean }) => r.starter)
       .botId as string;
-    db.update(udtBots).set({ mentorId: sensei }).where(eq(udtBots.botId, nx)).run();
+    db.update(udtBots)
+      .set({ mentorId: sensei, mentorSeason: 1 })
+      .where(eq(udtBots.botId, nx))
+      .run();
     const cup = await admin.post(
       '/tournaments',
       tournamentBody(

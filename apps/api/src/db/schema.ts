@@ -466,6 +466,8 @@ export const udtBots = sqliteTable('udt_bots', {
   windowHi: integer('window_hi'),
   pointsSpent: integer('points_spent').notNull().default(0),
   mentorId: text('mentor_id'),
+  /** The season of the mentor's lesson (a keeper's apprenticeship stays in its old season). */
+  mentorSeason: integer('mentor_season'),
   createdAt: text('created_at').notNull(),
   /** "own", "nominated" (by the manager), "graduated" (into the library) or "rejected". */
   status: text('status').notNull().default('own'),
@@ -477,7 +479,25 @@ export const udtBots = sqliteTable('udt_bots', {
   renamed: integer('renamed', { mode: 'boolean' }).notNull().default(false),
   /** The one breakthrough happened (potential and skill +1, values cut). */
   breakthrough: integer('breakthrough', { mode: 'boolean' }).notNull().default(false),
+  /** The season the bot came from as a keeper (its newest keep); null: made this season. */
+  keptFrom: integer('kept_from'),
 });
+
+/**
+ * Keepers: own bots a manager keeps at the end of `season` for the next one (at most
+ * `udt.keepers.max`); `appliedAt` once the bot moved over (the team was founded again).
+ */
+export const udtKeepers = sqliteTable(
+  'udt_keepers',
+  {
+    season: integer('season').notNull(),
+    userId: text('user_id').notNull(),
+    botId: text('bot_id').notNull(),
+    chosenAt: text('chosen_at').notNull(),
+    appliedAt: text('applied_at'),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.botId] })],
+);
 
 /** The manager's latest scout report (three talents) of a season. */
 export const udtScouts = sqliteTable(

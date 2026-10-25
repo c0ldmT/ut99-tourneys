@@ -583,4 +583,20 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_bots ADD COLUMN made_by TEXT;
   UPDATE udt_bots SET made_by = user_id;
   `,
+  // 39: Dream Team keepers (league plan L-E7): up to two own bots a manager keeps for the next
+  // season (chosen at the season's end, taken over when the team is founded again).
+  `
+  ALTER TABLE udt_bots ADD COLUMN kept_from INTEGER;
+  ALTER TABLE udt_bots ADD COLUMN mentor_season INTEGER;
+  UPDATE udt_bots SET mentor_season = season WHERE mentor_id IS NOT NULL;
+  CREATE TABLE udt_keepers (
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    bot_id TEXT NOT NULL,
+    chosen_at TEXT NOT NULL,
+    applied_at TEXT,
+    PRIMARY KEY (season, bot_id)
+  );
+  CREATE INDEX udt_keepers_user ON udt_keepers(user_id, season);
+  `,
 ];

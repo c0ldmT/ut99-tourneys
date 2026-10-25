@@ -130,7 +130,9 @@ export class UdtAcademyService {
 
   private mentorsUsed(season: number): Set<string> {
     return new Set(
-      [...this.udt.ownBots(season).values()].flatMap((b) => (b.mentorId ? [b.mentorId] : [])),
+      [...this.udt.ownBots(season).values()].flatMap((b) =>
+        b.mentorId && b.mentorSeason === season ? [b.mentorId] : [],
+      ),
     );
   }
 
@@ -224,7 +226,10 @@ export class UdtAcademyService {
     const names = new Map(this.bots.list().map((b) => [b.id, b.name]));
     const side = (id: string) => ({ botId: id, name: names.get(id) ?? '?', here: here.has(id) });
     return [...this.udt.ownBots(season).values()]
-      .filter((b) => b.mentorId && (b.userId === userId || here.has(b.mentorId)))
+      .filter(
+        (b) =>
+          b.mentorId && b.mentorSeason === season && (b.userId === userId || here.has(b.mentorId)),
+      )
       .map((b) => {
         const mentor = side(b.mentorId!);
         const apprentice = side(b.botId);
@@ -349,6 +354,7 @@ export class UdtAcademyService {
         potential: t.potential,
         ...windowOf(window),
         mentorId,
+        ...(mentorId ? { mentorSeason: season } : {}),
         createdAt: now,
       })
       .run();
@@ -422,7 +428,11 @@ export class UdtAcademyService {
     );
     this.db.transaction(() => {
       this.bots.update(p.botId, { traits: { ...p.traits, ...lesson } });
-      this.db.update(udtBots).set({ mentorId: m.botId }).where(eq(udtBots.botId, p.botId)).run();
+      this.db
+        .update(udtBots)
+        .set({ mentorId: m.botId, mentorSeason: season })
+        .where(eq(udtBots.botId, p.botId))
+        .run();
       if (inherited)
         this.db
           .insert(udtTraits)

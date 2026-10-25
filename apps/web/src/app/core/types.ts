@@ -1059,6 +1059,8 @@ export interface UdtRosterBot {
     canRename: boolean;
     /** The one breakthrough happened. */
     breakthrough?: boolean;
+    /** A keeper: the season it came from (plays for free). */
+    keptFrom?: number | null;
     /** Fully developed for good: points have nothing left to buy (no plaque). */
     maxed?: boolean;
     /** The mentor it learned from; `here`: in the roster (faster XP). */
@@ -1162,6 +1164,40 @@ export interface UdtView {
   starterExtra?: number;
   /** Trade offers waiting for the manager. */
   tradesIn?: number;
+  /** Without a team: last season's team (the form takes its name and tag). */
+  lastTeam?: UdtTeam | null;
+  /** Without a team: the keepers that come along when it is founded. */
+  keepers?: { botId: string; name: string; skill: number; nextSkill: number }[];
+}
+
+/** An own bot at the season's end: can it be kept, its skill next season. */
+export interface UdtKeeperBot {
+  botId: string;
+  name: string;
+  origin: string | null;
+  skill: number;
+  nextSkill: number;
+  rarity: UdtRarity;
+  traits: BotTraitsView;
+  level: number;
+  potential: [number, number] | null;
+  keptFrom: number | null;
+  ok: boolean;
+  why: 'bought' | 'nominated' | 'graduated' | 'rejected' | null;
+}
+
+/** The keeper choice at a season's end. */
+export interface UdtKeepers {
+  open: boolean;
+  season: number | null;
+  from?: string;
+  /** Last day of the choice (null: until the next season starts). */
+  until?: string | null;
+  max: number;
+  skillLoss?: number;
+  tag?: string;
+  bots: UdtKeeperBot[];
+  chosen: string[];
 }
 
 export interface UdtOffer {
@@ -1472,6 +1508,8 @@ export interface UdtGraduationBot {
   level: number;
   ready: boolean;
   honours: boolean;
+  /** In its first season as a keeper: no graduation yet. */
+  keeper?: boolean;
 }
 
 export interface UdtGraduation {
@@ -1503,6 +1541,8 @@ export interface UdtYearbookEntry {
   team: string;
   tag: string;
   active: boolean;
+  /** Kept for that season (keeper). */
+  keptTo?: number | null;
 }
 
 export interface UdtYearbook {
