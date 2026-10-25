@@ -408,11 +408,25 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     // season (decision 129): otherwise not yet - it is made once that season runs, and a start
     // that passes meanwhile is left behind like a missed one.
     if (!this.tournaments.canMake(t.kind, start)) return;
+    // A start in a reservation of the server (the league evening) moves behind it.
+    const at = this.tournaments.calendar.nextFree(
+      this.tournaments.calendarView({
+        agentId: t.agentId,
+        kind: t.kind ?? 'standard',
+        udtJson: null,
+        settings: t.settings,
+      }),
+      start,
+    );
+    if (at !== start)
+      this.log.info(
+        `series ${r.name}: ${new Date(start).toISOString()} moved behind a reservation`,
+      );
     const row = this.tournaments.create(
       {
         ...t,
         name,
-        scheduledAt: new Date(start).toISOString(),
+        scheduledAt: new Date(at).toISOString(),
         registrationOpen: true,
         // A season tournament only while a season runs.
         seasonal: !!t.seasonal && !!this.seasons.current(),

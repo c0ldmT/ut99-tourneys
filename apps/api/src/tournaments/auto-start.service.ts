@@ -18,6 +18,8 @@ export class AutoStartService implements OnModuleInit, OnModuleDestroy {
   private busy = false;
   /** Last reason a tournament could not start yet (logged once per change). */
   private readonly waiting = new Map<string, string>();
+  /** The end of the reservation a tournament waited behind (its hour of waiting starts there). */
+  private readonly reserved = new Map<string, number>();
 
   constructor(
     @Inject(CLOCK) private readonly clock: ApiClock,
@@ -53,7 +55,22 @@ export class AutoStartService implements OnModuleInit, OnModuleDestroy {
   private async step(t: TournamentRow, now: number): Promise<void> {
     const by = this.actor(t);
     if (!by) return;
-    const late = now - Date.parse(t.scheduledAt!);
+    const view = this.tournaments.calendarView({ ...t, settings: this.tournaments.settings(t) });
+    // A reservation of the server (the league evening) comes first: the start waits behind it
+    // and the hour of waiting counts from its end.
+    const r = this.tournaments.calendar.blocking(view, now);
+    if (r) {
+      const why = `the server is reserved for ${r.label} until ${new Date(r.to).toISOString()}`;
+      if (this.waiting.get(t.id) !== why) {
+        this.waiting.set(t.id, why);
+        this.log.info(`autostart ${t.id} waits: ${why}`);
+      }
+      this.reserved.set(t.id, r.to);
+      return;
+    }
+    const start = Math.max(Date.parse(t.scheduledAt!), this.reserved.get(t.id) ?? 0);
+    // The league lets its matchdays wait longer (until the evening is over).
+    const deadline = this.tournaments.calendar.deadline(view, start) ?? start + AUTOSTART_WAIT_MS;
     try {
       if (t.phase === 'draft') {
         this.tournaments.seed(t.id, { mode: 'auto', humanOrder: 'rating' }, by);
@@ -61,6 +78,7 @@ export class AutoStartService implements OnModuleInit, OnModuleDestroy {
       }
       await this.tournaments.run(t.id);
       this.waiting.delete(t.id);
+      this.reserved.delete(t.id);
       this.log.info(`autostart ${t.id}: started`);
     } catch (e) {
       const why = (e as Error).message;
@@ -68,8 +86,9 @@ export class AutoStartService implements OnModuleInit, OnModuleDestroy {
         this.waiting.set(t.id, why);
         this.log.info(`autostart ${t.id} waits: ${why}`);
       }
-      if (late < AUTOSTART_WAIT_MS) return;
+      if (now < deadline) return;
       this.waiting.delete(t.id);
+      this.reserved.delete(t.id);
       const phase = this.tournaments.require(t.id).phase;
       if (phase === 'seeded') {
         this.tournaments.cancelSeeded(t.id, `no free server for an hour (${why})`, by);

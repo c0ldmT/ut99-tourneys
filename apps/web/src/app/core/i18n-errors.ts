@@ -268,6 +268,8 @@ export const ERRORS_DE: Record<string, string> = {
   'own bot of this season not found': 'Eigener Bot dieser Season nicht gefunden.',
   'retired already': 'Schon abgetreten.',
   'the bot is {status}': 'Der Bot ist schon weiter ({status}).',
+  'the server is reserved for {label} from {from} to {to}':
+    'Der Server ist von {from} bis {to} für {label} reserviert.',
   'a keeper graduates in a later season':
     'Ein Keeper kann erst in einer späteren Season abschließen, nicht in seiner ersten als Keeper.',
   '{name} is a keeper for next season: take it out first':
@@ -353,6 +355,7 @@ const PARAM_KEYS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   '*': { phase: 'phase.' },
   'the offer is {status}': { status: 'udt.trades.st.' },
   'the bot is {status}': { status: 'udt.academy.st.' },
+  'the server is reserved for {label} from {from} to {to}': { label: 'cal.label.' },
 };
 
 /** Templates whose whole text comes from an i18n key built from a parameter. */

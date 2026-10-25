@@ -60,6 +60,7 @@ import { UdtService } from './udt/udt.service.js';
 import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
 import { AutoStartService } from './tournaments/auto-start.service.js';
+import { ServerCalendar } from './tournaments/server-calendar.js';
 
 export interface AppOverrides {
   clock?: ApiClock;
@@ -135,6 +136,7 @@ class AppModule {
         TeamsService,
         NotificationsService,
         TournamentsService,
+        ServerCalendar,
         StatsService,
         SettingsService,
         SeasonsService,

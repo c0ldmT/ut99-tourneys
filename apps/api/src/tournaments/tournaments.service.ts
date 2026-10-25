@@ -23,7 +23,7 @@ import {
 } from '@tourney/protocol';
 import { gameProblems } from '@tourney/adapter-ut99';
 import { z } from 'zod';
-import { CLOCK, type ApiClock } from '../config.js';
+import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import {
   neuroLedger,
@@ -52,6 +52,7 @@ import { BetsService } from '../bets/bets.service.js';
 import { EventLogService } from './event-log.service.js';
 import { matchDetail, type MatchDetail } from './match-detail.js';
 import { LiveHub } from './hub.js';
+import { ServerCalendar, localTime, type CalendarTournament } from './server-calendar.js';
 import {
   balanceBots,
   pickBotsNear,
@@ -293,7 +294,38 @@ export class TournamentsService {
     @Inject(SettingsService) private readonly settingsSvc: SettingsService,
     @Inject(BetsService) private readonly bets: BetsService,
     @Inject(ShopService) private readonly shop: ShopService,
+    @Inject(ServerCalendar) readonly calendar: ServerCalendar,
+    @Inject(CONFIG) private readonly config: ApiConfig,
   ) {}
+
+  /** What the server calendar needs of a tournament (also of one being made). */
+  calendarView(t: {
+    id?: string;
+    agentId: string;
+    kind?: string | null;
+    udtJson?: string | null;
+    settings: TournamentSettings;
+  }): CalendarTournament {
+    return {
+      id: t.id ?? '',
+      agentId: t.agentId,
+      kind: t.kind ?? 'standard',
+      udtJson: t.udtJson ?? null,
+      settings: t.settings,
+    };
+  }
+
+  /** A start that runs into a reservation of its server (the league evening) is refused. */
+  private assertFree(t: CalendarTournament, scheduledAt: string | null | undefined): void {
+    if (!scheduledAt) return;
+    const r = this.calendar.blocking(t, Date.parse(scheduledAt));
+    if (r)
+      throw conflict('the server is reserved for {label} from {from} to {to}', {
+        label: r.label,
+        from: localTime(r.from, this.config.seasonTimeZone),
+        to: localTime(r.to, this.config.seasonTimeZone),
+      });
+  }
 
   private now() {
     return new Date(this.clock.now()).toISOString();
@@ -443,6 +475,17 @@ export class TournamentsService {
       this.checkUdtSettings(body.settings);
     }
     if (body.seasonal && !inSeason && !opts.seriesId) throw conflict('no season is running');
+    this.assertFree(
+      this.calendarView({
+        ...(body.id ? { id: body.id } : {}),
+        agentId: body.agentId,
+        kind: body.kind ?? 'standard',
+        udtJson:
+          body.kind === 'udt' ? JSON.stringify(UdtEventRulesSchema.parse(body.udt ?? {})) : null,
+        settings: body.settings,
+      }),
+      body.scheduledAt,
+    );
     let id = body.id ?? slugify(body.name);
     if (this.get(id)) {
       if (body.id) throw conflict('tournament {id} exists', { id });
@@ -557,6 +600,21 @@ export class TournamentsService {
       this.checkUdtSettings(body.settings);
     }
     if (body.webhookUrl !== undefined) set.webhookUrl = body.webhookUrl || null;
+    // A new start, server or size must not run into a reservation (draft only, see above).
+    if (
+      t.phase === 'draft' &&
+      (set.scheduledAt !== undefined || body.agentId !== undefined || body.settings !== undefined)
+    )
+      this.assertFree(
+        this.calendarView({
+          id,
+          agentId: body.agentId ?? t.agentId,
+          kind: set.kind ?? t.kind,
+          udtJson: set.udtJson !== undefined ? set.udtJson : t.udtJson,
+          settings: body.settings ?? this.settings(t),
+        }),
+        set.scheduledAt !== undefined ? set.scheduledAt : t.scheduledAt,
+      );
     const udtNow = (body.kind ?? t.kind) === 'udt';
     if (!udtNow && body.seasonal !== undefined && body.seasonal !== t.seasonal) {
       if (body.seasonal && !this.seasons.current()) throw conflict('no season is running');

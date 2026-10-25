@@ -2000,6 +2000,7 @@ const en = {
   'ok.udt.keepers': 'Keepers set.',
   'format.fixtures': 'League matchday',
   'bracket.fixtures': 'Pairings',
+  'cal.label.league': 'the league',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -4023,6 +4024,7 @@ const de: Record<TKey, string> = {
   'ok.udt.keepers': 'Keeper festgelegt.',
   'format.fixtures': 'Ligaspieltag',
   'bracket.fixtures': 'Partien',
+  'cal.label.league': 'die Liga',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };
