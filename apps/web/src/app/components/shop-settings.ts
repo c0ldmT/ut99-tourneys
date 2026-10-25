@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
@@ -11,7 +11,7 @@ import type { ShopItem } from '../core/types';
   imports: [FormsModule, RouterLink, TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <form class="card tablepanel" (ngSubmit)="save()">
+    <form class="card tablepanel" data-form="shop" (ngSubmit)="save()">
       <div class="toolbar">
         <h2>{{ 'shop.settings' | t }}</h2>
         <span class="grow"></span>
@@ -105,6 +105,8 @@ import type { ShopItem } from '../core/types';
 })
 export class ShopSettings {
   private readonly api = inject(Api);
+  /** Saved (the settings page drops its "unsaved" mark). */
+  readonly saved = output<void>();
   protected readonly catalog = signal<ShopItem[]>([]);
   protected readonly busy = signal(false);
   protected enabled = true;
@@ -137,6 +139,7 @@ export class ShopSettings {
     this.busy.set(true);
     try {
       await this.api.setShopSettings({ enabled: this.enabled, prices, hidden });
+      this.saved.emit();
       await this.load();
     } catch {
       // the toast shows the error

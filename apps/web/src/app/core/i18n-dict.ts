@@ -63,6 +63,14 @@ const en = {
   'settings.levelPointsHint':
     'A bot plays with its rating plus this many points per step above Adept (minus below). A Godlike bot that beats a Novice bot gains little, a human who beats a Novice bot as well.',
   'settings.saved': 'Saved.',
+  'settings.tabs': 'Areas',
+  'settings.tab.season': 'Season',
+  'settings.tab.bets': 'Bets & shop',
+  'settings.tab.bots': 'Bots & live',
+  'settings.tab.udt': 'Dream Team',
+  'settings.tab.system': 'System',
+  'settings.unsaved': 'Changes not saved yet',
+  'settings.unsavedConfirm': 'This tab has changes that are not saved. Leave it and drop them?',
   'admin.seedRating': 'Seed (by rating)',
   'admin.seedRatingHint':
     'The strongest meet late; bots are chosen and spread so that the teams come out about equally strong.',
@@ -2029,6 +2037,15 @@ const de: Record<TKey, string> = {
   'settings.levelPointsHint':
     'Ein Bot spielt mit seinem Rating plus so vielen Punkten pro Stufe über Adept (darunter minus). Schlägt ein Godlike-Bot einen Novice-Bot, gibt es wenig – ebenso für einen Menschen, der einen Novice-Bot schlägt.',
   'settings.saved': 'Gespeichert.',
+  'settings.tabs': 'Bereiche',
+  'settings.tab.season': 'Season',
+  'settings.tab.bets': 'Wetten & Shop',
+  'settings.tab.bots': 'Bots & Live',
+  'settings.tab.udt': 'Dream Team',
+  'settings.tab.system': 'System',
+  'settings.unsaved': 'Noch nicht gespeichert',
+  'settings.unsavedConfirm':
+    'Dieser Tab hat ungespeicherte Änderungen. Trotzdem wechseln und sie verwerfen?',
   'admin.seedRating': 'Setzen (nach Rating)',
   'admin.seedRatingHint':
     'Die Stärksten treffen spät aufeinander; Bots werden so gewählt und verteilt, dass die Teams etwa gleich stark sind.',

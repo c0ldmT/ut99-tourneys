@@ -28,6 +28,8 @@ describe('translations', () => {
   });
 
   it('has the dynamic keys', () => {
+    for (const t of ['season', 'bets', 'bots', 'udt', 'system'])
+      expect(DICT.en[`settings.tab.${t}`]).toBeDefined();
     for (const p of ['draft', 'seeded', 'checkIn', 'running', 'paused', 'finished', 'aborted'])
       expect(DICT.en[`phase.${p}`]).toBeDefined();
     for (const p of [

@@ -1,861 +1,177 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { Icon } from '../core/brand';
-import { ShopSettings } from '../components/shop-settings';
-import { FormsModule } from '@angular/forms';
-import { Api } from '../core/api';
-import { Auth } from '../core/auth';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
+import { map } from 'rxjs';
+import { SettingsBets } from '../components/settings-bets';
+import { SettingsBots } from '../components/settings-bots';
+import { SettingsSeason } from '../components/settings-season';
+import type { SettingsForm } from '../components/settings-shared';
+import { SettingsSystem } from '../components/settings-system';
+import { SettingsUdt } from '../components/settings-udt';
 import { I18n, TPipe } from '../core/i18n';
-import type { Season, SeasonsOverview, UdtSettings } from '../core/types';
 
-/** Website settings (admins): seasons, ratings, bets, the Neuro shop and the reset. */
+const TABS = ['season', 'bets', 'bots', 'udt', 'system'] as const;
+export type SettingsTab = (typeof TABS)[number];
+
+/**
+ * Website settings (admins) as tabs: season and ratings, bets and shop, bots and live data,
+ * Dream Team, system (reset). The tab is in the address (`?tab=`), so links and the back button
+ * work; every tab saves its own forms. A tab with changes not saved yet shows a dot, and
+ * leaving it asks first (a tab's values are lost when another one opens).
+ */
 @Component({
   selector: 'app-settings',
-  imports: [TPipe, FormsModule, Icon, ShopSettings],
+  imports: [TPipe, SettingsSeason, SettingsBets, SettingsBots, SettingsUdt, SettingsSystem],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
 
-    <section class="card">
-      <h2>{{ 'season.title' | t }}</h2>
-      @if (o(); as o) {
-        <p class="state">
-          @if (running(); as s) {
-            <span class="pill in">{{ 'season.in' | t }}</span>
-            {{
-              'season.runningText'
-                | t: { n: s.number, from: date(s.startDate), to: date(s.endDate) }
-            }}
-          } @else {
-            <span class="pill out">{{ 'season.out' | t }}</span>
-            @if (planned(); as p) {
-              {{ 'season.plannedText' | t: { n: p.number, from: date(p.startDate) } }}
-            } @else {
-              {{ 'season.noneText' | t }}
-            }
-          }
-        </p>
-
-        @if (o.seasons.length) {
-          <div class="scroll">
-            <table class="seasons">
-              <thead>
-                <tr>
-                  <th>{{ 'season.col.season' | t }}</th>
-                  <th>{{ 'season.col.from' | t }}</th>
-                  <th>{{ 'season.col.to' | t }}</th>
-                  <th>{{ 'season.col.status' | t }}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (s of seasonsNewestFirst(); track s.number) {
-                  <tr>
-                    <td>
-                      <b>{{ 'season.label' | t: { n: s.number } }}</b>
-                    </td>
-                    <td>
-                      @if (editing() === s.number && s.status === 'planned') {
-                        <input type="date" [min]="o.today" [(ngModel)]="editFrom" name="ef" />
-                      } @else {
-                        {{ date(s.startDate) }}
-                      }
-                    </td>
-                    <td>
-                      @if (editing() === s.number) {
-                        <input type="date" [min]="o.today" [(ngModel)]="editTo" name="et" />
-                      } @else {
-                        {{ date(s.endDate) }}
-                      }
-                    </td>
-                    <td>
-                      <span class="pill" [class]="s.status">{{ 'season.' + s.status | t }}</span>
-                    </td>
-                    <td class="actions">
-                      @if (editing() === s.number) {
-                        <button class="primary" (click)="saveEdit(s)" [disabled]="busy()">
-                          {{ 'common.save' | t }}
-                        </button>
-                        <button (click)="editing.set(null)">{{ 'common.cancel' | t }}</button>
-                      } @else {
-                        @if (s.status !== 'ended') {
-                          <button (click)="startEdit(s)" [disabled]="busy()">
-                            {{ 'season.move' | t }}
-                          </button>
-                        }
-                        @if (s.status === 'running') {
-                          <button (click)="end(s)" [disabled]="busy()">
-                            {{ 'season.endNow' | t }}
-                          </button>
-                        }
-                        @if (s.number === newest()) {
-                          <button
-                            class="icon dng"
-                            (click)="remove(s)"
-                            [disabled]="busy()"
-                            [title]="'common.delete' | t"
-                            [attr.aria-label]="'common.delete' | t"
-                          >
-                            <na-icon name="delete" />
-                          </button>
-                        }
-                      }
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-
-        @if (!planned()) {
-          <h3>{{ 'season.new' | t: { n: newest() + 1 } }}</h3>
-          <form class="row new" (ngSubmit)="create()">
-            <label
-              >{{ 'season.col.from' | t }}
-              <input type="date" name="from" [min]="minStart()" [(ngModel)]="newFrom" required />
-            </label>
-            <label
-              >{{ 'season.col.to' | t }}
-              <input
-                type="date"
-                name="to"
-                [min]="newFrom || minStart()"
-                [(ngModel)]="newTo"
-                required
-              />
-            </label>
-            <button type="submit" class="primary" [disabled]="busy() || !newFrom || !newTo">
-              {{ (newFrom === o.today ? 'season.startNow' : 'season.plan') | t }}
-            </button>
-          </form>
-        }
-        <p class="muted small">{{ 'season.hint' | t: { tz: o.timeZone } }}</p>
-      }
-    </section>
-
-    <form class="card" (ngSubmit)="save()">
-      <h2>{{ 'settings.rating' | t }}</h2>
-      <p class="muted small">{{ 'settings.ratingHint' | t }}</p>
-      <label class="row"
-        ><input
-          type="checkbox"
-          name="botGames"
-          [ngModel]="botGames()"
-          (ngModelChange)="botGames.set($event)"
-        />
-        {{ 'settings.botGames' | t }}</label
-      >
-      <p class="muted small">{{ 'settings.botGamesHint' | t }}</p>
-      <label
-        >{{ 'settings.levelPoints' | t }}
-        <input
-          type="number"
-          name="levelPoints"
-          min="0"
-          max="300"
-          step="10"
-          class="narrow"
-          [ngModel]="levelPoints()"
-          (ngModelChange)="levelPoints.set($event)"
-        />
-      </label>
-      <p class="muted small">{{ 'settings.levelPointsHint' | t }}</p>
-      <div class="row">
-        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-      </div>
-    </form>
-
-    <form class="card" (ngSubmit)="saveBetting()">
-      <h2>{{ 'bets.settings' | t }}</h2>
-      <p class="muted small">{{ 'bets.settingsHint' | t }}</p>
-      <div class="row gap">
-        <label
-          >{{ 'bets.startBalance' | t }}
-          <input
-            type="number"
-            name="startBalance"
-            min="10"
-            step="10"
-            class="narrow"
-            [(ngModel)]="startBalance"
-          />
-        </label>
-        <label
-          >{{ 'bets.floor' | t }}
-          <input type="number" name="floor" min="0" step="10" class="narrow" [(ngModel)]="floor" />
-        </label>
-      </div>
-      <div class="row gap">
-        <label
-          >{{ 'bets.windowSec' | t }}
-          <input
-            type="number"
-            name="windowSec"
-            min="0"
-            max="600"
-            step="5"
-            class="narrow"
-            [(ngModel)]="windowSec"
-          />
-        </label>
-      </div>
-      <p class="muted small">{{ 'bets.windowSecHint' | t }}</p>
-      <label class="row"
-        ><input type="checkbox" name="betsDiscord" [(ngModel)]="betsDiscord" />
-        {{ 'bets.discordLabel' | t }}</label
-      >
-      <label class="row"
-        ><input type="checkbox" name="botsBet" [(ngModel)]="botsBet" />
-        {{ 'bets.botsBetLabel' | t }}</label
-      >
-      <div class="row gap">
-        <label
-          >{{ 'bets.botsPerMatch' | t }}
-          <input
-            type="number"
-            name="botsPerMatch"
-            min="0"
-            max="50"
-            class="narrow"
-            [(ngModel)]="botsPerMatch"
-            [disabled]="!botsBet"
-          />
-        </label>
-      </div>
-      <div class="row">
-        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-      </div>
-    </form>
-
-    <form class="card" (ngSubmit)="saveBotAi()">
-      <h2>{{ 'botAi.title' | t }}</h2>
-      <p class="muted small">{{ 'botAi.hint' | t }}</p>
-      <label
-        >{{ 'botAi.level' | t }}
-        <select name="botAiLevel" [(ngModel)]="botAiLevel">
-          <option [ngValue]="2">{{ 'botAi.level2' | t }}</option>
-          <option [ngValue]="1">{{ 'botAi.level1' | t }}</option>
-          <option [ngValue]="0">{{ 'botAi.level0' | t }}</option>
-        </select>
-      </label>
-      <p class="muted small">{{ 'botAi.modHint' | t }}</p>
-      <label class="row"
-        ><input type="checkbox" name="botSkillCurve" [(ngModel)]="botSkillCurve" />
-        {{ 'botAi.skillCurve' | t }}</label
-      >
-      <p class="muted small">{{ 'botAi.skillCurveHint' | t }}</p>
-      <div class="row">
-        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-      </div>
-    </form>
-
-    <form class="card" (ngSubmit)="saveLive()">
-      <h2>{{ 'liveSet.title' | t }}</h2>
-      <p class="muted small">{{ 'liveSet.hint' | t }}</p>
-      <label
-        >{{ 'liveSet.delay' | t }}
-        <span class="row"
-          ><input
-            type="number"
-            name="liveDelay"
-            min="0"
-            max="120"
-            class="narrow"
-            [(ngModel)]="liveDelay"
-          />
-          s</span
+    <div class="tabs" role="tablist" [attr.aria-label]="'settings.tabs' | t">
+      @for (t of tabs; track t) {
+        <button
+          type="button"
+          role="tab"
+          [id]="'st-tab-' + t"
+          [attr.aria-selected]="tab() === t"
+          [attr.aria-controls]="tab() === t ? 'st-panel' : null"
+          [attr.tabindex]="tab() === t ? 0 : -1"
+          [class.active]="tab() === t"
+          (click)="open(t)"
+          (keydown)="key($event, t)"
         >
-      </label>
-      <p class="muted small">{{ 'liveSet.delayHint' | t }}</p>
-      <label
-        >{{ 'liveSet.days' | t }}
-        <span class="row"
-          ><input
-            type="number"
-            name="replayDays"
-            min="0"
-            max="3650"
-            class="narrow"
-            [(ngModel)]="replayDays"
-          />
-          {{ 'liveSet.daysUnit' | t }}</span
-        >
-      </label>
-      <p class="muted small">{{ 'liveSet.daysHint' | t }}</p>
-      <div class="row">
-        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-      </div>
-    </form>
-
-    <form class="card" (ngSubmit)="saveUdt()">
-      <h2>{{ 'udt.settings.title' | t }}</h2>
-      <p class="muted small">{{ 'udt.settings.hint' | t }}</p>
-      <label class="switch"
-        ><input type="checkbox" name="udtOn" [(ngModel)]="udtOn" /><span class="tr"></span
-        >{{ 'udt.settings.enabled' | t }}</label
-      >
-      <div class="row gap">
-        <label
-          >{{ 'udt.settings.marketTime' | t }}
-          <input type="time" name="udtTime" [(ngModel)]="udtTime" class="narrow" />
-        </label>
-        <label
-          >{{ 'udt.settings.offers' | t }}
-          <input
-            type="number"
-            name="udtOffers"
-            min="1"
-            max="40"
-            [(ngModel)]="udtOffers"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.budget' | t }}
-          <input
-            type="number"
-            name="udtBudget"
-            min="100"
-            step="100"
-            [(ngModel)]="udtBudget"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.extra' | t }}
-          <input
-            type="number"
-            name="udtExtra"
-            min="0"
-            step="50"
-            [(ngModel)]="udtExtra"
-            class="narrow"
-          />
-        </label>
-      </div>
-      <h3>{{ 'udt.settings.trade' | t }}</h3>
-      <label class="switch"
-        ><input type="checkbox" name="tradeOn" [(ngModel)]="trade.tradeEnabled" /><span
-          class="tr"
-        ></span
-        >{{ 'udt.settings.tradeOn' | t }}</label
-      >
-      <div class="row gap">
-        <label
-          >{{ 'udt.settings.tradeFee' | t }}
-          <input
-            type="number"
-            name="tradeFee"
-            min="0"
-            max="50"
-            [(ngModel)]="trade.tradeFeePct"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.tradeBalance' | t }}
-          <input
-            type="number"
-            name="tradeBalance"
-            min="0"
-            max="100"
-            [(ngModel)]="trade.tradeBalancePct"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.tradeLock' | t }}
-          <input
-            type="number"
-            name="tradeLock"
-            min="0"
-            max="30"
-            [(ngModel)]="trade.tradeLockDays"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.tradeExpiry' | t }}
-          <input
-            type="number"
-            name="tradeExpiry"
-            min="1"
-            max="336"
-            [(ngModel)]="trade.tradeExpiryHours"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.tradePair' | t }}
-          <input
-            type="number"
-            name="tradePair"
-            min="0"
-            max="50"
-            [(ngModel)]="trade.tradePairPerWeek"
-            class="narrow"
-          />
-        </label>
-      </div>
-      <p class="muted small">{{ 'udt.settings.tradeHint' | t }}</p>
-      <h3>{{ 'udt.settings.ai' | t }}</h3>
-      <label class="switch"
-        ><input type="checkbox" name="aiOn" [(ngModel)]="ai.aiEnabled" /><span class="tr"></span
-        >{{ 'udt.settings.aiOn' | t }}</label
-      >
-      <div class="row gap">
-        <label
-          >{{ 'udt.settings.aiCount' | t }}
-          <input
-            type="number"
-            name="aiCount"
-            min="0"
-            max="8"
-            [(ngModel)]="ai.aiCount"
-            class="narrow"
-          />
-        </label>
-        <label
-          >{{ 'udt.settings.aiStrength' | t }}
-          <select name="aiStrength" [(ngModel)]="ai.aiStrength">
-            @for (s of aiStrengths; track s) {
-              <option [ngValue]="s">{{ 'udt.settings.aiStrength.' + s | t }}</option>
-            }
-          </select>
-        </label>
-      </div>
-      <p class="muted small">{{ 'udt.settings.aiHint' | t }}</p>
-      <div class="row">
-        <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
-      </div>
-    </form>
-
-    <app-shop-settings />
-
-    <section class="card danger-zone">
-      <h2>⚠ {{ 'reset.title' | t }}</h2>
-      <p>{{ 'reset.what' | t }}</p>
-      <p class="muted small">{{ 'reset.keeps' | t }}</p>
-      @if (resetDone(); as r) {
-        <p class="notice">{{ 'reset.done' | t: { t: r.tournaments, s: r.seasons } }}</p>
-      }
-      @if (!resetOpen()) {
-        <button class="danger" (click)="openReset()">{{ 'reset.open' | t }}</button>
-      } @else {
-        <div class="reset-box">
-          <p class="warn">
-            <b>{{ 'reset.warning' | t }}</b>
-          </p>
-          <label class="row"
-            ><input type="checkbox" name="resetOk" [(ngModel)]="resetUnderstood" />
-            {{ 'reset.understood' | t }}</label
-          >
-          <label
-            >{{ 'reset.typeWord' | t: { word: resetWord } }}
-            <input
-              name="resetWord"
-              class="word"
-              autocomplete="off"
-              [(ngModel)]="resetTyped"
-              [placeholder]="resetWord"
-            />
-          </label>
-          <div class="row">
-            <button
-              class="danger solid"
-              [disabled]="busy() || !resetUnderstood || resetTyped !== resetWord"
-              (click)="reset()"
+          {{ 'settings.tab.' + t | t }}
+          @if (tab() === t && unsaved()) {
+            <span class="dot" [title]="'settings.unsaved' | t"
+              ><span class="sr">{{ 'settings.unsaved' | t }}</span></span
             >
-              {{ 'reset.confirm' | t }}
-            </button>
-            <button (click)="resetOpen.set(false)">{{ 'common.cancel' | t }}</button>
-          </div>
-        </div>
+          }
+        </button>
       }
-    </section>
+    </div>
+
+    <div
+      class="panel"
+      role="tabpanel"
+      id="st-panel"
+      tabindex="0"
+      [attr.aria-labelledby]="'st-tab-' + tab()"
+      (input)="changed($event)"
+      (change)="changed($event)"
+    >
+      @switch (tab()) {
+        @case ('season') {
+          <app-settings-season (saved)="saved($event)" />
+        }
+        @case ('bets') {
+          <app-settings-bets (saved)="saved($event)" />
+        }
+        @case ('bots') {
+          <app-settings-bots (saved)="saved($event)" />
+        }
+        @case ('udt') {
+          <app-settings-udt (saved)="saved($event)" />
+        }
+        @case ('system') {
+          <app-settings-system />
+        }
+      }
+    </div>
   `,
   styles: `
-    .card {
-      max-width: 820px;
-    }
-    .row.gap {
-      gap: 16px;
-      align-items: flex-end;
-    }
-    .danger-zone {
-      border: 2px solid var(--danger);
-      background: rgba(248, 81, 73, 0.05);
-      margin-top: 40px;
-    }
-    .danger-zone h2 {
-      color: var(--danger);
-    }
-    .reset-box {
-      border-top: 1px solid rgba(248, 81, 73, 0.4);
-      padding-top: 12px;
-    }
-    .warn {
-      color: var(--danger);
-    }
-    input.word {
-      max-width: 200px;
-      display: block;
-      margin-top: 4px;
-      font-family: ui-monospace, monospace;
-    }
-    button.danger.solid:not(:disabled) {
-      background: var(--danger);
-      color: #fff;
-      font-weight: 700;
-    }
-    .state {
-      display: flex;
-      gap: 10px;
+    .tabs button {
+      display: inline-flex;
       align-items: center;
-      flex-wrap: wrap;
-    }
-    .pill {
-      font-size: 0.8rem;
-      padding: 2px 10px;
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      white-space: nowrap;
-    }
-    .pill.in,
-    .pill.running {
-      color: var(--live);
-      border-color: var(--live);
-    }
-    .pill.out {
-      color: var(--muted);
-    }
-    .pill.planned {
-      color: var(--info);
-      border-color: var(--info);
-    }
-    .scroll {
-      overflow-x: auto;
-    }
-    table.seasons {
-      width: 100%;
-      white-space: nowrap;
-    }
-    .actions {
-      display: flex;
       gap: 6px;
-      justify-content: flex-end;
     }
-    h3 {
-      margin: 20px 0 8px;
-      font-size: 1rem;
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--neuro);
     }
-    form.new {
-      align-items: flex-end;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-    input.narrow {
-      width: 120px;
-      display: block;
-      margin-top: 4px;
-    }
-    input[type='date'] {
-      display: block;
-      margin-top: 4px;
+    .sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
     }
   `,
 })
 export class SettingsPage {
-  private readonly api = inject(Api);
-  private readonly auth = inject(Auth);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly i18n = inject(I18n);
-  protected readonly botGames = signal(true);
-  protected readonly levelPoints = signal(100);
-  protected readonly busy = signal(false);
-  protected readonly o = signal<SeasonsOverview | null>(null);
-  protected readonly editing = signal<number | null>(null);
-  protected editFrom = '';
-  protected editTo = '';
-  protected newFrom = '';
-  protected startBalance = 1000;
-  protected floor = 100;
-  protected botsBet = true;
-  protected windowSec = 20;
-  protected betsDiscord = true;
-  protected botsPerMatch = 6;
-  protected botAiLevel = 2;
-  protected liveDelay = 20;
-  protected replayDays = 60;
-  protected botSkillCurve = true;
-  protected udtOn = false;
-  protected ai = pickAi({});
-  protected readonly aiStrengths = ['calm', 'normal', 'ambitious'] as const;
-  protected trade = pickTrade({
-    tradeEnabled: true,
-    tradeFeePct: 5,
-    tradeBalancePct: 50,
-    tradeLockDays: 3,
-    tradeExpiryHours: 48,
-    tradePairPerWeek: 2,
+  protected readonly tabs = TABS;
+  private readonly query = toSignal(this.route.queryParamMap.pipe(map((q) => q.get('tab'))), {
+    initialValue: this.route.snapshot.queryParamMap.get('tab'),
   });
-  protected udtTime = '04:00';
-  protected udtOffers = 8;
-  protected udtBudget = 1500;
-  protected udtExtra = 50;
-  /** Website reset: opened, ticked and the word typed before the button works. */
-  protected readonly resetWord = 'RESET';
-  protected readonly resetOpen = signal(false);
-  protected readonly resetDone = signal<{ tournaments: number; seasons: number } | null>(null);
-  protected resetUnderstood = false;
-  protected resetTyped = '';
-  protected newTo = '';
-
-  protected readonly running = computed(
-    () => this.o()?.seasons.find((s) => s.status === 'running') ?? null,
-  );
-  protected readonly planned = computed(
-    () => this.o()?.seasons.find((s) => s.status === 'planned') ?? null,
-  );
-  protected readonly newest = computed(() => this.o()?.seasons.at(-1)?.number ?? 0);
-  protected readonly seasonsNewestFirst = computed(() => [...(this.o()?.seasons ?? [])].reverse());
-  /** A new season starts after the last one and not in the past. */
-  protected readonly minStart = computed(() => {
-    const o = this.o();
-    if (!o) return '';
-    const last = o.seasons.at(-1);
-    const afterLast = last ? addDay(last.endDate) : '';
-    return afterLast > o.today ? afterLast : o.today;
+  protected readonly tab = computed<SettingsTab>(() => {
+    const q = this.query();
+    return (TABS as readonly string[]).includes(q ?? '') ? (q as SettingsTab) : 'season';
   });
+  /** Forms of the open tab with changes not saved yet. */
+  private readonly dirty = signal<ReadonlySet<string>>(new Set());
+  protected readonly unsaved = computed(() => this.dirty().size > 0);
 
   constructor() {
-    void this.load();
-  }
-
-  protected date(d: string): string {
-    return this.i18n.day(d);
-  }
-
-  private async load() {
-    try {
-      const [s, o] = await Promise.all([this.api.settings(), this.api.seasons()]);
-      this.botGames.set(s.rating.botGames);
-      this.levelPoints.set(s.rating.levelPoints);
-      this.startBalance = s.betting.startBalance;
-      this.floor = s.betting.floor;
-      this.botsBet = s.betting.botsBet;
-      this.botsPerMatch = s.betting.botsPerMatch;
-      this.windowSec = s.betting.windowSec;
-      this.betsDiscord = s.betting.discord;
-      this.botAiLevel = s.botAi?.level ?? 2;
-      this.liveDelay = s.live?.delaySec ?? 20;
-      this.replayDays = s.live?.replayDays ?? 60;
-      this.botSkillCurve = s.botAi?.skillCurve ?? true;
-      if (s.udt) {
-        this.udtOn = s.udt.enabled;
-        this.udtTime = s.udt.marketTime;
-        this.udtOffers = s.udt.offersPerDay;
-        this.udtBudget = s.udt.starterBudget;
-        this.udtExtra = s.udt.starterExtra ?? 50;
-        this.trade = pickTrade(s.udt);
-        this.ai = pickAi(s.udt);
-      }
-      this.o.set(o);
-    } catch {
-      // the toast shows the error
-    }
-  }
-
-  private async run(fn: () => Promise<unknown>) {
-    this.busy.set(true);
-    try {
-      await fn();
-      this.editing.set(null);
-      this.o.set(await this.api.seasons());
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected create() {
-    void this.run(async () => {
-      await this.api.createSeason(this.newFrom, this.newTo);
-      this.newFrom = '';
-      this.newTo = '';
+    // Another tab (also by the back button): the old tab's values are gone with it.
+    effect(() => {
+      this.tab();
+      untracked(() => this.dirty.set(new Set()));
     });
   }
 
-  protected startEdit(s: Season) {
-    this.editFrom = s.startDate;
-    this.editTo = s.endDate;
-    this.editing.set(s.number);
+  /** Opens tab `t`; false when the admin keeps the unsaved changes of the open tab. */
+  protected open(t: SettingsTab): boolean {
+    if (t === this.tab()) return true;
+    if (this.unsaved() && !confirm(this.i18n.t('settings.unsavedConfirm'))) return false;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { tab: t === 'season' ? null : t },
+      queryParamsHandling: 'merge',
+    });
+    return true;
   }
 
-  protected saveEdit(s: Season) {
-    const body =
-      s.status === 'planned'
-        ? { startDate: this.editFrom, endDate: this.editTo }
-        : { endDate: this.editTo };
-    void this.run(() => this.api.updateSeason(s.number, body));
+  /** Arrow keys, Home and End move between the tabs (the tab pattern of ARIA). */
+  protected key(e: KeyboardEvent, t: SettingsTab) {
+    const i = TABS.indexOf(t);
+    const next =
+      e.key === 'ArrowRight'
+        ? TABS[(i + 1) % TABS.length]
+        : e.key === 'ArrowLeft'
+          ? TABS[(i - 1 + TABS.length) % TABS.length]
+          : e.key === 'Home'
+            ? TABS[0]
+            : e.key === 'End'
+              ? TABS[TABS.length - 1]
+              : null;
+    if (!next) return;
+    e.preventDefault();
+    // Focus follows only when the tab really changes (not when the admin keeps the changes).
+    if (this.open(next)) document.getElementById(`st-tab-${next}`)?.focus();
   }
 
-  protected end(s: Season) {
-    if (!confirm(this.i18n.t('season.endConfirm', { n: s.number }))) return;
-    void this.run(() => this.api.endSeason(s.number));
+  /** A field of a saving form changed. */
+  protected changed(e: Event) {
+    const form = (e.target as Element | null)?.closest?.('form[data-form]');
+    const key = form?.getAttribute('data-form');
+    if (!key || this.dirty().has(key)) return;
+    this.dirty.update((d) => new Set([...d, key]));
   }
 
-  protected remove(s: Season) {
-    if (!confirm(this.i18n.t('season.deleteConfirm', { n: s.number }))) return;
-    void this.run(() => this.api.deleteSeason(s.number));
+  protected saved(key: SettingsForm) {
+    if (!this.dirty().has(key)) return;
+    this.dirty.update((d) => new Set([...d].filter((k) => k !== key)));
   }
-
-  protected async saveBetting() {
-    this.busy.set(true);
-    try {
-      const s = await this.api.setBettingSettings({
-        startBalance: Math.round(Number(this.startBalance)),
-        floor: Math.round(Number(this.floor)),
-        botsBet: this.botsBet,
-        botsPerMatch: Math.round(Number(this.botsPerMatch)),
-        windowSec: Math.round(Number(this.windowSec)),
-        discord: this.betsDiscord,
-      });
-      this.startBalance = s.betting.startBalance;
-      this.floor = s.betting.floor;
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async saveUdt() {
-    this.busy.set(true);
-    try {
-      const s = await this.api.setUdtSettings({
-        enabled: this.udtOn,
-        marketTime: this.udtTime,
-        offersPerDay: Math.round(Number(this.udtOffers)),
-        starterBudget: Math.round(Number(this.udtBudget)),
-        starterExtra: Math.max(0, Math.round(Number(this.udtExtra))),
-        ...Object.fromEntries(
-          Object.entries(this.trade).map(([k, v]) => [
-            k,
-            typeof v === 'boolean' ? v : Math.round(Number(v)),
-          ]),
-        ),
-        aiEnabled: this.ai.aiEnabled,
-        aiCount: Math.max(0, Math.min(8, Math.round(Number(this.ai.aiCount) || 0))),
-        aiStrength: this.ai.aiStrength,
-      });
-      this.trade = pickTrade(s.udt);
-      this.ai = pickAi(s.udt);
-      this.udtOn = s.udt.enabled;
-      // The menu shows the Dream Team at once.
-      this.auth.config.update((c) => ({ ...c, udt: s.udt.enabled }));
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async saveBotAi() {
-    this.busy.set(true);
-    try {
-      const s = await this.api.setBotAiSettings({
-        level: Number(this.botAiLevel),
-        skillCurve: !!this.botSkillCurve,
-      });
-      this.botAiLevel = s.botAi.level;
-      this.botSkillCurve = s.botAi.skillCurve;
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async saveLive() {
-    this.busy.set(true);
-    try {
-      const s = await this.api.setLiveSettings({
-        delaySec: Number(this.liveDelay),
-        replayDays: Number(this.replayDays),
-      });
-      this.liveDelay = s.live.delaySec;
-      this.replayDays = s.live.replayDays;
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected openReset() {
-    this.resetUnderstood = false;
-    this.resetTyped = '';
-    this.resetDone.set(null);
-    this.resetOpen.set(true);
-  }
-
-  protected async reset() {
-    if (!this.resetUnderstood || this.resetTyped !== this.resetWord) return;
-    if (!confirm(this.i18n.t('reset.lastChance'))) return;
-    this.busy.set(true);
-    try {
-      this.resetDone.set(await this.api.resetAll(this.resetTyped));
-      this.resetOpen.set(false);
-      this.o.set(await this.api.seasons());
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-
-  protected async save() {
-    this.busy.set(true);
-    try {
-      const s = await this.api.setRatingSettings({
-        botGames: this.botGames(),
-        levelPoints: Math.round(Number(this.levelPoints())),
-      });
-      this.botGames.set(s.rating.botGames);
-      this.levelPoints.set(s.rating.levelPoints);
-      this.o.set(await this.api.seasons());
-    } catch {
-      // the toast shows the error
-    } finally {
-      this.busy.set(false);
-    }
-  }
-}
-
-function addDay(d: string): string {
-  const [y, m, day] = d.split('-').map(Number) as [number, number, number];
-  return new Date(Date.UTC(y, m - 1, day + 1)).toISOString().slice(0, 10);
-}
-
-/** The trade fields of the Dream Team settings. */
-function pickTrade(u: Partial<UdtSettings>) {
-  return {
-    tradeEnabled: u.tradeEnabled ?? true,
-    tradeFeePct: u.tradeFeePct ?? 5,
-    tradeBalancePct: u.tradeBalancePct ?? 50,
-    tradeLockDays: u.tradeLockDays ?? 3,
-    tradeExpiryHours: u.tradeExpiryHours ?? 48,
-    tradePairPerWeek: u.tradePairPerWeek ?? 2,
-  };
-}
-
-/** The AI manager fields of the Dream Team settings. */
-function pickAi(u: Partial<UdtSettings>) {
-  return {
-    aiEnabled: u.aiEnabled ?? false,
-    aiCount: u.aiCount ?? 4,
-    aiStrength: u.aiStrength ?? ('normal' as UdtSettings['aiStrength']),
-  };
 }
