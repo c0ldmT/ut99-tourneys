@@ -577,4 +577,10 @@ export const MIGRATIONS: string[] = [
   CREATE INDEX IF NOT EXISTS bets_bot ON bets(bot_id, season);
   CREATE INDEX IF NOT EXISTS bets_match ON bets(tournament_id, match_id);
   `,
+  // 38: own Dream Team bots can be traded: who made a bot (licences, breeder) is kept apart from
+  // who owns it now (user_id).
+  `
+  ALTER TABLE udt_bots ADD COLUMN made_by TEXT;
+  UPDATE udt_bots SET made_by = user_id;
+  `,
 ];

@@ -194,47 +194,78 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
         <section class="card">
           <h2>{{ 'udt.academy.mentors' | t }}</h2>
           <p class="muted small">{{ 'udt.academy.mentorText' | t: { lv: v.mentorLevel } }}</p>
-          @for (m of v.mentors; track m.botId) {
-            <div class="mrow">
-              <span class="udt-chip r-{{ rarity(m.skill) }}"
-                ><span>{{ m.skill }}</span></span
+          @if (v.mentors.length) {
+            <label class="mpick"
+              >{{ 'udt.academy.mentorPick' | t }}
+              <select
+                name="mentor"
+                [ngModel]="mentor()?.botId ?? ''"
+                (ngModelChange)="mentorId.set($event)"
               >
-              <span class="grow"
-                ><b>{{ m.name }}</b>
-                <span class="muted small">{{ 'udt.level' | t }} {{ m.level }}</span>
-                @if (m.mentorTrait) {
-                  <span class="udt-mark star">{{ 'udt.trait.mentor' | t }}</span>
+                @for (m of v.mentors; track m.botId) {
+                  <option [value]="m.botId">
+                    {{ m.name }} · {{ skillName(m.skill) }} · {{ 'udt.level' | t }} {{ m.level
+                    }}{{ m.ready ? '' : ' – ' + mentorBlocked(m, v.mentorLevel) }}
+                  </option>
                 }
-                @if (m.used) {
-                  <span class="udt-mark">{{ 'udt.academy.hasApprentice' | t }}</span>
-                }
-              </span>
-              @if (!m.ready && !m.used) {
-                <span class="muted small">{{
-                  'udt.academy.fromLevel' | t: { lv: v.mentorLevel }
-                }}</span>
-              }
-              @if (m.ready) {
-                <input
-                  type="text"
-                  maxlength="20"
-                  [name]="'m' + m.botId"
-                  [placeholder]="'udt.academy.name' | t"
-                  [ngModel]="mentorNames()[m.botId] ?? ''"
-                  (ngModelChange)="setMentorName(m.botId, $event)"
-                />
-                <button
-                  type="button"
-                  [disabled]="
-                    busy() || v.rosterFull || v.licence.nextPrice === null || !mentorName(m)
-                  "
-                  (click)="apprentice(m)"
+              </select>
+            </label>
+            @if (mentor(); as m) {
+              <div class="mrow">
+                <span class="udt-chip r-{{ rarity(m.skill) }}"
+                  ><span>{{ m.skill }}</span></span
                 >
-                  {{ 'udt.academy.takeApprentice' | t }}
-                </button>
+                <span class="grow"
+                  ><b>{{ m.name }}</b>
+                  <span class="muted small">{{ 'udt.level' | t }} {{ m.level }}</span>
+                  @if (m.mentorTrait) {
+                    <span class="udt-mark star">{{ 'udt.trait.mentor' | t }}</span>
+                  }
+                  @if (m.used) {
+                    <span class="udt-mark">{{ 'udt.academy.hasApprentice' | t }}</span>
+                  }
+                </span>
+              </div>
+              @if (m.ready && m.apprentice; as p) {
+                <p class="small">
+                  {{
+                    'udt.academy.pupil'
+                      | t: { skill: skillName(p.skill), pot: skillName(p.potential) }
+                  }}
+                  @if (p.traits.length) {
+                    {{
+                      'udt.academy.pupilTrait'
+                        | t: { pct: p.inheritChance * 100, list: traitNames(p.traits) }
+                    }}
+                  } @else {
+                    {{ 'udt.academy.pupilNoTrait' | t }}
+                  }
+                </p>
+                <div class="row">
+                  <input
+                    type="text"
+                    maxlength="20"
+                    [name]="'m' + m.botId"
+                    [placeholder]="'udt.academy.pupilName' | t"
+                    [attr.aria-label]="'udt.academy.pupilName' | t"
+                    [ngModel]="mentorNames()[m.botId] ?? ''"
+                    (ngModelChange)="setMentorName(m.botId, $event)"
+                  />
+                  <button
+                    type="button"
+                    [disabled]="
+                      busy() || v.rosterFull || v.licence.nextPrice === null || !mentorName(m)
+                    "
+                    (click)="apprentice(m)"
+                  >
+                    {{ 'udt.academy.takeApprentice' | t }}
+                  </button>
+                </div>
+              } @else {
+                <p class="muted small">{{ mentorBlocked(m, v.mentorLevel) }}</p>
               }
-            </div>
-          } @empty {
+            }
+          } @else {
             <p class="muted small">{{ 'udt.academy.noMentors' | t }}</p>
           }
         </section>
@@ -341,6 +372,11 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       justify-content: space-between;
       font-size: 0.85rem;
     }
+    .mpick select {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+    }
     .mrow {
       display: flex;
       align-items: center;
@@ -382,6 +418,14 @@ export class UdtAcademyPage {
   protected readonly busy = signal(false);
   protected readonly names = signal<Partial<Record<number, string>>>({});
   protected readonly mentorNames = signal<Partial<Record<string, string>>>({});
+  /** The chosen mentor (default: the first that can take an apprentice). */
+  protected readonly mentorId = signal<string | null>(null);
+  protected readonly mentor = computed((): UdtMentor | null => {
+    const list = this.a()?.mentors ?? [];
+    return (
+      list.find((m) => m.botId === this.mentorId()) ?? list.find((m) => m.ready) ?? list[0] ?? null
+    );
+  });
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
   private readonly router = inject(Router);
   protected readonly bpId = signal<string | null>(null);
@@ -490,6 +534,17 @@ export class UdtAcademyPage {
 
   protected setMentorName(id: string, v: string) {
     this.mentorNames.update((n) => ({ ...n, [id]: v }));
+  }
+
+  /** Why a bot cannot take an apprentice now. */
+  protected mentorBlocked(m: UdtMentor, lv: number): string {
+    return m.used
+      ? this.i18n.t('udt.academy.hasApprentice')
+      : this.i18n.t('udt.academy.fromLevel', { lv });
+  }
+
+  protected traitNames(codes: readonly string[]): string {
+    return codes.map((c) => this.i18n.t(`udt.trait.${c}`)).join(', ');
   }
 
   protected mentorName(m: UdtMentor) {

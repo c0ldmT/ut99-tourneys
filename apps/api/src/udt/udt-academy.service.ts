@@ -4,6 +4,9 @@ import { and, eq, isNull } from 'drizzle-orm';
 import {
   drawPotentialWindow,
   apprentice,
+  apprenticePotential,
+  apprenticeSkill,
+  apprenticeTraitChance,
   BLUEPRINTS,
   blueprintPotential,
   BREAKTHROUGH_LEVEL,
@@ -82,13 +85,13 @@ export const DevelopBody = z.object({
 
 const rng = () => randomInt(0, 2 ** 32) / 2 ** 32;
 
-/** A mentor needs some experience in the team: level 3. */
+/** A mentor needs some experience in the team: level 3 (bought or own bots, decision 207). */
 const MENTOR_LEVEL = 3;
 
 /**
  * Dream Team academy: scouting (three talents, values and potential as ranges), creation
  * licences (the starter is the first, then 2,000 / 4,000 / 8,000 × index), apprentices of
- * mentors (bought bots of level 3+, one apprentice each per season), developing own bots with
+ * mentors (any roster bot of level 3+, one apprentice each per season), developing own bots with
  * points from their levels up to their potential.
  */
 /** The model a new bot gets: the look's (even empty: the default) before the blueprint's. */
@@ -110,8 +113,9 @@ export class UdtAcademyService {
     return new Date(this.clock.now()).toISOString();
   }
 
+  /** Bots the manager made this season (licences count them, also after a trade). */
   private made(season: number, userId: string): number {
-    return this.udt.ownBots(season, userId).size;
+    return this.udt.madeCount(season, userId);
   }
 
   private scout(season: number, userId: string) {
@@ -145,17 +149,27 @@ export class UdtAcademyService {
       licence: { made, nextPrice: licencePrice(made, index) },
       rosterFull: roster.length >= ROSTER_MAX,
       report: s ? (JSON.parse(s.reportJson) as TalentReport[]) : null,
-      mentors: roster
-        .filter((r) => !r.own && !r.starter)
-        .map((r) => ({
+      mentors: roster.map((r) => {
+        const mentorTrait = r.udtTraits.some((t) => t.code === 'mentor');
+        return {
           botId: r.botId,
           name: r.name,
           skill: r.skill,
           level: r.level,
-          mentorTrait: r.udtTraits.some((t) => t.code === 'mentor'),
+          own: !!r.own,
+          mentorTrait,
           ready: r.level >= MENTOR_LEVEL && !used.has(r.botId),
           used: used.has(r.botId),
-        })),
+          /** What the apprentice would get (its values and the inherited trait are drawn). */
+          apprentice: {
+            skill: apprenticeSkill(r.skill),
+            potential: apprenticePotential(r.skill),
+            /** Traits that can be passed on and the chance that one is. */
+            traits: r.udtTraits.filter((x) => x.code !== 'mentor').map((x) => x.code),
+            inheritChance: apprenticeTraitChance(mentorTrait),
+          },
+        };
+      }),
       own: roster.filter((r) => r.own),
       blueprints: this.blueprintsOf(season, user.id).map((b) => ({
         id: b.id,
@@ -281,6 +295,7 @@ export class UdtAcademyService {
         botId: bot.id,
         season,
         userId: user.id,
+        madeBy: user.id,
         origin,
         potential: t.potential,
         ...windowOf(window),
@@ -323,13 +338,12 @@ export class UdtAcademyService {
     return this.view(user);
   }
 
-  /** A mentor (bought bot of level 3+) takes an apprentice: leaning values, maybe a trait. */
+  /** A mentor (any roster bot of level 3+) takes an apprentice: leaning values, maybe a trait. */
   mentor(user: User, body: z.infer<typeof MentorBody>) {
     this.udt.assertOn();
     const season = this.udt.season().number;
     const m = this.udt.roster(user.id, season).find((r) => r.botId === body.mentorId);
     if (!m) throw notFound('mentor in your roster');
-    if (m.own || m.starter) throw conflict('a mentor is a bought bot, not one you made');
     if (m.level < MENTOR_LEVEL)
       throw conflict('a mentor needs level {level}', { level: MENTOR_LEVEL });
     if (this.mentorsUsed(season).has(m.botId))

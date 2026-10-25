@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { udtRoster, udtTraits } from '../src/db/schema.js';
+import { eq } from 'drizzle-orm';
+import { BotsService } from '../src/bots/bots.service.js';
+import { udtBots, udtRoster, udtTraits } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
 
@@ -71,7 +73,8 @@ describe('Unreal Dream Team: trades', () => {
       blocked: string | null;
       value: number;
     }[];
-    expect(timRoster.find((r) => r.name === 'Tox')?.blocked).toBe('starter');
+    // The starter can be traded too (decision 207), after the lock like every new bot.
+    expect(timRoster.find((r) => r.name === 'Tox')?.blocked).toBe('locked');
     expect(timRoster.find((r) => r.name === 'Bravo')?.blocked).toBeNull();
     const body = { to: timId, give: [lib.Alpha], take: [lib.Bravo], giveNeuro: 100 };
     const pre = await mario.post('/udt/trades/preview', body);
@@ -126,6 +129,56 @@ describe('Unreal Dream Team: trades', () => {
     expect(
       (await mario.post('/udt/trades/preview', { to: timId, giveNeuro: 5, takeNeuro: 5 })).status,
     ).toBe(400);
+  });
+
+  it('trades own bots: the owner changes, the maker stays (licences, breeder)', async () => {
+    const { admin, mario, tim, marioId, timId, lib, db } = await setup();
+    await admin.req('PUT', '/settings/udt', { tradeLockDays: 0 });
+    const mira = (await mario.get('/udt')).body.roster.find(
+      (r: { starter: boolean }) => r.starter,
+    ) as { botId: string };
+    const before = (await mario.get('/udt/academy')).body.licence;
+    const mine = (await mario.get('/udt/trades')).body.mine as {
+      botId: string;
+      value: number;
+      homemade: boolean;
+      blocked: string | null;
+    }[];
+    const m = mine.find((b) => b.botId === mira.botId)!;
+    // The starter shows no market value on the roster, but is worth it in a trade.
+    expect(m).toMatchObject({ homemade: true, blocked: null });
+    expect(m.value).toBeGreaterThan(0);
+    const offer = await mario.post('/udt/trades', {
+      to: timId,
+      give: [mira.botId],
+      take: [lib.Bravo],
+      giveNeuro: 600,
+    });
+    expect(offer.status, JSON.stringify(offer.body)).toBe(201);
+    const id = offer.body.open[0].id as string;
+    const ok = await tim.post(`/udt/trades/${id}/accept`);
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    // Tim owns Mira now: an own bot of his team (develops, no salary), no starter any more.
+    const timView = (await tim.get('/udt')).body.roster.find(
+      (r: { botId: string }) => r.botId === mira.botId,
+    );
+    expect(timView).toMatchObject({ starter: false, own: { origin: 'starter' } });
+    const row = db.select().from(udtBots).where(eq(udtBots.botId, mira.botId)).get()!;
+    expect(row).toMatchObject({ userId: timId, madeBy: marioId });
+    expect(api!.app.get(BotsService).get(mira.botId)?.udtOwner).toBe(timId);
+    // Mario's licences still count Mira as made by him.
+    expect((await mario.get('/udt/academy')).body.licence).toEqual(before);
+    // Tim may change its look; Mario no longer.
+    expect((await mario.req('PUT', `/udt/bots/${mira.botId}`, {})).status).toBe(403);
+    // Nominated for the graduation: not tradable.
+    db.update(udtBots).set({ status: 'nominated' }).where(eq(udtBots.botId, mira.botId)).run();
+    const nom = await tim.post('/udt/trades/preview', {
+      to: marioId,
+      give: [mira.botId],
+      take: [lib.Bravo],
+    });
+    expect(nom.status).toBe(409);
+    expect(JSON.stringify(nom.body)).toMatch(/nominated/);
   });
 
   it('declines, withdraws and voids with the held Neuro back', async () => {

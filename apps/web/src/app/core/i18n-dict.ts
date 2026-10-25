@@ -1366,10 +1366,16 @@ const en = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentors',
   'udt.academy.mentorText':
-    "A bought bot of level {lv} or more can take one apprentice per season (needs a licence): three skill steps lower, its potential one step below the mentor's skill, the play style leans towards the mentor and a trait may be passed on.",
+    "Every bot of your roster from level {lv} – bought or made by you – can take one apprentice per season (needs a licence): three skill steps lower, its potential one step below the mentor's skill, the play style leans towards the mentor and a trait may be passed on.",
   'udt.academy.hasApprentice': 'has an apprentice',
   'udt.academy.takeApprentice': 'Take an apprentice',
-  'udt.academy.noMentors': 'No bought bots in your roster yet.',
+  'udt.academy.noMentors': 'No bots in your roster yet.',
+  'udt.academy.mentorPick': 'Mentor',
+  'udt.academy.pupil':
+    'The apprentice: {skill}, potential up to {pot}; its play style leans towards the mentor.',
+  'udt.academy.pupilTrait': '{pct} % chance to inherit one of: {list}.',
+  'udt.academy.pupilNoTrait': 'No trait to pass on.',
+  'udt.academy.pupilName': 'Name of the apprentice',
   'udt.academy.inherited': 'The apprentice inherited the trait {trait}!',
   'udt.academy.own': 'Own bots',
   'udt.academy.gradText':
@@ -1728,10 +1734,11 @@ const en = {
   'udt.market.full': 'Your roster is full ({max} bots): sell a bot first.',
   'udt.market.roster': 'Roster',
   'udt.trades.rules':
-    'Only bought bots can be traded, from {lock} days after buying or trading; the starter and bots you made (talents, apprentices, blueprints) stay all season, bots in a running tournament wait. Fee {fee} % on what you receive · the smaller side is worth at least {bal} % of the other · every roster keeps at least one bot · offers run {h} h.',
-  'udt.trades.blocked.starter': 'made by its team: stays all season',
+    'Bought bots and the bots you made (also the starter) can be traded, from {lock} days after buying, making or trading; bots you made stay bots of their own at the new team (no salary, they keep developing) and you remain their breeder. Not while a bot plays in a drawn or running tournament or is nominated for the graduation. Fee {fee} % on what you receive · the smaller side is worth at least {bal} % of the other · every roster keeps at least one bot · offers run {h} h.',
+  'udt.trades.blocked.nominated': 'nominated for the graduation',
+  'udt.trades.own': 'made by its team: no salary, keeps developing',
   'udt.trades.noneTradable':
-    'None of your bots can be traded now: your starter and the bots you made stay with your team; a bought bot can be traded {lock} days after buying. You can still offer Neuro for a bot.',
+    'None of your bots can be traded now: a bot can be traded {lock} days after buying, making or trading, not while it plays or is nominated. You can still offer Neuro for a bot.',
   'udt.rename.label': 'New name',
   'udt.rename.button': 'Rename',
   'udt.rename.confirm': 'Rename {from} to {to}? This works only once.',
@@ -1747,7 +1754,7 @@ const en = {
     'You are the manager: you put together a team of bots that plays Dream Team tournaments on the game server. When your team does well, you earn Neuro and can afford better bots.',
   'udt.help.team.title': 'Found your team',
   'udt.help.team.text':
-    'Under My team you choose a name and a tag and build your starter bot with the start points. The starter is free, draws no salary and stays all season.',
+    'Under My team you choose a name and a tag and build your starter bot with the start points. The starter is free and draws no salary; like every bot you made it can be traded (one bot always stays).',
   'udt.help.bots.title': 'Get new bots',
   'udt.help.bots.text': 'There are four ways to new bots:',
   'udt.help.way.market.title': 'Market: buy at once',
@@ -1755,13 +1762,13 @@ const en = {
     'Every market day brings new bots at a fixed price. Buy one and it joins your roster right away; first come, first served.',
   'udt.help.way.academy.title': 'Academy: raise your own',
   'udt.help.way.academy.text':
-    'Scout three talents and sign one with a licence, let an experienced bought bot take an apprentice, or build a bot from a blueprint. Bots you made draw no salary, develop with points and can be renamed once for free.',
+    'Scout three talents and sign one with a licence, let an experienced bot (from level 3) take an apprentice, or build a bot from a blueprint. Bots you made draw no salary, develop with points and can be renamed once for free.',
   'udt.help.way.packs.title': 'Packs: traits and blueprints',
   'udt.help.way.packs.text':
     'Packs bring traits that make your bots stronger, and now and then a blueprint for the academy.',
   'udt.help.way.trades.title': 'Trades: swap with managers',
   'udt.help.way.trades.text':
-    'Swap bought bots and Neuro with other managers. Your starter and the bots you made stay with your team.',
+    'Swap bots and Neuro with other managers – bought ones and the ones you made, the starter too (one bot always stays). Bots you made keep their perks at the new team, and you stay their breeder.',
   'udt.help.bots.roster':
     'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value, at most what it cost (not while it plays in a drawn or running Dream Team tournament).',
   'udt.help.lineup.title': 'Line up',
@@ -3299,10 +3306,16 @@ const de: Record<TKey, string> = {
   'udt.academy.stat.strafing': 'Strafing',
   'udt.academy.mentors': 'Mentoren',
   'udt.academy.mentorText':
-    'Ein gekaufter Bot ab Level {lv} kann pro Season einen Lehrling ausbilden (braucht eine Lizenz): drei Skill-Stufen niedriger, Potenzial eine Stufe unter dem Skill des Mentors, die Spielweise lehnt sich an den Mentor an und ein Trait kann übergehen.',
+    'Jeder Bot deines Kaders ab Level {lv} – gekauft oder selbst gemacht – kann pro Season einen Lehrling aufnehmen (braucht eine Lizenz): drei Skill-Stufen tiefer, Potenzial eine Stufe unter dem Skill des Mentors, der Spielstil lehnt sich an den Mentor an, ein Trait kann übergehen.',
   'udt.academy.hasApprentice': 'hat einen Lehrling',
   'udt.academy.takeApprentice': 'Lehrling aufnehmen',
-  'udt.academy.noMentors': 'Noch keine gekauften Bots im Kader.',
+  'udt.academy.noMentors': 'Noch keine Bots im Kader.',
+  'udt.academy.mentorPick': 'Mentor',
+  'udt.academy.pupil':
+    'Der Lehrling: {skill}, Potenzial bis {pot}; sein Spielstil lehnt sich an den Mentor an.',
+  'udt.academy.pupilTrait': '{pct} % Chance, eins davon zu erben: {list}.',
+  'udt.academy.pupilNoTrait': 'Kein Trait zum Vererben.',
+  'udt.academy.pupilName': 'Name des Lehrlings',
   'udt.academy.inherited': 'Der Lehrling hat den Trait {trait} geerbt!',
   'udt.academy.own': 'Eigene Bots',
   'udt.academy.gradText':
@@ -3663,10 +3676,11 @@ const de: Record<TKey, string> = {
   'udt.market.full': 'Dein Kader ist voll ({max} Bots): Verkauf zuerst einen Bot.',
   'udt.market.roster': 'Kader',
   'udt.trades.rules':
-    'Handelbar sind nur gekaufte Bots, ab {lock} Tagen nach Kauf oder Tausch; der Starter und selbst gemachte Bots (Talente, Lehrlinge, Baupläne) bleiben die ganze Season, Bots in einem laufenden Turnier warten. Gebühr {fee} % auf das, was du bekommst · die kleinere Seite ist mindestens {bal} % der anderen wert · jeder Kader behält mindestens einen Bot · Angebote laufen {h} h.',
-  'udt.trades.blocked.starter': 'selbst gemacht: bleibt die Season',
+    'Handelbar sind gekaufte und selbst gemachte Bots (auch der Starter), ab {lock} Tagen nach Kauf, Erstellen oder Tausch; selbst gemachte bleiben beim neuen Team eigene Bots (kein Gehalt, entwickeln sich weiter), du bleibst ihr Züchter. Nicht, solange ein Bot in einem ausgelosten oder laufenden Turnier spielt oder für den Abschluss nominiert ist. Gebühr {fee} % auf das, was du bekommst · die kleinere Seite ist mindestens {bal} % der anderen wert · jeder Kader behält mindestens einen Bot · Angebote laufen {h} h.',
+  'udt.trades.blocked.nominated': 'für den Abschluss nominiert',
+  'udt.trades.own': 'selbst gemacht: kein Gehalt, entwickelt sich weiter',
   'udt.trades.noneTradable':
-    'Gerade ist keiner deiner Bots handelbar: Starter und selbst gemachte Bots bleiben in deinem Team, ein gekaufter Bot ist {lock} Tage nach dem Kauf handelbar. Neuro für einen Bot bieten kannst du trotzdem.',
+    'Gerade ist keiner deiner Bots handelbar: Ein Bot ist {lock} Tage nach Kauf, Erstellen oder Tausch handelbar, nicht während er spielt oder nominiert ist. Neuro für einen Bot bieten kannst du trotzdem.',
   'udt.rename.label': 'Neuer Name',
   'udt.rename.button': 'Umbenennen',
   'udt.rename.confirm': '{from} in {to} umbenennen? Das geht nur ein Mal.',
@@ -3682,7 +3696,7 @@ const de: Record<TKey, string> = {
     'Du bist Manager: Du stellst ein Team aus Bots zusammen, das auf dem Spielserver Dream-Team-Turniere spielt. Läuft es gut für dein Team, verdienst du Neuro und kannst dir bessere Bots leisten.',
   'udt.help.team.title': 'Team gründen',
   'udt.help.team.text':
-    'Unter Mein Team wählst du Namen und Tag und baust deinen Starter-Bot mit den Startpunkten. Der Starter kostet nichts, bekommt kein Gehalt und bleibt die ganze Season.',
+    'Unter Mein Team wählst du Namen und Tag und baust deinen Starter-Bot mit den Startpunkten. Der Starter kostet nichts und bekommt kein Gehalt; wie jeder selbst gemachte Bot ist er handelbar (ein Bot bleibt immer).',
   'udt.help.bots.title': 'Neue Bots bekommen',
   'udt.help.bots.text': 'Es gibt vier Wege zu neuen Bots:',
   'udt.help.way.market.title': 'Markt: sofort kaufen',
@@ -3690,13 +3704,13 @@ const de: Record<TKey, string> = {
     'Jeder Markttag bringt neue Bots zum Festpreis. Kaufst du einen, ist er sofort in deinem Kader; wer zuerst kommt, bekommt ihn.',
   'udt.help.way.academy.title': 'Akademie: eigene Bots hochziehen',
   'udt.help.way.academy.text':
-    'Scoute drei Talente und verpflichte eins mit einer Lizenz, lass einen erfahrenen gekauften Bot einen Lehrling aufnehmen oder bau einen Bot aus einem Bauplan. Selbst gemachte Bots bekommen kein Gehalt, entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen.',
+    'Scoute drei Talente und verpflichte eins mit einer Lizenz, lass einen erfahrenen Bot (ab Level 3) einen Lehrling aufnehmen oder bau einen Bot aus einem Bauplan. Selbst gemachte Bots bekommen kein Gehalt, entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen.',
   'udt.help.way.packs.title': 'Packs: Traits und Baupläne',
   'udt.help.way.packs.text':
     'Packs bringen Traits, die deine Bots stärker machen, und ab und zu einen Bauplan für die Akademie.',
   'udt.help.way.trades.title': 'Handel: mit Managern tauschen',
   'udt.help.way.trades.text':
-    'Tausche gekaufte Bots und Neuro mit anderen Managern. Dein Starter und selbst gemachte Bots bleiben in deinem Team.',
+    'Tausche Bots und Neuro mit anderen Managern – gekaufte und selbst gemachte, auch den Starter (ein Bot bleibt immer). Selbst gemachte Bots behalten beim neuen Team ihre Vorteile, du bleibst ihr Züchter.',
   'udt.help.bots.roster':
     'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts, höchstens den Kaufpreis (nicht, solange er in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
   'udt.help.lineup.title': 'Aufstellen',

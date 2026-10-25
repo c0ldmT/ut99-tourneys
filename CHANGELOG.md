@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team: bots you made (starter, talents, apprentices, blueprint bots) can be traded like bought ones - every roster keeps at least one bot, not while nominated for the graduation. At the new team they stay own bots (no salary, they keep developing); their maker stays their breeder and keeps counting them for the licences. Market sales stay for bought bots.
+- Dream Team academy: pick the mentor from a list of your roster - every bot from level 3, also the ones you made - and see what the apprentice gets (skill, potential, the chance to inherit a trait) before you name it.
 - Dream Team breakthrough: a fully developed own bot (level 10, skill at its potential, all values at 100) can raise skill and potential once for development points; its values drop by about a third, so it comes out a bit stronger and grows further with training. Fully developed bots lose the points plaque.
 - Tournament page: the match being played in the match page's look - scorebar with clock and limits, every player's health and frags - and a tap opens the match page.
 - Dream Team bot page: team, card, potential, Dream Team statistics (games, wins, K/D, damage, latest matches) and career; every bot link in Dream Team leads there, the normal bot profile only shows for bots that also play normal tournaments.

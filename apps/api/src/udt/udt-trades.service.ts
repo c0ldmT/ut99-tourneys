@@ -10,7 +10,7 @@ import { randomId } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { udtRoster, udtTrades, udtTraits } from '../db/schema.js';
+import { bots, udtBots, udtRoster, udtTrades, udtTraits } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
@@ -74,14 +74,41 @@ export class UdtTradesService {
     return playingBots(this.db, this.events, userId);
   }
 
-  /** Why a roster bot cannot be traded now (null: it can). */
-  private blocked(r: RosterBot, acquiredAt: string, playing: Set<string>): string | null {
-    if (r.starter || r.own) return 'starter';
+  /**
+   * Why a roster bot cannot be traded now (null: it can). Own bots (the starter too) can be
+   * traded since decision 207, not while nominated for the graduation.
+   */
+  private blocked(
+    r: RosterBot,
+    acquiredAt: string,
+    playing: Set<string>,
+    nominated: ReadonlySet<string>,
+  ): string | null {
+    if (nominated.has(r.botId)) return 'nominated';
     if (playing.has(r.botId)) return 'playing';
     if (r.striking) return 'striking';
     const lock = this.cfg().tradeLockDays * DAY;
     if (lock && Date.parse(acquiredAt) + lock > this.clock.now()) return 'locked';
     return null;
+  }
+
+  /** Own bots nominated for the graduation (they stay until the nomination is withdrawn). */
+  private nominated(season: number, userId: string): Set<string> {
+    return new Set(
+      [...this.udt.ownBots(season, userId).values()]
+        .filter((b) => b.status === 'nominated')
+        .map((b) => b.botId),
+    );
+  }
+
+  /**
+   * What a roster bot is worth in a trade: its market value (the starter's too, which shows
+   * none on the roster).
+   */
+  private worth(r: RosterBot, season: number): number {
+    return r.starter
+      ? this.udt.value({ id: r.botId, skill: r.skill, traits: r.traits }, season, r.udtTraits)
+      : r.value;
   }
 
   private acquired(season: number, userId: string): Map<string, string> {
@@ -100,6 +127,7 @@ export class UdtTradesService {
     const season = this.udt.season().number;
     const at = this.acquired(season, userId);
     const playing = this.playing(userId);
+    const nominated = this.nominated(season, userId);
     const lock = this.cfg().tradeLockDays * DAY;
     return this.udt.roster(userId, season).map((r) => {
       const a = at.get(r.botId) ?? this.nowIso();
@@ -115,9 +143,11 @@ export class UdtTradesService {
         level: r.level,
         slots: r.slots,
         stamina: r.stamina,
-        value: r.value,
+        value: this.worth(r, season),
         starter: r.starter,
-        blocked: this.blocked(r, a, playing),
+        /** Made by its team (starter, talent, apprentice, blueprint): no salary, develops. */
+        homemade: !!r.own,
+        blocked: this.blocked(r, a, playing, nominated),
         unlocksAt: lock ? new Date(Date.parse(a) + lock).toISOString() : null,
       };
     });
@@ -153,13 +183,14 @@ export class UdtTradesService {
     const roster = new Map(this.udt.roster(userId, season).map((r) => [r.botId, r]));
     const at = this.acquired(season, userId);
     const playing = this.playing(userId);
+    const nominated = this.nominated(season, userId);
     let value = 0;
     for (const id of botIds) {
       const r = roster.get(id);
       if (!r) throw conflict('bot {id} is not in that roster (any more)', { id });
-      const why = this.blocked(r, at.get(id) ?? this.nowIso(), playing);
-      if (why === 'starter')
-        throw conflict('{name} was made by its team (starter, talent, apprentice): it stays', {
+      const why = this.blocked(r, at.get(id) ?? this.nowIso(), playing, nominated);
+      if (why === 'nominated')
+        throw conflict('{name} is nominated for the graduation: withdraw the nomination first', {
           name: r.name,
         });
       if (why === 'playing')
@@ -171,7 +202,7 @@ export class UdtTradesService {
           name: r.name,
           tradeLockDays: this.cfg().tradeLockDays,
         });
-      value += r.value;
+      value += this.worth(r, season);
     }
     return value;
   }
@@ -234,7 +265,7 @@ export class UdtTradesService {
       toSize - take.length + give.length > ROSTER_MAX
     )
       throw conflict('at most {max} bots per roster', { max: ROSTER_MAX });
-    // Every manager keeps at least one bot (the starter cannot go, but the rule is explicit).
+    // Every manager keeps at least one bot (own bots and the starter can be traded too).
     if (fromSize - give.length + take.length < 1 || toSize - take.length + give.length < 1)
       throw conflict('every manager keeps at least one bot');
     if (cfg.tradePairPerWeek && this.pairCount(season, from, to) >= cfg.tradePairPerWeek)
@@ -433,11 +464,33 @@ export class UdtTradesService {
       const now = this.nowIso();
       const move = (botIds: string[], to: string) => {
         if (!botIds.length) return;
+        // A starter is a normal own bot in its new team (the starter rules are its founder's).
         this.db
           .update(udtRoster)
-          .set({ userId: to, dmSlot: null, mhSlot: null, bench: null, acquiredAt: now })
+          .set({
+            userId: to,
+            dmSlot: null,
+            mhSlot: null,
+            bench: null,
+            acquiredAt: now,
+            starter: false,
+          })
           .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, botIds)))
           .run();
+        // Own bots change their owner (the maker stays: licences, breeder).
+        this.db
+          .update(udtBots)
+          .set({ userId: to })
+          .where(and(eq(udtBots.season, season), inArray(udtBots.botId, botIds)))
+          .run();
+        const own = this.db
+          .select({ id: udtBots.botId })
+          .from(udtBots)
+          .where(and(eq(udtBots.season, season), inArray(udtBots.botId, botIds)))
+          .all()
+          .map((b) => b.id);
+        if (own.length)
+          this.db.update(bots).set({ udtOwner: to }).where(inArray(bots.id, own)).run();
         // The traits go with the bot.
         this.db
           .update(udtTraits)

@@ -299,7 +299,10 @@ export class UdtTeamPage {
     (this.view()?.roster ?? []).reduce((s, b) => s + b.value, 0),
   );
   protected readonly salary = computed(() =>
-    (this.view()?.roster ?? []).filter((b) => !b.starter).reduce((s, b) => s + salaryOf(b), 0),
+    // Bots a team made (also traded ones) draw no salary.
+    (this.view()?.roster ?? [])
+      .filter((b) => !b.starter && !b.own)
+      .reduce((s, b) => s + salaryOf(b), 0),
   );
 
   constructor() {

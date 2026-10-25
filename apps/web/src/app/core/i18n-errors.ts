@@ -221,13 +221,11 @@ export const ERRORS_DE: Record<string, string> = {
   'that is its name already': 'So heißt er schon.',
   'bot in your roster not found': 'Der Bot ist nicht in deinem Kader.',
   'the starter bot stays with your team': 'Der Starter-Bot bleibt in deinem Team.',
-  'a bot you made stays with your team this season':
-    'Ein Bot, den du gemacht hast, bleibt diese Season in deinem Team.',
+  'a bot made by a team cannot be sold to the market, only traded':
+    'Ein selbst gemachter Bot kann nicht an den Markt verkauft, nur getauscht werden.',
 
   // --- Dream Team: academy
   'a bot is called {name} already': 'Ein Bot heißt schon {name}.',
-  'a mentor is a bought bot, not one you made':
-    'Ein Mentor ist ein gekaufter Bot, keiner, den du gemacht hast.',
   'a mentor needs level {level}': 'Ein Mentor braucht Level {level}.',
   'at most {made} own bots per season': 'Höchstens {made} eigene Bots pro Season.',
   'at most {max} bots: make room first': 'Höchstens {max} Bots: Mach zuerst Platz im Kader.',
@@ -329,8 +327,8 @@ export const ERRORS_DE: Record<string, string> = {
     '{name} spielt gerade in einem laufenden Dream-Team-Turnier.',
   '{name} was bought or traded less than {tradeLockDays} days ago':
     '{name} wurde vor weniger als {tradeLockDays} Tagen gekauft oder getauscht.',
-  '{name} was made by its team (starter, talent, apprentice): it stays':
-    '{name} wurde vom eigenen Team gemacht (Starter, Talent, Lehrling): Er bleibt.',
+  '{name} is nominated for the graduation: withdraw the nomination first':
+    '{name} ist für den Abschluss nominiert: Zieh die Nominierung zuerst zurück.',
 };
 
 /**

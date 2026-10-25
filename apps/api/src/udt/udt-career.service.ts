@@ -97,7 +97,7 @@ export class UdtCareerService implements OnModuleInit {
       if (!g) continue;
       this.ledger.book({
         season: s.number,
-        userId: g.userId,
+        userId: breederOf(g),
         kind: 'udt_breeder',
         amount: roundNeuro(BREEDER_TITLE * this.udt.index(s.number)),
         ref: `breeder-title:${tournamentId}:${id}`,
@@ -112,7 +112,7 @@ export class UdtCareerService implements OnModuleInit {
     if (!g || price <= 0) return;
     this.ledger.book({
       season,
-      userId: g.userId,
+      userId: breederOf(g),
       kind: 'udt_breeder',
       amount: roundNeuro(price * BREEDER_SALE),
       ref: `breeder-sale:${saleRef}`,
@@ -267,7 +267,7 @@ export class UdtCareerService implements OnModuleInit {
       games: r?.games ?? 0,
       xp: r?.xp ?? 0,
       level,
-      breeder: this.users.byId(b.userId)?.displayName ?? '?',
+      breeder: this.users.byId(breederOf(b))?.displayName ?? '?',
       team: team?.name ?? '?',
       tag: team?.tag ?? '',
       active: lib?.active ?? false,
@@ -307,7 +307,7 @@ export class UdtCareerService implements OnModuleInit {
   breeders() {
     this.udt.assertOn();
     const grads = this.db.select().from(udtBots).where(eq(udtBots.status, 'graduated')).all();
-    const users = [...new Set(grads.map((g) => g.userId))];
+    const users = [...new Set(grads.map(breederOf))];
     const bonus = new Map<string, number>();
     if (users.length)
       for (const l of this.db
@@ -320,8 +320,8 @@ export class UdtCareerService implements OnModuleInit {
       .map((u) => ({
         userId: u,
         name: this.users.byId(u)?.displayName ?? '?',
-        graduates: grads.filter((g) => g.userId === u).length,
-        honours: grads.filter((g) => g.userId === u && g.honours).length,
+        graduates: grads.filter((g) => breederOf(g) === u).length,
+        honours: grads.filter((g) => breederOf(g) === u && g.honours).length,
         bonus: bonus.get(u) ?? 0,
       }))
       .sort((a, b) => b.graduates - a.graduates || b.honours - a.honours || b.bonus - a.bonus);
@@ -337,7 +337,7 @@ export class UdtCareerService implements OnModuleInit {
         .all()
         .map((g) => [
           g.botId,
-          { breeder: this.users.byId(g.userId)?.displayName ?? '?', honours: g.honours },
+          { breeder: this.users.byId(breederOf(g))?.displayName ?? '?', honours: g.honours },
         ]),
     );
   }
@@ -395,7 +395,7 @@ export class UdtCareerService implements OnModuleInit {
             origin: made.origin,
             season: made.season,
             status: made.status,
-            breeder: this.users.byId(made.userId)?.displayName ?? '?',
+            breeder: this.users.byId(breederOf(made))?.displayName ?? '?',
           }
         : null,
       season,
@@ -524,4 +524,9 @@ export class UdtCareerService implements OnModuleInit {
       .filter((b) => !b.udtOwner && !retired.has(b.id) && careers.get(b.id)?.retire)
       .map((b) => ({ botId: b.id, name: b.name, career: careers.get(b.id)! }));
   }
+}
+
+/** Who made an own bot (it may belong to another manager after a trade). */
+function breederOf(b: { userId: string; madeBy: string | null }): string {
+  return b.madeBy ?? b.userId;
 }

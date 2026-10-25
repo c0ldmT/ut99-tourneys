@@ -161,7 +161,9 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
                           [bot]="card(b)"
                           [small]="true"
                           [dim]="!!b.blocked"
-                          [note]="b.blocked ? blockedText(b) : null"
+                          [note]="
+                            b.blocked ? blockedText(b) : b.homemade ? ('udt.trades.own' | t) : null
+                          "
                         />
                       </button>
                     }
@@ -201,7 +203,9 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
                           [bot]="card(b, partner()?.tag)"
                           [small]="true"
                           [dim]="!!b.blocked"
-                          [note]="b.blocked ? blockedText(b) : null"
+                          [note]="
+                            b.blocked ? blockedText(b) : b.homemade ? ('udt.trades.own' | t) : null
+                          "
                         />
                       </button>
                     }

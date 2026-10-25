@@ -203,6 +203,18 @@ export const STARTER_SKILL = 3;
 /** Potential of a starter bot: two skill steps above (at most Godlike). */
 export const starterPotential = (skill: number): number => Math.min(7, Math.round(skill) + 2);
 
+/** An apprentice's skill: three steps below its mentor's (at least 1). */
+export const apprenticeSkill = (mentorSkill: number): number =>
+  Math.max(1, Math.round(mentorSkill) - 3);
+
+/** An apprentice's potential: one step below its mentor's skill (at most 6, never below its skill). */
+export const apprenticePotential = (mentorSkill: number): number =>
+  Math.max(apprenticeSkill(mentorSkill), Math.min(6, Math.round(mentorSkill) - 1));
+
+/** The chance that an apprentice inherits one of its mentor's traits (the mentor trait: 50 %). */
+export const apprenticeTraitChance = (hasMentorTrait: boolean): number =>
+  hasMentorTrait ? 0.5 : 0.25;
+
 /**
  * An apprentice of a mentor: skill three steps below the mentor (at least 1), potential one step
  * below the mentor's skill (owner, 23.10.: a Godlike mentor made a salary-free Godlike); the values lean towards the mentor's (70 %, all of them with the mentor
@@ -218,10 +230,10 @@ export function apprentice(
   const v = (m: number | undefined) =>
     r3(clamp(lean * (m ?? 0) + (1 - lean) * (rng() * 2 - 1) * 0.6, -1, 1));
   const passable = mentor.traitCodes.filter((c) => c !== 'mentor');
-  const chance = hasMentorTrait ? 0.5 : 0.25;
+  const chance = apprenticeTraitChance(hasMentorTrait);
   const inherited =
     passable.length && rng() < chance ? passable[Math.floor(rng() * passable.length)]! : null;
-  const skill = Math.max(1, Math.round(mentor.skill) - 3);
+  const skill = apprenticeSkill(mentor.skill);
   return {
     name,
     skill,
@@ -232,7 +244,7 @@ export function apprentice(
       combatStyle: v(mentor.values.combatStyle),
       camping: r3(clamp(lean * (mentor.values.camping ?? 0) + (1 - lean) * rng() * 0.5, 0, 1)),
     },
-    potential: Math.max(skill, Math.min(6, Math.round(mentor.skill) - 1)),
+    potential: apprenticePotential(mentor.skill),
     inherited,
   };
 }

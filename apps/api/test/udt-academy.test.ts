@@ -105,7 +105,14 @@ describe('Unreal Dream Team: academy', () => {
       .values({ season: 1, botId: lib, userId: marioId, price: 9000, acquiredAt: 'x', xp: 0 })
       .run();
     let v = (await mario.get('/udt/academy')).body;
-    expect(v.mentors).toMatchObject([{ name: 'Sensei', ready: false }]);
+    const of = (name: string) => v.mentors.find((m: { name: string }) => m.name === name);
+    // Every roster bot is listed, also the ones made by the team (decision 207).
+    expect(of('Sensei')).toMatchObject({
+      ready: false,
+      own: false,
+      apprentice: { skill: 3, potential: 5, inheritChance: 0.25 },
+    });
+    expect(of('Mira')).toMatchObject({ ready: false, own: true });
     expect((await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil' })).status).toBe(
       409,
     );
@@ -116,10 +123,18 @@ describe('Unreal Dream Team: academy', () => {
     expect(pupil).toMatchObject({ skill: 3, own: { origin: 'apprentice' } });
     expect(pupil.traits.accuracy).toBeGreaterThan(0.3);
     v = ok.body;
-    expect(v.mentors[0]).toMatchObject({ used: true, ready: false });
+    expect(of('Sensei')).toMatchObject({ used: true, ready: false });
     expect(
       (await mario.post('/udt/academy/mentor', { mentorId: lib, name: 'Pupil2' })).status,
     ).toBe(409);
+    // The starter (made by the team, level 3 too) can be a mentor as well.
+    expect(of('Mira')).toMatchObject({ ready: true, own: true });
+    const mira = of('Mira').botId as string;
+    const second = await mario.post('/udt/academy/mentor', { mentorId: mira, name: 'Pupil3' });
+    expect(second.status, JSON.stringify(second.body)).toBe(200);
+    expect(second.body.own.find((b: { name: string }) => b.name === 'Pupil3').own.origin).toBe(
+      'apprentice',
+    );
   });
 
   it('graduates an own bot with 15 games and level 5 after an admin approved', async () => {

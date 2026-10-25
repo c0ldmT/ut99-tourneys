@@ -470,12 +470,17 @@ export class UdtAiService implements OnModuleInit {
     this.academy.sign(user, { pick: best.i, name });
   }
 
-  /** Incoming offers: accepted when the AI gets at least `min` × what it gives. */
+  /**
+   * Incoming offers: accepted when the AI gets at least `min` × what it gives. Never for bots a
+   * team made: they cannot be sold, and an AI paying for them would buy them like the market.
+   */
   private answerTrades(user: User, min: number): number {
     let n = 0;
+    const season = this.udt.season().number;
     for (const t of this.trades.list(user).open.filter((x) => x.incoming)) {
       try {
-        if (t.giveValue >= t.takeValue * min) this.trades.accept(user, t.id);
+        const made = t.give.some((b) => this.udt.isOwnBot(season, b.botId));
+        if (!made && t.giveValue >= t.takeValue * min) this.trades.accept(user, t.id);
         else this.trades.decline(user, t.id);
         n++;
       } catch {
@@ -498,8 +503,13 @@ export class UdtAiService implements OnModuleInit {
     if (!humans.length) return 0;
     const p = humans[Math.floor(rng() * humans.length)]!;
     for (const give of mine.sort(() => rng() - 0.5)) {
+      // Not for bots a team made (see answerTrades).
       const want = p.roster.find(
-        (b) => !b.blocked && b.value > 0 && Math.abs(b.value - give.value) <= give.value * 0.2,
+        (b) =>
+          !b.blocked &&
+          !b.homemade &&
+          b.value > 0 &&
+          Math.abs(b.value - give.value) <= give.value * 0.2,
       );
       if (!want) continue;
       try {

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm';
 import { BotTraitsSchema } from '@tourney/protocol';
 import {
   baseValue,
@@ -319,7 +319,21 @@ export class UdtService {
     return this.traitsOnBots(season).get(botId) ?? [];
   }
 
-  /** The bots a manager made this season (starter, talents, apprentices). */
+  /** How many bots a manager made this season (they may have been traded since). */
+  madeCount(season: number, userId: string): number {
+    return this.db
+      .select({ id: udtBots.botId })
+      .from(udtBots)
+      .where(
+        and(
+          eq(udtBots.season, season),
+          or(eq(udtBots.madeBy, userId), and(isNull(udtBots.madeBy), eq(udtBots.userId, userId))),
+        ),
+      )
+      .all().length;
+  }
+
+  /** The own bots a manager has this season (starter, talents, apprentices, also traded ones). */
   ownBots(season: number, userId?: string): Map<string, typeof udtBots.$inferSelect> {
     return new Map(
       this.db
@@ -351,7 +365,7 @@ export class UdtService {
     return this.settings.get().udt.aiEnabled;
   }
 
-  /** A bot the manager made stays with the team: not sold, not traded, no salary. */
+  /** A bot a manager made (also after a trade): not sold to the market, no salary. */
   isOwnBot(season: number, botId: string): boolean {
     return !!this.db
       .select({ id: udtBots.botId })
@@ -722,6 +736,7 @@ export class UdtService {
         botId: bot.id,
         season: season.number,
         userId: user.id,
+        madeBy: user.id,
         origin: 'starter',
         potential: starterPotential(skill),
         ...windowOf(drawPotentialWindow(starterPotential(skill), skill, [skill, 7], Math.random)),

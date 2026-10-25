@@ -451,7 +451,10 @@ export const udtTrades = sqliteTable('udt_trades', {
 export const udtBots = sqliteTable('udt_bots', {
   botId: text('bot_id').primaryKey(),
   season: integer('season').notNull(),
+  /** The manager who owns the bot now (own bots can be traded). */
   userId: text('user_id').notNull(),
+  /** The manager who made it (licences, breeder); null in rows older than migration 38. */
+  madeBy: text('made_by'),
   /** "starter", "academy", "apprentice" or "blueprint". */
   origin: text('origin').notNull(),
   potential: integer('potential').notNull(),

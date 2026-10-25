@@ -1351,7 +1351,9 @@ export interface UdtPartnerBot {
   stamina: number;
   value: number;
   starter: boolean;
-  blocked: 'starter' | 'playing' | 'striking' | 'locked' | null;
+  /** Made by its team (starter, talent, apprentice, blueprint): no salary, develops. */
+  homemade?: boolean;
+  blocked: 'nominated' | 'playing' | 'striking' | 'locked' | null;
   unlocksAt: string | null;
 }
 
@@ -1394,9 +1396,13 @@ export interface UdtMentor {
   name: string;
   skill: number;
   level: number;
+  /** Made by the team (any roster bot of level 3+ can be a mentor). */
+  own?: boolean;
   mentorTrait: boolean;
   ready: boolean;
   used: boolean;
+  /** What the apprentice would get (values and the inherited trait are drawn). */
+  apprentice?: { skill: number; potential: number; traits: string[]; inheritChance: number };
 }
 
 export interface UdtAcademy {

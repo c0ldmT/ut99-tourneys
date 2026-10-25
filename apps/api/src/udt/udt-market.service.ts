@@ -585,7 +585,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     if (!r) throw notFound('bot in your roster');
     if (r.starter) throw conflict('the starter bot stays with your team');
     if (this.udt.isOwnBot(season.number, botId))
-      throw conflict('a bot you made stays with your team this season');
+      throw conflict('a bot made by a team cannot be sold to the market, only traded');
     const bot = this.bots.list().find((b) => b.id === botId);
     // Its lineup is fixed in a seeded or running tournament: it plays that one out first.
     if (playingBots(this.db, this.events, user.id).has(botId))
