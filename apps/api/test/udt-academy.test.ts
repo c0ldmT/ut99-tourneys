@@ -139,7 +139,24 @@ describe('Unreal Dream Team: academy', () => {
     v = ok.body;
     // No new bot, no licence used.
     expect(v.licence.made).toBe(1);
-    expect(of('Sensei')).toMatchObject({ used: true, ready: false });
+    expect(of('Sensei')).toMatchObject({
+      used: true,
+      ready: false,
+      apprentice: { botId: mira, name: 'Mira', here: true },
+    });
+    expect(v.mentorships).toEqual([
+      {
+        mentor: { botId: lib, name: 'Sensei', here: true },
+        apprentice: { botId: mira, name: 'Mira', here: true },
+        active: true,
+      },
+    ]);
+    expect(of('Sensei').notPupils).toEqual(
+      expect.arrayContaining([
+        { botId: other, why: 'bought' },
+        { botId: mira, why: 'mentored' },
+      ]),
+    );
     expect((await teach(lib, mira)).status).toBe(409);
     // A mentor needs skill 6 (Mira has 3) besides level 3.
     expect(of('Mira')).toMatchObject({ ready: false, why: 'skill' });

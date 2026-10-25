@@ -144,6 +144,7 @@ export class UdtAcademyService {
     const used = this.mentorsUsed(season);
     const own = this.udt.ownBots(season, user.id);
     const s = this.scout(season, user.id);
+    const mentorships = this.mentorships(season, user.id, roster);
     return {
       hasTeam: !!team,
       tag: team?.tag ?? '',
@@ -175,6 +176,12 @@ export class UdtAcademyService {
           /** Traits that can be passed on and the chance that one is. */
           traits: r.udtTraits.filter((x) => x.code !== 'mentor').map((x) => x.code),
           inheritChance: apprenticeTraitChance(mentorTrait),
+          /** Its apprentice of this season (also one in another team now). */
+          apprentice: mentorships.find((x) => x.mentor.botId === r.botId)?.apprentice ?? null,
+          /** The other roster bots and why they cannot learn from it. */
+          notPupils: roster
+            .filter((p) => p.botId !== r.botId && !canLearn(p, r, own))
+            .map((p) => ({ botId: p.botId, why: whyNotPupil(p, r, own) })),
           /** Bots the team made that could learn from it, with their values before and after. */
           pupils: roster
             .filter((p) => canLearn(p, r, own))
@@ -189,6 +196,10 @@ export class UdtAcademyService {
         };
       }),
       own: roster.filter((r) => r.own),
+      /** The whole roster (cards in the mentor panel). */
+      roster,
+      /** Mentor and apprentice pairs of the season in this team; `active`: both in the roster. */
+      mentorships,
       blueprints: this.blueprintsOf(season, user.id).map((b) => ({
         id: b.id,
         rarity: b.rarity,
@@ -202,6 +213,23 @@ export class UdtAcademyService {
       /** XP factor of an apprentice while its mentor is in the roster. */
       apprenticeXp: APPRENTICE_XP,
     };
+  }
+
+  /**
+   * The season's mentor and apprentice pairs of a team: its apprentices (mentor here or not) and
+   * its mentors whose apprentice went to another team.
+   */
+  private mentorships(season: number, userId: string, roster: readonly RosterBot[]) {
+    const here = new Set(roster.map((r) => r.botId));
+    const names = new Map(this.bots.list().map((b) => [b.id, b.name]));
+    const side = (id: string) => ({ botId: id, name: names.get(id) ?? '?', here: here.has(id) });
+    return [...this.udt.ownBots(season).values()]
+      .filter((b) => b.mentorId && (b.userId === userId || here.has(b.mentorId)))
+      .map((b) => {
+        const mentor = side(b.mentorId!);
+        const apprentice = side(b.botId);
+        return { mentor, apprentice, active: mentor.here && apprentice.here };
+      });
   }
 
   /** A new scout report: three talents (replaces the last report). */
@@ -602,4 +630,17 @@ function canLearn(
     !row.mentorId &&
     p.skill < mentor.skill
   );
+}
+
+/** Why a roster bot cannot be the apprentice of `mentor`. */
+function whyNotPupil(
+  p: RosterBot,
+  mentor: RosterBot,
+  own: ReadonlyMap<string, { status: string; mentorId: string | null }>,
+): 'bought' | 'mentored' | 'skill' | 'nominated' {
+  const row = own.get(p.botId);
+  if (!row) return 'bought';
+  if (row.mentorId) return 'mentored';
+  if (row.status !== 'own') return 'nominated';
+  return p.skill >= mentor.skill ? 'skill' : 'bought';
 }

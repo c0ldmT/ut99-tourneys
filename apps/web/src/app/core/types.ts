@@ -1405,6 +1405,10 @@ export interface UdtMentor {
   used: boolean;
   /** Why it cannot teach now. */
   why?: 'used' | 'skill' | 'level' | null;
+  /** Its apprentice of this season. */
+  apprentice?: { botId: string; name: string; here: boolean } | null;
+  /** The other roster bots and why they cannot learn from it. */
+  notPupils?: { botId: string; why: 'bought' | 'mentored' | 'skill' | 'nominated' }[];
   /** Traits that can be passed on and the chance that one is. */
   traits: string[];
   inheritChance: number;
@@ -1441,6 +1445,14 @@ export interface UdtAcademy {
   own: UdtRosterBot[];
   developCost: Record<'accuracy' | 'alertness' | 'strafing' | 'skill', number>;
   mentorLevel: number;
+  /** The whole roster (cards in the mentor panel). */
+  roster?: UdtRosterBot[];
+  /** Mentor and apprentice pairs of the season; `active`: both in the roster (XP bonus). */
+  mentorships: {
+    mentor: { botId: string; name: string; here: boolean };
+    apprentice: { botId: string; name: string; here: boolean };
+    active: boolean;
+  }[];
   /** A mentor needs this skill (6). */
   mentorSkill?: number;
   /** XP factor of an apprentice while its mentor is in the roster (1.5). */

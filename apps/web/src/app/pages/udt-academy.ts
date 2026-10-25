@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { UdtMentorPanel } from '../components/udt-mentor-panel';
 import { UdtPotential } from '../components/udt-potential';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
@@ -22,7 +23,17 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
  */
 @Component({
   selector: 'app-udt-academy',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtPotential],
+  imports: [
+    FormsModule,
+    RouterLink,
+    TPipe,
+    NeuroPipe,
+    Coin,
+    UdtCard,
+    UdtNav,
+    UdtPotential,
+    UdtMentorPanel,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -192,105 +203,12 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
           </section>
         }
 
-        <section class="card">
-          <h2>{{ 'udt.academy.mentors' | t }}</h2>
-          <p class="muted small">
-            {{
-              'udt.academy.mentorText'
-                | t
-                  : {
-                      lv: v.mentorLevel,
-                      skill: skillName(v.mentorSkill ?? 6),
-                      xp: xpBonus(v),
-                    }
-            }}
-          </p>
-          @if (v.mentors.length) {
-            <label class="mpick"
-              >{{ 'udt.academy.mentorPick' | t }}
-              <select
-                name="mentor"
-                [ngModel]="mentor()?.botId ?? ''"
-                (ngModelChange)="mentorId.set($event)"
-              >
-                @for (m of v.mentors; track m.botId) {
-                  <option [value]="m.botId">
-                    {{ m.name }} · {{ skillName(m.skill) }} · {{ 'udt.level' | t }} {{ m.level
-                    }}{{ m.ready ? '' : ' – ' + mentorBlocked(m, v) }}
-                  </option>
-                }
-              </select>
-            </label>
-            @if (mentor(); as m) {
-              <div class="mrow">
-                <span class="udt-chip r-{{ rarity(m.skill) }}"
-                  ><span>{{ m.skill }}</span></span
-                >
-                <span class="grow"
-                  ><b>{{ m.name }}</b>
-                  <span class="muted small">{{ 'udt.level' | t }} {{ m.level }}</span>
-                  @if (m.mentorTrait) {
-                    <span class="udt-mark star">{{ 'udt.trait.mentor' | t }}</span>
-                  }
-                  @if (m.used) {
-                    <span class="udt-mark">{{ 'udt.academy.hasApprentice' | t }}</span>
-                  }
-                </span>
-              </div>
-              @if (m.ready && m.pupils.length) {
-                <label class="mpick"
-                  >{{ 'udt.academy.pupilPick' | t }}
-                  <select
-                    name="pupil"
-                    [ngModel]="pupil()?.botId ?? ''"
-                    (ngModelChange)="pupilId.set($event)"
-                  >
-                    @for (p of m.pupils; track p.botId) {
-                      <option [value]="p.botId">
-                        {{ p.name }} · {{ skillName(p.skill) }} · {{ 'udt.level' | t }}
-                        {{ p.level }}
-                      </option>
-                    }
-                  </select>
-                </label>
-                @if (pupil(); as p) {
-                  <p class="small muted">{{ 'udt.academy.lesson' | t }}</p>
-                  <ul class="lesson small">
-                    @for (k of lessonKeys; track k) {
-                      <li [class.up]="p.after[k] !== p.before[k]">
-                        {{ 'udt.academy.lesson.' + k | t }}:
-                        <span class="mono">{{ pct(p.before[k], k) }}</span>
-                        @if (p.after[k] !== p.before[k]) {
-                          → <b class="mono">{{ pct(p.after[k], k) }}</b>
-                        }
-                      </li>
-                    }
-                  </ul>
-                  <p class="small">
-                    {{ 'udt.academy.pupilXp' | t: { xp: xpBonus(v), mentor: m.name } }}
-                    @if (m.traits.length) {
-                      {{
-                        'udt.academy.pupilTrait'
-                          | t: { pct: m.inheritChance * 100, list: traitNames(m.traits) }
-                      }}
-                    } @else {
-                      {{ 'udt.academy.pupilNoTrait' | t }}
-                    }
-                  </p>
-                  <button type="button" [disabled]="busy()" (click)="apprentice(m, p)">
-                    {{ 'udt.academy.takeApprentice' | t }}
-                  </button>
-                }
-              } @else if (m.ready) {
-                <p class="muted small">{{ 'udt.academy.noPupils' | t }}</p>
-              } @else {
-                <p class="muted small">{{ mentorBlocked(m, v) }}</p>
-              }
-            }
-          } @else {
-            <p class="muted small">{{ 'udt.academy.noMentors' | t }}</p>
-          }
-        </section>
+        <udt-mentor-panel
+          [academy]="v"
+          [busy]="busy()"
+          [cards]="rosterCards()"
+          (teach)="apprentice($event.mentor, $event.pupil)"
+        />
 
         <section class="card">
           <h2>{{ 'udt.academy.own' | t }}</h2>
@@ -394,34 +312,6 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       justify-content: space-between;
       font-size: 0.85rem;
     }
-    .lesson {
-      margin: 4px 0;
-      padding-left: 18px;
-    }
-    .lesson li.up b {
-      color: var(--live);
-    }
-    .mpick select {
-      display: block;
-      width: 100%;
-      margin-top: 4px;
-    }
-    .mrow {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 0;
-      border-top: 1px solid var(--border);
-      flex-wrap: wrap;
-    }
-    .grow {
-      flex: 1 1 180px;
-      min-width: 0;
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
     .build {
       display: flex;
       flex-wrap: wrap;
@@ -446,27 +336,6 @@ export class UdtAcademyPage {
   protected readonly grad = signal<UdtGraduation | null>(null);
   protected readonly busy = signal(false);
   protected readonly names = signal<Partial<Record<number, string>>>({});
-  /** The chosen apprentice (default: the first bot that can learn from the mentor). */
-  protected readonly pupilId = signal<string | null>(null);
-  protected readonly pupil = computed((): UdtPupil | null => {
-    const list = this.mentor()?.pupils ?? [];
-    return list.find((p) => p.botId === this.pupilId()) ?? list[0] ?? null;
-  });
-  protected readonly lessonKeys = [
-    'accuracy',
-    'alertness',
-    'strafing',
-    'combatStyle',
-    'camping',
-  ] as const;
-  /** The chosen mentor (default: the first that can take an apprentice). */
-  protected readonly mentorId = signal<string | null>(null);
-  protected readonly mentor = computed((): UdtMentor | null => {
-    const list = this.a()?.mentors ?? [];
-    return (
-      list.find((m) => m.botId === this.mentorId()) ?? list.find((m) => m.ready) ?? list[0] ?? null
-    );
-  });
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
   private readonly router = inject(Router);
   protected readonly bpId = signal<string | null>(null);
@@ -543,10 +412,6 @@ export class UdtAcademyPage {
     });
   }
 
-  protected rarity(skill: number) {
-    return botRarity(skill);
-  }
-
   /** The talent as a card: values in the middle of the scout's ranges. */
   protected talentCard(t: UdtTalentReport, tag: string): CardBot {
     const mid = (k: 'accuracy' | 'alertness' | 'strafing') =>
@@ -573,28 +438,6 @@ export class UdtAcademyPage {
     this.names.update((n) => ({ ...n, [i]: v }));
   }
 
-  /** Why a bot cannot take an apprentice now. */
-  protected mentorBlocked(m: UdtMentor, v: UdtAcademy): string {
-    if (m.used || m.why === 'used') return this.i18n.t('udt.academy.hasApprentice');
-    if (m.why === 'skill')
-      return this.i18n.t('udt.academy.fromSkill', { skill: this.skillName(v.mentorSkill ?? 6) });
-    return this.i18n.t('udt.academy.fromLevel', { lv: v.mentorLevel });
-  }
-
-  /** The apprentice's XP bonus in per cent (50). */
-  protected xpBonus(v: UdtAcademy): number {
-    return Math.round(((v.apprenticeXp ?? 1.5) - 1) * 100);
-  }
-
-  protected traitNames(codes: readonly string[]): string {
-    return codes.map((c) => this.i18n.t(`udt.trait.${c}`)).join(', ');
-  }
-
-  /** A value on the page's 0..100 scale (camping 0..1 as 0..100 too). */
-  protected pct(v: number, k: (typeof this.lessonKeys)[number]): number {
-    return Math.round(k === 'camping' ? v * 100 : (v + 1) * 50);
-  }
-
   protected async scout() {
     await this.act(async () => {
       this.a.set(await this.api.udtScout());
@@ -609,6 +452,12 @@ export class UdtAcademyPage {
       this.grad.set(await this.api.udtGraduation());
     });
   }
+
+  /** Cards of the roster bots for the mentor panel. */
+  protected readonly rosterCards = computed(
+    () =>
+      new Map((this.a()?.roster ?? []).map((b) => [b.botId, this.ownCard(b, this.a()?.tag ?? '')])),
+  );
 
   protected async apprentice(m: UdtMentor, p: UdtPupil) {
     await this.act(async () => {

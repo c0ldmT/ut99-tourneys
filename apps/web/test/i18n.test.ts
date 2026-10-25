@@ -45,6 +45,10 @@ describe('translations', () => {
     // Origins of own Dream Team bots (badges on My team, squads, yearbook).
     for (const o of ['starter', 'academy', 'apprentice', 'blueprint'])
       expect(DICT.en[`udt.academy.origin.${o}`]).toBeDefined();
+    // Why a bot cannot be an apprentice (mentor panel).
+    for (const w of ['bought', 'mentored', 'skill', 'nominated'])
+      for (const lang of ['en', 'de'] as const)
+        expect(DICT[lang][`udt.mentor.not.${w}`]).toBeDefined();
     // What an apprentice learns (academy).
     for (const k of ['accuracy', 'alertness', 'strafing', 'combatStyle', 'camping'])
       expect(DICT.en[`udt.academy.lesson.${k}`]).toBeDefined();
