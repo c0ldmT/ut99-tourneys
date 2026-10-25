@@ -13,7 +13,8 @@
     "dev": "node --conditions=@tourney/source --env-file-if-exists=.env --import tsx src/main.ts",
     "udt:sim": "node --conditions=@tourney/source --import tsx scripts/udt-sim.ts",
     "udt:academy-sim": "node --conditions=@tourney/source --import tsx scripts/udt-academy-sim.ts",
-    "bot:sim": "node --conditions=@tourney/source --import tsx scripts/bot-sim.ts"
+    "bot:sim": "node --conditions=@tourney/source --import tsx scripts/bot-sim.ts",
+    "db:anonymize": "node --conditions=@tourney/source --import tsx scripts/db-anonymize.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",
