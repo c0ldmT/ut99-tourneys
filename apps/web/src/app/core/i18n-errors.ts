@@ -270,6 +270,23 @@ export const ERRORS_DE: Record<string, string> = {
   'the bot is {status}': 'Der Bot ist schon weiter ({status}).',
   'the server is reserved for {label} from {from} to {to}':
     'Der Server ist von {from} bis {to} für {label} reserviert.',
+  'the league does not fit into season {season}: {hint}':
+    'Die Liga passt nicht in Season {season}: {hint}.',
+  'the league of season {season} runs already': 'Die Liga von Season {season} läuft schon.',
+  'league game {id} not found': 'Ligaspiel {id} nicht gefunden.',
+  'league club {id} not found': 'Ligaclub {id} nicht gefunden.',
+  'league of season {season} not found': 'Keine Liga in Season {season}.',
+  'the league is not running': 'Die Liga läuft nicht.',
+  '{n} managers do not fit into {places} league places':
+    '{n} Manager passen nicht auf {places} Ligaplätze.',
+  'clubs per tier: 8, 10, 12, 14 or 16': 'Teams pro Liga: 8, 10, 12, 14 oder 16.',
+  'only the home club picks the map': 'Nur der Heimclub wählt die Map.',
+  'the game is not open any more': 'Das Spiel ist nicht mehr offen.',
+  'map {map} is not in the league pool': 'Die Map {map} ist nicht im Liga-Pool.',
+  'the test league cannot start in the past':
+    'Die Testliga kann nicht in der Vergangenheit starten.',
+  'only a test league can be called off': 'Nur eine Testliga kann abgebrochen werden.',
+  'no admin to make the league games': 'Kein Admin, der die Ligaspiele anlegt.',
   'a keeper graduates in a later season':
     'Ein Keeper kann erst in einer späteren Season abschließen, nicht in seiner ersten als Keeper.',
   '{name} is a keeper for next season: take it out first':
@@ -356,6 +373,7 @@ const PARAM_KEYS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   'the offer is {status}': { status: 'udt.trades.st.' },
   'the bot is {status}': { status: 'udt.academy.st.' },
   'the server is reserved for {label} from {from} to {to}': { label: 'cal.label.' },
+  'the league does not fit into season {season}: {hint}': { hint: 'league.fitHint.' },
 };
 
 /** Templates whose whole text comes from an i18n key built from a parameter. */

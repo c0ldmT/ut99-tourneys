@@ -66,14 +66,28 @@ export class UdtRewardsService implements OnModuleInit {
     // The season's Dream Team champion gets a frame and a title (shop awards).
     this.shop.registerAwardProvider((season) => {
       const userId = this.champion(season);
-      return userId
+      const out = userId
         ? [
             { userId, item: AWARDS.dreamTeam(season) },
             { userId, item: AWARDS.dreamTeamTitle(season) },
           ]
         : [];
+      // With a league the cup ranking has its own badge (L-E10), once the season is over.
+      const s = this.seasons.list().find((x) => x.number === season);
+      const over = !!s && this.seasons.current()?.number !== season;
+      if (this.leagueChampion(season) !== undefined && over) {
+        const top = this.table(season).find((r) => !r.ai && r.points > 0);
+        if (top) out.push({ userId: top.userId, item: AWARDS.cupRanking(season) });
+      }
+      return out;
     });
   }
+
+  /**
+   * The league's champion of a season (set by the league): a user id, null without a human
+   * winner, undefined when the season had no league (the cups decide).
+   */
+  leagueChampion: (season: number) => string | null | undefined = () => undefined;
 
   private onAppended(
     id: string,
@@ -297,6 +311,9 @@ export class UdtRewardsService implements OnModuleInit {
   champion(season: number): string | null {
     const s = this.seasons.list().find((x) => x.number === season);
     if (!s) return null;
+    // A league season: the winner of the Pro Series final four (L-E10).
+    const league = this.leagueChampion(season);
+    if (league !== undefined) return league;
     const ai = this.udt.aiIds();
     const finales = this.db
       .select()

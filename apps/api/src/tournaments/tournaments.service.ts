@@ -129,6 +129,18 @@ export const UdtEventRulesSchema = z.object({
   minTeams: z.number().int().min(2).max(16).default(4),
   /** Season finale: the top of the season table plays (no sign-up). */
   finale: z.boolean().default(false),
+  /**
+   * A league game (made by the league, one per fixture): its season, fixture and kind. No
+   * sign-up, the two clubs play; no game money, place reward or cup ranking points.
+   */
+  league: z
+    .object({
+      season: z.number().int().min(1),
+      fixture: z.string().min(1).max(64),
+      kind: z.enum(['league', 'relegation', 'semi', 'final', 'third']),
+    })
+    .nullable()
+    .default(null),
 });
 export type UdtEventRules = z.infer<typeof UdtEventRulesSchema>;
 

@@ -18,6 +18,12 @@ import { UdtEventsService } from './udt-events.service.js';
 import { UdtRewardsService } from './udt-rewards.service.js';
 import { ApproveBody, UdtCareerService } from './udt-career.service.js';
 import { KeepersBody, UdtKeepersService } from './udt-keepers.service.js';
+import {
+  EstimateQuery,
+  TestLeagueBody,
+  UdtLeagueService,
+  type TestLeagueInput,
+} from './udt-league.service.js';
 import { UdtAiService } from './udt-ai.service.js';
 import {
   BuildBody,
@@ -63,6 +69,7 @@ export class UdtController {
     @Inject(UdtAiService) private readonly ai: UdtAiService,
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(UdtKeepersService) private readonly keepers: UdtKeepersService,
+    @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
   ) {}
 
   @Get()
@@ -393,6 +400,56 @@ export class UdtController {
   @Delete('graduation/:botId')
   unnominate(@CurrentUser() user: User, @Param('botId') botId: string) {
     return this.career.withdraw(user, botId);
+  }
+
+  /** The league: tables, the matchday as a conference, fixtures, the viewer's next game. */
+  @Get('league')
+  leagueView(@CurrentUser() user: User, @Query('season') season?: string) {
+    return this.league.view(user, season ? Number(season) || undefined : undefined);
+  }
+
+  /** Champions and tiers of every finished league season. */
+  @Get('league/history')
+  leagueHistory() {
+    return this.league.history();
+  }
+
+  /** The home club's manager picks the map of the next game. */
+  @Put('league/fixtures/:id/map')
+  leagueMap(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(z.object({ map: z.string().min(1).max(64) }))) body: { map: string },
+  ) {
+    return this.league.setMap(user, id, body.map);
+  }
+
+  /** Admin view of the league (settings tab): the run, its plan, the server time estimate. */
+  @AdminOnly()
+  @Get('league/admin')
+  leagueAdmin() {
+    this.udt.assertOn();
+    return this.league.adminView();
+  }
+
+  @AdminOnly()
+  @Get('league/estimate')
+  leagueEstimate(@Query(new ZodPipe(EstimateQuery)) q: Record<string, unknown>) {
+    return this.league.estimate(q as never);
+  }
+
+  /** A test league in the running season (L-E9). */
+  @AdminOnly()
+  @Post('league/test')
+  @HttpCode(200)
+  leagueTest(@Body(new ZodPipe(TestLeagueBody)) body: TestLeagueInput) {
+    return this.league.startTest(body);
+  }
+
+  @AdminOnly()
+  @Delete('league/test')
+  leagueTestAbort() {
+    return this.league.abortTest();
   }
 
   /** The keeper choice at the season's end (open or not, bots that can be kept, the chosen). */

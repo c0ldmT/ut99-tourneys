@@ -104,7 +104,16 @@ describe('anonymised database copy', () => {
     const clan = (await admin.post('/bot-clans', { name: 'Nachtwache', tag: 'NW' })).body as {
       id: string;
     };
-    const libs = ['Xanadu', 'Loquat', 'Malcolmo', 'Brocki', 'Laurenz', 'Vissel', 'Gorgo', 'Zed'];
+    const libs = [
+      'Xanadu',
+      'Loquat',
+      'Malcolmo',
+      'Brocki',
+      'Laurenz',
+      'Vissel',
+      'Gorgo',
+      'Zedrian',
+    ];
     const ids: string[] = [];
     for (const [i, name] of libs.entries())
       ids.push(
@@ -158,6 +167,9 @@ describe('anonymised database copy', () => {
       return t.id;
     };
     await cup('Mariolus Geburtstagscup');
+    // A test league: the managers' clubs and AI clubs named from the list.
+    const league = await admin.post('/udt/league/test', { placement: 'one' });
+    expect(league.status, JSON.stringify(league.body)).toBe(200);
     // A deleted cup leaves its id (a slug of the name) in the ledger.
     const gone = await cup('Sabines Abschiedscup');
     expect((await admin.del(`/tournaments/${gone}`)).status).toBeLessThan(300);

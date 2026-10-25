@@ -170,8 +170,57 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         ticketIndexed: true,
         minTeams: 4,
         finale: false,
+        league: null,
       }
     );
+  }
+
+  /**
+   * League games (rules.league) are seeded by the league (set by UdtLeagueService): the two
+   * clubs in their fixed slots.
+   */
+  leagueLineup: (
+    t: TournamentRow,
+    settings: TournamentSettings,
+  ) => { entrants: Entrant[]; fill: Entrant[]; slots: string[] } = () => {
+    throw conflict('the league is not running');
+  };
+
+  /**
+   * A manager's club in a league game: the deathmatch lineup (bench for tired and striking
+   * bots; no value cap or star limit), weak base bots in the places it cannot fill (L-E18);
+   * bots playing in another drawn or running Dream Team tournament stay out (one at a time).
+   */
+  leagueTeam(userId: string, settings: TournamentSettings, entrantId: string): Entrant | null {
+    const season = this.udt.season().number;
+    const team = this.udt.team(userId, season);
+    if (!team) return null;
+    const rules = { ...this.rules({ kind: 'standard' } as TournamentRow), valueCap: null };
+    // The manager's other league games run one after another on the same server: their bots
+    // are free for this one (cups in the league slot are kept out by the server calendar).
+    const busy = botsOf(
+      lockedTournaments(this.db, this.log)
+        .map((l) => l.projection)
+        .filter((p) => p.settings.format !== 'fixtures'),
+      userId,
+    );
+    const l = this.lineup(userId, settings, rules, busy);
+    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
+    const careers = this.career.careers();
+    const named = uniqueNames();
+    const specs: BotSpec[] = l.bots
+      .map((r) => this.spec(r, team.tag, lib, careers))
+      .map((s) => ({ ...s, name: named(s.name) }));
+    for (let i = specs.length; i < settings.teamSize; i++)
+      specs.push({ name: named(gameName(team.tag, `Rookie${i + 1}`)), skill: 1 });
+    return {
+      id: entrantId,
+      kind: 'team',
+      displayName: team.name,
+      tag: team.tag,
+      members: [],
+      bots: specs,
+    };
   }
 
   /**
@@ -418,6 +467,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const rules = this.rules(t);
+    if (rules.league) return this.leagueLineup(t, settings);
     const season = this.udt.season().number;
     // Career phases change the accuracy of every bot in Dream Team games.
     const careers = this.career.careers();
@@ -562,7 +612,9 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       .from(tournaments)
       .where(eq(tournaments.kind, 'udt'))
       .orderBy(desc(tournaments.createdAt))
-      .all();
+      .all()
+      // League games show on the league's pages, not among the cups.
+      .filter((t) => !this.rules(t).league);
     const open = rows.filter((t) => t.phase !== 'finished' && t.phase !== 'aborted');
     const done = rows.filter((t) => t.phase === 'finished').slice(0, 5);
     const ai = this.udt.aiIds();

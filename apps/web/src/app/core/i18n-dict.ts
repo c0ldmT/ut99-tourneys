@@ -2001,6 +2001,11 @@ const en = {
   'format.fixtures': 'League matchday',
   'bracket.fixtures': 'Pairings',
   'cal.label.league': 'the league',
+  'league.fitHint.medium': 'choose the length medium',
+  'league.fitHint.short': 'choose the length short',
+  'league.fitHint.none': 'make the season longer or start the league earlier',
+  'udt.kind.udt_league': 'League table money',
+  'udt.kind.udt_cup_bonus': 'Cup bonus',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -4025,6 +4030,11 @@ const de: Record<TKey, string> = {
   'format.fixtures': 'Ligaspieltag',
   'bracket.fixtures': 'Partien',
   'cal.label.league': 'die Liga',
+  'league.fitHint.medium': 'wähle die Länge Mittel',
+  'league.fitHint.short': 'wähle die Länge Kurz',
+  'league.fitHint.none': 'verlängere die Season oder starte die Liga früher',
+  'udt.kind.udt_league': 'Liga-Tabellengeld',
+  'udt.kind.udt_cup_bonus': 'Cup-Bonus',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

@@ -154,13 +154,24 @@ export const AWARDS = {
     value: `Top Bettor S${n}`,
     awarded: true,
   }),
+  /** Dream Team with a league: the top of the cup ranking (L-E10). */
+  cupRanking: (n: number): ShopItem => ({
+    id: `award.cupranking.${n}`,
+    slot: 'title',
+    name: `Cup King S${n}`,
+    price: 0,
+    tier: 4,
+    value: `Cup King S${n}`,
+    awarded: true,
+  }),
 };
 
 /** An awarded item from its id ("award.champion.3"). */
 export function awardById(id: string): ShopItem | undefined {
-  const m = /^award\.(champion|bettor|dreamteam|dtchampion)\.(\d+)$/.exec(id);
+  const m = /^award\.(champion|bettor|dreamteam|dtchampion|cupranking)\.(\d+)$/.exec(id);
   if (!m) return undefined;
   const n = Number(m[2]);
+  if (m[1] === 'cupranking') return AWARDS.cupRanking(n);
   if (m[1] === 'dreamteam') return AWARDS.dreamTeam(n);
   if (m[1] === 'dtchampion') return AWARDS.dreamTeamTitle(n);
   return m[1] === 'champion' ? AWARDS.champion(n) : AWARDS.topBettor(n);

@@ -692,13 +692,20 @@ export class BetsService {
 
   // --- the bots bet ---------------------------------------------------------------------------
 
+  /**
+   * Betting bots per match of a tournament when it has its own number (set by the league:
+   * fewer for league games, risk R11); null: the season's betting setting.
+   */
+  botsPerMatchOf: (t: typeof tournaments.$inferSelect) => number | null = () => null;
+
   /** Lets the control center's bots bet on every match of the tournament that just opened. */
   private botsBet(tournamentId: string): void {
     try {
       const t = this.db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).get();
       if (!t || this.closedReason(t)) return;
       const season = this.seasons.current()!;
-      if (!season.betting.botsBet || season.betting.botsPerMatch <= 0) return;
+      const perMatch = this.botsPerMatchOf(t) ?? season.betting.botsPerMatch;
+      if (!season.betting.botsBet || perMatch <= 0) return;
       const b = this.book(tournamentId);
       if (!b) return;
       const open = [...b.books.values()].filter(
@@ -715,7 +722,7 @@ export class BetsService {
         try {
           for (const m of open) {
             this.botsDecided.add(`${tournamentId}/${m.matchId}`);
-            this.matchBotBets(t.id, m, b.proj, library, revenge, season, round);
+            this.matchBotBets(t.id, m, b.proj, library, revenge, season, round, perMatch);
           }
         } catch {
           // as below
@@ -734,6 +741,7 @@ export class BetsService {
     revenge: ReadonlyMap<string, string>,
     season: Season,
     round: BetRound,
+    perMatch: number,
   ): void {
     const existing = new Set(
       this.db
@@ -747,7 +755,7 @@ export class BetsService {
     const candidates = library
       .filter((x) => !m.participants.includes(botBettor(x.id)) && !existing.has(x.id))
       .map((x) => ({ ...toBettingBot(x), lib: x }));
-    const n = Math.max(0, season.betting.botsPerMatch - existing.size);
+    const n = Math.max(0, perMatch - existing.size);
     const sides = m.entrants!.map((id) => betSide(id, proj, library)) as [BetSide, BetSide];
     for (const bot of drawBettors(candidates, n, createRng(seed))) {
       const feelings: BotFeelings = {

@@ -554,3 +554,82 @@ export const gameReplays = sqliteTable(
   },
   (t) => [primaryKey({ columns: [t.tournamentId, t.matchId, t.game, t.run] })],
 );
+
+/** Dream Team league clubs: a manager's (for good, `userId`) or an AI club (`userId` null). */
+export const leagueClubs = sqliteTable('league_clubs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').unique(),
+  name: text('name').notNull(),
+  tag: text('tag').notNull(),
+  /** Seed of an AI club's bots, profile and strength factor. */
+  seed: text('seed').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+/** A season's league: its plan (evenings, relegation and final four days) and state. */
+export const leagueRuns = sqliteTable('league_runs', {
+  season: integer('season').primaryKey(),
+  /** A test league started in a running season (L-E9). */
+  test: integer('test', { mode: 'boolean' }).notNull().default(false),
+  /** "running", "done" or "aborted". */
+  status: text('status').notNull(),
+  tiers: integer('tiers').notNull(),
+  size: integer('size').notNull(),
+  perEvening: integer('per_evening').notNull(),
+  /** { evenings: [day, matchdays[]][], relegation: day, final: day, slotTime } */
+  planJson: text('plan_json').notNull(),
+  tableMoney: integer('table_money', { mode: 'boolean' }).notNull().default(true),
+  placement: text('placement').notNull().default('cup'),
+  /** The final four's winner (club id). */
+  champion: text('champion'),
+  startedAt: text('started_at').notNull(),
+  endedAt: text('ended_at'),
+});
+
+/** The clubs of a season's league: tier, the AI club's strength now, the final table. */
+export const leagueSeasons = sqliteTable(
+  'league_seasons',
+  {
+    season: integer('season').notNull(),
+    clubId: text('club_id').notNull(),
+    tier: integer('tier').notNull(),
+    strength: real('strength'),
+    place: integer('place'),
+    nextTier: integer('next_tier'),
+    finalPlace: integer('final_place'),
+    points: integer('points').notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.clubId] })],
+);
+
+/**
+ * League games: matchdays ("league"), relegation and final four ties ("relegation", "semi",
+ * "final", "third"; best of three). A game with a manager's club is played (`real`, its own
+ * tournament), AI against AI is simulated (shown from `revealAt`). Status scheduled, played,
+ * simulated, forfeit or void.
+ */
+export const leagueFixtures = sqliteTable('league_fixtures', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  tier: integer('tier').notNull(),
+  matchday: integer('matchday').notNull(),
+  kind: text('kind').notNull(),
+  leg: integer('leg').notNull().default(0),
+  home: text('home').notNull(),
+  away: text('away').notNull(),
+  /** The league evening (date in the season time zone) and the planned kick-off. */
+  day: text('day').notNull(),
+  scheduledAt: text('scheduled_at').notNull(),
+  /** The home club's map (played games). */
+  map: text('map'),
+  real: integer('real', { mode: 'boolean' }).notNull().default(false),
+  tournamentId: text('tournament_id'),
+  status: text('status').notNull().default('scheduled'),
+  homeFrags: integer('home_frags'),
+  awayFrags: integer('away_frags'),
+  overtime: integer('overtime', { mode: 'boolean' }).notNull().default(false),
+  winner: text('winner'),
+  revealAt: text('reveal_at'),
+  /** Moved to a later evening this often (the server was not free). */
+  postponed: integer('postponed').notNull().default(0),
+});

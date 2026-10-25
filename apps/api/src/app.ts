@@ -53,6 +53,7 @@ import { UdtTradesService } from './udt/udt-trades.service.js';
 import { UdtAcademyService } from './udt/udt-academy.service.js';
 import { UdtCareerService } from './udt/udt-career.service.js';
 import { UdtKeepersService } from './udt/udt-keepers.service.js';
+import { UdtLeagueService } from './udt/udt-league.service.js';
 import { UdtAiService } from './udt/udt-ai.service.js';
 import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
@@ -156,6 +157,7 @@ class AppModule {
         UdtAcademyService,
         UdtCareerService,
         UdtKeepersService,
+        UdtLeagueService,
         UdtAiService,
         UdtTestService,
         AgentGateway,

@@ -788,8 +788,20 @@ export class UdtService {
         .run();
       this.takeKeepers(user.id, season.number, this.aiIds().has(user.id), now);
     });
+    for (const fn of this.foundedHooks)
+      try {
+        fn(user.id, season.number);
+      } catch {
+        // the league logs its own problems
+      }
     return this.team(user.id, season.number)!;
   }
+
+  /** Called after a team was founded (the league lets a late manager take over an AI club). */
+  onFounded(fn: (userId: string, season: number) => void): void {
+    this.foundedHooks.push(fn);
+  }
+  private readonly foundedHooks: ((userId: string, season: number) => void)[] = [];
 
   /**
    * The roster bots of a manager's season that could be kept for the next one (L-E7): own bots

@@ -325,12 +325,18 @@ function run(db: Database.Database): AnonymizeReport {
   const tableNames = {
     player: users.map((u) => u.display_name),
     bot: [...col<string>('bots', 'name'), ...col<string>('udt_hall', 'name')],
-    team: [...col<string>('udt_teams', 'name'), ...col<string>('teams', 'name'), ...teamNames],
+    team: [
+      ...col<string>('udt_teams', 'name'),
+      ...col<string>('teams', 'name'),
+      ...col<string>('league_clubs', 'name'),
+      ...teamNames,
+    ],
     clan: clans.map((c) => c.name),
   };
   const tableTags = [
     ...clans.map((c) => c.tag),
     ...col<string>('udt_teams', 'tag'),
+    ...col<string>('league_clubs', 'tag'),
     ...col<string | null>('teams', 'tag').filter((t): t is string => !!t),
   ];
 
@@ -572,6 +578,7 @@ function run(db: Database.Database): AnonymizeReport {
       };
     });
     named('udt_hall', (r) => ({ name: names.get(r.name!)! }));
+    named('league_clubs', (r) => ({ name: names.get(r.name!)!, tag: names.tag(r.tag!) }));
     named('udt_trades', () => ({ message: null }));
 
     const done = new Set([
@@ -605,6 +612,8 @@ function run(db: Database.Database): AnonymizeReport {
       'teams.tag',
       'udt_hall.name',
       'udt_trades.message',
+      'league_clubs.name',
+      'league_clubs.tag',
     ]);
     for (const t of tables) {
       const cols = columns

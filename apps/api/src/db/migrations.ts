@@ -599,4 +599,65 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX udt_keepers_user ON udt_keepers(user_id, season);
   `,
+  // 40: the Dream Team league: clubs (a manager's for good, AI clubs), a season's run, the clubs
+  // of a season with their tier and table, the fixtures (played, simulated, postponed).
+  `
+  CREATE TABLE league_clubs (
+    id TEXT PRIMARY KEY,
+    user_id TEXT UNIQUE,
+    name TEXT NOT NULL,
+    tag TEXT NOT NULL,
+    seed TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE TABLE league_runs (
+    season INTEGER PRIMARY KEY,
+    test INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    tiers INTEGER NOT NULL,
+    size INTEGER NOT NULL,
+    per_evening INTEGER NOT NULL,
+    plan_json TEXT NOT NULL,
+    table_money INTEGER NOT NULL DEFAULT 1,
+    placement TEXT NOT NULL DEFAULT 'cup',
+    champion TEXT,
+    started_at TEXT NOT NULL,
+    ended_at TEXT
+  );
+  CREATE TABLE league_seasons (
+    season INTEGER NOT NULL,
+    club_id TEXT NOT NULL,
+    tier INTEGER NOT NULL,
+    strength REAL,
+    place INTEGER,
+    next_tier INTEGER,
+    final_place INTEGER,
+    points INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (season, club_id)
+  );
+  CREATE TABLE league_fixtures (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    tier INTEGER NOT NULL,
+    matchday INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    leg INTEGER NOT NULL DEFAULT 0,
+    home TEXT NOT NULL,
+    away TEXT NOT NULL,
+    day TEXT NOT NULL,
+    scheduled_at TEXT NOT NULL,
+    map TEXT,
+    real INTEGER NOT NULL DEFAULT 0,
+    tournament_id TEXT,
+    status TEXT NOT NULL DEFAULT 'scheduled',
+    home_frags INTEGER,
+    away_frags INTEGER,
+    overtime INTEGER NOT NULL DEFAULT 0,
+    winner TEXT,
+    reveal_at TEXT,
+    postponed INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX league_fixtures_season ON league_fixtures(season, day);
+  CREATE INDEX league_fixtures_tournament ON league_fixtures(tournament_id);
+  `,
 ];

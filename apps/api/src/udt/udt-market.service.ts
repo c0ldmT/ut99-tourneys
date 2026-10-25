@@ -109,7 +109,19 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Runs the market day when it is due (also the first one of a season right away). */
+  /** Called on every tick (each minute; the test mode's clock moves call it every hour). */
+  onTick(fn: () => void): void {
+    this.tickHooks.push(fn);
+  }
+  private readonly tickHooks: (() => void)[] = [];
+
   tick(): boolean {
+    for (const fn of this.tickHooks)
+      try {
+        fn();
+      } catch (e) {
+        this.log.error(`udt tick: ${e instanceof Error ? e.message : String(e)}`);
+      }
     try {
       if (!this.udt.enabled()) return false;
       const season = this.seasons.current();

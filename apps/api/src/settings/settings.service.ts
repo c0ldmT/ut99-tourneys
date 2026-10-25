@@ -78,6 +78,55 @@ export const BotAiSettingsSchema = z.object({
 });
 export type BotAiSettings = z.infer<typeof BotAiSettingsSchema>;
 
+const HHMM = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/);
+const Ints = (n: number, max: number) => z.array(z.number().int().min(0).max(max)).min(1).max(n);
+const Factors = (n: number) => z.array(z.number().min(0).max(5)).min(1).max(n);
+
+/**
+ * The Dream Team league: tiers of `size` clubs (managers' teams and AI clubs), a double round
+ * robin of 5v5 games on the league evenings (`slotDays` at `slotTime`; `length`: matchdays per
+ * evening), relegation and the Pro Series final four at the end of the season.
+ */
+export const LeagueSettingsSchema = z.object({
+  /** On: a league starts in every season on `startDay` (changes count from the next season). */
+  enabled: z.boolean().default(false),
+  tiers: z.number().int().min(1).max(4).default(2),
+  size: z
+    .number()
+    .int()
+    .refine((n) => [8, 10, 12, 14, 16].includes(n), 'clubs per tier: 8, 10, 12, 14 or 16')
+    .default(16),
+  /** Day of the season the league starts on (1 = its first day). */
+  startDay: z.number().int().min(1).max(30).default(4),
+  /** League weekdays, 0 = Monday. */
+  slotDays: z.array(z.number().int().min(0).max(6)).min(1).max(7).default([0, 1, 2, 3, 4, 5]),
+  slotTime: HHMM.default('18:00'),
+  length: z.enum(['short', 'medium', 'long']).default('long'),
+  /** AI against AI: simulated, one top game a matchday played, or all played (L-E13). */
+  aiGames: z.enum(['simulate', 'topGame', 'all']).default('simulate'),
+  /** The server of the league games (null: the server of the newest Dream Team tournament). */
+  agentId: z.string().max(64).nullable().default(null),
+  profileId: z.string().max(64).nullable().default(null),
+  /** Maps of the league (empty: the pool of the newest Dream Team deathmatch tournament). */
+  mapPool: z.array(z.string().min(1).max(64)).max(40).default([]),
+  /** League rules (L-E16): team frag limit and time limit. */
+  fragLimit: z.number().int().min(5).max(200).default(50),
+  timeLimitMin: z.number().int().min(5).max(60).default(15),
+  /** AI clubs' strength × the median of the tier's managers; floor per tier (lineup sum). */
+  factors: Factors(4).default([1, 1, 1, 1]),
+  aiFloor: z.array(z.number().min(0).max(60)).min(1).max(4).default([8, 7, 5, 5]),
+  /** Weekly table money (index 1) for places 1-4 / 5-8 / 9-12 / 13-16, factor per tier. */
+  tableMoney: Ints(4, 100_000).default([1200, 700, 400, 200]),
+  tierMult: Factors(4).default([1.4, 1, 0.7, 0.5]),
+  /** Betting bots per league game (instead of the season's bots per match). */
+  betBots: z.number().int().min(0).max(50).default(10),
+  /** A manager who founds a team later takes over an AI club until this matchday (L-E18). */
+  joinUntil: z.number().int().min(0).max(30).default(20),
+  /** After a test league: promotion and relegation count for the next season. */
+  keepTestTiers: z.boolean().default(false),
+});
+export type LeagueSettings = z.infer<typeof LeagueSettingsSchema>;
+
 /**
  * Unreal Dream Team (add-on): off by default. The market day runs once a day at `marketTime`
  * (SEASON_TZ); `offersPerDay` bots are on offer; the starter bot may cost up to `starterBudget`
@@ -122,6 +171,10 @@ export const UdtSettingsSchema = z.object({
       days: z.number().int().min(1).max(14).default(2),
     })
     .default({ max: 2, skillLoss: 1, days: 2 }),
+  /** The Dream Team league (league plan, decisions L-E1-L-E18); blocks are sent whole. */
+  league: LeagueSettingsSchema.default(LeagueSettingsSchema.parse({})),
+  /** Weekly cup bonus (index 1) for places 1-3 of the cup ranking while a league runs (L-E10). */
+  cupBonus: z.array(z.number().int().min(0).max(100_000)).max(3).default([1000, 600, 300]),
 });
 export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
 
@@ -212,6 +265,12 @@ export class SettingsService {
     return this.get();
   }
 
+  /** Checks of other services before Dream Team settings are saved (the league must fit). */
+  checkUdt(fn: (next: UdtSettings, sent: Partial<UdtSettings>) => void): void {
+    this.udtChecks.push(fn);
+  }
+  private readonly udtChecks: ((next: UdtSettings, sent: Partial<UdtSettings>) => void)[] = [];
+
   setUdt(value: Partial<UdtSettings>): WebsiteSettings {
     const now = this.get().udt as Record<string, unknown>;
     const merged: Record<string, unknown> = { ...now };
@@ -220,6 +279,7 @@ export class SettingsService {
       merged[k] = isBlock(v) && isBlock(now[k]) ? { ...now[k], ...v } : v;
     const next = UdtSettingsSchema.safeParse(merged);
     if (!next.success) throw invalidInput(next.error);
+    for (const fn of this.udtChecks) fn(next.data, value);
     this.put('udt', next.data);
     return this.get();
   }
