@@ -217,7 +217,14 @@ export function bracketLines(
   const b = proj.bracket;
   if (!b) return [];
   const lines: BridgeToMod[] = [
-    { t: 'brh', fmt: b.definition.format, size: b.definition.size, n: b.matches.length, rev },
+    {
+      t: 'brh',
+      // The mod knows single and double; a league matchday's pairings show like a first round.
+      fmt: b.definition.format === 'double' ? 'double' : 'single',
+      size: b.definition.size,
+      n: b.matches.length,
+      rev,
+    },
   ];
   // Monster Hunt: game scores are run times in ms; the HUD shows games won instead.
   const race = proj.settings.game.adapter === ADAPTER_MH;

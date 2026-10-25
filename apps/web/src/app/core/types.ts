@@ -60,7 +60,7 @@ export interface TournamentSummary {
   id: string;
   name: string;
   phase: Phase;
-  format: 'single' | 'double';
+  format: 'single' | 'double' | 'fixtures';
   size: number;
   teamSize: number;
   /** dm: deathmatch (1v1 or teams), mh: Monster Hunt time race. */

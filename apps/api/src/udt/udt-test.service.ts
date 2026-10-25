@@ -172,8 +172,12 @@ export class UdtTestService {
         },
       ]);
     }
-    if (p.phase === 'running' && last)
-      p = append([{ type: 'tournament.finished', actor, data: { championId: last } }]);
+    // A league matchday (fixtures) ends without a champion.
+    const fixtures = p.bracket?.definition.format === 'fixtures';
+    if (p.phase === 'running' && last && (!fixtures || p.bracket?.status === 'finished'))
+      p = append([
+        { type: 'tournament.finished', actor, data: fixtures ? {} : { championId: last } },
+      ]);
     return { phase: p.phase, results: p.results.length, championId: p.championId ?? null };
   }
 

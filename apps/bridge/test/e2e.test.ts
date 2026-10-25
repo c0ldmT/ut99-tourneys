@@ -96,6 +96,23 @@ describe('end to end against the simulated UT server', () => {
     expect(env.director.projection.results).toHaveLength(7);
   });
 
+  it('plays a league matchday (fixtures): every pairing once, finished without a champion', async () => {
+    const file = tournamentFile(
+      { players: players.slice(0, 2) },
+      { format: 'fixtures', size: 6, botMatchMode: 'simulate' },
+    );
+    env = await setup({ file });
+    await env.run(finished(env));
+    const p = env.director.projection;
+    expect(p.phase).toBe('finished');
+    expect(p.championId).toBeUndefined();
+    expect(p.results).toHaveLength(3);
+    expect(p.bracket?.standings.every((s) => s.placement === null)).toBe(true);
+    expect(env.log.lines.some((l) => l.includes('All matches are played'))).toBe(true);
+    // The mod gets the pairings like a first round.
+    expect(env.sim.received.find((m) => m.t === 'brh')).toMatchObject({ fmt: 'single', n: 3 });
+  });
+
   it('waits for bets: the first game starts at least betWindowSec after the match was called', async () => {
     const file = tournamentFile(
       { players: players.slice(0, 2) },

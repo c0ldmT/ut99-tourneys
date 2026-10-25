@@ -1750,17 +1750,19 @@ export class MatchDirector extends EventEmitter {
 
   private async finish(): Promise<void> {
     const champion = this.proj.bracket?.championId;
-    if (!champion) return;
+    // A league matchday (fixtures) has no champion: it is done when every pairing is decided.
+    const fixtures = this.proj.bracket?.definition.format === 'fixtures';
+    if (!champion && !(fixtures && this.proj.bracket?.status === 'finished')) return;
     if (this.proj.phase !== 'finished') {
-      if (!(await this.append({ type: 'tournament.finished', data: { championId: champion } })))
-        return;
+      const data = champion ? { championId: champion } : {};
+      if (!(await this.append({ type: 'tournament.finished', data }))) return;
     }
     const delayMs = this.proj.settings.postTournamentShutdownSec * 1000;
     this.stage = { kind: 'finished', deadline: this.o.clock.now() + delayMs };
     this.send([...this.bracketUpdate(), this.phase()]);
-    this.say(`${this.name(champion)} wins the tournament!`);
+    this.say(champion ? `${this.name(champion)} wins the tournament!` : 'All matches are played!');
     this.say(`The server shuts down in ${delayMs / 1000} seconds.`);
-    this.emit('finished', champion);
+    this.emit('finished', champion ?? '');
     const shutdown = () => {
       this.emit('shutdown');
     };

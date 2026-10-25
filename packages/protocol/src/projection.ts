@@ -292,6 +292,9 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         delete p.pausedReason;
         break;
       case 'tournament.finished':
+        // Only a league matchday (fixtures) ends without a champion.
+        if ((p.bracketDefinition?.format === 'fixtures') !== (e.data.championId === undefined))
+          fail(e.data.championId ? 'a league matchday has no champion' : 'the champion is missing');
         p.phase = 'finished';
         p.championId = e.data.championId;
         delete p.currentMatch;

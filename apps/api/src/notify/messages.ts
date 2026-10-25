@@ -11,6 +11,7 @@ const T = {
   de: {
     single: 'Single Elimination',
     double: 'Double Elimination',
+    fixtures: 'Ligaspieltag',
     players: 'Plätze',
     teams: 'Teams',
     mode1: '1v1 Deathmatch',
@@ -80,6 +81,7 @@ const T = {
   en: {
     single: 'single elimination',
     double: 'double elimination',
+    fixtures: 'league matchday',
     players: 'slots',
     teams: 'teams',
     mode1: '1v1 deathmatch',

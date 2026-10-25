@@ -105,11 +105,16 @@ export function computeBracket(
   }
 
   const championId = findChampion(definition, byId);
+  // Fixtures have no champion: done when every pairing is decided.
+  const done =
+    definition.format === 'fixtures'
+      ? matches.every((m) => m.status === 'completed')
+      : !!championId;
   return {
     definition,
     matches,
     byId,
-    status: championId ? 'finished' : 'running',
+    status: done ? 'finished' : 'running',
     ...(championId ? { championId } : {}),
     standings: computeStandings(definition, matches, championId),
     issues,
@@ -169,6 +174,7 @@ function findChampion(
   def: BracketDefinition,
   byId: Record<MatchId, MatchState>,
 ): EntrantId | undefined {
+  if (def.format === 'fixtures') return undefined;
   if (def.format === 'single') {
     return byId[`W${Math.log2(def.size)}-1`]?.winnerId;
   }
@@ -193,7 +199,9 @@ function computeStandings(
   // stage key -> placement
   const placementByStage = new Map<string, number>();
   let eliminated = 0;
-  if (def.format === 'single') {
+  if (def.format === 'fixtures') {
+    // No placements: wins and losses only.
+  } else if (def.format === 'single') {
     for (let r = 1; r <= rounds; r++) {
       eliminated += def.size / 2 ** r;
       placementByStage.set(`W${r}`, def.size - eliminated + 1);
@@ -217,7 +225,8 @@ function computeStandings(
     loser.losses++;
 
     let stage: string | null = null;
-    if (def.format === 'single') stage = `W${m.round}`;
+    if (def.format === 'fixtures') stage = null;
+    else if (def.format === 'single') stage = `W${m.round}`;
     else if (m.side === 'L') stage = `L${m.round}`;
     else if (m.id === GF2) stage = 'GF';
     else if (m.id === GF1) {

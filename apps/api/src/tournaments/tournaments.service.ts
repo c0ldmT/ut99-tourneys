@@ -143,7 +143,16 @@ export type LineupProvider = (
   t: TournamentRow,
   settings: TournamentSettings,
   rng: () => number,
-) => { entrants: Entrant[]; fill: Entrant[]; dropped?: DrawDrop[] };
+) => {
+  entrants: Entrant[];
+  fill: Entrant[];
+  dropped?: DrawDrop[];
+  /**
+   * Fixed slots (a league matchday: the pairings in order, `settings.size` ids of `entrants`);
+   * without: the entrants and the fill are drawn at random.
+   */
+  slots?: string[];
+};
 
 /**
  * A team that signed up but is not in the drawn bracket, and why: its bots play in other
@@ -1287,7 +1296,7 @@ export class TournamentsService {
     const settings = this.settings(t);
     const rngSeed = body.rngSeed ?? `${t.id}-${this.clock.now()}`;
     const rng = createRng(rngSeed);
-    const { entrants: main, fill, dropped = [] } = provider(t, settings, rng);
+    const { entrants: main, fill, dropped = [], slots: fixed } = provider(t, settings, rng);
     if (main.length > settings.size)
       throw badRequest('{n} teams do not fit into a bracket of {size}', {
         n: main.length,
@@ -1295,14 +1304,16 @@ export class TournamentsService {
       });
     let slots: string[];
     try {
-      slots = buildSlots({
-        size: settings.size,
-        humans: main.map((e) => e.id),
-        botPool: fill.map((e) => e.id).slice(0, settings.size - main.length),
-        humanOrder: 'random',
-        botPlacement: 'random',
-        rng,
-      });
+      slots = fixed
+        ? fixedSlots(fixed, settings.size, [...main, ...fill])
+        : buildSlots({
+            size: settings.size,
+            humans: main.map((e) => e.id),
+            botPool: fill.map((e) => e.id).slice(0, settings.size - main.length),
+            humanOrder: 'random',
+            botPlacement: 'random',
+            rng,
+          });
     } catch (e) {
       throw badRequest((e as Error).message);
     }
@@ -2095,4 +2106,14 @@ export class TournamentsService {
     this.require(id);
     return this.log.load(id);
   }
+}
+
+/** A provider's fixed slots (league matchday): every slot an entrant, nobody twice. */
+function fixedSlots(slots: string[], size: number, entrants: readonly Entrant[]): string[] {
+  if (slots.length !== size) throw new Error(`expected ${size} slots, got ${slots.length}`);
+  const known = new Set(entrants.map((e) => e.id));
+  const unknown = slots.filter((s) => !known.has(s));
+  if (unknown.length) throw new Error(`unknown entrants: ${unknown.join(', ')}`);
+  if (new Set(slots).size !== slots.length) throw new Error('an entrant is placed twice');
+  return [...slots];
 }

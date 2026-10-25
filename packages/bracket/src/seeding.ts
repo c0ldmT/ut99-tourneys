@@ -20,7 +20,13 @@ export function standardSeedOrder(size: number): number[] {
 
 /** Places entrants given in seed order (best first) into first-round slots. */
 export function slotsFromSeeds(seeded: readonly EntrantId[]): EntrantId[] {
-  const order = standardSeedOrder(seeded.length);
+  const n = seeded.length;
+  if (n < 2 || n % 2) throw new Error(`an even number of entrants is needed, got ${n}`);
+  // Not a power of two (a league matchday's pairings): 1 v n, 2 v n-1, ...
+  const order =
+    (n & (n - 1)) === 0
+      ? standardSeedOrder(n)
+      : Array.from({ length: n / 2 }, (_, i) => [i + 1, n - i]).flat();
   return order.map((seed) => seeded[seed - 1] as EntrantId);
 }
 

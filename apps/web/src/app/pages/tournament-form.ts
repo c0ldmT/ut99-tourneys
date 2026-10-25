@@ -1979,7 +1979,8 @@ export class TournamentFormPage {
       scheduledAt: toLocalInput(scheduledAt),
       registrationOpen: p.registrationOpen,
       autoStart: p.autoStart,
-      format: s.format,
+      // League matchdays (fixtures) are made by the league, not with this form.
+      format: s.format === 'fixtures' ? 'single' : s.format,
       size: s.size,
       teamSize: s.teamSize ?? 1,
       game: s.game.adapter === MH_ADAPTER ? 'mh' : 'dm',

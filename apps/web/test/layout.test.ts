@@ -13,6 +13,26 @@ const titles = { W: 'W', L: 'L', GF: 'GF', SE: 'SE' };
 const slots = (n: number) => Array.from({ length: n }, (_, i) => `e${i + 1}`);
 
 describe('bracket layout', () => {
+  it('lays out a league matchday (fixtures) as a grid of pairings', () => {
+    const s = computeBracket(
+      {
+        format: 'fixtures',
+        size: 12,
+        slots: slots(12),
+        grandFinalReset: false,
+        bestOf: { default: 1 },
+      },
+      [],
+    );
+    const l = layoutBracket(s, { ...titles, FX: 'FX' });
+    expect(l.boxes).toHaveLength(6);
+    expect(l.connectors).toEqual([]);
+    expect(l.sections).toEqual([{ side: 'W', title: 'FX', y: 0 }]);
+    expect(new Set(l.boxes.map((b) => b.x)).size).toBe(4);
+    expect(new Set(l.boxes.map((b) => b.y)).size).toBe(2);
+    expect(l.width).toBeLessThanOrEqual(4 * (BOX_W + 34) + 8);
+  });
+
   it('lays out single elimination in rounds without overlaps', () => {
     const s = computeBracket(
       {

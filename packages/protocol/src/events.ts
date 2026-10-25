@@ -207,7 +207,8 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
   event('match.result', z.object({ result: MatchResultSchema })),
   event('tournament.paused', z.object({ reason: z.string().max(200) })),
   event('tournament.resumed', z.object({})),
-  event('tournament.finished', z.object({ championId: Id })),
+  /** Without a champion: a fixtures bracket (league matchday) is done. */
+  event('tournament.finished', z.object({ championId: Id.optional() })),
   event('tournament.aborted', z.object({ reason: z.string().max(200) })),
 ]);
 

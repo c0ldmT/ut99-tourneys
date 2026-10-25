@@ -38,6 +38,30 @@ export interface BracketLayout {
 }
 
 /**
+ * A league matchday (fixtures): independent pairings in rows of up to four columns (two for up
+ * to four pairings), no connectors.
+ */
+function layoutFixtures(state: BracketState, title: string, boxW: number): BracketLayout {
+  const n = state.matches.length;
+  const cols = n <= 1 ? 1 : n <= 4 ? 2 : 4;
+  const boxes = [...state.matches]
+    .sort((a, b) => a.index - b.index)
+    .map((match, i) => ({
+      match,
+      x: (i % cols) * (boxW + COL_GAP),
+      y: TITLE_H + Math.floor(i / cols) * (BOX_H + ROW_GAP),
+    }));
+  const rows = Math.ceil(n / cols);
+  return {
+    width: Math.min(n, cols) * (boxW + COL_GAP) - COL_GAP + 8,
+    height: TITLE_H + rows * (BOX_H + ROW_GAP),
+    boxes,
+    connectors: [],
+    sections: [{ side: 'W', title, y: 0 }],
+  };
+}
+
+/**
  * Columns are rounds; a match sits at the vertical middle of the matches feeding it from the
  * same side, first-round matches (and losers-bracket matches fed only from the winners side)
  * are stacked from the top. The losers bracket goes below the winners bracket, the grand final
@@ -45,9 +69,11 @@ export interface BracketLayout {
  */
 export function layoutBracket(
   state: BracketState,
-  titles: { W: string; L: string; GF: string; SE: string },
+  titles: { W: string; L: string; GF: string; SE: string; FX?: string },
   boxW = BOX_W,
 ): BracketLayout {
+  if (state.definition.format === 'fixtures')
+    return layoutFixtures(state, titles.FX ?? titles.SE, boxW);
   const bySide = (side: MatchState['side']) => state.matches.filter((m) => m.side === side);
   const pos = new Map<string, { x: number; y: number }>();
   const boxes: BoxLayout[] = [];

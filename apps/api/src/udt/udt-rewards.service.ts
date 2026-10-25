@@ -123,6 +123,9 @@ export class UdtRewardsService implements OnModuleInit {
     const mh = proj.settings.game.adapter === ADAPTER_MH;
     const index = this.udt.index(season);
     const games = Math.max(1, result.games?.length ?? 1);
+    // League matchdays (fixtures) pay no game money (L-E8: table money instead); stamina and
+    // experience count like in a cup. (An admin's corrected result counts them once more.)
+    const league = isLeague(proj);
     const mvp = this.mvpSide(tournamentId, result.matchId, mh) ?? result.winnerId;
     for (const [me, other] of [
       [result.entrants[0], result.entrants[1]],
@@ -152,14 +155,16 @@ export class UdtRewardsService implements OnModuleInit {
         matchReward({ won, mvp: mvp === me, teamSize, vsBaseBots: !udtManagerOf(other) }, index) *
           factor,
       );
-      const first = this.ledger.book({
-        season,
-        userId,
-        kind: 'udt_reward',
-        amount,
-        ref: `udt-match:${tournamentId}:${result.matchId}:${userId}`,
-        meta: { tournamentId, matchId: result.matchId, won, mvp: mvp === me },
-      });
+      const first =
+        league ||
+        this.ledger.book({
+          season,
+          userId,
+          kind: 'udt_reward',
+          amount,
+          ref: `udt-match:${tournamentId}:${result.matchId}:${userId}`,
+          meta: { tournamentId, matchId: result.matchId, won, mvp: mvp === me },
+        });
       if (!first) continue; // booked before: stamina and experience too
       if (!ids.length) continue;
       // Apprentices learn faster while their mentor is in the same roster (decision 209).
@@ -214,6 +219,8 @@ export class UdtRewardsService implements OnModuleInit {
   }
 
   private finished(tournamentId: string, season: number, proj: TournamentProjection): void {
+    // A league matchday: no place rewards, no pot (risk R5).
+    if (isLeague(proj)) return;
     const teamSize = proj.settings.teamSize;
     const index = this.udt.index(season);
     const standings = proj.bracket?.standings ?? [];
@@ -332,7 +339,8 @@ export class UdtRewardsService implements OnModuleInit {
       // Only the season's own tournaments (not the next season's, decision 110).
       if (this.tournaments.udtSeason(t) !== season) continue;
       const proj = this.events.projection(t.id);
-      if (!proj) continue;
+      // League matchdays do not count for the cup ranking (L-E10, risk R5).
+      if (!proj || isLeague(proj)) continue;
       const factor = FORMAT_POINTS[proj.settings.teamSize] ?? 1;
       for (const st of proj.bracket?.standings ?? []) {
         const userId = udtManagerOf(st.entrantId);
@@ -361,3 +369,6 @@ export class UdtRewardsService implements OnModuleInit {
     );
   }
 }
+
+/** A league matchday (fixtures bracket): the league pays its own money and keeps its own table. */
+export const isLeague = (p: TournamentProjection): boolean => p.settings.format === 'fixtures';

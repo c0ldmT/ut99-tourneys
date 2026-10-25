@@ -573,10 +573,13 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           @if (tab() === 'control') {
             <div class="stack">
               <div class="row">
-                <a class="btn" [routerLink]="['/t', t.id, 'edit']">{{ 'admin.edit' | t }}</a>
-                <a class="btn" routerLink="/new" [queryParams]="{ mode: 'series', from: t.id }">{{
-                  'series.makeFrom' | t
-                }}</a>
+                <!-- League matchdays (fixtures) are made and changed by the league only. -->
+                @if (t.settings.format !== 'fixtures') {
+                  <a class="btn" [routerLink]="['/t', t.id, 'edit']">{{ 'admin.edit' | t }}</a>
+                  <a class="btn" routerLink="/new" [queryParams]="{ mode: 'series', from: t.id }">{{
+                    'series.makeFrom' | t
+                  }}</a>
+                }
                 @if (t.phase === 'draft') {
                   <button
                     (click)="

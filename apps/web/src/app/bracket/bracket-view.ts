@@ -210,6 +210,7 @@ export class BracketView {
         L: this.i18n.t('bracket.losers'),
         GF: this.i18n.t('bracket.grandFinal'),
         SE: this.i18n.t('bracket.bracket'),
+        FX: this.i18n.t('bracket.fixtures'),
       },
       this.boxW,
     ),

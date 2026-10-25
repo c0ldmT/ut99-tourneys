@@ -9,9 +9,16 @@
 export type EntrantId = string;
 export type MatchId = string;
 
-export type BracketFormat = 'single' | 'double';
+/**
+ * single / double elimination, or "fixtures": independent pairings without progression (a
+ * league matchday: every match is ready at the start, the tournament ends when all are decided,
+ * there is no champion and no placement).
+ */
+export type BracketFormat = 'single' | 'double' | 'fixtures';
 export const BRACKET_SIZES = [4, 8, 16, 32] as const;
-export type BracketSize = (typeof BRACKET_SIZES)[number];
+/** Sizes of a fixtures bracket: 1-8 pairings. */
+export const FIXTURE_SIZES = [2, 4, 6, 8, 10, 12, 14, 16] as const;
+export type BracketSize = (typeof BRACKET_SIZES)[number] | (typeof FIXTURE_SIZES)[number];
 
 /** W = winners bracket (also used for single elimination), L = losers bracket, GF = grand final. */
 export type BracketSide = 'W' | 'L' | 'GF';

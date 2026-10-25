@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import type { BestOfPolicy, BracketDefinition, GameResult, MatchResult } from '@tourney/bracket';
+import {
+  BRACKET_SIZES,
+  FIXTURE_SIZES,
+  type BestOfPolicy,
+  type BracketDefinition,
+  type GameResult,
+  type MatchResult,
+} from '@tourney/bracket';
 
 /** Schemas for the shared tournament domain. They mirror the bracket engine types 1:1. */
 
@@ -19,10 +26,16 @@ export const BestOfPolicySchema = z.object({
   grandFinal: OddBestOf.optional(),
 }) satisfies z.ZodType<BestOfPolicy>;
 
-export const BracketFormatSchema = z.enum(['single', 'double']);
+/** "fixtures": independent pairings of a league matchday (sizes 2-16, see FIXTURE_SIZES). */
+export const BracketFormatSchema = z.enum(['single', 'double', 'fixtures']);
 export const BracketSizeSchema = z.union([
+  z.literal(2),
   z.literal(4),
+  z.literal(6),
   z.literal(8),
+  z.literal(10),
+  z.literal(12),
+  z.literal(14),
   z.literal(16),
   z.literal(32),
 ]);
@@ -238,6 +251,8 @@ export type TournamentSettings = z.infer<typeof TournamentSettingsSchema>;
 /** Cross-field checks the schema cannot express. Returns human-readable problems. */
 export function settingsProblems(s: TournamentSettings): string[] {
   const problems: string[] = [];
+  const sizes: readonly number[] = s.format === 'fixtures' ? FIXTURE_SIZES : BRACKET_SIZES;
+  if (!sizes.includes(s.size)) problems.push(`a ${s.format} bracket cannot hold ${s.size}`);
   if (s.teamSize > 1 && s.size > MAX_TEAM_BRACKET) {
     problems.push(`team tournaments hold at most ${MAX_TEAM_BRACKET} teams`);
   }

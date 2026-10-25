@@ -1998,6 +1998,8 @@ const en = {
   'udt.keep.keptTo': 'Keeper in season {n}',
   'udt.keep.noGrad': 'Keeper: graduation in a later season',
   'ok.udt.keepers': 'Keepers set.',
+  'format.fixtures': 'League matchday',
+  'bracket.fixtures': 'Pairings',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -4019,6 +4021,8 @@ const de: Record<TKey, string> = {
   'udt.keep.keptTo': 'Keeper in Season {n}',
   'udt.keep.noGrad': 'Keeper: Abschluss erst in einer späteren Season',
   'ok.udt.keepers': 'Keeper festgelegt.',
+  'format.fixtures': 'Ligaspieltag',
+  'bracket.fixtures': 'Partien',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

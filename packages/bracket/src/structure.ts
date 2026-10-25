@@ -8,7 +8,7 @@ import type {
   MatchSource,
   MatchStage,
 } from './types.js';
-import { BRACKET_SIZES } from './types.js';
+import { BRACKET_SIZES, FIXTURE_SIZES } from './types.js';
 
 export const matchId = (side: 'W' | 'L', round: number, index: number): MatchId =>
   `${side}${round}-${index}`;
@@ -70,8 +70,24 @@ export function buildStructure(
   bestOf: BestOfPolicy,
   grandFinalReset: boolean,
 ): MatchNode[] {
-  const rounds = log2(size);
   const raw: RawNode[] = [];
+  if (format === 'fixtures') {
+    // Independent pairings: match W1-i is slots 2i-2 vs 2i-1, nothing follows.
+    for (let i = 1; i <= size / 2; i++)
+      raw.push({
+        id: matchId('W', 1, i),
+        side: 'W',
+        round: 1,
+        index: i,
+        stage: null,
+        sources: [
+          { kind: 'slot', slot: 2 * i - 2 },
+          { kind: 'slot', slot: 2 * i - 1 },
+        ],
+      });
+    return raw.map((node) => ({ ...node, depth: 0, height: 0, bestOf: bestOf.default }));
+  }
+  const rounds = log2(size);
 
   // Winners bracket (= the whole bracket for single elimination).
   for (let r = 1; r <= rounds; r++) {
@@ -181,9 +197,9 @@ export function buildStructure(
 
 export function validateDefinition(def: BracketDefinition): string[] {
   const errors: string[] = [];
-  if (!(BRACKET_SIZES as readonly number[]).includes(def.size))
-    errors.push(`unsupported size ${def.size}`);
-  if (def.format !== 'single' && def.format !== 'double')
+  const sizes: readonly number[] = def.format === 'fixtures' ? FIXTURE_SIZES : BRACKET_SIZES;
+  if (!sizes.includes(def.size)) errors.push(`unsupported size ${def.size}`);
+  if (def.format !== 'single' && def.format !== 'double' && def.format !== 'fixtures')
     errors.push(`unknown format ${def.format}`);
   if (def.slots.length !== def.size)
     errors.push(`expected ${def.size} slots, got ${def.slots.length}`);

@@ -268,6 +268,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             break;
           }
           case 'tournament.finished': {
+            // A league matchday has no champion (the league posts its own results).
+            if (!after.championId) break;
             const s = this.bets.discordTournament(t.id);
             const summary = s && M.betsTournament(this.lang, s, this.betNames(after));
             const w = after.entrants[after.championId ?? ''];
