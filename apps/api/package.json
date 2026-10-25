@@ -14,6 +14,7 @@
     "udt:sim": "node --conditions=@tourney/source --import tsx scripts/udt-sim.ts",
     "udt:academy-sim": "node --conditions=@tourney/source --import tsx scripts/udt-academy-sim.ts",
     "udt:calibrate": "node --conditions=@tourney/source --import tsx scripts/udt-calibrate.ts",
+    "udt:league-sim": "node --conditions=@tourney/source --import tsx scripts/udt-league-sim.ts",
     "bot:sim": "node --conditions=@tourney/source --import tsx scripts/bot-sim.ts",
     "db:anonymize": "node --conditions=@tourney/source --import tsx scripts/db-anonymize.ts"
   },

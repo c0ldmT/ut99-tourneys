@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- League simulation for the Dream Team league: `pnpm --filter @tourney/api udt:league-sim [export.db]` plays several seasons with the league and keepers against today (index, money, keepers, strikes, wins against AI clubs, champions).
 - Dream Team keepers: on the last two days of a season (and until the next one starts) every manager picks up to two bots the team made on My team; next season they play again - one skill step lower (not below Skilled), with their potential and values, without traits, experience or salary. The founding form takes last season's team name and tag.
 - Anonymised database copy for simulators and analyses (`pnpm --filter @tourney/api db:anonymize <tourney.db> [out.db]`): players, bots, clans, teams, tournaments, series and servers get neutral names in every table and in the event log; sessions, tokens, Discord ids, webhooks, server addresses, free texts and replays go; numbers stay, so wallets and the Dream Team economy compute the same. The source stays untouched; a final scan reports any original name left.
 - Dream Team licences: as many as a manager pays for - each costs twice the one before (2,000 / 4,000 / 8,000 / 16,000 … × index); the limit of four own bots per season is gone. Blueprint bots now draw 75 % of a bought bot's salary (starter, talents and apprentices stay free); the bot details show a bot's salary.

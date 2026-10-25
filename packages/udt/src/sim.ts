@@ -34,7 +34,29 @@ import {
   developPoints,
 } from './academy.js';
 import { levelOf } from './traits.js';
-import { SKILL_STRENGTH as STRENGTH, gameChance } from './model.js';
+import { SKILL_STRENGTH as STRENGTH, botStrength, gameChance } from './model.js';
+import {
+  CUP_BONUS,
+  CUP_FORMAT_POINTS,
+  CUP_POINTS,
+  DEFAULT_RUBBER_BAND,
+  TABLE_MONEY,
+  TIER_MULT,
+  clubFactor,
+  finalFour,
+  matchdaysOf,
+  nextTiers,
+  promotion,
+  rubberBands,
+  schedule,
+  simulateGame,
+  standings,
+  tableMoney,
+  winsNeeded,
+  type LeagueResult,
+  type RubberBand,
+  type TableRow,
+} from './league.js';
 
 export interface SimBot {
   id: string;
@@ -91,6 +113,50 @@ export interface SimOptions {
    * experience and develop up to their potential.
    */
   academy?: SimAcademy;
+  /** The Dream Team league (off without): tiers of AI and manager clubs, 5v5 matchdays. */
+  league?: SimLeague;
+  /**
+   * Keepers per manager from the last season (league plan L-E7): own bots that start in the
+   * roster without salary; their skill is already the kept one.
+   */
+  keepers?: readonly (readonly { skill: number; score: number; potential: number }[])[];
+  /** Roster size a manager aims at on a day (default 2 / 3 / 5 / 7 from day 0 / 3 / 10 / 17). */
+  rosterTarget?: (day: number) => number;
+}
+
+/** League options of the simulator (defaults: the league plan's decisions). */
+export interface SimLeague {
+  /** Tier of each manager (0 = Pro Series). */
+  tierOf: readonly number[];
+  tiers: number;
+  /** Clubs per tier (even, 8-16; default 16). */
+  size?: number;
+  /** First league day (day index, default 3 = the season's fourth day). */
+  startDay?: number;
+  /** League weekdays (0 = Monday; default Monday to Saturday). */
+  weekdays?: readonly number[];
+  /** Matchdays per league evening (default 1, "long"). */
+  perEvening?: number;
+  teamSize?: number;
+  band?: RubberBand;
+  /** Weekly table money per band of four places (index 1) and the factor per tier. */
+  tableMoney?: readonly number[] | null;
+  tierMult?: readonly number[];
+  /** Weekly cup bonus for places 1-3 of the cup ranking (index 1); null: none. */
+  cupBonus?: readonly number[] | null;
+}
+
+/** A club of the league at the season's end. */
+export interface SimLeagueClub {
+  name: string;
+  tier: number;
+  manager?: string;
+  strategy?: Strategy;
+  row: TableRow;
+  /** Tier of the next season (after promotion, relegation ties). */
+  nextTier: number;
+  /** Final four place (Pro Series). */
+  final?: number;
 }
 
 export interface SimAcademy {
@@ -159,7 +225,25 @@ export interface SimResult {
     finalNet: number;
     firstStrong: number | null;
     first5v5: number | null;
+    /** League: Neuro from table money and cup bonus; wins / losses against AI clubs per half. */
+    leagueMoney: number;
+    cupBonus: number;
+    /** Cup ranking points (places in cups, like the website's table). */
+    cupPoints: number;
+    /** League games with fewer than five fit bots (base bots filled the lineup). */
+    shortGames: number;
   }[];
+  /** Own bots per manager at the season's end (starter, built, keepers): the keeper candidates. */
+  ownEnd?: { skill: number; score: number; potential: number }[][];
+  league?: {
+    clubs: SimLeagueClub[];
+    matchdays: number;
+    realGames: number;
+    simulatedGames: number;
+    /** Per manager: wins and games against AI clubs in the first and second half. */
+    halves: { tier: number; first: [number, number]; second: [number, number] }[];
+    overtimes: number;
+  };
 }
 
 function rngOf(seed: number): () => number {
@@ -181,6 +265,8 @@ interface Owned {
   striking: boolean;
   /** Made by the team (academy): no market sale, develops with experience. */
   own?: { xp: number; spent: number; potential: number };
+  /** Kept from the last season: no salary. */
+  keeper?: boolean;
 }
 
 interface Manager {
@@ -275,6 +361,20 @@ export function simulateSeason(o: SimOptions): SimResult {
           ? { own: { xp: 0, spent: 0, potential: Math.min(7, (o.starterSkill ?? 3) + 2) } }
           : {}),
       },
+      ...(o.keepers?.[i] ?? []).map((k, j) => ({
+        bot: {
+          id: `keeper-${i}-${j}`,
+          name: `Keeper ${i + 1}.${j + 1}`,
+          skill: k.skill,
+          score: k.score,
+        },
+        price: 0,
+        stamina: 100,
+        starter: false,
+        striking: false,
+        keeper: true,
+        own: { xp: 0, spent: 0, potential: k.potential },
+      })),
     ],
     blueprints: [],
     pity: { sinceEpic: 0, sinceLegendary: 0 },
@@ -299,11 +399,16 @@ export function simulateSeason(o: SimOptions): SimResult {
       finalNet: 0,
       firstStrong: null,
       first5v5: null,
+      leagueMoney: 0,
+      cupBonus: 0,
+      cupPoints: 0,
+      shortGames: 0,
     },
   }));
 
   const out: SimResult = { days: [], events: [], rescued: 0, totals: [] };
   let offers: SimBot[] = [];
+  const league = o.league ? setupLeague(o.league) : null;
 
   for (let day = 0; day < days; day++) {
     const weekday = day % 7; // 0 = Monday
@@ -371,6 +476,12 @@ export function simulateSeason(o: SimOptions): SimResult {
       }
     }
 
+    // --- League evening (before the cups of the day); money on Mondays.
+    if (league) {
+      if (weekday === 0) leagueMoney(league);
+      leagueEvening(league, day);
+    }
+
     // --- Events.
     for (const ev of EVENTS) {
       if (!ev.days.includes(weekday)) continue;
@@ -402,6 +513,12 @@ export function simulateSeason(o: SimOptions): SimResult {
     }
   }
 
+  if (league) out.league = endLeague(league, days - 1);
+  out.ownEnd = managers.map((m) =>
+    m.roster
+      .filter((x) => x.own)
+      .map((x) => ({ skill: x.bot.skill, score: x.bot.score, potential: x.own!.potential })),
+  );
   out.rescued = rescued;
   out.totals = managers.map((m) => {
     const own = m.roster.filter((x) => x.own && !x.starter);
@@ -416,7 +533,7 @@ export function simulateSeason(o: SimOptions): SimResult {
 
   /** Weekly salary of a roster bot: bought ones in full, blueprint bots by the share. */
   function salaryOf(x: Owned): number {
-    if (x.starter) return 0;
+    if (x.starter || x.keeper) return 0;
     const full = weeklySalary(value(x.bot), x.bot.skill, cfg);
     return x.own ? Math.round(full * (o.academy?.blueprintSalary ?? 0)) : full;
   }
@@ -515,7 +632,15 @@ export function simulateSeason(o: SimOptions): SimResult {
   // Whether a manager buys an offer at its price: fills the roster towards its target size,
   // keeps a reserve of two weeks of salaries.
   function wants(m: Manager, day: number, b: SimBot, price: number): boolean {
-    const target = day < 3 ? 2 : day < 10 ? 3 : day < 17 ? 5 : 7;
+    const target = o.rosterTarget
+      ? o.rosterTarget(day)
+      : day < 3
+        ? 2
+        : day < 10
+          ? 3
+          : day < 17
+            ? 5
+            : 7;
     const salaries = m.roster.reduce(
       (s, x) => s + (x.starter ? 0 : weeklySalary(value(x.bot), x.bot.skill, cfg)),
       0,
@@ -659,12 +784,284 @@ export function simulateSeason(o: SimOptions): SimResult {
     placeOf.set(champ, 1);
     for (const [t, place] of placeOf) {
       if (!t.manager) continue;
+      const base =
+        place === 1
+          ? CUP_POINTS[1]
+          : place === 2
+            ? CUP_POINTS[2]
+            : place <= 4
+              ? CUP_POINTS[3]
+              : CUP_POINTS.played;
+      t.manager.t.cupPoints += Math.round(base * (CUP_FORMAT_POINTS[ev.teamSize] ?? 1));
       const r = placeReward(place, ev.teamSize, index, onlyBase, cfg);
       t.manager.cash += r;
       t.manager.t.rewards += r;
       if (place === 1) t.manager.t.titles++;
     }
     out.events.push({ day, name: ev.name, teamSize: ev.teamSize, humans, winner: champ.name });
+  }
+
+  // ---------- league ----------
+
+  interface Club {
+    name: string;
+    tier: number;
+    manager?: Manager;
+    factor: number;
+  }
+  interface LeagueState {
+    L: SimLeague;
+    size: number;
+    teamSize: number;
+    clubs: Club[];
+    byName: Map<string, Club>;
+    /** Per tier: matchdays of pairings. */
+    fixtures: { home: string; away: string }[][][];
+    results: LeagueResult[][];
+    next: number;
+    realGames: number;
+    simulatedGames: number;
+    overtimes: number;
+    halves: Map<Manager, { first: [number, number]; second: [number, number] }>;
+    /** The rubber band per tier (renewed every league evening). */
+    band: number[] | null;
+  }
+
+  function setupLeague(L: SimLeague): LeagueState {
+    const size = L.size ?? 16;
+    const clubs: Club[] = [];
+    const fixtures: { home: string; away: string }[][][] = [];
+    for (let t = 0; t < L.tiers; t++) {
+      const list: Club[] = managers
+        .filter((_, i) => L.tierOf[i] === t)
+        .slice(0, size)
+        .map((m) => ({ name: m.name, tier: t, manager: m, factor: 1 }));
+      for (let k = 1; list.length < size; k++) {
+        const name = `AI ${t}-${k}`;
+        list.push({ name, tier: t, factor: clubFactor(`${o.seed ?? 1}:${name}`) });
+      }
+      clubs.push(...list);
+      fixtures.push(
+        schedule(
+          list.map((c) => c.name),
+          `${o.seed ?? 1}:${t}`,
+        ),
+      );
+    }
+    return {
+      L,
+      size,
+      teamSize: L.teamSize ?? 5,
+      clubs,
+      byName: new Map(clubs.map((c) => [c.name, c])),
+      fixtures,
+      results: fixtures.map(() => []),
+      next: 0,
+      realGames: 0,
+      simulatedGames: 0,
+      overtimes: 0,
+      halves: new Map(managers.map((m) => [m, { first: [0, 0], second: [0, 0] }])),
+      band: null,
+    };
+  }
+
+  /** A manager's league lineup: the best five fit bots, base bots for missing places. */
+  function leagueSide(s: LeagueState, m: Manager, play: boolean): number {
+    const fit = m.roster
+      .filter((x) => !x.striking && x.stamina > 0)
+      .sort((a, b) => strength(b) - strength(a))
+      .slice(0, s.teamSize);
+    if (play) {
+      if (fit.length < s.teamSize) m.t.shortGames++;
+      rest(m, fit);
+    }
+    return (
+      fit.reduce((n, x) => n + strength(x), 0) + (s.teamSize - fit.length) * botStrength(1, 0.5)
+    );
+  }
+
+  /** The AI clubs' strength of the week: the managers' lineups now (the rubber band). */
+  function renewBand(s: LeagueState) {
+    const sides = managers.map((m, i) => ({
+      tier: s.L.tierOf[i] ?? 0,
+      strength: leagueSide(s, m, false),
+    }));
+    s.band = rubberBands(sides, s.fixtures.length, s.L.band ?? DEFAULT_RUBBER_BAND);
+  }
+
+  function aiSide(s: LeagueState, c: Club): number {
+    if (!s.band) renewBand(s);
+    return s.band![c.tier]! * c.factor;
+  }
+
+  function sideOf(s: LeagueState, c: Club, play: boolean): number {
+    return c.manager ? leagueSide(s, c.manager, play) : aiSide(s, c);
+  }
+
+  /** After a game: stamina, form games and experience of the manager's bots. */
+  function played(s: LeagueState, m: Manager, won: boolean) {
+    const bots = m.roster
+      .filter((x) => !x.striking && x.stamina > 0)
+      .sort((a, b) => strength(b) - strength(a))
+      .slice(0, s.teamSize);
+    for (const x of bots) {
+      const g = games.get(x.bot.id) ?? { games: 0, wins: 0 };
+      g.games++;
+      if (won) g.wins++;
+      games.set(x.bot.id, g);
+      x.stamina = staminaAfterGames(x.stamina, 1, cfg);
+      gainXp(x, won);
+    }
+  }
+
+  function leagueDays(s: LeagueState): number[] {
+    const out: number[] = [];
+    const wd = s.L.weekdays ?? [0, 1, 2, 3, 4, 5];
+    for (let d = s.L.startDay ?? 3; d < days - 3; d++) if (wd.includes(d % 7)) out.push(d);
+    return out;
+  }
+
+  function leagueEvening(s: LeagueState, day: number) {
+    const all = matchdaysOf(s.size);
+    if (s.next >= all) return;
+    const evenings = leagueDays(s);
+    const i = evenings.indexOf(day);
+    if (i < 0) return;
+    renewBand(s);
+    // The last league evening plays what is left (a season too short for the length).
+    const n = i === evenings.length - 1 ? all - s.next : (s.L.perEvening ?? 1);
+    for (let k = 0; k < n && s.next < all; k++, s.next++) {
+      s.fixtures.forEach((tier, t) => {
+        for (const p of tier[s.next]!) {
+          const home = s.byName.get(p.home)!;
+          const away = s.byName.get(p.away)!;
+          const r = simulateGame(
+            { club: home.name, strength: sideOf(s, home, true) },
+            { club: away.name, strength: sideOf(s, away, true) },
+            rng,
+            s.teamSize,
+          );
+          s.results[t]!.push(r);
+          if (r.overtime) s.overtimes++;
+          if (home.manager || away.manager) s.realGames++;
+          else s.simulatedGames++;
+          for (const [c, other] of [
+            [home, away],
+            [away, home],
+          ] as const) {
+            if (!c.manager) continue;
+            const won = r.winner === c.name;
+            played(s, c.manager, won);
+            if (!other.manager) {
+              const h = s.halves.get(c.manager)!;
+              const half = s.next < all / 2 ? h.first : h.second;
+              half[0] += won ? 1 : 0;
+              half[1]++;
+            }
+          }
+        }
+      });
+    }
+  }
+
+  /** Monday: table money by the places (from the first played matchday) and the cup bonus. */
+  function leagueMoney(s: LeagueState) {
+    const f = index ** cfg.rewardIndexExp;
+    if (s.next > 0 && s.L.tableMoney !== null)
+      s.fixtures.forEach((_, t) => {
+        const table = standings(
+          s.clubs.filter((c) => c.tier === t).map((c) => c.name),
+          s.results[t]!,
+        );
+        for (const r of table) {
+          const m = s.byName.get(r.club)!.manager;
+          if (!m) continue;
+          const amount = Math.round(
+            tableMoney(r.place, t, s.L.tableMoney ?? TABLE_MONEY, s.L.tierMult ?? TIER_MULT) * f,
+          );
+          m.cash += amount;
+          m.t.rewards += amount;
+          m.t.leagueMoney += amount;
+        }
+      });
+    const bonus = s.L.cupBonus === undefined ? CUP_BONUS : s.L.cupBonus;
+    if (bonus)
+      [...managers]
+        .filter((m) => m.t.cupPoints > 0)
+        .sort((a, b) => b.t.cupPoints - a.t.cupPoints)
+        .slice(0, bonus.length)
+        .forEach((m, i) => {
+          const amount = Math.round(bonus[i]! * f);
+          m.cash += amount;
+          m.t.rewards += amount;
+          m.t.cupBonus += amount;
+        });
+  }
+
+  /** Best of three at the season's end (true: `a` wins). */
+  function bestOf(s: LeagueState, a: Club, b: Club): boolean {
+    let wa = 0;
+    let wb = 0;
+    while (wa < winsNeeded(3) && wb < winsNeeded(3)) {
+      const r = simulateGame(
+        { club: a.name, strength: sideOf(s, a, false) },
+        { club: b.name, strength: sideOf(s, b, false) },
+        rng,
+        s.teamSize,
+      );
+      if (r.winner === a.name) wa++;
+      else wb++;
+    }
+    return wa > wb;
+  }
+
+  function endLeague(s: LeagueState, _day: number): NonNullable<SimResult['league']> {
+    const tables = s.fixtures.map((_, t) =>
+      standings(
+        s.clubs.filter((c) => c.tier === t).map((c) => c.name),
+        s.results[t]!,
+        o.seed ?? 1,
+      ),
+    );
+    const winners = new Map<string, string>();
+    for (const tie of promotion(tables).relegation) {
+      const up = s.byName.get(tie.upper)!;
+      const low = s.byName.get(tie.lower)!;
+      winners.set(tie.upper, bestOf(s, up, low) ? up.name : low.name);
+    }
+    const next = nextTiers(tables, winners);
+    const finals = new Map<string, number>();
+    const [sf1, sf2] = finalFour(tables[0]!);
+    const semi = (p: { home: string; away: string }) =>
+      bestOf(s, s.byName.get(p.home)!, s.byName.get(p.away)!) ? [p.home, p.away] : [p.away, p.home];
+    const [w1, l1] = semi(sf1);
+    const [w2, l2] = semi(sf2);
+    const [champ, second] = semi({ home: w1!, away: w2! });
+    const [third, fourth] = semi({ home: l1!, away: l2! });
+    finals.set(champ!, 1);
+    finals.set(second!, 2);
+    finals.set(third!, 3);
+    finals.set(fourth!, 4);
+    return {
+      clubs: tables.flatMap((tb, t) =>
+        tb.map((row) => {
+          const c = s.byName.get(row.club)!;
+          return {
+            name: c.name,
+            tier: t,
+            ...(c.manager ? { manager: c.manager.name, strategy: c.manager.strategy } : {}),
+            row,
+            nextTier: next.get(c.name)!,
+            ...(finals.has(c.name) ? { final: finals.get(c.name)! } : {}),
+          };
+        }),
+      ),
+      matchdays: matchdaysOf(s.size),
+      realGames: s.realGames,
+      simulatedGames: s.simulatedGames,
+      halves: managers.map((m, i) => ({ tier: s.L.tierOf[i] ?? 0, ...s.halves.get(m)! })),
+      overtimes: s.overtimes,
+    };
   }
 
   function shuffle<T>(l: readonly T[]): T[] {
