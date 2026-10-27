@@ -216,7 +216,17 @@ export class SettingsService {
     @Inject(CLOCK) private readonly clock: ApiClock,
   ) {}
 
+  /** The settings as last read (asked for many times per tick: reading and checking is slow). */
+  private cached?: { version: number; value: WebsiteSettings };
+
+  /** The website settings (a copy: callers may change it). */
   get(): WebsiteSettings {
+    if (this.cached?.version !== this.version)
+      this.cached = { version: this.version, value: this.read() };
+    return structuredClone(this.cached.value);
+  }
+
+  private read(): WebsiteSettings {
     const rows = this.db.select().from(settings).all();
     const raw: Record<string, unknown> = {};
     for (const r of rows) {

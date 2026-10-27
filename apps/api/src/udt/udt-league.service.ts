@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lte, sql, type SQL } from 'drizzle-orm';
 import {
   udtEntrantId,
   type BotSpec,
@@ -67,6 +67,44 @@ type FixtureRow = typeof leagueFixtures.$inferSelect;
 type RunRow = typeof leagueRuns.$inferSelect;
 type ClubRow = typeof leagueClubs.$inferSelect;
 export type FixtureKind = 'league' | 'relegation' | 'semi' | 'final' | 'third';
+
+function chunks<T>(list: T[], n: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < list.length; i += n) out.push(list.slice(i, i + n));
+  return out;
+}
+
+/** What the simulations of one evening share (see `simContext`). */
+interface SimContext {
+  strength: (clubId: string) => number;
+  /** Per day: when the last simulated result shows. */
+  latest: Map<string, number>;
+  fragLimit: number;
+}
+
+/**
+ * Runs the steps one after another and gives the event loop a turn whenever about 20 ms of
+ * work were done (requests, the bridge, live data go on in between).
+ */
+export async function runInSteps(
+  steps: (() => void)[],
+  onError: (e: unknown) => void,
+  onStep?: (done: number) => void,
+): Promise<void> {
+  let since = performance.now();
+  for (let i = 0; i < steps.length; i++) {
+    try {
+      steps[i]!();
+    } catch (e) {
+      onError(e);
+    }
+    onStep?.(i + 1);
+    if (performance.now() - since > 20) {
+      await new Promise<void>((r) => setImmediate(r));
+      since = performance.now();
+    }
+  }
+}
 
 /** The days of a league: the evenings with their matchdays, the relegation and final day. */
 export interface LeaguePlan {
@@ -215,7 +253,10 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         this.log.error(`league result ${id}: ${(e as Error).message}`);
       }
     });
-    this.market.onTick(() => this.tick());
+    // The market's own timer is left out: the league has its timer (with pauses, tickAsync).
+    this.market.onTick((fromTimer) => {
+      if (!fromTimer) this.tick();
+    });
     this.settings.checkUdt((next, sent) => {
       if (sent.league) this.checkFits(next.league);
     });
@@ -232,7 +273,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       }
     });
     this.tournaments.onResetAll(() => this.wipe());
-    this.timer = setInterval(() => this.tick(), 30_000);
+    this.timer = setInterval(() => void this.tickAsync(), 30_000);
     this.timer.unref();
   }
 
@@ -349,13 +390,17 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const cfg = this.cfg();
     if (cfg.agentId && cfg.profileId) return { agentId: cfg.agentId, profileId: cfg.profileId };
     const t = this.db
-      .select()
+      .select({
+        kind: tournaments.kind,
+        udtJson: tournaments.udtJson,
+        agentId: tournaments.agentId,
+        profileId: tournaments.profileId,
+      })
       .from(tournaments)
       .where(eq(tournaments.kind, 'udt'))
-      .orderBy(asc(tournaments.createdAt))
+      .orderBy(desc(tournaments.createdAt))
       .all()
-      .filter((x) => !this.isLeagueTournament(x))
-      .at(-1);
+      .find((x) => !this.isLeagueTournament(x));
     return t ? { agentId: t.agentId, profileId: t.profileId } : null;
   }
 
@@ -364,17 +409,24 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const run = season ? this.run(season.number) : undefined;
     if (!run || run.status !== 'running' || this.server()?.agentId !== agentId) return [];
     const plan = this.plan(run);
-    const fixtures = this.fixtures(run.season);
+    // Asked for every tournament that could start (autostart, every tick): only what it needs.
+    const real = this.db
+      .select({ day: leagueFixtures.day, status: leagueFixtures.status })
+      .from(leagueFixtures)
+      .where(and(eq(leagueFixtures.season, run.season), eq(leagueFixtures.real, true)))
+      .all();
+    const perDay = new Map<string, number>();
+    for (const f of real) perDay.set(f.day, (perDay.get(f.day) ?? 0) + 1);
     const days = [
       ...plan.evenings.map((e) => e.day),
       plan.relegation,
       plan.final,
-      ...fixtures.filter((f) => f.real && f.status === 'scheduled').map((f) => f.day),
+      ...real.filter((f) => f.status === 'scheduled').map((f) => f.day),
     ];
     const out = [];
     for (const day of new Set(days)) {
       const start = zonedMs(day, plan.slotTime, this.tz);
-      const games = fixtures.filter((f) => f.day === day && f.real).length || 1;
+      const games = perDay.get(day) || 1;
       const end = start + games * GAME_MINUTES * 60_000 + BUFFER_MS;
       if (start < to && end > from)
         out.push({
@@ -681,10 +733,12 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           startedAt: now,
         })
         .run();
-      for (const m of members)
+      // In batches (one insert per row took a Raspberry Pi seconds for a whole season).
+      for (const part of chunks(members, 100))
         tx.insert(leagueSeasons)
-          .values({ season: season.number, clubId: m.clubId, tier: m.tier })
+          .values(part.map((m) => ({ season: season.number, clubId: m.clubId, tier: m.tier })))
           .run();
+      const games: (typeof leagueFixtures.$inferInsert)[] = [];
       for (let t = 0; t < tiers; t++) {
         const days = schedule(
           members.filter((m) => m.tier === t).map((m) => m.clubId),
@@ -693,30 +747,28 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         for (const e of plan.evenings)
           for (const md of e.matchdays)
             days[md]!.forEach((p, i, list) =>
-              tx
-                .insert(leagueFixtures)
-                .values({
-                  id: `f${randomId(12)}`,
-                  season: season.number,
-                  tier: t,
-                  matchday: md + 1,
-                  kind: 'league',
-                  home: p.home,
-                  away: p.away,
-                  day: e.day,
-                  scheduledAt: this.kickOff(e.day, plan.slotTime, md - e.matchdays[0]!, i + t * 10),
-                  real:
-                    humans.has(p.home) ||
-                    humans.has(p.away) ||
-                    cfg.aiGames === 'all' ||
-                    // The top game: the first pairing of two AI clubs in the Pro Series.
-                    (cfg.aiGames === 'topGame' &&
-                      t === 0 &&
-                      list.findIndex((x) => !humans.has(x.home) && !humans.has(x.away)) === i),
-                })
-                .run(),
+              games.push({
+                id: `f${randomId(12)}`,
+                season: season.number,
+                tier: t,
+                matchday: md + 1,
+                kind: 'league',
+                home: p.home,
+                away: p.away,
+                day: e.day,
+                scheduledAt: this.kickOff(e.day, plan.slotTime, md - e.matchdays[0]!, i + t * 10),
+                real:
+                  humans.has(p.home) ||
+                  humans.has(p.away) ||
+                  cfg.aiGames === 'all' ||
+                  // The top game: the first pairing of two AI clubs in the Pro Series.
+                  (cfg.aiGames === 'topGame' &&
+                    t === 0 &&
+                    list.findIndex((x) => !humans.has(x.home) && !humans.has(x.away)) === i),
+              }),
             );
       }
+      for (const part of chunks(games, 100)) tx.insert(leagueFixtures).values(part).run();
     });
     this.log.info(
       `league of season ${season.number} started${o.test ? ' (test)' : ''}: ${members.length} clubs, ${plan.evenings.length} evenings`,
@@ -739,37 +791,13 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   // The league evenings
   // ------------------------------------------------------------------------------------------
 
-  /** Every 30 s (and on the test mode's clock moves): starts, evenings, the season's end. */
+  /** The test mode's clock moves (and tests): starts, evenings, the season's end - at once. */
   tick(): void {
     if (this.ticking) return;
     this.ticking = true;
     try {
-      const season = this.seasons.current();
-      // A run of a season that is over: decided with what is there (also with the Dream Team
-      // off, so the season keeps its champion).
-      for (const r of this.db
-        .select()
-        .from(leagueRuns)
-        .where(eq(leagueRuns.status, 'running'))
-        .all())
-        if (r.season !== season?.number) this.finish(r, true);
-      if (!season || !this.udt.enabled()) return;
-      let run = this.run(season.number);
-      const cfg = this.cfg();
-      const today = this.udt.today();
-      // On the start day (or the day after, if the website was down): switched on later in a
-      // season, the league waits for the next one (a test league runs at once).
-      const first = this.seasonDay(season, cfg.startDay);
-      if (
-        !run &&
-        cfg.enabled &&
-        today >= first &&
-        today <= addDays(first, 1) &&
-        this.planFor(season, cfg, today)
-      )
-        run = this.start(season, { startDate: today > first ? today : first });
-      if (!run || run.status !== 'running') return;
-      this.evening(run, today);
+      const due = this.due();
+      if (due && !this.quiet(due.run, due.today)) this.evening(due.run, due.today);
     } catch (e) {
       this.log.error(`league: ${(e as Error).message}`);
     } finally {
@@ -777,22 +805,120 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /** A timer tick is running its evening's steps. */
+  private stepping = false;
+
+  /**
+   * Every 30 s: like `tick`, but the evening's games are made and simulated in steps with
+   * pauses in between, so the website keeps answering while a whole evening is set up (on a
+   * Raspberry Pi that takes seconds). A test mode tick meanwhile does the rest itself (each
+   * step reads its game again).
+   */
+  async tickAsync(): Promise<void> {
+    if (this.ticking || this.stepping) return;
+    let due: { run: RunRow; today: string } | null;
+    let steps: (() => void)[] = [];
+    this.ticking = true;
+    try {
+      due = this.due();
+      if (due && this.quiet(due.run, due.today)) due = null;
+      if (due) steps = this.eveningSteps(due.run, due.today);
+    } catch (e) {
+      this.log.error(`league: ${(e as Error).message}`);
+      due = null;
+    } finally {
+      this.ticking = false;
+    }
+    if (!due) return;
+    this.stepping = true;
+    try {
+      await runInSteps(steps, (e) => this.log.error(`league: ${(e as Error).message}`));
+      const run = this.run(due.run.season);
+      if (run?.status === 'running') this.eveningEnd(run, due.today);
+    } catch (e) {
+      this.log.error(`league: ${(e as Error).message}`);
+    } finally {
+      this.stepping = false;
+    }
+  }
+
+  /**
+   * Nothing to do today (most ticks): no game due or left over, and regular games still to come
+   * (so relegation, final four and the end cannot be due either). Two counts instead of
+   * reading every game of the season twice a minute.
+   */
+  private quiet(run: RunRow, today: string): boolean {
+    const count = (...where: SQL[]) =>
+      this.db
+        .select({ n: sql<number>`count(*)` })
+        .from(leagueFixtures)
+        .where(
+          and(
+            eq(leagueFixtures.season, run.season),
+            eq(leagueFixtures.status, 'scheduled'),
+            ...where,
+          ),
+        )
+        .get()?.n ?? 0;
+    if (count(lte(leagueFixtures.day, today))) return false;
+    return count(eq(leagueFixtures.kind, 'league')) > 0;
+  }
+
+  /** The running league and today, after starting one that is due (null: nothing to do). */
+  private due(): { run: RunRow; today: string } | null {
+    const season = this.seasons.current();
+    // A run of a season that is over: decided with what is there (also with the Dream Team
+    // off, so the season keeps its champion).
+    for (const r of this.db.select().from(leagueRuns).where(eq(leagueRuns.status, 'running')).all())
+      if (r.season !== season?.number) this.finish(r, true);
+    if (!season || !this.udt.enabled()) return null;
+    let run = this.run(season.number);
+    const cfg = this.cfg();
+    const today = this.udt.today();
+    // On the start day (or the day after, if the website was down): switched on later in a
+    // season, the league waits for the next one (a test league runs at once).
+    const first = this.seasonDay(season, cfg.startDay);
+    if (
+      !run &&
+      cfg.enabled &&
+      today >= first &&
+      today <= addDays(first, 1) &&
+      this.planFor(season, cfg, today)
+    )
+      run = this.start(season, { startDate: today > first ? today : first });
+    if (!run || run.status !== 'running') return null;
+    return { run, today };
+  }
+
   private noServerDay = '';
 
   /** The day the rubber band was renewed last, per season (once per league evening). */
   private readonly banded = new Map<number, string>();
 
-  /** What is due today: games, simulations, relegation, the final four. */
+  /** What is due today: games, simulations, relegation, the final four (all at once). */
   private evening(run: RunRow, today: string): void {
+    for (const step of this.eveningSteps(run, today)) step();
+    this.eveningEnd(run, today);
+  }
+
+  /**
+   * The evening's games as steps (one game made or simulated each), after the games missed on
+   * their day moved on and the rubber band was renewed. Every step reads its game again: a
+   * test mode tick may have done it meanwhile.
+   */
+  private eveningSteps(run: RunRow, today: string): (() => void)[] {
     const plan = this.plan(run);
     const now = this.clock.now();
     const slot = (day: string) => zonedMs(day, plan.slotTime, this.tz);
+    let all = this.fixtures(run.season);
     // A played game not started by the end of its day moves on (one running over midnight is
     // waited for; a seeded one is called off first, its abort moves it).
-    for (const f of this.fixtures(run.season)) {
+    let moved = false;
+    for (const f of all) {
       if (f.status !== 'scheduled' || !f.real || !f.tournamentId || f.day >= today) continue;
       const t = this.tournaments.get(f.tournamentId);
       if (t && ['checkIn', 'running', 'paused'].includes(t.phase)) continue;
+      moved = true;
       if (t && t.phase === 'seeded')
         try {
           this.tournaments.cancelSeeded(
@@ -806,49 +932,76 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         }
       this.postpone(run, f, 'missed');
     }
-    const open = this.fixtures(run.season).filter(
-      (f) => f.status === 'scheduled' && f.day <= today,
-    );
+    if (moved) all = this.fixtures(run.season);
+    const open = all.filter((f) => f.status === 'scheduled' && f.day <= today);
     // Regular games left over on the relegation day: simulated (R2, the season must end).
     const lastCall = today >= plan.relegation;
     if (open.length && this.banded.get(run.season) !== today) {
       this.renewBand(run);
       this.banded.set(run.season, today);
     }
+    const ctx = this.simContext(run, all);
+    const steps: (() => void)[] = [];
     for (const f of open) {
       const simulated = !f.real || (lastCall && f.kind === 'league');
       if (!simulated) {
-        if (!f.tournamentId) this.createGame(run, f);
-      } else if (now >= slot(f.day) || f.day < today) this.simulate(run, f, slot(f.day));
+        if (!f.tournamentId)
+          steps.push(() => {
+            // Still due today (a test mode tick meanwhile may have done or moved it).
+            const cur = this.fixture(f.id);
+            if (cur?.status === 'scheduled' && cur.day === f.day && !cur.tournamentId)
+              this.createGame(run, cur);
+          });
+      } else if (now >= slot(f.day) || f.day < today)
+        steps.push(() => {
+          const cur = this.fixture(f.id);
+          if (cur?.status === 'scheduled' && cur.day === f.day)
+            this.simulate(run, cur, slot(cur.day), ctx);
+        });
     }
-    const all = this.fixtures(run.season);
+    return steps;
+  }
+
+  private fixture(id: string): FixtureRow | undefined {
+    return this.db.select().from(leagueFixtures).where(eq(leagueFixtures.id, id)).get();
+  }
+
+  /** After the evening's games: relegation, the final four, the end of the league. */
+  private eveningEnd(run: RunRow, today: string): void {
+    const plan = this.plan(run);
+    const now = this.clock.now();
+    let all = this.fixtures(run.season);
     const shown = (f: FixtureRow) => !!f.winner && (!f.revealAt || Date.parse(f.revealAt) <= now);
     const regularDone = all
       .filter((f) => f.kind === 'league')
       .every((f) => f.status !== 'scheduled');
-    if (regularDone && today >= plan.relegation && !all.some((f) => f.kind === 'relegation'))
+    if (regularDone && today >= plan.relegation && !all.some((f) => f.kind === 'relegation')) {
       this.createRelegation(run, today > plan.relegation ? today : plan.relegation);
-    const after = this.fixtures(run.season);
-    const relegationDone = after
+      all = this.fixtures(run.season);
+    }
+    const relegationDone = all
       .filter((f) => f.kind === 'relegation')
       .every((f) => f.status !== 'scheduled');
     if (
       regularDone &&
       relegationDone &&
       today >= plan.final &&
-      !after.some((f) => f.kind === 'semi')
-    )
+      !all.some((f) => f.kind === 'semi')
+    ) {
       this.createSemis(run, today > plan.final ? today : plan.final);
-    const semis = after.filter((f) => f.kind === 'semi');
+      all = this.fixtures(run.season);
+    }
+    const semis = all.filter((f) => f.kind === 'semi');
     // The final and the game for third place once both semi-finals are shown.
-    if (semis.length === 2 && semis.every(shown) && !after.some((f) => f.kind === 'final'))
+    if (semis.length === 2 && semis.every(shown) && !all.some((f) => f.kind === 'final')) {
       this.createFinals(run, semis, today);
-    const end = this.fixtures(run.season);
-    const finals = end.filter((f) => f.kind === 'final' || f.kind === 'third');
+      all = this.fixtures(run.season);
+    }
+    const finals = all.filter((f) => f.kind === 'final' || f.kind === 'third');
     if (
       finals.length === 2 &&
       finals.every(shown) &&
-      end.filter((f) => f.kind === 'relegation').every(shown)
+      all.filter((f) => f.kind === 'relegation').every(shown)
     )
       this.finish(run, false);
   }
@@ -921,11 +1074,42 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     return m?.strength ?? this.cfg().aiFloor[m?.tier ?? 0] ?? 8;
   }
 
+  /**
+   * What the simulations of an evening share (read once): the clubs' strength (AI: the band;
+   * a manager: the lineup), when the day's last result shows, the frag limit.
+   */
+  private simContext(run: RunRow, all: FixtureRow[]): SimContext {
+    const humans = this.humanClubs();
+    const members = new Map(this.members(run.season).map((m) => [m.clubId, m]));
+    const cfg = this.cfg();
+    const settings = this.leagueSettings('league');
+    const strengths = new Map<string, number>();
+    const latest = new Map<string, number>();
+    for (const f of all)
+      if (f.revealAt) latest.set(f.day, Math.max(latest.get(f.day) ?? 0, Date.parse(f.revealAt)));
+    return {
+      latest,
+      fragLimit: cfg.fragLimit,
+      strength: (clubId) => {
+        let v = strengths.get(clubId);
+        if (v === undefined) {
+          const userId = humans.get(clubId);
+          const m = members.get(clubId);
+          v = userId
+            ? this.lineupStrength(userId, settings)
+            : (m?.strength ?? cfg.aiFloor[m?.tier ?? 0] ?? 8);
+          strengths.set(clubId, v);
+        }
+        return v;
+      },
+    };
+  }
+
   /** Simulates a game (AI against AI, or a played one the season has no time left for). */
-  private simulate(run: RunRow, f: FixtureRow, slotStart: number): void {
+  private simulate(run: RunRow, f: FixtureRow, slotStart: number, ctx: SimContext): void {
     const rng = leagueRng(`${f.id}:${run.season}`);
-    const home = { club: f.home, strength: this.strengthOf(run.season, f.home) };
-    const away = { club: f.away, strength: this.strengthOf(run.season, f.away) };
+    const home = { club: f.home, strength: ctx.strength(f.home) };
+    const away = { club: f.away, strength: ctx.strength(f.away) };
     const bo = f.kind === 'league' ? 1 : 3;
     let wh = 0;
     let wa = 0;
@@ -933,7 +1117,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     let af = 0;
     let ot = false;
     while (wh < winsNeeded(bo) && wa < winsNeeded(bo)) {
-      const r = simulateGame(home, away, rng, 5, this.cfg().fragLimit);
+      const r = simulateGame(home, away, rng, 5, ctx.fragLimit);
       hf += r.homeFrags;
       af += r.awayFrags;
       ot = r.overtime;
@@ -942,10 +1126,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     }
     // Shown during the evening one after another, like in a conference: after the last one
     // of the day.
-    const latest = this.fixtures(run.season)
-      .filter((x) => x.day === f.day && x.revealAt)
-      .reduce((m, x) => Math.max(m, Date.parse(x.revealAt!)), slotStart);
+    const latest = Math.max(ctx.latest.get(f.day) ?? 0, slotStart);
     const reveal = Math.max(this.clock.now(), latest + GAME_MINUTES * 60_000);
+    ctx.latest.set(f.day, reveal);
     this.db
       .update(leagueFixtures)
       .set({

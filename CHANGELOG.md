@@ -168,6 +168,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Dream Team league: setting up a league evening no longer blocks the website (games are made and simulated in steps), quiet minutes cost next to nothing and starting a league is about twice as fast.
 - Drawing a bracket again (after a reset or with "draw again") showed the old pairings in the bets panel and the bots bet on them; old bets could even move to another team (fill teams keep their ids like "udtbots-1"). A new draw now voids the bets placed so far (stakes back) and the bots bet on the new matches. Deleting a tournament and creating one with the same name no longer keeps the bots from betting.
 - Dream Team: a team left out at the draw because its bots play in another drawn or running Dream Team tournament (one tournament at a time) no longer vanishes silently: the Dream Team page and the tournament page warn before the draw, automatic sign-ups (also the AI managers') wait until the bots are free, and the organizer is told after the draw which teams are not in the bracket and why.
 - Drawing a bracket is much faster, above all late in a season and for Dream Team cups: the betting bots no longer settle every bet of the season for each bet they place, the AI and automatic sign-ups read only the tournament they enter, and season dates, bot pools and the bots playing elsewhere are read once instead of per entry. Tournament pages and the Neuro balance load faster too. Nothing in the rules changes.

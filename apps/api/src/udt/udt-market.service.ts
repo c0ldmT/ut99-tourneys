@@ -100,7 +100,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     } catch (e) {
       this.log.error(`udt old bids: ${e instanceof Error ? e.message : String(e)}`);
     }
-    this.timer = setInterval(() => this.tick(), 60_000);
+    this.timer = setInterval(() => this.tick(true), 60_000);
     this.timer.unref();
   }
 
@@ -109,16 +109,19 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Runs the market day when it is due (also the first one of a season right away). */
-  /** Called on every tick (each minute; the test mode's clock moves call it every hour). */
-  onTick(fn: () => void): void {
+  /**
+   * Called on every tick (each minute; the test mode's clock moves call it every hour);
+   * `fromTimer`: the minute timer (not a clock move).
+   */
+  onTick(fn: (fromTimer: boolean) => void): void {
     this.tickHooks.push(fn);
   }
-  private readonly tickHooks: (() => void)[] = [];
+  private readonly tickHooks: ((fromTimer: boolean) => void)[] = [];
 
-  tick(): boolean {
+  tick(fromTimer = false): boolean {
     for (const fn of this.tickHooks)
       try {
-        fn();
+        fn(fromTimer);
       } catch (e) {
         this.log.error(`udt tick: ${e instanceof Error ? e.message : String(e)}`);
       }
