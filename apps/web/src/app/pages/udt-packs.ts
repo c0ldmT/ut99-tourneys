@@ -55,7 +55,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       </div>
       @if (!v.hasTeam) {
         <p class="card muted">
-          {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt">{{ 'udt.nav.team' | t }}</a>
+          {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt/team">{{ 'udt.nav.team' | t }}</a>
         </p>
       }
 
@@ -137,7 +137,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       />
 
       <div class="lower">
-        <section class="card">
+        <section class="card" id="inventory">
           <h2>{{ 'udt.packs.inventory' | t }} ({{ v.inventory.length }})</h2>
           @for (c of v.inventory; track c.id) {
             <div class="irow">
@@ -162,7 +162,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
           }
           <p class="muted small">{{ 'udt.packs.mod' | t }}</p>
         </section>
-        <section class="card">
+        <section class="card" id="craft">
           <h2>{{ 'udt.packs.craftTitle' | t }}</h2>
           <p class="muted small">{{ 'udt.packs.craftText' | t }}</p>
           @for (c of v.catalog; track c.code) {

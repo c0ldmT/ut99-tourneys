@@ -69,15 +69,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
             </div>
             <h1 class="disp lg-h1">{{ 'league.title' | t }}</h1>
           </div>
-          <nav class="lg-views" [attr.aria-label]="'league.views' | t">
-            @for (x of views; track x) {
-              <a
-                [routerLink]="x === 'table' ? '/udt/league' : '/udt/league/' + x"
-                [attr.aria-current]="tab() === x ? 'page' : null"
-                >{{ 'league.view.' + x | t }}</a
-              >
-            }
-          </nav>
+          <!-- The views are the tabs of the league area in the Dream Team navigation (228). -->
         </div>
 
         @switch (tab()) {
@@ -209,7 +201,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                           | t: { home: n.home.name }
                       }}
                     </p>
-                    <a class="btn primary lg-wide" routerLink="/udt">{{
+                    <a class="btn primary lg-wide" routerLink="/udt/team">{{
                       'league.checkLineup' | t
                     }}</a>
                   </section>
@@ -645,7 +637,6 @@ export class UdtLeaguePage implements OnDestroy {
   private readonly i18n = inject(I18n);
   private readonly loading = inject(Loading);
   private readonly route = inject(ActivatedRoute);
-  protected readonly views = VIEWS;
   protected readonly filters = ['all', 'real', 'sim'] as const;
   protected readonly view = signal<LeagueView | null>(null);
   protected readonly history = signal<LeagueHistorySeason[]>([]);

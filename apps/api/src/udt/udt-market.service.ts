@@ -453,6 +453,16 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     return out;
   }
 
+  /** When the next market day opens (ms). */
+  nextAt(): number {
+    const today = this.udt.today();
+    return zonedMs(
+      this.dayDone(today) ? nextDay(today) : today,
+      this.settings.get().udt.marketTime,
+      this.seasons.timeZone,
+    );
+  }
+
   /** The market page: today's offers with price, value and history; who bought what. */
   view(user: User) {
     this.udt.assertOn();

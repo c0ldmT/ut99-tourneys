@@ -1,3 +1,4 @@
+import { SeasonsService } from '../seasons/seasons.service.js';
 import { z } from 'zod';
 import {
   Body,
@@ -70,6 +71,7 @@ export class UdtController {
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(UdtKeepersService) private readonly keepers: UdtKeepersService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
+    @Inject(SeasonsService) private readonly seasons: SeasonsService,
   ) {}
 
   @Get()
@@ -82,6 +84,29 @@ export class UdtController {
       ...v,
       roster: v.roster.map((r) => ({ ...r, career: careers.get(r.botId) ?? null })),
       tradesIn,
+    };
+  }
+
+  /**
+   * The Dream Team hub (decision 228): a short state per area for its segments - my team, the
+   * league, packs, cups, transfers. Between seasons only what is known without one.
+   */
+  @Get('hub')
+  hub(@CurrentUser() user: User) {
+    this.udt.assertOn();
+    const season = this.seasons.current();
+    const n = season?.number ?? null;
+    return {
+      season: n,
+      today: this.udt.today(),
+      team: n !== null ? this.udt.hubTeam(user.id, n) : null,
+      league: this.league.hubLeague(user.id),
+      packs: n !== null ? this.packs.hubPacks(user.id, n) : null,
+      cups: n !== null ? this.events.hubCups(user.id, n) : null,
+      transfers: {
+        tradesIn: n !== null ? this.trades.incoming(user.id) : 0,
+        marketAt: n !== null ? new Date(this.market.nextAt()).toISOString() : null,
+      },
     };
   }
 

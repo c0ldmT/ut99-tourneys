@@ -62,7 +62,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       </div>
       @if (!v.hasTeam) {
         <p class="card muted">
-          {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt">{{ 'udt.nav.team' | t }}</a>
+          {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt/team">{{ 'udt.nav.team' | t }}</a>
         </p>
       } @else {
         <section class="card">
@@ -237,7 +237,7 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
                   <a
                     class="btn"
                     [class.primary]="b.own!.points > 0 || b.own!.canRename"
-                    routerLink="/udt"
+                    routerLink="/udt/team"
                     [queryParams]="{ bot: b.botId }"
                     >{{
                       (b.own!.canRename ? 'udt.academy.toPanelRename' : 'udt.academy.toPanel') | t
@@ -479,7 +479,7 @@ export class UdtAcademyPage {
 
   /** Development and renaming are on My team (the bot's details). */
   protected toTeam(botId: string) {
-    void this.router.navigate(['/udt'], { queryParams: { bot: botId } });
+    void this.router.navigate(['/udt/team'], { queryParams: { bot: botId } });
   }
 
   protected async nominate(id: string) {

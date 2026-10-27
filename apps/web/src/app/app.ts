@@ -480,8 +480,24 @@ export class App {
     if (typeof history !== 'undefined') history.scrollRestoration = 'manual';
     const scroller = inject(ViewportScroller);
     const back = signal<[number, number] | null>(null);
+    // A link to a part of a page (#inventory): there once the page is shown.
+    const anchor = signal<string | null>(null);
+    let atAnchor = false;
     const sub = this.router.events.subscribe((e) => {
-      if (!(e instanceof Scroll) || !this.loading.pageChanged) return;
+      if (!(e instanceof Scroll)) return;
+      const was = atAnchor;
+      atAnchor = !!e.anchor;
+      if (e.anchor && !e.position) {
+        // Another page starts at the top (if the part is missing, it stays there).
+        if (this.loading.pageChanged) scroller.scrollToPosition([0, 0]);
+        anchor.set(e.anchor);
+        return;
+      }
+      // From a part of the page back to the page itself (#inventory → packs): the top.
+      if (!this.loading.pageChanged) {
+        if (was && !e.position) scroller.scrollToPosition([0, 0]);
+        return;
+      }
       if (e.position) back.set(e.position);
       else {
         back.set(null);
@@ -494,6 +510,15 @@ export class App {
       if (!p || this.loading.hidden()) return;
       back.set(null);
       scroller.scrollToPosition(p);
+    });
+    effect(() => {
+      const a = anchor();
+      if (!a || this.loading.hidden()) return;
+      anchor.set(null);
+      // After the page's content is in place.
+      requestAnimationFrame(() =>
+        document.getElementById(a)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      );
     });
   }
 

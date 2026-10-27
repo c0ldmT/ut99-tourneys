@@ -20,6 +20,7 @@ import type { ApiLogger } from '../common/logger.js';
 import { LOGGER } from '../common/logger.js';
 import { DISCORD, type DiscordApi } from './discord.js';
 import { isWebhookUrl } from '../notify/discord-out.js';
+import { UdtLeagueService } from '../udt/udt-league.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { AdminOnly, CurrentUser, Public, type AuthedRequest } from './guard.js';
 import { SESSION_COOKIE, SessionsService } from './sessions.service.js';
@@ -47,6 +48,7 @@ export class AuthController {
     @Inject(DISCORD) private readonly discord: DiscordApi | null,
     @Inject(LOGGER) private readonly log: ApiLogger,
     @Inject(SettingsService) private readonly settings: SettingsService,
+    @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
   ) {}
 
   /** What the frontend needs before login. */
@@ -59,6 +61,8 @@ export class AuthController {
       devLogin: this.config.devLogin,
       /** Unreal Dream Team switched on (menu), test mode of a local instance. */
       udt: this.settings.get().udt.enabled,
+      /** The Dream Team league shows (its area in Dream Team, decision 228). */
+      udtLeague: this.settings.get().udt.enabled && this.league.visible(),
       testMode: this.config.testMode,
       notify: {
         directMessages: Boolean(this.config.notify.botToken),

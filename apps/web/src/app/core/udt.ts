@@ -3,13 +3,16 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  ElementRef,
   inject,
   input,
   output,
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink, RouterLinkActive } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { filter, map } from 'rxjs';
 import {
   madeSalaryShare,
   baseValue,
@@ -30,6 +33,7 @@ import { Coin } from './brand';
 import { I18n, TPipe } from './i18n';
 import { NeuroPipe } from './neuro';
 import { Toasts } from './toast';
+import { UDT_AREAS, udtAreaOf, udtAreas, type UdtAreaItem } from './udt-areas';
 import type { BotTraitsView, UdtCareer, UdtRarity, UdtTestState, UdtTraitOnBot } from './types';
 
 export {
@@ -330,36 +334,75 @@ export function staminaColor(s: number): string {
   return s >= 60 ? 'var(--live)' : s >= 40 ? '#f59e0b' : 'var(--danger)';
 }
 
-/** Sub navigation of the Dream Team pages, with the test mode bar for admins. */
+/**
+ * Navigation of the Dream Team pages (decision 228): the way back to the hub, the areas (my
+ * team, league, packs, cups, transfers) and the pages of the current area; the help and, for
+ * admins in test mode, the test bar. `bare`: only help and test bar (the hub draws its own).
+ */
 @Component({
   selector: 'udt-nav',
-  imports: [RouterLink, RouterLinkActive, TPipe, UdtHelp],
+  imports: [RouterLink, TPipe, UdtHelp],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <nav class="udt-nav" [attr.aria-label]="'udt.title' | t">
-      <a routerLink="/udt" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">{{
-        'udt.nav.team' | t
-      }}</a>
-      <a routerLink="/udt/league" routerLinkActive="active">{{ 'udt.nav.league' | t }}</a>
-      <a routerLink="/udt/market" routerLinkActive="active">{{ 'udt.nav.market' | t }}</a>
-      <a routerLink="/udt/packs" routerLinkActive="active">{{ 'udt.nav.packs' | t }}</a>
-      <a routerLink="/udt/trades" routerLinkActive="active"
-        >{{ 'udt.nav.trades' | t }}
-        @if (tradesIn()) {
-          <span class="udt-badge" [attr.aria-label]="'udt.trades.waiting' | t: { n: tradesIn() }">{{
-            tradesIn()
-          }}</span>
+    @if (!bare()) {
+      <nav class="udt-nav" [attr.aria-label]="'udt.title' | t">
+        <div class="udt-areas">
+          <a
+            routerLink="/udt"
+            class="udt-hubbtn"
+            [title]="'udt.hub.title' | t"
+            [attr.aria-label]="'udt.hub.title' | t"
+            ><span
+              ><svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 3 21 12 12 21 3 12zM3 12h18M12 3v18" /></svg></span
+          ></a>
+          @for (a of areas(); track a.id) {
+            <a
+              class="udt-area"
+              [routerLink]="a.items[0]!.link"
+              [class.on]="a.id === area()"
+              [attr.aria-current]="a.id === area() ? 'true' : null"
+              [style.--ac]="a.color"
+              [style.--acr]="a.rgb"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
+                <path [attr.d]="a.icon" />
+              </svg>
+              <span class="l">{{ a.label | t }}</span
+              ><span class="s">{{ a.short | t }}</span>
+              @if (a.id === 'trans' && tradesIn()) {
+                <span
+                  class="udt-badge"
+                  [attr.aria-label]="'udt.trades.waiting' | t: { n: tradesIn() }"
+                  >{{ tradesIn() }}</span
+                >
+              }
+            </a>
+          }
+          <button type="button" class="udt-help-btn" (click)="help().open()">
+            <span class="q" aria-hidden="true">?</span
+            ><span class="hl">{{ 'udt.help.button' | t }}</span>
+          </button>
+        </div>
+        @if (current(); as c) {
+          <div class="udt-tabs" [style.--ac]="c.color">
+            @for (i of c.items; track i.label) {
+              <a
+                [routerLink]="i.link"
+                [fragment]="i.fragment"
+                [class.active]="isActive(i)"
+                [attr.aria-current]="isActive(i) ? 'page' : null"
+                (click)="again(i)"
+                >{{ i.label | t }}
+                @if (i.badge === 'trades' && tradesIn()) {
+                  <span class="udt-badge">{{ tradesIn() }}</span>
+                }
+              </a>
+            }
+          </div>
         }
-      </a>
-      <a routerLink="/udt/academy" routerLinkActive="active">{{ 'udt.nav.academy' | t }}</a>
-      <a routerLink="/udt/events" routerLinkActive="active">{{ 'udt.nav.events' | t }}</a>
-      <a routerLink="/udt/table" routerLinkActive="active">{{ 'udt.nav.table' | t }}</a>
-      <a routerLink="/udt/squads" routerLinkActive="active">{{ 'udt.nav.squads' | t }}</a>
-      <a routerLink="/udt/yearbook" routerLinkActive="active">{{ 'udt.nav.yearbook' | t }}</a>
-      <button type="button" class="udt-help-btn" (click)="help().open()">
-        <span class="q" aria-hidden="true">?</span>{{ 'udt.help.button' | t }}
-      </button>
-    </nav>
+      </nav>
+    }
     <udt-help />
     @if (testBar()) {
       <div class="udt-test" role="region" [attr.aria-label]="'udt.test.title' | t">
@@ -392,6 +435,21 @@ export function staminaColor(s: number): string {
 })
 export class UdtNav {
   private readonly auth = inject(Auth);
+  private readonly router = inject(Router);
+  /** Only the help and the test bar (the hub draws its own areas). */
+  readonly bare = input(false);
+  /** The address shown (path and fragment). */
+  private readonly url = toSignal(
+    this.router.events.pipe(
+      filter((e): e is NavigationEnd => e instanceof NavigationEnd),
+      map((e) => e.urlAfterRedirects),
+    ),
+    { initialValue: this.router.url },
+  );
+  protected readonly areas = computed(() => udtAreas(!!this.auth.config().udtLeague));
+  protected readonly area = computed(() => udtAreaOf(this.url()));
+  /** The area of the page (also one hidden from the row, e.g. a league before the config knows). */
+  protected readonly current = computed(() => UDT_AREAS.find((a) => a.id === this.area()) ?? null);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   private readonly toasts = inject(Toasts);
@@ -406,11 +464,44 @@ export class UdtNav {
 
   protected readonly help = viewChild.required(UdtHelp);
 
+  /** Opens the help (the hub's button in its middle). */
+  openHelp(): void {
+    this.help().open();
+  }
+
+  /** A tab is the page shown: same path (the league's table also on /udt/league/table), same anchor. */
+  protected isActive(i: UdtAreaItem): boolean {
+    const [rest, fragment] = this.url().split('#') as [string, string | undefined];
+    const path = rest.split('?')[0]!;
+    const same =
+      path === i.link ||
+      (i.link === '/udt/league' ? path === '/udt/league/table' : path.startsWith(i.link + '/'));
+    return same && (i.fragment ?? null) === (fragment ?? null);
+  }
+
+  private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
+
   constructor() {
     if (this.testBar()) void this.load();
-    void this.loadTrades();
-    // New managers see the help once by itself.
-    afterNextRender(() => this.help().openFirstTime());
+    afterNextRender(() => {
+      // The hub shows the offers itself (bare: no areas here).
+      if (!this.bare()) void this.loadTrades();
+      // New managers see the help once by itself.
+      this.help().openFirstTime();
+      // Phones: the tab row scrolls; the page shown in view.
+      const row = this.host.nativeElement.querySelector<HTMLElement>('.udt-tabs');
+      const tab = row?.querySelector<HTMLElement>('a.active');
+      if (row && tab && row.scrollWidth > row.clientWidth)
+        row.scrollLeft = tab.offsetLeft - (row.clientWidth - tab.offsetWidth) / 2;
+    });
+  }
+
+  /** A tab of the page shown again (the router ignores it): to its part, or the top. */
+  protected again(i: UdtAreaItem): void {
+    if (!this.isActive(i)) return;
+    if (i.fragment)
+      document.getElementById(i.fragment)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   private async loadTrades() {

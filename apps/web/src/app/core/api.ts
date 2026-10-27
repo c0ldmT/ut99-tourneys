@@ -87,6 +87,7 @@ import type {
   SeriesOverview,
   UserBets,
   WebsiteSettings,
+  UdtHub,
 } from './types';
 
 /**
@@ -248,6 +249,7 @@ export class Api {
 
   // --- Unreal Dream Team
   udt = () => this.call<UdtView>('GET', '/udt');
+  udtHub = () => this.call<UdtHub>('GET', '/udt/hub');
   udtCreateTeam = (body: unknown) =>
     this.call<UdtView>('POST', '/udt/team', body, { ok: 'ok.udt.team' });
   udtLineup = (body: {

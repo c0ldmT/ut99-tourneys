@@ -209,6 +209,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team: the menu item opens an overview with the areas My team, League, Packs, Cups and Transfers as segments of one shape, each with its pages and what is due (next league game, points to give, trade offers, next cup); every Dream Team page has a two-row navigation (area, then its pages); My team moved to /udt/team, Events are called Cups.
 - SmartStockBots is a website setting (Bots & live: automatic, on, off) for every tournament - also league games and Dream Team cups, which so far ran without it.
 - New tournament: kind as tiles (classic, season, Dream Team), the flow as switch rows with hints, lengths short / medium / long (best of and limits for the mode, with the longest possible duration), every map of the server chosen to start with; the bots section is gone.
 - Tournament list: now called "Matches", with a "League" filter; the league's games of an evening show as one row that opens to list them (your own game stays a row of its own).

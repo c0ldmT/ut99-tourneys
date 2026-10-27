@@ -112,6 +112,19 @@ export class UdtPacksService {
       .all();
   }
 
+  /** Packs for the Dream Team hub: the nearest certain legendary, the trait inventory. */
+  hubPacks(userId: string, season: number) {
+    return {
+      legendaryIn: Math.min(
+        ...BOXES.map(
+          (b) =>
+            DEFAULT_ECONOMY.packs[b].pityLegendary - this.pity(season, userId, b).sinceLegendary,
+        ),
+      ),
+      traits: this.inventory(season, userId).length,
+    };
+  }
+
   /** Unused blueprints of the manager this season. */
   blueprints(season: number, userId: string) {
     return this.db

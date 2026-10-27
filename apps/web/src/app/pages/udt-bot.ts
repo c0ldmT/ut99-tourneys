@@ -89,7 +89,7 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
             <udt-potential [skill]="p.roster!.skill" [potential]="own.potential" />
           }
           @if (p.team?.mine) {
-            <a class="btn primary" routerLink="/udt" [queryParams]="{ bot: p.bot.id }">{{
+            <a class="btn primary" routerLink="/udt/team" [queryParams]="{ bot: p.bot.id }">{{
               'udt.bot.openTeam' | t
             }}</a>
           }

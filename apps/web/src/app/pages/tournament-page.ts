@@ -189,7 +189,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     <button (click)="act(api.unregister(t.id))" [disabled]="busy()">
                       {{ 'tp.udtWithdraw' | t }}
                     </button>
-                    <a class="btn" routerLink="/udt">{{ 'tp.udtLineup' | t }}</a>
+                    <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
                   </div>
                 } @else if (
                   t.registrationOpen && (t.registrations.length < t.settings.size || aiTeams(t) > 0)
@@ -202,7 +202,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     >
                       {{ 'tp.udtEnter' | t }}
                     </button>
-                    <a class="btn" routerLink="/udt">{{ 'tp.udtLineup' | t }}</a>
+                    <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
                   </div>
                 } @else {
                   <p class="muted">{{ 'tp.registrationClosed' | t }}</p>

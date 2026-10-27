@@ -273,7 +273,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
                     }
                   </button>
                   <button type="button" (click)="reset()">{{ 'udt.packs.done' | t }}</button>
-                  <a class="btn primary" routerLink="/udt">{{ 'udt.packs.toTeam' | t }}</a>
+                  <a class="btn primary" routerLink="/udt/team">{{ 'udt.packs.toTeam' | t }}</a>
                 </div>
               }
             </div>

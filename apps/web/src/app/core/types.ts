@@ -32,6 +32,44 @@ export interface SiteConfig {
   udt?: boolean;
   /** Dream Team test mode (local test instance). */
   testMode?: boolean;
+  /** The Dream Team league shows (its area in Dream Team). */
+  udtLeague?: boolean;
+}
+
+/** The Dream Team hub (`GET /udt/hub`): a short state per area. */
+export interface UdtHub {
+  season: number | null;
+  today: string;
+  team: {
+    name: string;
+    tag: string;
+    bots: number;
+    lineup: number;
+    tired: number;
+    striking: number;
+    points: number;
+  } | null;
+  league: {
+    visible: boolean;
+    running: boolean;
+    next: {
+      at: string;
+      kind: 'league' | 'relegation' | 'semi' | 'final' | 'third';
+      matchday: number | null;
+      opponent: string;
+      home: boolean;
+    } | null;
+    place: number | null;
+    tier: number | null;
+  };
+  packs: { legendaryIn: number; traits: number } | null;
+  cups: {
+    live: boolean;
+    open: number;
+    entered: number;
+    next: { id: string; name: string; at: string | null; entered: boolean } | null;
+  } | null;
+  transfers: { tradesIn: number; marketAt: string | null };
 }
 
 export interface Me {

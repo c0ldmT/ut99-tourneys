@@ -359,11 +359,17 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The table of each tier (tier 0 = Pro Series) from the shown regular games. */
-  tables(season: number, now = this.clock.now(), beforeDay?: string): TableRow[][] {
+  tables(
+    season: number,
+    now = this.clock.now(),
+    beforeDay?: string,
+    /** The season's games, when the caller has read them already. */
+    fixtures?: FixtureRow[],
+  ): TableRow[][] {
     const run = this.run(season);
     if (!run) return [];
     const members = this.members(season);
-    const all = this.fixtures(season).filter((f) => f.kind === 'league');
+    const all = (fixtures ?? this.fixtures(season)).filter((f) => f.kind === 'league');
     return Array.from({ length: run.tiers }, (_, t) =>
       standings(
         members.filter((m) => m.tier === t).map((m) => m.clubId),
@@ -445,6 +451,47 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   /** A league game's tournament (its rules name the fixture). */
   isLeagueTournament(t: { kind: string; udtJson: string | null }): boolean {
     return t.kind === 'udt' && !!t.udtJson && !!this.rulesOf(t.udtJson)?.league;
+  }
+
+  /** The league shows in Dream Team (setting on, or a league in the running season). */
+  visible(): boolean {
+    if (this.cfg().enabled) return true;
+    const season = this.seasons.current();
+    return !!season && !!this.run(season.number);
+  }
+
+  /** The league for the Dream Team hub: running, the manager's next game, place and tier. */
+  hubLeague(userId: string) {
+    const season = this.seasons.current();
+    const run = season ? this.run(season.number) : undefined;
+    const none = { visible: true, running: false, next: null, place: null, tier: null };
+    if (!run) return { ...none, visible: this.visible() };
+    const clubs = this.clubs();
+    const members = new Map(this.members(run.season).map((m) => [m.clubId, m]));
+    const mine = [...clubs.values()].find((c) => c.userId === userId && members.has(c.id));
+    const running = run.status === 'running';
+    if (!mine) return { ...none, running };
+    const all = this.fixtures(run.season);
+    // The next by kick-off (a postponed game keeps its matchday).
+    const f = all
+      .filter((x) => (x.home === mine.id || x.away === mine.id) && x.status === 'scheduled')
+      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))[0];
+    const other = f ? (f.home === mine.id ? f.away : f.home) : null;
+    return {
+      visible: true,
+      running,
+      next: f
+        ? {
+            at: f.scheduledAt,
+            kind: f.kind as FixtureKind,
+            matchday: f.kind === 'league' ? f.matchday : null,
+            opponent: clubs.get(other!)?.name ?? '?',
+            home: f.home === mine.id,
+          }
+        : null,
+      place: placeIn(this.tables(run.season, this.clock.now(), undefined, all), mine.id),
+      tier: members.get(mine.id)?.tier ?? null,
+    };
   }
 
   /** A league game in the tournament lists: evening, matchday, clubs, the user's own. */

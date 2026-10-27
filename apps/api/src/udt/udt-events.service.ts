@@ -346,6 +346,62 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Cups for the Dream Team hub: one running, the next coming up (entered or not), how many
+   * take sign-ups. League games do not count.
+   */
+  hubCups(userId: string, season: number) {
+    const rows = this.db
+      .select({
+        id: tournaments.id,
+        name: tournaments.name,
+        phase: tournaments.phase,
+        scheduledAt: tournaments.scheduledAt,
+        registrationOpen: tournaments.registrationOpen,
+        udtJson: tournaments.udtJson,
+      })
+      .from(tournaments)
+      .where(
+        and(
+          eq(tournaments.kind, 'udt'),
+          eq(tournaments.udtSeason, season),
+          inArray(tournaments.phase, ['draft', 'seeded', 'checkIn', 'running', 'paused']),
+        ),
+      )
+      .all()
+      .filter((t) => !t.udtJson?.includes('"league":{'));
+    const mine = new Set(
+      rows.length
+        ? this.db
+            .select({ id: udtEntries.tournamentId })
+            .from(udtEntries)
+            .where(
+              and(
+                eq(udtEntries.userId, userId),
+                inArray(
+                  udtEntries.tournamentId,
+                  rows.map((t) => t.id),
+                ),
+              ),
+            )
+            .all()
+            .map((e) => e.id)
+        : [],
+    );
+    const coming = rows
+      .filter((t) => t.phase !== 'running' && t.phase !== 'paused')
+      .sort((a, b) => (a.scheduledAt ?? '~').localeCompare(b.scheduledAt ?? '~'));
+    const next = coming[0];
+    return {
+      live: rows.some((t) => t.phase === 'running' || t.phase === 'paused'),
+      open: coming.filter((t) => t.phase === 'draft' && t.registrationOpen).length,
+      entered: coming.filter((t) => mine.has(t.id)).length,
+      next: next
+        ? { id: next.id, name: next.name, at: next.scheduledAt, entered: mine.has(next.id) }
+        : null,
+    };
+  }
+
   private entries(tournamentId: string): string[] {
     return this.db
       .select()

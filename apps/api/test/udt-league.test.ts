@@ -183,6 +183,25 @@ describe('Dream Team league', () => {
     expect(hist[0]).toMatchObject({ season: 1, test: false });
   });
 
+  it('the Dream Team hub shows the league and a short state of every area (decision 228)', async () => {
+    const { admin, mario } = await setup();
+    expect((await mario.get('/config')).body.udtLeague).toBe(true);
+    let hub = (await mario.get('/udt/hub')).body;
+    expect(hub.team).toMatchObject({ name: 'Nexus', bots: 1 });
+    expect(hub.league).toMatchObject({ visible: true, running: false, next: null });
+    expect(hub.packs.legendaryIn).toBeGreaterThan(0);
+    expect(hub.cups).toMatchObject({ live: false, next: null });
+    expect(hub.transfers.tradesIn).toBe(0);
+    await admin.post('/udt/test/advance', { hours: 3 * 24 });
+    hub = (await mario.get('/udt/hub')).body;
+    expect(hub.league.running).toBe(true);
+    expect(hub.league.next).toMatchObject({ kind: 'league', matchday: 1 });
+    expect(hub.league.place).toBeGreaterThan(0);
+    await admin.req('PUT', '/settings/udt', { league: { ...LEAGUE, enabled: false } });
+    // A league running this season still shows.
+    expect((await mario.get('/config')).body.udtLeague).toBe(true);
+  });
+
   it('a test league in the running season: starts tomorrow, can be called off', async () => {
     const { admin, mario } = await setup();
     await admin.req('PUT', '/settings/udt', { league: { ...LEAGUE, enabled: false } });

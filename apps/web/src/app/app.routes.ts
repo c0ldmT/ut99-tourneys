@@ -1,3 +1,5 @@
+import { inject } from '@angular/core';
+import { Router, type ActivatedRouteSnapshot } from '@angular/router';
 import type { Routes } from '@angular/router';
 import { adminOnly, loggedIn } from './core/auth';
 
@@ -29,6 +31,20 @@ export const routes: Routes = [
       {
         path: 'udt',
         title: 'udt.title',
+        // Old links to a bot of My team (/udt?bot=…) lead there (decision 228).
+        canActivate: [
+          (route: ActivatedRouteSnapshot) => {
+            const bot = route.queryParamMap.get('bot');
+            return bot
+              ? inject(Router).createUrlTree(['/udt/team'], { queryParams: { bot } })
+              : true;
+          },
+        ],
+        loadComponent: () => import('./pages/udt-hub').then((m) => m.UdtHubPage),
+      },
+      {
+        path: 'udt/team',
+        title: 'udt.nav.team',
         loadComponent: () => import('./pages/udt-team').then((m) => m.UdtTeamPage),
       },
       {

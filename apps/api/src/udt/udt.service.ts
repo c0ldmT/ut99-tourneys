@@ -433,6 +433,42 @@ export class UdtService {
     return scrap;
   }
 
+  /**
+   * My team for the Dream Team hub: roster and lineup size, tired or striking bots, development
+   * points to give (own bots). Null without a team this season.
+   */
+  hubTeam(userId: string, season: number) {
+    const team = this.team(userId, season);
+    if (!team) return null;
+    const roster = this.db
+      .select()
+      .from(udtRoster)
+      .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
+      .all();
+    const own = new Map(
+      this.db
+        .select()
+        .from(udtBots)
+        .where(and(eq(udtBots.season, season), eq(udtBots.userId, userId)))
+        .all()
+        .map((b) => [b.botId, b]),
+    );
+    let points = 0;
+    for (const r of roster) {
+      const b = own.get(r.botId);
+      if (b) points += Math.max(0, developPoints(levelOf(r.xp), b.pointsSpent));
+    }
+    return {
+      name: team.name,
+      tag: team.tag,
+      bots: roster.length,
+      lineup: roster.filter((r) => r.dmSlot !== null).length,
+      tired: roster.filter((r) => r.stamina < 40).length,
+      striking: roster.filter((r) => r.striking).length,
+      points,
+    };
+  }
+
   team(userId: string, season: number): UdtTeam | null {
     const t = this.db
       .select()
