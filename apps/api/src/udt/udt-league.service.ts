@@ -55,6 +55,7 @@ import { ServerCalendar } from '../tournaments/server-calendar.js';
 import {
   TournamentsService,
   UdtEventRulesSchema,
+  type LeagueTag,
   type TournamentRow,
 } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
@@ -220,6 +221,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     });
     this.market.afterDay((season, day) => this.marketDay(season, day));
     this.rewards.leagueChampion = (season) => this.champion(season);
+    this.tournaments.leagueOf = (t, userId) => this.tagOf(t, userId);
     this.bets.botsPerMatchOf = (t) =>
       t.kind === 'udt' && t.udtJson && this.rulesOf(t.udtJson)?.league ? this.cfg().betBots : null;
     this.udt.onFounded((userId, season) => {
@@ -389,6 +391,38 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   /** A league game's tournament (its rules name the fixture). */
   isLeagueTournament(t: { kind: string; udtJson: string | null }): boolean {
     return t.kind === 'udt' && !!t.udtJson && !!this.rulesOf(t.udtJson)?.league;
+  }
+
+  /** A league game in the tournament lists: evening, matchday, clubs, the user's own. */
+  private tagOf(t: TournamentRow, userId: string): LeagueTag | null {
+    const rules = t.kind === 'udt' && t.udtJson ? this.rulesOf(t.udtJson)?.league : null;
+    if (!rules) return null;
+    const f = this.db
+      .select()
+      .from(leagueFixtures)
+      .where(eq(leagueFixtures.id, rules.fixture))
+      .get();
+    if (!f) return null;
+    const clubs = this.db
+      .select()
+      .from(leagueClubs)
+      .where(inArray(leagueClubs.id, [f.home, f.away]))
+      .all();
+    const club = (id: string) => clubs.find((c) => c.id === id);
+    // A game called off and moved on: its old tournament stays on its own evening.
+    const day =
+      f.tournamentId !== t.id && t.scheduledAt
+        ? new Intl.DateTimeFormat('en-CA', { timeZone: this.tz }).format(new Date(t.scheduledAt))
+        : f.day;
+    return {
+      season: f.season,
+      kind: f.kind as FixtureKind,
+      day,
+      matchday: f.kind === 'league' ? f.matchday : null,
+      home: club(f.home)?.name ?? '?',
+      away: club(f.away)?.name ?? '?',
+      mine: club(f.home)?.userId === userId || club(f.away)?.userId === userId,
+    };
   }
 
   private rulesOf(json: string) {

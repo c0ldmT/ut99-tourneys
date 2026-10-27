@@ -26,14 +26,30 @@ import type {
   TournamentSummary,
 } from '../core/types';
 
+type LeagueGame = TournamentSummary & { league: NonNullable<TournamentSummary['league']> };
+
+/** The league's games of one evening (one row of the list). */
+interface LeagueEvening {
+  id: string;
+  at: string;
+  label: string;
+  games: LeagueGame[];
+}
+
+/** A row of the list: a tournament, or a league evening. */
+type ListRow = { id: string; t?: TournamentSummary; ev?: LeagueEvening };
+
 /** The filters are kept per browser (not the series: that one is a jump from its card). */
 const STORE = 'tourney.listFilter';
 const RUNNING = ['running', 'paused'];
+const KINDS: string[] = ['classic', 'udt', 'league'];
 
 function storedFilter(): TournamentFilter {
   try {
     const f = JSON.parse(localStorage.getItem(STORE) ?? '{}') as TournamentFilter;
-    return { kind: f.kind, mode: f.mode, mine: f.mine, status: f.status };
+    // "season" was a kind before the league came (decision 224).
+    const kind = f.kind && KINDS.includes(f.kind) ? f.kind : undefined;
+    return { kind, mode: f.mode, mine: f.mine, status: f.status };
   } catch {
     return {};
   }
@@ -89,18 +105,21 @@ function storedFilter(): TournamentFilter {
         [placeholder]="'list.search' | t"
         [attr.aria-label]="'list.search' | t"
       />
-      <div class="pills" role="group" [attr.aria-label]="'list.kind.label' | t">
-        @for (k of kinds; track k) {
-          <button
-            type="button"
-            [class.on]="(filter().kind ?? 'all') === k"
-            [attr.aria-pressed]="(filter().kind ?? 'all') === k"
-            (click)="set({ kind: k === 'all' ? undefined : k })"
-          >
-            {{ 'list.kind.' + k | t }}
-          </button>
-        }
-      </div>
+      <!-- Without Dream Team every tournament is classic. -->
+      @if (auth.config().udt) {
+        <div class="pills" role="group" [attr.aria-label]="'list.kind.label' | t">
+          @for (k of kinds; track k) {
+            <button
+              type="button"
+              [class.on]="(filter().kind ?? 'all') === k"
+              [attr.aria-pressed]="(filter().kind ?? 'all') === k"
+              (click)="set({ kind: k === 'all' ? undefined : k })"
+            >
+              {{ 'list.kind.' + k | t }}
+            </button>
+          }
+        </div>
+      }
       <div class="pills" role="group" [attr.aria-label]="'list.mode.label' | t">
         @for (m of modes; track m) {
           <button
@@ -138,7 +157,9 @@ function storedFilter(): TournamentFilter {
     </div>
 
     <ng-template #badges let-t>
-      @if (t.kind === 'udt') {
+      @if (t.league) {
+        <span class="badge udt"><na-udt-mark [size]="14" />{{ 'list.kind.league' | t }}</span>
+      } @else if (t.kind === 'udt') {
         <span class="badge udt"><na-udt-mark [size]="14" />DT</span>
       }
       @if (t.seasonal && t.kind !== 'udt') {
@@ -179,6 +200,68 @@ function storedFilter(): TournamentFilter {
           }
         </span>
       </a>
+    </ng-template>
+
+    <ng-template #evening let-e let-done="done">
+      <div class="tl-ev" [class.open]="isOpen(e.id)">
+        <button
+          type="button"
+          class="trow tl-evhead udt"
+          [class.done]="done"
+          [attr.aria-expanded]="isOpen(e.id)"
+          [attr.aria-controls]="e.id + '-list'"
+          (click)="toggle(e.id)"
+        >
+          <span class="when"
+            >{{ time(e.at) }}
+            @if (done) {
+              <small>{{ shortDate(e.at) }}</small>
+            }
+          </span>
+          <span class="what">
+            <span class="ttl"
+              ><span class="nm">{{ 'list.ev.title' | t }}</span
+              ><span class="badge udt"
+                ><na-udt-mark [size]="14" />{{ 'list.kind.league' | t }}</span
+              ></span
+            >
+            <span class="meta">{{ e.label }}</span>
+          </span>
+          <span class="st tl-evn"
+            >{{ 'list.ev.games' | t: { n: e.games.length } }}
+            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="m6 9 6 6 6-6"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              /></svg
+          ></span>
+        </button>
+        <div class="tl-evlist" [id]="e.id + '-list'" [attr.inert]="isOpen(e.id) ? null : ''">
+          <div>
+            @for (g of e.games; track g.id) {
+              <a class="h" [routerLink]="['/t', g.id]">
+                <span class="d">{{ time(at(g)) }}</span>
+                <span class="tl-evvs">{{ g.league.home }} – {{ g.league.away }}</span>
+                @if (g.phase === 'aborted') {
+                  <span class="badge aborted">{{ 'phase.aborted' | t }}</span>
+                } @else if (g.champion) {
+                  <span class="champ"
+                    ><ng-container *ngTemplateOutlet="trophy" />{{ g.champion }}</span
+                  >
+                } @else if (g.league.kind !== 'league') {
+                  <span class="muted">{{ 'league.kind.' + g.league.kind | t }}</span>
+                }
+              </a>
+            }
+            @if (!done) {
+              <a class="all" routerLink="/udt/league/day">{{ 'list.ev.conference' | t }} →</a>
+            }
+          </div>
+        </div>
+      </div>
     </ng-template>
 
     <ng-template #trophy>
@@ -297,22 +380,28 @@ function storedFilter(): TournamentFilter {
         <div class="tlist">
           @for (g of upcomingGroups(); track g.label) {
             <div class="gttl">{{ g.label }}</div>
-            @for (t of g.items; track t.id) {
-              <a class="trow" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
-                <span class="when">{{ t.scheduledAt ? time(t.scheduledAt) : '–' }}</span>
-                <span class="what">
-                  <span class="ttl"
-                    ><span class="nm">{{ t.name }}</span
-                    ><ng-container *ngTemplateOutlet="badges; context: { $implicit: t }"
-                  /></span>
-                  <span class="meta">{{ meta(t) }}</span>
-                </span>
-                <span class="fill">
-                  <span class="mono">{{ fill(t) }}</span>
-                  <span class="meter"><span [style.width.%]="fillPct(t)"></span></span>
-                </span>
-                <span class="st {{ state(t).cls }}">{{ state(t).text }}</span>
-              </a>
+            @for (r of g.items; track r.id) {
+              @if (r.ev; as e) {
+                <ng-container *ngTemplateOutlet="evening; context: { $implicit: e, done: false }" />
+              } @else if (r.t; as t) {
+                <a class="trow" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
+                  <span class="when">{{ t.scheduledAt ? time(t.scheduledAt) : '–' }}</span>
+                  <span class="what">
+                    <span class="ttl"
+                      ><span class="nm">{{ t.name }}</span
+                      ><ng-container *ngTemplateOutlet="badges; context: { $implicit: t }"
+                    /></span>
+                    <span class="meta">{{ meta(t) }}</span>
+                  </span>
+                  <span class="fill">
+                    @if (!t.league) {
+                      <span class="mono">{{ fill(t) }}</span>
+                      <span class="meter"><span [style.width.%]="fillPct(t)"></span></span>
+                    }
+                  </span>
+                  <span class="st {{ state(t).cls }}">{{ state(t).text }}</span>
+                </a>
+              }
             }
           } @empty {
             <p class="empty">{{ 'list.nothingNext' | t }}</p>
@@ -443,8 +532,12 @@ function storedFilter(): TournamentFilter {
           >
         </div>
         <div class="tlist">
-          @for (t of recent(); track t.id) {
-            <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
+          @for (r of recentRows(); track r.id) {
+            @if (r.ev; as e) {
+              <ng-container *ngTemplateOutlet="evening; context: { $implicit: e, done: true }" />
+            } @else if (r.t; as t) {
+              <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
+            }
           } @empty {
             <p class="empty">{{ 'list.nothingDone' | t }}</p>
           }
@@ -468,8 +561,12 @@ function storedFilter(): TournamentFilter {
         <div class="tlist">
           @for (g of archiveGroups(); track g.label) {
             <div class="gttl">{{ g.label }}</div>
-            @for (t of g.items; track t.id) {
-              <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
+            @for (r of g.items; track r.id) {
+              @if (r.ev; as e) {
+                <ng-container *ngTemplateOutlet="evening; context: { $implicit: e, done: true }" />
+              } @else if (r.t; as t) {
+                <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
+              }
             }
           } @empty {
             @if (archive()) {
@@ -923,11 +1020,19 @@ export class TournamentListPage {
   readonly view = input<string | undefined>(undefined);
   protected readonly tab = computed(() => (this.view() === 'archive' ? 'archive' : 'now'));
 
-  protected readonly kinds = ['all', 'classic', 'udt', 'season'] as const;
+  /**
+   * Classic tournaments, Dream Team cups, the league (only with Dream Team on; season and Dream
+   * Team show as badges on the rows).
+   */
+  protected readonly kinds = ['all', 'classic', 'udt', 'league'] as const;
   protected readonly modes = ['all', '1v1', 'team', 'mh'] as const;
   protected readonly statuses = ['all', 'finished', 'aborted'] as const;
 
   protected readonly filter = signal<TournamentFilter>(storedFilter());
+  /** The filter as it counts: without Dream Team the kind filter is hidden and ignored. */
+  private readonly serverFilter = computed(() =>
+    this.auth.config().udt ? this.filter() : { ...this.filter(), kind: undefined },
+  );
   /** The search as typed (the filter follows after a short pause). */
   protected readonly qInput = signal('');
   private typing?: ReturnType<typeof setTimeout>;
@@ -962,10 +1067,12 @@ export class TournamentListPage {
       ),
   );
   protected readonly upcomingGroups = computed(() =>
-    this.groups(this.upcoming(), (t) => t.scheduledAt, this.i18n.t('list.noDate')),
+    this.rowGroups(this.upcoming(), (t) => t.scheduledAt, this.i18n.t('list.noDate')),
   );
+  /** The last results: five rows, a league evening as one. */
+  protected readonly recentRows = computed(() => this.fold(this.recent(), 'recent').slice(0, 5));
   protected readonly archiveGroups = computed(() =>
-    this.groups(this.archiveItems(), (t) => this.at(t), ''),
+    this.rowGroups(this.archiveItems(), (t) => this.at(t), ''),
   );
   protected readonly seriesShown = computed(() => {
     const f = this.filter();
@@ -973,7 +1080,7 @@ export class TournamentListPage {
     return this.series().filter((s) => {
       if (f.kind === 'udt' && s.kind !== 'udt') return false;
       if (f.kind === 'classic' && s.kind === 'udt') return false;
-      if (f.kind === 'season' && !s.seasonal) return false;
+      if (f.kind === 'league') return false;
       if (f.mode && f.mode !== this.modeOf(s.game, s.teamSize)) return false;
       if (q && !s.name.toLowerCase().includes(q)) return false;
       if (f.mine && !(s.next?.id && this.activeById().get(s.next.id)?.registeredMe)) return false;
@@ -989,7 +1096,7 @@ export class TournamentListPage {
     void this.loadSeries();
     // The server-side part: the last results (overview) or the archive's first page.
     effect(() => {
-      const f = this.filter();
+      const f = this.serverFilter();
       const tab = this.tab();
       untracked(() => void (tab === 'archive' ? this.loadArchive(f) : this.loadRecent(f)));
     });
@@ -1045,7 +1152,7 @@ export class TournamentListPage {
     this.moreBusy.set(true);
     const req = this.req;
     try {
-      const page = await this.api.archive(this.filter(), 20, a.next);
+      const page = await this.api.archive(this.serverFilter(), 20, a.next);
       // Filters changed meanwhile (a new first page): this page belongs to the old list.
       if (req !== this.req || this.archive() !== a) return;
       this.archive.set(page);
@@ -1076,7 +1183,9 @@ export class TournamentListPage {
   private async loadRecent(f: TournamentFilter) {
     const req = ++this.req;
     try {
-      const page = await this.api.archive({ ...f, status: undefined, series: undefined }, 5);
+      // A league evening has many games: enough results for five rows with the evenings
+      // folded (see recentRows).
+      const page = await this.api.archive({ ...f, status: undefined, series: undefined }, 30);
       if (req !== this.req) return;
       this.recent.set(page.items);
       this.doneTotal.set(page.total);
@@ -1104,9 +1213,11 @@ export class TournamentListPage {
 
   /** The filters in the browser (the overview: its lists are complete). */
   private matches(t: TournamentSummary, f: TournamentFilter): boolean {
-    if (f.kind === 'udt' && t.kind !== 'udt') return false;
+    // Without Dream Team the kind filter is hidden (a stored one does not count).
+    if (!this.auth.config().udt) f = { ...f, kind: undefined };
+    if (f.kind === 'udt' && (t.kind !== 'udt' || t.league)) return false;
+    if (f.kind === 'league' && !t.league) return false;
     if (f.kind === 'classic' && t.kind === 'udt') return false;
-    if (f.kind === 'season' && !t.seasonal) return false;
     if (f.mode && f.mode !== this.modeOf(t.game, t.teamSize)) return false;
     if (f.mine && !t.registeredMe) return false;
     if (f.q && !t.name.toLowerCase().includes(f.q.toLowerCase())) return false;
@@ -1116,6 +1227,73 @@ export class TournamentListPage {
   /** When a tournament was (or is) played: its start, else its creation. */
   protected at(t: TournamentSummary): string {
     return t.scheduledAt ?? t.createdAt;
+  }
+
+  /**
+   * The day groups as rows: the league's games of an evening become one row (opened, it shows
+   * them), the user's own league games and everything else stay rows of their own. With the
+   * league filter every game is a row.
+   */
+  private rowGroups(
+    list: TournamentSummary[],
+    when: (t: TournamentSummary) => string | null,
+    none: string,
+  ): { label: string; items: ListRow[] }[] {
+    return this.groups(list, when, none).map((g) => ({
+      label: g.label,
+      items: this.fold(g.items, g.label),
+    }));
+  }
+
+  /** The tournaments as rows, the league's games of an evening folded into one (see rowGroups). */
+  private fold(list: TournamentSummary[], scope: string): ListRow[] {
+    // Ids without spaces (aria-controls refers to them).
+    const scopeKey = scope.replace(/[^a-z0-9]+/gi, '_');
+    const single = this.filter().kind === 'league';
+    const rows: ListRow[] = [];
+    const evenings = new Map<string, LeagueEvening>();
+    for (const t of list) {
+      const l = t.league;
+      if (!l || l.mine || single) {
+        rows.push({ id: t.id, t });
+        continue;
+      }
+      const key = `${l.season}:${l.day}`;
+      let e = evenings.get(key);
+      if (!e) {
+        e = { id: `ev-${l.season}-${l.day}-${scopeKey}`, at: this.at(t), label: '', games: [] };
+        evenings.set(key, e);
+        rows.push({ id: e.id, ev: e });
+      }
+      e.games.push(t as LeagueGame);
+    }
+    for (const e of evenings.values()) {
+      e.games.sort((a, b) => this.at(a).localeCompare(this.at(b)));
+      e.at = this.at(e.games[0]!);
+      e.label = this.eveningLabel(e.games);
+    }
+    // An evening of one game is that game.
+    return rows.map((r) =>
+      r.ev?.games.length === 1 ? { id: r.ev.games[0]!.id, t: r.ev.games[0] } : r,
+    );
+  }
+
+  /** "Matchdays 12–13 · Relegation" */
+  private eveningLabel(games: LeagueGame[]): string {
+    const days = games.map((g) => g.league.matchday).filter((d): d is number => d !== null);
+    const parts: string[] = [];
+    if (days.length) {
+      const a = Math.min(...days);
+      const b = Math.max(...days);
+      parts.push(
+        a === b
+          ? this.i18n.t('list.ev.matchday', { n: a })
+          : this.i18n.t('list.ev.matchdays', { a, b }),
+      );
+    }
+    for (const k of new Set(games.map((g) => g.league.kind)))
+      if (k !== 'league') parts.push(this.i18n.t(`league.kind.${k}`));
+    return parts.join(' · ');
   }
 
   private groups(
@@ -1180,7 +1358,12 @@ export class TournamentListPage {
     const tr = (k: string) => this.i18n.t(k);
     if (t.phase === 'checkIn') return { cls: 'ci', text: tr('list.stateCheckIn') };
     if (t.registeredMe)
-      return { cls: 'me', text: '✓ ' + tr(t.kind === 'udt' ? 'list.youEntered' : 'list.youPlay') };
+      return {
+        cls: 'me',
+        text:
+          '✓ ' +
+          tr(t.league ? 'list.yourGame' : t.kind === 'udt' ? 'list.youEntered' : 'list.youPlay'),
+      };
     if (t.phase === 'seeded') return { cls: 'closed', text: tr('phase.seeded') };
     if (t.registrationOpen) return { cls: '', text: tr('list.open') };
     return { cls: 'closed', text: tr('list.closed') };

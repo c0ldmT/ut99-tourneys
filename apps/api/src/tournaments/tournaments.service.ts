@@ -89,8 +89,11 @@ export const DONE_PHASES = ['finished', 'aborted'];
 /** Filters and page of the archive (`GET /tournaments?scope=done`). */
 export const ArchiveQuerySchema = z.object({
   q: z.string().max(80).optional(),
-  /** classic: not Dream Team; season: counts for the season; udt: Dream Team. */
-  kind: z.enum(['classic', 'udt', 'season']).optional(),
+  /**
+   * classic: not Dream Team; season: counts for the season; udt: Dream Team cups (not the
+   * league); league: the Dream Team league's games.
+   */
+  kind: z.enum(['classic', 'udt', 'league', 'season']).optional(),
   mode: z.enum(['1v1', 'team', 'mh']).optional(),
   status: z.enum(['finished', 'aborted']).optional(),
   series: z.string().max(64).optional(),
@@ -103,8 +106,13 @@ export const ArchiveQuerySchema = z.object({
 });
 export type ArchiveQuery = z.infer<typeof ArchiveQuerySchema>;
 
-function kindMatches(t: TournamentRow, kind: NonNullable<ArchiveQuery['kind']>): boolean {
-  if (kind === 'udt') return t.kind === 'udt';
+function kindMatches(
+  t: TournamentRow,
+  kind: NonNullable<ArchiveQuery['kind']>,
+  league: boolean,
+): boolean {
+  if (kind === 'udt') return t.kind === 'udt' && !league;
+  if (kind === 'league') return league;
   if (kind === 'season') return t.seasonal;
   return t.kind !== 'udt';
 }
@@ -175,6 +183,20 @@ export interface DrawDrop {
   name: string;
   reason: 'busy' | 'lineup' | 'full';
   busyIn?: string[];
+}
+
+/** A league game in the tournament lists (see `TournamentsService.leagueOf`). */
+export interface LeagueTag {
+  season: number;
+  kind: 'league' | 'relegation' | 'semi' | 'final' | 'third';
+  /** The league evening (the server's day, YYYY-MM-DD). */
+  day: string;
+  /** Regular games only. */
+  matchday: number | null;
+  home: string;
+  away: string;
+  /** The user's club plays. */
+  mine: boolean;
 }
 
 /**
@@ -782,6 +804,12 @@ export class TournamentsService {
   }
 
   private readonly signupProviders = new Map<string, SignupProvider>();
+
+  /**
+   * A game of the Dream Team league (set by UdtLeagueService): its evening, matchday, clubs and
+   * whether the user's club plays. Null for every other tournament.
+   */
+  leagueOf: (t: TournamentRow, userId: string) => LeagueTag | null = () => null;
   /** Winner names of finished tournaments by log head (the list and the archive search). */
   private readonly champions = new Map<
     string,
@@ -1952,7 +1980,7 @@ export class TournamentsService {
         const t = r.t;
         if (f.status && t.phase !== f.status) return false;
         if (f.series && t.seriesId !== f.series) return false;
-        if (f.kind && !kindMatches(t, f.kind)) return false;
+        if (f.kind && !kindMatches(t, f.kind, !!this.udtRules(t)?.league)) return false;
         if (f.mode && !modeMatches(this.settings(t), f.mode)) return false;
         if (f.mine && !this.isMine(r, user)) return false;
         if (q && !t.name.toLowerCase().includes(q)) {
@@ -1973,8 +2001,9 @@ export class TournamentsService {
     };
   }
 
-  /** Whether the user plays in the tournament (registration, or a Dream Team entry). */
+  /** Whether the user plays in the tournament (registration, Dream Team entry, league club). */
   private isMine(r: { t: TournamentRow; mine: number }, user: User): boolean {
+    if (this.leagueOf(r.t, user.id)?.mine) return true;
     const provider = this.signupProviders.get(r.t.kind);
     return provider ? provider.entries(r.t.id).some((e) => e.userId === user.id) : r.mine > 0;
   }
@@ -2027,6 +2056,8 @@ export class TournamentsService {
       mine = entries.some((e) => e.userId === user.id) ? 1 : 0;
       teamCount = 0;
     }
+    const league = this.leagueOf(t, user.id);
+    if (league?.mine) mine = 1;
     const live = t.phase === 'running' || t.phase === 'paused';
     const loaded = live ? this.log.projection(t.id) : undefined;
     const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
@@ -2055,6 +2086,8 @@ export class TournamentsService {
       seriesId: t.seriesId,
       seasonal: t.seasonal,
       kind: t.kind,
+      /** A game of the Dream Team league: its evening, matchday and clubs. */
+      ...(league ? { league } : {}),
       /** The match being played now (running tournaments): names and series score. */
       ...(cm
         ? {

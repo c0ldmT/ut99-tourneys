@@ -2132,8 +2132,81 @@ details.help ul {
   text-decoration: line-through;
   text-decoration-color: rgba(255, 122, 135, 0.5);
 }
+/* Match list (tournament-list): a league evening as one row, its games below. */
+.tl-ev {
+  border-top: 1px solid var(--border);
+}
+.gttl + .tl-ev,
+.tl-ev:first-child {
+  border-top: 0;
+}
+.tl-evhead {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.tl-evhead .tl-evn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.tl-evhead svg {
+  transition: transform 0.25s;
+}
+.tl-ev.open .tl-evhead svg {
+  transform: rotate(180deg);
+}
+.tl-evlist {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--bg-2);
+}
+.tl-ev.open .tl-evlist {
+  grid-template-rows: 1fr;
+}
+.tl-evlist > div {
+  overflow: hidden;
+}
+.tl-evlist .h {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  color: var(--text);
+}
+.tl-evlist .h:hover {
+  background: var(--panel-2);
+}
+.tl-evlist .d {
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+}
+.tl-evlist .tl-evvs {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-evlist .all {
+  display: block;
+  padding: 8px 16px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 .trow .champ,
-.scard .champ {
+.scard .champ,
+.tl-evlist .champ {
   display: inline-flex;
   align-items: center;
   gap: 6px;

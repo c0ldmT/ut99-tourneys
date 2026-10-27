@@ -207,6 +207,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Tournament list: now called "Matches", with a "League" filter; the league's games of an evening show as one row that opens to list them (your own game stays a row of its own).
 - Dream Team navigation: "Table" is now "Cup ranking", the league has its own tab.
 - Ratings: a bot's difficulty step is worth 200 rating points by default (was 100), which predicts real games best; saved settings and running seasons keep their value.
 - Dream Team game model calibrated on real games: simulated games (season simulator `udt:sim`, the test mode's simulated matches) use `p = sA^k / (sA^k + sB^k)` with k = 3 in 1v1 and 4.5 in teams instead of 2, so a favourite wins as often as in the games (one skill step: about three of four duels). `pnpm --filter @tourney/api udt:calibrate <tourney.db>` checks the model on a database (log loss per k, favourite's win rate per skill gap) and fits the rating setting "rating points per bot level" to the same games (the owner's export: 200 instead of the default 100).

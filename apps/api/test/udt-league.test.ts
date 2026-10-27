@@ -131,6 +131,24 @@ describe('Dream Team league', () => {
       .where(eq(tournaments.id, games[0]!.tournamentId!))
       .get()!;
     expect(JSON.parse(t.settingsJson)).toMatchObject({ format: 'fixtures', size: 2, teamSize: 5 });
+    // The match list knows league games: evening, matchday, clubs, the user's own (decision 224).
+    const list = (await mario.get('/tournaments?scope=active')).body as {
+      id: string;
+      registeredMe: boolean;
+      league?: { kind: string; day: string; matchday: number | null; home: string; mine: boolean };
+    }[];
+    const tagged = list.filter((x) => x.league);
+    expect(tagged.length).toBe(games.length);
+    expect(tagged[0]!.league).toMatchObject({ kind: 'league', day: games[0]!.day });
+    const own = tagged.filter((x) => x.league!.mine);
+    expect(own.length).toBeGreaterThan(0);
+    for (const x of own) expect(x.registeredMe).toBe(true);
+    // Archive filters: "league" only league games, "Dream Team" only the cups.
+    for (const g of games.slice(0, 2)) await admin.post(`/udt/test/simulate/${g.tournamentId}`);
+    const done = async (kind: string) =>
+      ((await mario.get(`/tournaments?scope=done&kind=${kind}`)).body as { total: number }).total;
+    expect(await done('league')).toBe(2);
+    expect(await done('udt')).toBe(0);
     // Play the whole season day by day.
     let played = 0;
     for (let d = 0; d < 20; d++) {

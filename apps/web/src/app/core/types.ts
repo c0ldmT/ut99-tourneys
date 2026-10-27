@@ -56,6 +56,16 @@ export interface PublicUser {
 
 export type Phase = 'draft' | 'seeded' | 'checkIn' | 'running' | 'paused' | 'finished' | 'aborted';
 
+export interface LeagueTag {
+  season: number;
+  kind: 'league' | 'relegation' | 'semi' | 'final' | 'third';
+  day: string;
+  matchday: number | null;
+  home: string;
+  away: string;
+  mine: boolean;
+}
+
 export interface TournamentSummary {
   id: string;
   name: string;
@@ -77,6 +87,8 @@ export interface TournamentSummary {
   kind?: string;
   /** Created by this series. */
   seriesId?: string | null;
+  /** A game of the Dream Team league: its evening (server day), matchday and clubs. */
+  league?: LeagueTag;
   /** The match being played now (running tournaments). */
   now?: {
     matchId: string;
@@ -111,7 +123,7 @@ export interface TournamentArchive {
 /** Filters of the archive (and of the overview, in the browser). */
 export interface TournamentFilter {
   q?: string;
-  kind?: 'classic' | 'udt' | 'season';
+  kind?: 'classic' | 'udt' | 'league';
   mode?: '1v1' | 'team' | 'mh';
   status?: 'finished' | 'aborted';
   series?: string;

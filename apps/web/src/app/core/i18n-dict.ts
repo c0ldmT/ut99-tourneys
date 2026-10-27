@@ -2,7 +2,7 @@
 export type Lang = 'en' | 'de';
 
 const en = {
-  'nav.tournaments': 'Tournaments',
+  'nav.tournaments': 'Matches',
   'nav.new': 'New tournament',
   'nav.agents': 'Servers',
   'nav.users': 'Users',
@@ -429,7 +429,7 @@ const en = {
   'login.error.discord': 'Discord login failed. Please try again.',
   'login.error.access_denied': 'You cancelled the Discord login.',
 
-  'list.title': 'Tournaments',
+  'list.title': 'Matches',
   'list.new': 'New tournament',
   'list.slots': 'slots',
   'list.teams': 'teams',
@@ -1922,8 +1922,14 @@ const en = {
   'list.kind.label': 'Kind',
   'list.kind.all': 'All',
   'list.kind.classic': 'Classic',
-  'list.kind.udt': 'Dream Team',
-  'list.kind.season': 'Season',
+  'list.kind.udt': 'DT cups',
+  'list.kind.league': 'League',
+  'list.ev.title': 'League evening',
+  'list.ev.games': '{n} games',
+  'list.ev.matchday': 'Matchday {n}',
+  'list.ev.matchdays': 'Matchdays {a}–{b}',
+  'list.ev.conference': 'To the conference',
+  'list.yourGame': 'Your game',
   'list.mode.label': 'Mode',
   'list.mode.all': 'All modes',
   'list.mode.1v1': '1v1',
@@ -2222,7 +2228,7 @@ const en = {
 export type TKey = keyof typeof en;
 
 const de: Record<TKey, string> = {
-  'nav.tournaments': 'Turniere',
+  'nav.tournaments': 'Matches',
   'nav.new': 'Neues Turnier',
   'nav.agents': 'Server',
   'nav.users': 'Benutzer',
@@ -2652,7 +2658,7 @@ const de: Record<TKey, string> = {
   'login.error.discord': 'Die Discord-Anmeldung ist fehlgeschlagen. Bitte noch einmal.',
   'login.error.access_denied': 'Du hast die Discord-Anmeldung abgebrochen.',
 
-  'list.title': 'Turniere',
+  'list.title': 'Matches',
   'list.new': 'Neues Turnier',
   'list.slots': 'Plätze',
   'list.teams': 'Teams',
@@ -4161,8 +4167,14 @@ const de: Record<TKey, string> = {
   'list.kind.label': 'Art',
   'list.kind.all': 'Alle',
   'list.kind.classic': 'Klassisch',
-  'list.kind.udt': 'Dream Team',
-  'list.kind.season': 'Season',
+  'list.kind.udt': 'DT-Cups',
+  'list.kind.league': 'Liga',
+  'list.ev.title': 'Liga-Abend',
+  'list.ev.games': '{n} Spiele',
+  'list.ev.matchday': 'Spieltag {n}',
+  'list.ev.matchdays': 'Spieltage {a}–{b}',
+  'list.ev.conference': 'Zur Konferenz',
+  'list.yourGame': 'Dein Spiel',
   'list.mode.label': 'Modus',
   'list.mode.all': 'Alle Modi',
   'list.mode.1v1': '1v1',
