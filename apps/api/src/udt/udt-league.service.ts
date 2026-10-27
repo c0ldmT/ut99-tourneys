@@ -32,6 +32,7 @@ import { z } from 'zod';
 import { UsersService, type User } from '../auth/users.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
+import { ServerActivity } from '../common/activity.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { pickTeamNames } from '../common/names.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
@@ -223,6 +224,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(CONFIG) private readonly config: ApiConfig,
     @Inject(LOGGER) private readonly log: ApiLogger,
+    @Inject(ServerActivity) private readonly activity: ServerActivity,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(UsersService) private readonly users: UsersService,
@@ -832,7 +834,15 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     if (!due) return;
     this.stepping = true;
     try {
-      await runInSteps(steps, (e) => this.log.error(`league: ${(e as Error).message}`));
+      // The website shows the work (activity bar) while the games are made and simulated.
+      if (steps.length)
+        await this.activity.run('leagueEvening', steps.length, (h) =>
+          runInSteps(
+            steps,
+            (e) => this.log.error(`league: ${(e as Error).message}`),
+            (n) => h.step(n),
+          ),
+        );
       const run = this.run(due.run.season);
       if (run?.status === 'running') this.eveningEnd(run, due.today);
     } catch (e) {

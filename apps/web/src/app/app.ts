@@ -19,6 +19,7 @@ import { I18n, TPipe } from './core/i18n';
 import type { Lang } from './core/i18n-dict';
 import { ToastHost } from './core/toast';
 import { Loading } from './core/loading';
+import { ActivityBar } from './components/activity-bar';
 import { Loader } from './components/loader';
 
 @Component({
@@ -38,6 +39,7 @@ import { Loader } from './components/loader';
     Icon,
     ToastHost,
     Loader,
+    ActivityBar,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -156,6 +158,9 @@ import { Loader } from './components/loader';
         }
       </div>
       <div class="progress" [class.on]="loading.bar()" aria-hidden="true"><span></span></div>
+      @if (auth.me()) {
+        <na-activity />
+      }
     </header>
     <main class="container">
       @if (loading.spinner()) {

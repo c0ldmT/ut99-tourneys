@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Activity bar under the header: everybody sees when the server sets up a league evening (with progress) or is very busy and pages take longer.
 - Dream Team league page: the table of every tier with zones, form and the season's timeline; the matchday with the games on the server and the AI games as a conference, a live table with moves; the fixtures (only yours at a tap); the season finale with final four, relegation and who goes up and down; the history. My team shows the next league game, the home team picks its map. Settings: tab "UDT Liga" with the server time per league evening and the test league.
 - Dream Team test mode: "Matchday now" plays the next league evening, "League season end" the rest of the league.
 - Dream Team league: managers' teams and AI clubs play a double round robin in tiers (Pro Series, Division 1 ...) on league evenings, games with a manager on the server, AI against AI simulated and shown during the evening; table with overtime points, weekly table money and cup bonus, relegation and the Pro Series final four as the season's finale, promotion and relegation into the next season, a test league in a running season (admin settings).

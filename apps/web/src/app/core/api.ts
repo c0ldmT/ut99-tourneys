@@ -3,6 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { I18n } from './i18n';
 import { errorMessage, type ErrorBody } from './i18n-errors';
+import { ServerActivity } from './activity';
 import { Loading } from './loading';
 import type { NeuroWallet } from './neuro';
 import { Toasts } from './toast';
@@ -130,6 +131,7 @@ export class Api {
   private i18n = inject(I18n);
   private toasts = inject(Toasts);
   private loading = inject(Loading);
+  private activity = inject(ServerActivity);
   /** Counts successful changes (POST/PUT/PATCH/DELETE): the Neuro store reloads on it. */
   readonly changes = signal(0);
 
@@ -144,6 +146,8 @@ export class Api {
       get: method === 'GET',
       background: !!(opts.read || opts.background) || this.loading.inBackground,
     });
+    // Slow answers show the activity bar (the server may be blocked and unable to say so).
+    const ended = this.activity.call();
     try {
       res = await firstValueFrom(
         this.http.request<T>(method, `/api${url}`, {
@@ -158,6 +162,7 @@ export class Api {
       throw err;
     } finally {
       done();
+      ended();
     }
     if (method !== 'GET' && !opts.read) this.changes.update((n) => n + 1);
     if (opts.ok) {

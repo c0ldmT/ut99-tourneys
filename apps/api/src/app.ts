@@ -43,6 +43,7 @@ import { SeriesController, SeriesOverviewController } from './series/series.cont
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { NeuroHub } from './ledger/neuro-hub.js';
+import { ServerActivity } from './common/activity.js';
 import { NeuroController } from './ledger/neuro.controller.js';
 import { UdtController } from './udt/udt.controller.js';
 import { UdtTestController } from './udt/udt-test.controller.js';
@@ -131,6 +132,7 @@ class AppModule {
         LiveHub,
         LiveRecorder,
         NeuroHub,
+        ServerActivity,
         EventLogService,
         AgentConnections,
         AgentsService,

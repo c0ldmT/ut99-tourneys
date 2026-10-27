@@ -10,6 +10,7 @@ import {
   type PipeTransform,
 } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
+import { ServerActivity } from './activity';
 import { Api } from './api';
 import { Auth } from './auth';
 import { I18n } from './i18n';
@@ -62,6 +63,7 @@ export interface NeuroWallet {
 export class NeuroStore {
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
+  private readonly activity = inject(ServerActivity);
   private readonly state = signal<NeuroWallet | null>(null);
   readonly wallet = this.state.asReadonly();
   readonly balance = computed(() => {
@@ -144,6 +146,8 @@ export class NeuroStore {
       // an ended session): then try again later.
       if (es.readyState !== EventSource.CLOSED) return;
       if (this.source === es) this.source = undefined;
+      // A restart: what the server worked on is over (it says again once connected).
+      this.activity.reset();
       clearTimeout(this.retry);
       this.retry = setTimeout(() => {
         if (this.userId) this.connect();
@@ -151,9 +155,18 @@ export class NeuroStore {
       this.backoff = Math.min(this.backoff * 2, 60_000);
     };
     es.addEventListener('neuro', () => this.refresh());
+    // What the server works on (activity bar, decision 227): the state at the start, then changes.
+    es.addEventListener('activity', (e) => {
+      try {
+        this.activity.server.set(JSON.parse((e as MessageEvent<string>).data));
+      } catch {
+        // a broken line: keep the last state
+      }
+    });
   }
 
   private close() {
+    this.activity.reset();
     clearTimeout(this.retry);
     this.source?.close();
     this.source = undefined;
