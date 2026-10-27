@@ -11,7 +11,7 @@ import { Api } from '../core/api';
 import { TPipe } from '../core/i18n';
 import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
 
-/** Settings tab "Bots & live": the bot AI (skill curve) and the live data of games. */
+/** Settings tab "Bots & live": the bot AI (skill curve, SmartStockBots) and the live data of games. */
 @Component({
   selector: 'app-settings-bots',
   imports: [FormsModule, TPipe],
@@ -34,6 +34,15 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
         {{ 'botAi.skillCurve' | t }}</label
       >
       <p class="muted small">{{ 'botAi.skillCurveHint' | t }}</p>
+      <label
+        >{{ 'botAi.ssb' | t }}
+        <select name="smartStockBots" [(ngModel)]="smartStockBots">
+          <option value="auto">{{ 'botAi.ssbAuto' | t }}</option>
+          <option value="on">{{ 'botAi.ssbOn' | t }}</option>
+          <option value="off">{{ 'botAi.ssbOff' | t }}</option>
+        </select>
+      </label>
+      <p class="muted small">{{ 'botAi.ssbHint' | t }}</p>
       <div class="row">
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
       </div>
@@ -87,6 +96,7 @@ export class SettingsBots {
   protected readonly busy = signal(false);
   protected botAiLevel = 2;
   protected botSkillCurve = true;
+  protected smartStockBots: 'auto' | 'on' | 'off' = 'auto';
   protected liveDelay = 20;
   protected replayDays = 60;
 
@@ -99,6 +109,7 @@ export class SettingsBots {
       const s = await this.api.settings();
       this.botAiLevel = s.botAi?.level ?? 2;
       this.botSkillCurve = s.botAi?.skillCurve ?? true;
+      this.smartStockBots = s.botAi?.smartStockBots ?? 'auto';
       this.liveDelay = s.live?.delaySec ?? 20;
       this.replayDays = s.live?.replayDays ?? 60;
       // Plain fields (ngModel): without zone.js the view must be told about them.
@@ -114,9 +125,11 @@ export class SettingsBots {
       const s = await this.api.setBotAiSettings({
         level: Number(this.botAiLevel),
         skillCurve: !!this.botSkillCurve,
+        smartStockBots: this.smartStockBots,
       });
       this.botAiLevel = s.botAi.level;
       this.botSkillCurve = s.botAi.skillCurve;
+      this.smartStockBots = s.botAi.smartStockBots;
       this.saved.emit('botAi');
     } catch {
       // the toast shows the error

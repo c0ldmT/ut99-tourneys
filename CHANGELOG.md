@@ -207,6 +207,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- SmartStockBots is a website setting (Bots & live: automatic, on, off) for every tournament - also league games and Dream Team cups, which so far ran without it.
+- New tournament: kind as tiles (classic, season, Dream Team), the flow as switch rows with hints, lengths short / medium / long (best of and limits for the mode, with the longest possible duration), every map of the server chosen to start with; the bots section is gone.
 - Tournament list: now called "Matches", with a "League" filter; the league's games of an evening show as one row that opens to list them (your own game stays a row of its own).
 - Dream Team navigation: "Table" is now "Cup ranking", the league has its own tab.
 - Ratings: a bot's difficulty step is worth 200 rating points by default (was 100), which predicts real games best; saved settings and running seasons keep their value.

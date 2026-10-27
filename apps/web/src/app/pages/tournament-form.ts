@@ -11,7 +11,7 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
-import { Icon } from '../core/brand';
+import { Icon, UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { isLocalAddress } from '../core/connect';
 import { scheduleText, weekdayNames } from '../core/series-text';
@@ -46,6 +46,54 @@ const LIMITS: Record<number, { fragLimit: number; timeLimitMin: number }> = {
   3: { fragLimit: 40, timeLimitMin: 15 },
   5: { fragLimit: 60, timeLimitMin: 15 },
 };
+
+/**
+ * Tournament lengths (Mario 27.10.): best of per round and frag/time limits - for one on one
+ * as given, for teams scaled from LIMITS; Monster Hunt: the time per run.
+ */
+type Length = 'short' | 'medium' | 'long';
+const LENGTHS: Record<
+  Length,
+  {
+    frags: number;
+    minutes: number;
+    mhMinutes: number;
+    bo: Pick<Model, 'boDefault' | 'boSemi' | 'boFinal' | 'boLbFinal' | 'boGrand'>;
+  }
+> = {
+  short: {
+    frags: 8,
+    minutes: 8,
+    mhMinutes: 15,
+    bo: { boDefault: 1, boSemi: 0, boFinal: 0, boLbFinal: 0, boGrand: 1 },
+  },
+  medium: {
+    frags: 15,
+    minutes: 10,
+    mhMinutes: 20,
+    bo: { boDefault: 1, boSemi: 0, boFinal: 3, boLbFinal: 0, boGrand: 3 },
+  },
+  long: {
+    frags: 30,
+    minutes: 12,
+    mhMinutes: 25,
+    bo: { boDefault: 3, boSemi: 0, boFinal: 5, boLbFinal: 0, boGrand: 5 },
+  },
+};
+
+/** Frag and time limit of a length for a team size (1v1 as set, teams by the LIMITS ratio). */
+function lengthLimits(l: Length, teamSize: number): { fragLimit: number; timeLimitMin: number } {
+  const one = LIMITS[1]!;
+  const base = LIMITS[teamSize] ?? one;
+  const x = LENGTHS[l];
+  return {
+    fragLimit: Math.round((x.frags * base.fragLimit) / one.fragLimit),
+    timeLimitMin: Math.round((x.minutes * base.timeLimitMin) / one.timeLimitMin),
+  };
+}
+
+/** Minutes between two games of a match (map change, countdown, vote). */
+const BETWEEN_GAMES_MIN = 3;
 
 /** One tournament, or a series that creates one every n weeks. */
 type When = 'once' | 'series';
@@ -94,7 +142,6 @@ interface Model {
   mapMode: 'vote' | 'random';
   voteTimeoutSec: number;
   countdownSec: number;
-  smartStockBots: boolean;
   friendlyFirePct: 0 | 50 | 100;
   penaltySec: number;
   monsterSkill: number;
@@ -149,7 +196,7 @@ function toLocalInput(iso: string | null): string {
  */
 @Component({
   selector: 'app-tournament-form',
-  imports: [FormsModule, RouterLink, TPipe, Icon],
+  imports: [FormsModule, RouterLink, TPipe, Icon, UdtMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -185,6 +232,143 @@ function toLocalInput(iso: string | null): string {
             />
             @if (f.when === 'series') {
               <p class="muted small">{{ 'series.nameHint' | t }}</p>
+            }
+
+            <div class="lbl">{{ 'form.kind' | t }}</div>
+            <div class="tiles kinds" role="group" [attr.aria-label]="'form.kind' | t">
+              <button
+                type="button"
+                class="tile"
+                [class.on]="kindOf(f) === 'classic'"
+                [attr.aria-pressed]="kindOf(f) === 'classic'"
+                [disabled]="locked() && f.udt"
+                (click)="setKind('classic')"
+              >
+                <na-icon name="flame" [size]="22" />
+                <b>{{ 'form.kindClassic' | t }}</b>
+                <span class="muted small">{{ 'form.kindClassicHint' | t }}</span>
+              </button>
+              <button
+                type="button"
+                class="tile"
+                [class.on]="kindOf(f) === 'season'"
+                [attr.aria-pressed]="kindOf(f) === 'season'"
+                [disabled]="(locked() && f.udt) || (!currentSeason() && f.when === 'once')"
+                (click)="setKind('season')"
+              >
+                <na-icon name="crown" [size]="22" />
+                <b>{{ 'form.kindSeason' | t }}</b>
+                <span class="muted small">{{ 'form.kindSeasonHint' | t }}</span>
+              </button>
+              @if (auth.config().udt || f.udt) {
+                <button
+                  type="button"
+                  class="tile udt"
+                  [class.on]="f.udt"
+                  [attr.aria-pressed]="f.udt"
+                  [disabled]="locked() || (!currentSeason() && f.when === 'once')"
+                  (click)="setKind('udt')"
+                >
+                  <na-udt-mark [size]="22" />
+                  <b>{{ 'form.kindUdt' | t }}</b>
+                  <span class="muted small">{{ 'form.kindUdtHint' | t }}</span>
+                </button>
+              }
+            </div>
+            <p class="muted small">
+              {{
+                (f.udt ? 'form.udtSeason' : f.seasonal ? 'form.seasonHint' : 'form.classicHint') | t
+              }}
+              @if (currentSeason(); as n) {
+                <span class="ok">{{ 'form.seasonRunning' | t: { n } }}</span>
+              } @else if (f.when === 'series') {
+                {{ 'form.seasonalSeries' | t }}
+              } @else {
+                <span class="err">{{ 'form.seasonNone' | t }}</span>
+              }
+            </p>
+            @if (f.udt) {
+              <fieldset class="plain udtbox" [disabled]="locked()">
+                <legend>{{ 'form.udtRules' | t }}</legend>
+                <div class="fields">
+                  <div class="field">
+                    <label for="fucap">{{ 'form.udtCap' | t }}</label>
+                    <input
+                      id="fucap"
+                      type="number"
+                      name="udtCap"
+                      min="0"
+                      step="100"
+                      [(ngModel)]="f.udtCap"
+                      (ngModelChange)="touch()"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fustars">{{ 'form.udtStars' | t }}</label>
+                    <select
+                      id="fustars"
+                      name="udtStars"
+                      [(ngModel)]="f.udtStars"
+                      (ngModelChange)="touch()"
+                    >
+                      <option [ngValue]="-1">{{ 'form.udtNoLimit' | t }}</option>
+                      @for (n of [0, 1, 2, 3, 4, 5]; track n) {
+                        <option [ngValue]="n">{{ n }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="futicket">{{ 'form.udtTicket' | t }}</label>
+                    <input
+                      id="futicket"
+                      type="number"
+                      name="udtTicket"
+                      min="0"
+                      step="100"
+                      [(ngModel)]="f.udtTicket"
+                      (ngModelChange)="touch()"
+                    />
+                  </div>
+                  @if (f.udtTicket > 0) {
+                    <div class="field">
+                      <label for="fumin">{{ 'form.udtMinTeams' | t }}</label>
+                      <input
+                        id="fumin"
+                        type="number"
+                        name="udtMinTeams"
+                        min="2"
+                        max="16"
+                        [(ngModel)]="f.udtMinTeams"
+                        (ngModelChange)="touch()"
+                      />
+                    </div>
+                  }
+                </div>
+                <p class="muted small">{{ 'form.udtHint' | t }} {{ 'form.udtTicketHint' | t }}</p>
+                <div class="optrows">
+                  @if (f.udtTicket > 0) {
+                    <label class="switch optrow"
+                      ><span class="ot"
+                        ><b>{{ 'form.udtTicketIndexed' | t }}</b></span
+                      ><input
+                        type="checkbox"
+                        name="udtTicketIndexed"
+                        [(ngModel)]="f.udtTicketIndexed"
+                        (ngModelChange)="touch()" /><span class="tr"></span
+                    ></label>
+                  }
+                  <label class="switch optrow"
+                    ><span class="ot"
+                      ><b>{{ 'form.udtFinale' | t }}</b
+                      ><span class="muted small">{{ 'form.udtFinaleHint' | t }}</span></span
+                    ><input
+                      type="checkbox"
+                      name="udtFinale"
+                      [(ngModel)]="f.udtFinale"
+                      (ngModelChange)="touch()" /><span class="tr"></span
+                  ></label>
+                </div>
+              </fieldset>
             }
 
             @if (canChooseWhen()) {
@@ -399,144 +583,34 @@ function toLocalInput(iso: string | null): string {
               }
             }
 
-            <div class="switches">
+            <div class="lbl">{{ 'form.flow' | t }}</div>
+            <div class="optrows">
               @if (f.when === 'once') {
-                <label class="switch"
+                <label class="switch optrow"
+                  ><span class="ot"
+                    ><b>{{ 'form.registrationOpen' | t }}</b
+                    ><span class="muted small">{{ 'form.registrationOpenHint' | t }}</span></span
                   ><input
                     type="checkbox"
                     name="reg"
                     [(ngModel)]="f.registrationOpen"
-                    (ngModelChange)="touch()"
-                  /><span class="tr"></span>{{ 'form.registrationOpen' | t }}</label
-                >
+                    (ngModelChange)="touch()" /><span class="tr"></span
+                ></label>
               }
-              @if (!f.udt) {
-                <label class="switch"
-                  ><input
-                    type="checkbox"
-                    name="seasonal"
-                    [(ngModel)]="f.seasonal"
-                    (ngModelChange)="touch()"
-                    [disabled]="!currentSeason() && !f.seasonal && f.when === 'once'"
-                  /><span class="tr"></span>{{ 'form.seasonal' | t }}</label
-                >
-              }
-              <label class="switch"
+              <label class="switch optrow"
+                ><span class="ot"
+                  ><b>{{ 'form.autoStart' | t }}</b
+                  ><span class="muted small">{{ 'form.autoStartHint' | t }}</span></span
                 ><input
                   type="checkbox"
                   name="autoStart"
                   [(ngModel)]="f.autoStart"
                   (ngModelChange)="touch()"
-                  [disabled]="f.when === 'once' && !f.scheduledAt && !f.autoStart"
-                /><span class="tr"></span>{{ 'form.autoStart' | t }}</label
-              >
+                  [disabled]="f.when === 'once' && !f.scheduledAt && !f.autoStart" /><span
+                  class="tr"
+                ></span
+              ></label>
             </div>
-            @if (f.autoStart) {
-              <p class="muted small">{{ 'form.autoStartHint' | t }}</p>
-            }
-            @if (auth.config().udt || f.udt) {
-              <label class="switch"
-                ><input
-                  type="checkbox"
-                  name="udt"
-                  [(ngModel)]="f.udt"
-                  (ngModelChange)="f.udt && (f.seasonal = true); touch()"
-                  [disabled]="locked()"
-                /><span class="tr"></span>{{ 'form.udt' | t }}</label
-              >
-              @if (f.udt) {
-                <div class="row gap">
-                  <label
-                    >{{ 'form.udtCap' | t }}
-                    <input
-                      type="number"
-                      name="udtCap"
-                      min="0"
-                      step="100"
-                      class="narrow"
-                      [(ngModel)]="f.udtCap"
-                      (ngModelChange)="touch()"
-                      [disabled]="locked()"
-                    />
-                  </label>
-                  <label
-                    >{{ 'form.udtStars' | t }}
-                    <select
-                      name="udtStars"
-                      [(ngModel)]="f.udtStars"
-                      (ngModelChange)="touch()"
-                      [disabled]="locked()"
-                    >
-                      <option [ngValue]="-1">{{ 'form.udtNoLimit' | t }}</option>
-                      @for (n of [0, 1, 2, 3, 4, 5]; track n) {
-                        <option [ngValue]="n">{{ n }}</option>
-                      }
-                    </select>
-                  </label>
-                </div>
-                <p class="muted small">{{ 'form.udtHint' | t }}</p>
-                <div class="row gap">
-                  <label
-                    >{{ 'form.udtTicket' | t }}
-                    <input
-                      type="number"
-                      name="udtTicket"
-                      min="0"
-                      step="100"
-                      class="narrow"
-                      [(ngModel)]="f.udtTicket"
-                      (ngModelChange)="touch()"
-                      [disabled]="locked()"
-                    />
-                  </label>
-                  @if (f.udtTicket > 0) {
-                    <label
-                      >{{ 'form.udtMinTeams' | t }}
-                      <input
-                        type="number"
-                        name="udtMinTeams"
-                        min="2"
-                        max="16"
-                        class="narrow"
-                        [(ngModel)]="f.udtMinTeams"
-                        (ngModelChange)="touch()"
-                        [disabled]="locked()"
-                      />
-                    </label>
-                    <label class="switch"
-                      ><input
-                        type="checkbox"
-                        name="udtTicketIndexed"
-                        [(ngModel)]="f.udtTicketIndexed"
-                        (ngModelChange)="touch()"
-                        [disabled]="locked()"
-                      /><span class="tr"></span>{{ 'form.udtTicketIndexed' | t }}</label
-                    >
-                  }
-                </div>
-                <p class="muted small">{{ 'form.udtTicketHint' | t }}</p>
-                <label class="switch"
-                  ><input
-                    type="checkbox"
-                    name="udtFinale"
-                    [(ngModel)]="f.udtFinale"
-                    (ngModelChange)="touch()"
-                    [disabled]="locked()"
-                  /><span class="tr"></span>{{ 'form.udtFinale' | t }}</label
-                >
-                <p class="muted small">{{ 'form.udtFinaleHint' | t }}</p>
-              }
-            }
-            <p class="muted small">
-              {{ (f.udt ? 'form.udtSeason' : 'form.seasonalHint') | t }}
-              @if (currentSeason(); as n) {
-                <span class="ok">{{ 'form.seasonRunning' | t: { n } }}</span>
-              } @else if (f.when === 'series') {
-                {{ 'form.seasonalSeries' | t }}
-              } @else {
-                <span class="err">{{ 'form.seasonNone' | t }}</span>
-              }
-            </p>
           </section>
 
           <!-- 2 Game and bracket -->
@@ -566,6 +640,33 @@ function toLocalInput(iso: string | null): string {
                 <span class="muted small">{{ 'form.gameMhHint' | t }}</span>
               </button>
             </div>
+
+            <div class="lbl">{{ 'form.length' | t }}</div>
+            <div class="seg len" role="group" [attr.aria-label]="'form.length' | t">
+              @for (l of lengths; track l) {
+                <button
+                  type="button"
+                  [class.on]="lengthNow() === l"
+                  [attr.aria-pressed]="lengthNow() === l"
+                  [disabled]="locked()"
+                  (click)="setLength(l)"
+                >
+                  <b>{{ 'form.len.' + l | t }}</b>
+                  <small>{{ lengthText(l) }}</small>
+                </button>
+              }
+              <button
+                type="button"
+                [class.on]="lengthNow() === 'custom'"
+                [attr.aria-pressed]="lengthNow() === 'custom'"
+                [disabled]="locked()"
+                (click)="customOpen.set(!customOpen())"
+              >
+                <b>{{ 'form.len.custom' | t }}</b>
+                <small>{{ 'form.lenCustomHint' | t }}</small>
+              </button>
+            </div>
+            <p class="muted small">{{ durationText() }}</p>
 
             <div class="opts">
               <div>
@@ -629,18 +730,43 @@ function toLocalInput(iso: string | null): string {
                 </div>
               </div>
             </div>
-            @if (f.format === 'double') {
-              <label class="switch"
-                ><input
-                  type="checkbox"
-                  name="gfr"
-                  [(ngModel)]="f.grandFinalReset"
-                  (ngModelChange)="touch()"
-                  [disabled]="locked()"
-                /><span class="tr"></span>{{ 'form.gfReset' | t }}</label
-              >
+            <div class="optrows">
+              @if (f.format === 'double') {
+                <label class="switch optrow"
+                  ><span class="ot"
+                    ><b>{{ 'form.gfReset' | t }}</b></span
+                  ><input
+                    type="checkbox"
+                    name="gfr"
+                    [(ngModel)]="f.grandFinalReset"
+                    (ngModelChange)="touch()"
+                    [disabled]="locked()" /><span class="tr"></span
+                ></label>
+              }
+              @if (f.teamSize > 1) {
+                <label class="switch optrow"
+                  ><span class="ot"
+                    ><b>{{ 'form.clanTeams' | t }}</b
+                    ><span class="muted small">{{ 'form.clanTeamsHint' | t }}</span></span
+                  ><input
+                    type="checkbox"
+                    name="clanTeams"
+                    [(ngModel)]="f.clanTeams"
+                    [disabled]="locked()" /><span class="tr"></span
+                ></label>
+              }
+            </div>
+            @if (tooFewBots()) {
+              <p class="error small">{{ 'form.botsTooFew' | t: { n: f.teamSize * 2 } }}</p>
             }
-            <details class="more" [open]="boCustomized()">
+            @if (ownPool()) {
+              <p class="notice small">{{ 'form.botsLegacy' | t }}</p>
+            }
+            <details
+              class="more"
+              [open]="lengthNow() === 'custom' || customOpen()"
+              (toggle)="customOpen.set($any($event.target).open)"
+            >
               <summary>{{ 'form.boCustom' | t }}</summary>
               <div class="fields">
                 @for (k of boKeys(); track k.key) {
@@ -881,7 +1007,7 @@ function toLocalInput(iso: string | null): string {
                     id="fprof"
                     name="profile"
                     [(ngModel)]="f.profileId"
-                    (ngModelChange)="touch()"
+                    (ngModelChange)="onProfile()"
                   >
                     @for (p of profiles(); track p.id) {
                       <option [value]="p.id">{{ p.name }}</option>
@@ -904,84 +1030,9 @@ function toLocalInput(iso: string | null): string {
             }
           </section>
 
-          <!-- 5 Bots -->
+          <!-- 5 Discord -->
           <section class="card sec">
-            <header class="sh">
-              <span class="no">5</span>{{ 'form.secBots' | t }}
-              <span class="grow"></span>
-              <a class="btn small" routerLink="/admin/bots">{{ 'form.botsCenter' | t }}</a>
-            </header>
-            @if (activeLibrary().length) {
-              <p>
-                {{ 'form.botsFromCenter' | t: { n: activeLibrary().length } }}
-              </p>
-              <div class="bots">
-                @for (b of activeLibrary(); track b.id) {
-                  <a class="bchip" [routerLink]="['/bots', b.id]" [title]="'skill.' + b.skill | t">
-                    <span class="sk" [attr.data-s]="b.skill">{{ b.skill }}</span>
-                    {{ b.gameName }}
-                  </a>
-                }
-              </div>
-            } @else {
-              <p class="notice">{{ 'form.botsNone' | t }}</p>
-            }
-            @if (tooFewBots()) {
-              <p class="error small">{{ 'form.botsTooFew' | t: { n: f.teamSize * 2 } }}</p>
-            }
-            @if (ownPool()) {
-              <p class="notice small">{{ 'form.botsLegacy' | t }}</p>
-            }
-            <p class="muted small">
-              @if (f.teamSize > 1) {
-                {{ 'form.botPoolHintTeam' | t: { n: f.teamSize * 2 } }}
-              } @else {
-                {{ 'form.botPoolHint' | t: { size: f.size } }}
-              }
-              {{ 'form.botsFixed' | t }}
-            </p>
-            <div class="switches">
-              @if (f.teamSize > 1) {
-                <label class="switch"
-                  ><input
-                    type="checkbox"
-                    name="clanTeams"
-                    [(ngModel)]="f.clanTeams"
-                    [disabled]="locked()"
-                  /><span class="tr"></span>{{ 'form.clanTeams' | t }}</label
-                >
-              }
-              <label class="switch"
-                ><input
-                  type="checkbox"
-                  name="ssb"
-                  [(ngModel)]="f.smartStockBots"
-                  [disabled]="locked()"
-                /><span class="tr"></span>{{ 'form.smartStockBots' | t }}</label
-              >
-            </div>
-            <p class="muted small">
-              @if (f.teamSize > 1) {
-                {{ 'form.clanTeamsHint' | t }}
-              }
-              {{ 'form.smartStockBotsHint' | t }}
-              @switch (ssbInstalled()) {
-                @case (true) {
-                  <span class="ok">{{ 'form.ssbInstalled' | t }}</span>
-                }
-                @case (false) {
-                  <span class="err">{{ 'form.ssbMissing' | t }}</span>
-                }
-                @default {
-                  {{ 'form.ssbUnknown' | t }}
-                }
-              }
-            </p>
-          </section>
-
-          <!-- 6 Discord -->
-          <section class="card sec">
-            <header class="sh"><span class="no">6</span>{{ 'form.notify' | t }}</header>
+            <header class="sh"><span class="no">5</span>{{ 'form.notify' | t }}</header>
             <div class="seg">
               @for (x of notifyModes; track x) {
                 <button
@@ -1011,10 +1062,10 @@ function toLocalInput(iso: string | null): string {
             </p>
           </section>
 
-          <!-- 7 Advanced -->
+          <!-- 6 Advanced -->
           <details class="card sec adv">
             <summary class="sh">
-              <span class="no">7</span>{{ 'form.secAdvanced' | t }}
+              <span class="no">6</span>{{ 'form.secAdvanced' | t }}
               <span class="muted small">{{ 'form.secAdvancedHint' | t }}</span>
             </summary>
             <fieldset class="plain" [disabled]="locked()">
@@ -1294,6 +1345,54 @@ function toLocalInput(iso: string | null): string {
     .seg.days button {
       min-width: 46px;
     }
+    .lbl {
+      font-size: 0.86rem;
+      font-weight: 600;
+      color: var(--text-2);
+      margin: 14px 0 6px;
+    }
+    .tiles.kinds {
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      margin-bottom: 6px;
+    }
+    .tiles.kinds .tile {
+      padding: 10px 14px;
+    }
+    .tile.udt.on {
+      border-color: var(--udt);
+      background: rgba(178, 107, 255, 0.12);
+      color: #d7b4ff;
+      box-shadow: inset 0 0 0 1px var(--udt);
+    }
+    fieldset.plain.udtbox {
+      border: 1px solid rgba(178, 107, 255, 0.45);
+      border-radius: var(--radius);
+      padding: 12px 16px 4px;
+      margin: 6px 0 14px;
+    }
+    fieldset.plain.udtbox legend {
+      padding: 0 6px;
+      font-weight: 700;
+      color: #d7b4ff;
+    }
+    .seg.len {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      width: 100%;
+    }
+    .seg.len button {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      padding: 8px 12px;
+      text-align: left;
+    }
+    .seg.len small {
+      font-weight: 500;
+      font-size: 0.74rem;
+      opacity: 0.85;
+    }
     .tiles {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1329,12 +1428,6 @@ function toLocalInput(iso: string | null): string {
       flex-wrap: wrap;
       gap: 14px 22px;
       margin-bottom: 12px;
-    }
-    .switches {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px 24px;
-      margin: 10px 0 4px;
     }
     fieldset.plain {
       border: 0;
@@ -1439,55 +1532,6 @@ function toLocalInput(iso: string | null): string {
       align-items: center;
       gap: 8px;
     }
-    .bots {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 10px;
-    }
-    .bchip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 3px 10px 3px 4px;
-      border: 1px solid var(--line);
-      border-radius: 999px;
-      color: var(--text);
-      font-size: 0.88rem;
-      background: var(--bg-2);
-    }
-    .bchip:hover {
-      border-color: var(--accent-dim);
-      text-decoration: none;
-    }
-    .sk {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      background: var(--panel-3);
-      color: var(--text-2);
-    }
-    .sk[data-s='5'],
-    .sk[data-s='6'] {
-      color: var(--neuro);
-    }
-    .sk[data-s='7'] {
-      background: var(--hot);
-      color: #fff;
-    }
-    .btn.small {
-      min-height: 30px;
-      padding: 3px 12px;
-      font-family: var(--font);
-      text-transform: none;
-      letter-spacing: 0;
-      font-size: 0.85rem;
-    }
     .hook {
       margin-top: 12px;
     }
@@ -1582,6 +1626,12 @@ function toLocalInput(iso: string | null): string {
       .tiles {
         grid-template-columns: 1fr;
       }
+      .seg.len {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .tiles.kinds {
+        grid-template-columns: 1fr;
+      }
       .mapsearch {
         width: 100%;
       }
@@ -1617,6 +1667,11 @@ export class TournamentFormPage {
   protected readonly ffChoices = [0, 50, 100] as const;
   protected readonly notifyModes = ['default', 'custom', 'off'] as const;
   protected readonly mapFilter = signal('');
+  protected readonly lengths: Length[] = ['short', 'medium', 'long'];
+  /** "Custom" opens the best of per round. */
+  protected readonly customOpen = signal(false);
+  /** Only a new tournament takes every map of the server (until maps are chosen by hand). */
+  private mapsByHand = true;
   protected newMap = '';
   /** Bumped when the model changes (the model is mutated in place by the form). */
   private readonly tick = signal(0);
@@ -1689,11 +1744,6 @@ export class TournamentFormPage {
     const n = this.activeLibrary().length;
     return !!f && f.teamSize > 1 && n > 0 && n < 2 * f.teamSize;
   });
-  /** true/false once the server was scanned, null if unknown. */
-  protected readonly ssbInstalled = computed(() => {
-    const pk = this.profile()?.inventory?.packages;
-    return pk ? pk.some((p) => p.toLowerCase() === 'smartstockbots') : null;
-  });
   protected readonly mapChoices = computed(() => {
     const f = this.model();
     const prefix = f?.game === 'mh' ? 'MH-' : 'DM-';
@@ -1734,9 +1784,24 @@ export class TournamentFormPage {
       );
     return keys;
   });
-  protected readonly boCustomized = computed(() => {
+  /** The length the settings match, else custom. */
+  protected readonly lengthNow = computed((): Length | 'custom' => {
     const f = this.model();
-    return !!f && !!(f.boSemi || f.boFinal || f.boLbFinal);
+    if (!f) return 'custom';
+    return this.lengths.find((l) => this.isLength(f, l)) ?? 'custom';
+  });
+
+  /** At most how long the bracket takes (every match to its last game, every game to the limit). */
+  protected readonly durationText = computed(() => {
+    const f = this.model();
+    if (!f) return '';
+    const n = this.maxGames(f);
+    const per = f.timeLimitMin || 15;
+    const total = n * (per + BETWEEN_GAMES_MIN);
+    const h = Math.floor(total / 60);
+    const min = total % 60;
+    const d = h ? `${h} h ${min ? `${min} min` : ''}`.trim() : `${min} min`;
+    return this.i18n.t('form.lenDuration', { d, n, m: per });
   });
 
   /** The schedule as the API takes it. */
@@ -1895,6 +1960,13 @@ export class TournamentFormPage {
           : this.defaults(agents.find((x) => x.online) ?? agents[0]);
         if (this.mode() === 'series') this.toSeries(f);
         this.m.set(f);
+        // A copy keeps its maps; a new one starts medium with every map of the server.
+        if (!from) {
+          this.mapsByHand = false;
+          this.applyLength(f, 'medium');
+          this.autoMaps(f);
+          this.touch();
+        }
       }
     } catch {
       // the Api shows the error as a toast
@@ -1943,9 +2015,6 @@ export class TournamentFormPage {
       mapMode: 'vote',
       voteTimeoutSec: 45,
       countdownSec: 5,
-      smartStockBots: !!a?.profiles[0]?.inventory?.packages?.some(
-        (p) => p.toLowerCase() === 'smartstockbots',
-      ),
       friendlyFirePct: 0,
       penaltySec: 5,
       monsterSkill: 5,
@@ -2002,7 +2071,6 @@ export class TournamentFormPage {
       mapMode: r['mapMode'] === 'random' ? 'random' : 'vote',
       voteTimeoutSec: num('voteTimeoutSec', 45),
       countdownSec: num('countdownSec', 5),
-      smartStockBots: r['smartStockBots'] === true,
       friendlyFirePct:
         r['friendlyFirePct'] === 50 || r['friendlyFirePct'] === 100 ? r['friendlyFirePct'] : 0,
       penaltySec: num('penaltySec', 5),
@@ -2099,6 +2167,97 @@ export class TournamentFormPage {
     f.scheduledAt = '';
   }
 
+  protected kindOf(f: Model): 'classic' | 'season' | 'udt' {
+    return f.udt ? 'udt' : f.seasonal ? 'season' : 'classic';
+  }
+
+  /** Classic, season or Dream Team (a Dream Team tournament always counts for the season). */
+  protected setKind(k: 'classic' | 'season' | 'udt') {
+    const f = this.m();
+    if (!f) return;
+    f.udt = k === 'udt';
+    f.seasonal = k !== 'classic';
+    this.touch();
+  }
+
+  private isLength(f: Model, l: Length): boolean {
+    const x = LENGTHS[l];
+    const keys: (keyof typeof x.bo)[] =
+      f.format === 'double'
+        ? ['boDefault', 'boSemi', 'boFinal', 'boLbFinal', 'boGrand']
+        : ['boDefault', 'boSemi', 'boFinal'];
+    if (keys.some((k) => f[k] !== x.bo[k])) return false;
+    if (f.game === 'mh') return f.timeLimitMin === x.mhMinutes;
+    const lim = lengthLimits(l, f.teamSize);
+    return f.fragLimit === lim.fragLimit && f.timeLimitMin === lim.timeLimitMin;
+  }
+
+  private applyLength(f: Model, l: Length) {
+    Object.assign(f, LENGTHS[l].bo);
+    if (f.game === 'mh') f.timeLimitMin = LENGTHS[l].mhMinutes;
+    else Object.assign(f, lengthLimits(l, f.teamSize));
+  }
+
+  protected setLength(l: Length) {
+    const f = this.m();
+    if (!f) return;
+    this.applyLength(f, l);
+    this.customOpen.set(false);
+    this.touch();
+  }
+
+  /** "Bo1 · 8 frags · 8 min" for the length buttons (the current mode). */
+  protected lengthText(l: Length): string {
+    const f = this.model();
+    if (!f) return '';
+    const x = LENGTHS[l];
+    const bo = [`Bo${x.bo.boDefault}`];
+    if (x.bo.boFinal) bo.push(this.i18n.t('form.lenFinal', { n: x.bo.boFinal }));
+    if (f.game === 'mh') return `${bo.join(' · ')} · ${x.mhMinutes} min`;
+    const lim = lengthLimits(l, f.teamSize);
+    return `${bo.join(' · ')} · ${lim.fragLimit} ${this.i18n.t('form.uFrags')} · ${lim.timeLimitMin} min`;
+  }
+
+  /** Games of the bracket if every match goes the distance. */
+  private maxGames(f: Model): number {
+    const rounds = Math.log2(f.size);
+    const bo = (x: number) => x || f.boDefault;
+    // Winners' side (single elimination: the bracket): matches per round, semi-finals, final.
+    let games = 0;
+    for (let r = 1; r <= rounds; r++) {
+      const matches = f.size / 2 ** r;
+      const b = r === rounds ? bo(f.boFinal) : r === rounds - 1 ? bo(f.boSemi) : f.boDefault;
+      games += matches * b;
+    }
+    if (f.format === 'double') {
+      // Losers' side: size - 2 matches (its final with its own best of), the grand final (reset).
+      const lb = f.size - 2;
+      games += Math.max(0, lb - 1) * f.boDefault + (lb > 0 ? bo(f.boLbFinal) : 0);
+      games += bo(f.boGrand) * (f.grandFinalReset ? 2 : 1);
+    }
+    return games;
+  }
+
+  /** A new tournament: every map of the server for its game (until maps are chosen by hand). */
+  private autoMaps(f: Model) {
+    if (this.mapsByHand) return;
+    const prefix = f.game === 'mh' ? 'MH-' : 'DM-';
+    const maps = this.inventoryMaps()
+      .map((x) => x.id)
+      .filter((id) => id.toUpperCase().startsWith(prefix));
+    if (maps.length) f.mapPool = maps;
+    else if (f.game === 'dm') f.mapPool = [...STOCK_POOL];
+  }
+
+  protected onProfile() {
+    const f = this.m();
+    if (!f) return;
+    // The profile read below follows the model only after a touch.
+    this.touch();
+    this.autoMaps(f);
+    this.touch();
+  }
+
   protected setWhen(w: When) {
     const f = this.m();
     if (!f || f.when === w) return;
@@ -2111,13 +2270,10 @@ export class TournamentFormPage {
   protected onTeamSize(k: number) {
     const f = this.m();
     if (!f) return;
-    const before = LIMITS[f.teamSize];
-    const after = LIMITS[k];
-    if (before && after && f.game === 'dm') {
-      if (f.fragLimit === before.fragLimit) f.fragLimit = after.fragLimit;
-      if (f.timeLimitMin === before.timeLimitMin) f.timeLimitMin = after.timeLimitMin;
-    }
+    // A length's limits follow the mode (custom ones stay).
+    const len = this.lengthNow();
     f.teamSize = k;
+    if (len !== 'custom') this.applyLength(f, len);
     if (k > 1 && f.size > 16) f.size = 16;
     this.touch();
   }
@@ -2126,6 +2282,7 @@ export class TournamentFormPage {
   protected onGame(game: 'dm' | 'mh') {
     const f = this.m();
     if (!f || f.game === game) return;
+    const len = this.lengthNow();
     const prefix = game === 'mh' ? 'MH-' : 'DM-';
     f.mapPool = f.mapPool.filter((id) => id.toUpperCase().startsWith(prefix));
     if (game === 'mh') {
@@ -2141,6 +2298,8 @@ export class TournamentFormPage {
       if (!f.mapPool.length) f.mapPool = [...STOCK_POOL];
     }
     f.game = game;
+    if (len !== 'custom') this.applyLength(f, len);
+    this.autoMaps(f);
     this.touch();
   }
 
@@ -2149,11 +2308,14 @@ export class TournamentFormPage {
     if (!f) return;
     f.profileId = this.agents().find((a) => a.id === f.agentId)?.profiles[0]?.id ?? '';
     this.touch();
+    this.autoMaps(f);
+    this.touch();
   }
 
   protected toggleMap(id: string) {
     const f = this.m();
     if (!f) return;
+    this.mapsByHand = true;
     const i = f.mapPool.indexOf(id);
     if (i >= 0) f.mapPool.splice(i, 1);
     else f.mapPool.push(id);
@@ -2164,6 +2326,7 @@ export class TournamentFormPage {
   protected allMaps(on: boolean) {
     const f = this.m();
     if (!f) return;
+    this.mapsByHand = true;
     const shown = this.shownMaps().map((x) => x.id);
     f.mapPool = on
       ? [...new Set([...f.mapPool, ...shown])]
@@ -2175,6 +2338,7 @@ export class TournamentFormPage {
     const id = this.newMap.trim();
     const f = this.m();
     if (!f || !id) return;
+    this.mapsByHand = true;
     if (!f.mapPool.includes(id)) f.mapPool.push(id);
     this.newMap = '';
     this.touch();
@@ -2210,7 +2374,6 @@ export class TournamentFormPage {
           mapPool: f.mapPool,
           voteTimeoutSec: f.voteTimeoutSec,
           countdownSec: f.countdownSec,
-          smartStockBots: f.smartStockBots,
           friendlyFirePct: f.game === 'mh' ? 0 : f.friendlyFirePct,
           penaltySec: f.penaltySec,
           monsterSkill: f.monsterSkill,

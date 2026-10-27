@@ -411,6 +411,32 @@ export class TournamentsService {
     return STOCK_BOTS.map((b) => ({ ...b }));
   }
 
+  /**
+   * The settings a tournament starts with (its first event, which the bridge plays by): the
+   * website's SmartStockBots setting for every tournament - auto: on when the server has
+   * SmartStockBots.u (unknown packages: off).
+   */
+  private launchSettings(t: TournamentRow, settings: TournamentSettings): TournamentSettings {
+    const mode = this.settingsSvc.get().botAi.smartStockBots;
+    const inv = z
+      .object({ packages: z.array(z.string()) })
+      .safeParse(this.agents.inventory(t.agentId, t.profileId));
+    const has = inv.success
+      ? inv.data.packages.some((p) => p.toLowerCase() === 'smartstockbots')
+      : null;
+    // On: also where the server was not scanned; a server known to lack it plays without (the
+    // bridge would refuse the game).
+    let on = mode === 'on' ? has !== false : mode === 'auto' && has === true;
+    if (mode === 'on' && has === false) {
+      this.logger.warn(`SmartStockBots is on, but server ${t.agentId}/${t.profileId} lacks it`);
+      on = false;
+    }
+    return {
+      ...settings,
+      game: { ...settings.game, rules: { ...settings.game.rules, smartStockBots: on } },
+    };
+  }
+
   /** Checks a series template (as a tournament would be checked when it is created). */
   checkTemplate(t: Omit<CreateTournament, 'name'>): void {
     this.checkFields({
@@ -1358,7 +1384,7 @@ export class TournamentsService {
       batch.push({
         type: 'tournament.created',
         actor,
-        data: { tournamentId: id, name: t.name, settings },
+        data: { tournamentId: id, name: t.name, settings: this.launchSettings(t, settings) },
       });
     }
     batch.push({
@@ -1427,7 +1453,7 @@ export class TournamentsService {
       batch.push({
         type: 'tournament.created',
         actor,
-        data: { tournamentId: t.id, name: t.name, settings },
+        data: { tournamentId: t.id, name: t.name, settings: this.launchSettings(t, settings) },
       });
     batch.push({
       type: 'seeding.set',
@@ -2145,7 +2171,8 @@ export class TournamentsService {
       profileId: t.profileId,
       connectAddress: this.connectAddress(t),
       connectAddressOverride: t.connectAddress,
-      settings: this.settings(t),
+      // Once seeded, as the game plays them (SmartStockBots is set then, decision 225).
+      settings: proj?.settings ?? this.settings(t),
       botPool: this.botPool(t),
       botsFromLibrary: t.botsFromLibrary,
       seriesId: t.seriesId,

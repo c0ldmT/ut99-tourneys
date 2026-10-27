@@ -810,6 +810,34 @@ label.switch {
   font-size: 0.95rem;
   margin: 0;
 }
+/* A switch as a settings row: title and hint on the left, the switch on the right. */
+.optrows {
+  margin: 6px 0 10px;
+}
+label.switch.optrow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.optrows > label.switch.optrow:first-child {
+  border-top: 0;
+}
+.optrow .ot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.optrow .ot b {
+  font-weight: 600;
+}
+.optrow .ot .small {
+  font-weight: 400;
+}
 label.switch input {
   position: absolute;
   opacity: 0;

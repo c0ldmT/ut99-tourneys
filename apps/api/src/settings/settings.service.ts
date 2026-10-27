@@ -75,6 +75,11 @@ export const BotAiSettingsSchema = z.object({
    * speed, view, dodging and aim; off = UT's own levels (novice switch below Adept).
    */
   skillCurve: z.boolean().default(true),
+  /**
+   * SmartStockBots (bot mod as a server actor) in every game: auto = when the server has
+   * SmartStockBots.u (its scanned packages), on, off. Applied when a tournament is seeded.
+   */
+  smartStockBots: z.enum(['auto', 'on', 'off']).default('auto'),
 });
 export type BotAiSettings = z.infer<typeof BotAiSettingsSchema>;
 

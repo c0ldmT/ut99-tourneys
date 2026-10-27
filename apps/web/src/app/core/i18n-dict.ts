@@ -7,9 +7,6 @@ const en = {
   'nav.agents': 'Servers',
   'nav.users': 'Users',
   'nav.stats': 'Statistics',
-  'form.seasonal': 'Season tournament',
-  'form.seasonalHint':
-    'On: every game counts for the ratings and the season statistics and records (the season of the first game). Off: only the lifetime statistics.',
   'form.seasonRunning': 'Season {n} is running.',
   'form.seasonNone':
     'No season is running: season tournaments can only be created in season (Settings).',
@@ -539,14 +536,9 @@ const en = {
   'form.noMaps': 'No maps – scan the server or add one below.',
   'form.secServer': 'Game server',
   'form.secBots': 'Bots',
-  'form.botsCenter': 'Control center',
-  'form.botsFromCenter': '{n} active bots of the control center play, with the skill set there.',
-  'form.botsNone':
-    'No active bot in the control center: the bots of the server configuration play (else the stock bots).',
   'form.botsTooFew': 'Team games need at least {n} different active bots.',
   'form.botsLegacy':
     'This tournament still has its own bot list; saving switches it to the control center.',
-  'form.botsFixed': 'Changes in the control center count until the bracket is seeded.',
   'form.secAdvanced': 'Advanced',
   'form.secAdvancedHint': 'check-in, reconnects, map vote, bot games',
   'form.summary': 'Summary',
@@ -588,8 +580,6 @@ const en = {
   'form.friendlyFire': 'Friendly fire',
   'form.teamRulesHint':
     'Team deathmatch: the frag limit is the team score. Changing the mode updates suggested limits.',
-  'form.botPoolHintTeam':
-    'Bots fill team places nobody takes and teams without players. At least {n} different bots are needed.',
   'form.gfReset': 'Grand final reset',
   'form.boDefault': 'Games per match',
   'form.boSame': 'like the others',
@@ -604,12 +594,6 @@ const en = {
   'form.mapRandom': 'Random',
   'form.voteTimeout': 'Vote time (s)',
   'form.countdown': 'Countdown (s)',
-  'form.smartStockBots': 'SmartStockBots (smarter bots)',
-  'form.smartStockBotsHint':
-    'Server-side bot mod; players need nothing. Needs SmartStockBots.u in the System folder of the server:',
-  'form.ssbInstalled': 'installed',
-  'form.ssbMissing': 'not found on this server',
-  'form.ssbUnknown': 'unknown (scan the server first)',
   'form.addMap': 'Add',
   'form.noInventory':
     'The server was not scanned yet; showing the standard maps. Scan it on the servers page.',
@@ -627,8 +611,6 @@ const en = {
   'form.botPlacement': 'Empty slots',
   'form.botByes': 'Bots on the lowest seeds',
   'form.botRandom': 'Bots at random',
-  'form.botPoolHint':
-    'Bots fill the empty slots of the {size} bracket and replace players who do not check in.',
   'form.create': 'Create',
 
   'bracket.winners': 'Winners bracket',
@@ -1104,6 +1086,32 @@ const en = {
   'botAi.skillCurve': 'Skill curve instead of the novice switch (all game types)',
   'botAi.skillCurveHint':
     'All levels use the full bot AI: the level sets speed (Novice 70 % … Skilled 90 %), view, hearing, how often bots dodge and how well they aim; the aim error drifts instead of jumping with every shot, bots stop firing at walls after about a second. Off: UT’s own levels. Needs mod 0.13.0.',
+  'form.kind': 'Kind',
+  'form.kindClassic': 'Classic',
+  'form.kindClassicHint': 'Lifetime statistics only',
+  'form.kindSeason': 'Season',
+  'form.kindSeasonHint': 'Ratings, season statistics, bets',
+  'form.kindUdt': 'Dream Team',
+  'form.kindUdtHint': 'The managers’ lineups',
+  'form.classicHint': 'Counts for the lifetime statistics only.',
+  'form.seasonHint':
+    'Every game counts for the ratings and the season statistics and records (the season of the first game).',
+  'form.udtRules': 'Dream Team rules',
+  'form.registrationOpenHint': 'Players can sign up on the tournament page.',
+  'form.length': 'Tournament length',
+  'form.len.short': 'Short',
+  'form.len.medium': 'Medium',
+  'form.len.long': 'Long',
+  'form.len.custom': 'Custom',
+  'form.lenCustomHint': 'Your own best of and limits',
+  'form.lenFinal': 'final Bo{n}',
+  'form.lenDuration': 'At most about {d}: {n} games of up to {m} min, with breaks.',
+  'botAi.ssb': 'SmartStockBots (smarter bots)',
+  'botAi.ssbAuto': 'Automatic: on when the server has it',
+  'botAi.ssbOn': 'On',
+  'botAi.ssbOff': 'Off',
+  'botAi.ssbHint':
+    'Bot mod on the game server only (players need nothing): SmartStockBots.u in the server’s System folder. Applies to every tournament, the league and Dream Team cups, from the next draw on. Automatic switches it on where the scanned server has it.',
   'bets.discordLabel':
     "Post bets in the tournament's Discord channel (open, closed with pools, payout, summary)",
   'bets.botsPerMatch': 'Bots per match (at most)',
@@ -1678,7 +1686,6 @@ const en = {
   'udt.settings.offers': 'Offers per day',
   'udt.settings.budget': 'Starter budget (points)',
   'udt.settings.extra': 'Extra points to allocate',
-  'form.udt': 'Dream Team tournament (managers’ lineups)',
   'form.udtCap': 'Team value cap (reference, 0 = none)',
   'form.udtStars': 'Bots of skill 6-7 at most',
   'form.udtNoLimit': 'no limit',
@@ -2233,9 +2240,6 @@ const de: Record<TKey, string> = {
   'nav.agents': 'Server',
   'nav.users': 'Benutzer',
   'nav.stats': 'Statistiken',
-  'form.seasonal': 'Season-Turnier',
-  'form.seasonalHint':
-    'An: jedes Spiel zählt für die Ratings und die Season-Statistiken und -Rekorde (die Season des ersten Spiels). Aus: nur die Lifetime-Statistiken.',
   'form.seasonRunning': 'Season {n} läuft.',
   'form.seasonNone':
     'Gerade läuft keine Season: Season-Turniere gibt es nur in Season (Einstellungen).',
@@ -2769,15 +2773,9 @@ const de: Record<TKey, string> = {
   'form.noMaps': 'Keine Maps – Server einlesen oder unten eine hinzufügen.',
   'form.secServer': 'Gameserver',
   'form.secBots': 'Bots',
-  'form.botsCenter': 'Kontrollzentrum',
-  'form.botsFromCenter':
-    'Es spielen die {n} aktiven Bots des Kontrollzentrums, mit der Stärke von dort.',
-  'form.botsNone':
-    'Kein aktiver Bot im Kontrollzentrum: es spielen die Bots der Server-Konfiguration (sonst die Standard-Bots).',
   'form.botsTooFew': 'Team-Spiele brauchen mindestens {n} verschiedene aktive Bots.',
   'form.botsLegacy':
     'Dieses Turnier hat noch eine eigene Bot-Liste; beim Speichern wechselt es zum Kontrollzentrum.',
-  'form.botsFixed': 'Änderungen im Kontrollzentrum zählen, bis der Turnierbaum gesetzt ist.',
   'form.secAdvanced': 'Erweitert',
   'form.secAdvancedHint': 'Check-in, Reconnects, Map-Abstimmung, Bot-Spiele',
   'form.summary': 'Zusammenfassung',
@@ -2819,8 +2817,6 @@ const de: Record<TKey, string> = {
   'form.friendlyFire': 'Teamschaden',
   'form.teamRulesHint':
     'Team-Deathmatch: Das Fraglimit gilt für den Teamscore. Beim Moduswechsel passen sich die vorgeschlagenen Limits an.',
-  'form.botPoolHintTeam':
-    'Bots füllen freie Teamplätze und Teams ohne Spieler. Es werden mindestens {n} verschiedene Bots gebraucht.',
   'form.gfReset': 'Grand-Final-Reset',
   'form.boDefault': 'Spiele pro Match',
   'form.boSame': 'wie die anderen',
@@ -2835,12 +2831,6 @@ const de: Record<TKey, string> = {
   'form.mapRandom': 'Zufällig',
   'form.voteTimeout': 'Abstimmungszeit (s)',
   'form.countdown': 'Countdown (s)',
-  'form.smartStockBots': 'SmartStockBots (schlauere Bots)',
-  'form.smartStockBotsHint':
-    'Bot-Mod nur auf dem Server; die Spieler brauchen nichts. Benötigt SmartStockBots.u im System-Ordner des Servers:',
-  'form.ssbInstalled': 'installiert',
-  'form.ssbMissing': 'auf diesem Server nicht gefunden',
-  'form.ssbUnknown': 'unbekannt (Server zuerst einlesen)',
   'form.addMap': 'Hinzufügen',
   'form.noInventory':
     'Der Server wurde noch nicht eingelesen; es werden die Standard-Maps gezeigt. Einlesen auf der Server-Seite.',
@@ -2858,8 +2848,6 @@ const de: Record<TKey, string> = {
   'form.botPlacement': 'Freie Plätze',
   'form.botByes': 'Bots auf die schwächsten Setzplätze',
   'form.botRandom': 'Bots zufällig',
-  'form.botPoolHint':
-    'Bots füllen die freien Plätze des {size}er-Baums und ersetzen Spieler, die nicht zum Check-in kommen.',
   'form.create': 'Anlegen',
 
   'bracket.winners': 'Winners Bracket',
@@ -3341,6 +3329,32 @@ const de: Record<TKey, string> = {
   'botAi.skillCurve': 'Skill-Kurve statt Novice-Schalter (alle Spielmodi)',
   'botAi.skillCurveHint':
     'Alle Stufen nutzen die volle Bot-KI: Die Stufe bestimmt Tempo (Novice 70 % … Skilled 90 %), Sicht, Gehör, wie oft Bots ausweichen und wie gut sie zielen; der Zielfehler driftet statt mit jedem Schuss zu springen, auf Wände feuern sie nur noch etwa eine Sekunde. Aus: die Stufen von UT. Braucht Mod 0.13.0.',
+  'form.kind': 'Art',
+  'form.kindClassic': 'Klassisch',
+  'form.kindClassicHint': 'Nur Lifetime-Statistik',
+  'form.kindSeason': 'Season',
+  'form.kindSeasonHint': 'Ratings, Season-Statistik, Wetten',
+  'form.kindUdt': 'Dream Team',
+  'form.kindUdtHint': 'Aufstellungen der Manager',
+  'form.classicHint': 'Zählt nur für die Lifetime-Statistiken.',
+  'form.seasonHint':
+    'Jedes Spiel zählt für die Ratings und die Season-Statistiken und -Rekorde (die Season des ersten Spiels).',
+  'form.udtRules': 'Dream-Team-Regeln',
+  'form.registrationOpenHint': 'Spieler können sich auf der Turnierseite anmelden.',
+  'form.length': 'Turnierlänge',
+  'form.len.short': 'Kurz',
+  'form.len.medium': 'Mittel',
+  'form.len.long': 'Lang',
+  'form.len.custom': 'Eigene',
+  'form.lenCustomHint': 'Best-of und Limits selbst',
+  'form.lenFinal': 'Finale Bo{n}',
+  'form.lenDuration': 'Höchstens etwa {d}: {n} Spiele à bis zu {m} min, mit Pausen.',
+  'botAi.ssb': 'SmartStockBots (schlauere Bots)',
+  'botAi.ssbAuto': 'Automatisch: an, wenn der Server es hat',
+  'botAi.ssbOn': 'An',
+  'botAi.ssbOff': 'Aus',
+  'botAi.ssbHint':
+    'Bot-Mod nur auf dem Spielserver (Spieler brauchen nichts): SmartStockBots.u im System-Ordner des Servers. Gilt für alle Turniere, die Liga und Dream-Team-Cups, ab der nächsten Auslosung. Automatisch schaltet es dort ein, wo der eingelesene Server es hat.',
   'bets.discordLabel':
     'Wetten im Discord-Channel des Turniers posten (offen, geschlossen mit Pools, Auszahlung, Bilanz)',
   'bets.botsPerMatch': 'Bots pro Match (höchstens)',
@@ -3919,7 +3933,6 @@ const de: Record<TKey, string> = {
   'udt.settings.offers': 'Angebote pro Tag',
   'udt.settings.budget': 'Starter-Budget (Punkte)',
   'udt.settings.extra': 'Extrapunkte zum Verteilen',
-  'form.udt': 'Dream-Team-Turnier (Aufstellungen der Manager)',
   'form.udtCap': 'Teamwert-Grenze (Referenz, 0 = keine)',
   'form.udtStars': 'Höchstens Bots mit Skill 6–7',
   'form.udtNoLimit': 'keine Grenze',

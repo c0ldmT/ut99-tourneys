@@ -497,7 +497,7 @@ export interface WebsiteSettings {
   };
   shop: ShopSettings;
   /** Bot AI help in deathmatch: 0 off, 1 failsafe, 2 failsafe and duel mode. */
-  botAi: { level: number; skillCurve: boolean };
+  botAi: { level: number; skillCurve: boolean; smartStockBots: 'auto' | 'on' | 'off' };
   udt: UdtSettings;
   /** Live data: replay retention (days, 0 = for good) and the delay while humans play. */
   live: { replayDays: number; delaySec: number };
