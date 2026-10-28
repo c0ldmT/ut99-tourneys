@@ -21,6 +21,7 @@ import { ApproveBody, UdtCareerService } from './udt-career.service.js';
 import { KeepersBody, UdtKeepersService } from './udt-keepers.service.js';
 import {
   EstimateQuery,
+  FitQuery,
   TestLeagueBody,
   UdtLeagueService,
   type TestLeagueInput,
@@ -471,6 +472,22 @@ export class UdtController {
     return this.league.startTest(body);
   }
 
+  /** The plan of a league started late (start dialog): null when it does not fit. */
+  @AdminOnly()
+  @Get('league/fit')
+  leagueFit(@Query(new ZodPipe(FitQuery)) q: { startDate?: string }) {
+    return { plan: this.league.fit(q.startDate) };
+  }
+
+  /** A regular league in the running season, started now (decision 230). */
+  @AdminOnly()
+  @Post('league/start')
+  @HttpCode(200)
+  leagueStart(@Body(new ZodPipe(TestLeagueBody)) body: TestLeagueInput) {
+    return this.league.startRegular(body);
+  }
+
+  /** Calls the league off (a test league; a regular one before its first game). */
   @AdminOnly()
   @Delete('league/test')
   leagueTestAbort() {

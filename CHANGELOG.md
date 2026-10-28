@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Settings → UDT Liga: a status card shows where the league stands (off, starts on …, starts next season, evening x of y, champion) and starts a regular league or a test run in the running season at once (with its plan).
 - Activity bar under the header: everybody sees when the server sets up a league evening (with progress) or is very busy and pages take longer.
 - Dream Team league page: the table of every tier with zones, form and the season's timeline; the matchday with the games on the server and the AI games as a conference, a live table with moves; the fixtures (only yours at a tap); the season finale with final four, relegation and who goes up and down; the history. My team shows the next league game, the home team picks its map. Settings: tab "UDT Liga" with the server time per league evening and the test league.
 - Dream Team test mode: "Matchday now" plays the next league evening, "League season end" the rest of the league.
@@ -209,6 +210,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Settings → UDT Liga tidied: tiers, teams, start day and keepers as buttons, server and maps like the tournament form (automatic pool or own choice), table money as a table per place and tier with the weekly amounts, cup bonus as a podium, AI strength as sliders; no more lists like "1200 · 700 · 400 · 200".
 - Activity bar: "very busy" only shows after two long blocks of the server (1.5 s or more) within 10 s or when a page waits 4 s or more for an answer; background refreshes no longer count. The server log names what ran during each long block.
 - Dream Team: the menu item opens an overview with the areas My team, League, Packs, Cups and Transfers as segments of one shape, each with its pages and what is due (next league game, points to give, trade offers, next cup); every Dream Team page has a two-row navigation (area, then its pages); My team moved to /udt/team, Events are called Cups.
 - SmartStockBots is a website setting (Bots & live: automatic, on, off) for every tournament - also league games and Dream Team cups, which so far ran without it.

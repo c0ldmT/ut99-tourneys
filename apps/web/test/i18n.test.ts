@@ -70,8 +70,15 @@ describe('translations', () => {
         expect(DICT[lang][`league.formShort.${f}`]).toBeDefined();
       }
       for (const d of [0, 1, 2]) expect(DICT[lang][`lgs.day.${d}`]).toBeDefined();
-      for (const k of ['tableMoney', 'tierMult', 'keepers', 'factors', 'cupBonus'])
-        expect(DICT[lang][`lgs.${k}`]).toBeDefined();
+      for (const m of ['real', 'test'])
+        for (const k of ['mode', 'modeHint', 'modeNote'])
+          expect(DICT[lang][`lgs.${k}.${m}`]).toBeDefined();
+      for (const l of ['short', 'medium', 'long'])
+        expect(DICT[lang][`lgs.length.${l}`]).toBeDefined();
+      for (const a of ['simulate', 'topGame', 'all'])
+        expect(DICT[lang][`lgs.aiGames.${a}`]).toBeDefined();
+      for (const p of ['cup', 'random', 'one'])
+        expect(DICT[lang][`lgs.placement.${p}`]).toBeDefined();
     }
     // What an apprentice learns (academy).
     for (const k of ['accuracy', 'alertness', 'strafing', 'combatStyle', 'camping'])

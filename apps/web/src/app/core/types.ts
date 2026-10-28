@@ -1522,7 +1522,39 @@ export interface LeagueHistorySeason {
   }[][];
 }
 
+/** A league plan in short (the settings tab, decision 230). */
+export interface LeaguePlanSummary {
+  first: string;
+  time: string;
+  evenings: number;
+  perEvening: number;
+  last: string;
+  relegation: string;
+  final: string;
+}
+
+/** Where the league stands (settings tab, decision 230). */
+export interface LeagueStatus {
+  state: 'off' | 'waiting' | 'nextSeason' | 'running' | 'done';
+  test: boolean;
+  start: { season: number; day: string; plan: LeaguePlanSummary | null } | null;
+  now: LeaguePlanSummary | null;
+  progress: {
+    evenings: number;
+    eveningsTotal: number;
+    matchdays: number;
+    matchdaysTotal: number;
+    next: { day: string; matchdays: number[] } | null;
+    relegation: string;
+    final: string;
+    time: string;
+    abortable: boolean;
+  } | null;
+  champion: string | null;
+}
+
 export interface LeagueAdmin {
+  status: LeagueStatus;
   season: number | null;
   /** The website's day (test mode: the shifted clock). */
   today: string;

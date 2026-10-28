@@ -30,6 +30,7 @@ import type {
   UdtGraduation,
   UdtKeepers,
   LeagueAdmin,
+  LeaguePlanSummary,
   LeagueEstimate,
   LeagueHistorySeason,
   LeagueView,
@@ -397,8 +398,19 @@ export class Api {
     );
   udtLeagueTest = (body: Record<string, unknown>) =>
     this.call<LeagueAdmin>('POST', '/udt/league/test', body, { ok: 'ok.league.test' });
+  /** A regular league in the running season, started now (decision 230). */
+  udtLeagueStart = (body: Record<string, unknown>) =>
+    this.call<LeagueAdmin>('POST', '/udt/league/start', body, { ok: 'ok.league.start' });
+  /** The plan of a league started on `startDate` (null: it does not fit). */
+  udtLeagueFit = (startDate: string) =>
+    this.call<{ plan: LeaguePlanSummary | null }>(
+      'GET',
+      `/udt/league/fit?startDate=${encodeURIComponent(startDate)}`,
+      undefined,
+      { quiet: true, read: true },
+    );
   udtLeagueTestAbort = () =>
-    this.call<LeagueAdmin>('DELETE', '/udt/league/test', undefined, { ok: 'ok.league.testAbort' });
+    this.call<LeagueAdmin>('DELETE', '/udt/league/test', undefined, { ok: 'ok.league.abort' });
   /** The keeper choice (quiet: a page without a season shows nothing). */
   udtKeepers = () => this.call<UdtKeepers>('GET', '/udt/keepers', undefined, { quiet: true });
   udtSetKeepers = (botIds: string[]) =>

@@ -125,6 +125,9 @@ export const TestLeagueBody = z.object({
 });
 export type TestLeagueInput = z.infer<typeof TestLeagueBody>;
 
+/** The plan of a league started late (the start dialog, decision 230). */
+export const FitQuery = z.object({ startDate: z.iso.date().optional() });
+
 export const EstimateQuery = z.object({
   tiers: z.coerce.number().int().min(1).max(4).optional(),
   size: z.coerce.number().int().min(8).max(16).optional(),
@@ -173,6 +176,73 @@ export function leaguePlan(o: {
   const final = addDays(last, 2);
   if (final > o.end) return null;
   return { slotTime: o.slotTime, evenings, relegation, final };
+}
+
+/**
+ * A league that starts late (a test league, a league started in a running season): the fewest
+ * matchdays per evening that still end by `end` - on the league weekdays, else on any day.
+ */
+export function fittedPlan(o: {
+  start: string;
+  end: string;
+  weekdays: readonly number[];
+  size: number;
+  slotTime: string;
+}): LeaguePlan | null {
+  for (const anyDay of [false, true])
+    for (let n = 1; n <= matchdaysOf(o.size); n++) {
+      const plan = leaguePlan({ ...o, perEvening: n, anyDay });
+      if (plan) return plan;
+    }
+  return null;
+}
+
+/** A plan in short (the settings tab, decision 230). */
+export interface PlanSummary {
+  first: string;
+  time: string;
+  evenings: number;
+  perEvening: number;
+  last: string;
+  relegation: string;
+  final: string;
+}
+
+const summary = (p: LeaguePlan): PlanSummary => ({
+  first: p.evenings[0]!.day,
+  time: p.slotTime,
+  evenings: p.evenings.length,
+  perEvening: p.evenings[0]!.matchdays.length,
+  last: p.evenings.at(-1)!.day,
+  relegation: p.relegation,
+  final: p.final,
+});
+
+/**
+ * Where the league stands (the settings tab, decision 230): `off`, `waiting` (starts on its
+ * start day in this season), `nextSeason` (this season's start day is over), `running`, `done`.
+ */
+export interface LeagueStatus {
+  state: 'off' | 'waiting' | 'nextSeason' | 'running' | 'done';
+  test: boolean;
+  /** The next start by the settings (null: no season to start in yet, or the league is off). */
+  start: { season: number; day: string; plan: PlanSummary | null } | null;
+  /** A league started tomorrow in the running season (null: none fits, or one exists). */
+  now: PlanSummary | null;
+  /** A running league: evenings and matchdays played, the next evening. */
+  progress: {
+    evenings: number;
+    eveningsTotal: number;
+    matchdays: number;
+    matchdaysTotal: number;
+    next: { day: string; matchdays: number[] } | null;
+    relegation: string;
+    final: string;
+    time: string;
+    /** It can still be called off (a test league, or nothing played yet). */
+    abortable: boolean;
+  } | null;
+  champion: string | null;
 }
 
 /**
@@ -593,6 +663,8 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       perEvening?: number;
       placement?: 'cup' | 'random' | 'one';
       tableMoney?: boolean;
+      /** Started late: the fewest matchdays per evening that fit (like a test league). */
+      fit?: boolean;
     } = {},
   ): RunRow {
     // One transaction: a failed start leaves no clubs behind (the next tick tries again).
@@ -607,6 +679,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       perEvening?: number;
       placement?: 'cup' | 'random' | 'one';
       tableMoney?: boolean;
+      fit?: boolean;
     },
   ): RunRow {
     const cfg = this.cfg();
@@ -627,20 +700,15 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         slotTime: cfg.slotTime,
         anyDay: o.test,
       });
-    else if (o.test) {
-      // The fewest matchdays per evening that still end before the season's end.
-      for (const anyDay of [false, true])
-        for (let n = 1; !plan && n <= matchdaysOf(size); n++)
-          plan = leaguePlan({
-            start,
-            end: season.endDate,
-            weekdays: cfg.slotDays,
-            perEvening: n,
-            size,
-            slotTime: cfg.slotTime,
-            anyDay,
-          });
-    } else plan = this.planFor(season, cfg, o.startDate);
+    else if (o.test || o.fit)
+      plan = fittedPlan({
+        start,
+        end: season.endDate,
+        weekdays: cfg.slotDays,
+        size,
+        slotTime: cfg.slotTime,
+      });
+    else plan = this.planFor(season, cfg, o.startDate);
     if (!plan)
       throw conflict('the league does not fit into season {season}: {hint}', {
         season: season.number,
@@ -1805,13 +1873,32 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     return this.adminView();
   }
 
-  /** Calls the test league off: its fixture list and the games not played yet go. */
+  /**
+   * Starts the league in the running season now (decision 230): a regular one - it counts for
+   * the champion and the next season's tiers - with the fewest matchdays per evening that fit
+   * (as a test league). For a season whose start day is over, or to start earlier.
+   */
+  startRegular(body: TestLeagueInput) {
+    this.udt.assertOn();
+    const season = this.udt.season();
+    const today = this.udt.today();
+    if (body.startDate && body.startDate < today)
+      throw badRequest('the league cannot start in the past');
+    this.start(season, { ...body, fit: true, startDate: body.startDate ?? nextDay(today) });
+    return this.adminView();
+  }
+
+  /**
+   * Calls the league off: its fixture list and the games not played yet go. A test league at
+   * any time, a regular one only before its first game (decision 230).
+   */
   abortTest() {
     this.udt.assertOn();
     const season = this.udt.season();
     const run = this.run(season.number);
     if (!run) throw notFound('league of season {season}', { season: season.number });
-    if (!run.test) throw conflict('only a test league can be called off');
+    if (!this.canAbort(run))
+      throw conflict('a league can only be called off before its first game');
     for (const f of this.fixtures(season.number)) {
       const t = f.tournamentId ? this.tournaments.get(f.tournamentId) : undefined;
       if (t && (t.phase === 'draft' || t.phase === 'seeded'))
@@ -1826,7 +1913,28 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       tx.delete(leagueSeasons).where(eq(leagueSeasons.season, season.number)).run();
       tx.delete(leagueRuns).where(eq(leagueRuns.season, season.number)).run();
     });
+    // A regular league called off in its start window would start again by itself (`due()`):
+    // the league setting goes off.
+    const cfg = this.cfg();
+    if (
+      !run.test &&
+      cfg.enabled &&
+      this.udt.today() <= addDays(this.seasonDay(season, cfg.startDay), 1)
+    )
+      this.settings.setUdt({ league: { ...cfg, enabled: false } });
     return this.adminView();
+  }
+
+  /**
+   * A test league can be called off at any time, a regular one before its first evening begins
+   * (and while nothing was played or simulated).
+   */
+  private canAbort(run: RunRow): boolean {
+    if (run.test) return true;
+    const plan = this.plan(run);
+    const first = plan.evenings[0];
+    if (first && this.clock.now() >= zonedMs(first.day, plan.slotTime, this.tz)) return false;
+    return !this.anyPlayed(run.season);
   }
 
   /** The league tab of the settings: the run, its plan, the estimate. */
@@ -1849,6 +1957,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         : null,
       run: run ? { ...runView(run), plan: this.plan(run) } : null,
       fits: season ? !!this.planFor(season, cfg) : null,
+      status: this.status(),
       managers,
       estimate: estimateEvening({
         managers,
@@ -1860,6 +1969,120 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       evenings: eveningsOf(cfg.size, PER_EVENING[cfg.length]),
       server: this.server(),
       mapPool: this.mapPool(),
+    };
+  }
+
+  /** The plan of a league started late in the running season (null: it does not fit). */
+  fit(startDate?: string): PlanSummary | null {
+    this.udt.assertOn();
+    const season = this.udt.season();
+    const cfg = this.cfg();
+    const plan = fittedPlan({
+      start: startDate ?? nextDay(this.udt.today()),
+      end: season.endDate,
+      weekdays: cfg.slotDays,
+      size: cfg.size,
+      slotTime: cfg.slotTime,
+    });
+    return plan && summary(plan);
+  }
+
+  /** Whether a game of the season's league was played or simulated already. */
+  private anyPlayed(season: number): boolean {
+    return !!this.db
+      .select({ id: leagueFixtures.id })
+      .from(leagueFixtures)
+      .where(and(eq(leagueFixtures.season, season), sql`${leagueFixtures.status} <> 'scheduled'`))
+      .get();
+  }
+
+  /**
+   * The next start by the settings: on the start day of the running season while it can still
+   * start (as `due()`: the start day or the day after), else on the start day of the next
+   * planned season (null: none planned yet).
+   */
+  private upcoming(cfg: LeagueSettings): LeagueStatus['start'] {
+    const today = this.udt.today();
+    const cur = this.seasons.current();
+    if (cur && !this.run(cur.number)) {
+      const first = this.seasonDay(cur, cfg.startDay);
+      if (today <= addDays(first, 1)) {
+        const plan = this.planFor(cur, cfg, today > first ? today : undefined);
+        return {
+          season: cur.number,
+          day: today > first ? today : first,
+          plan: plan && summary(plan),
+        };
+      }
+    }
+    const next = this.seasons
+      .overview()
+      .seasons.filter((x) => x.status === 'planned' && (!cur || x.number > cur.number))
+      .sort((a, b) => a.number - b.number)[0];
+    if (!next) return null;
+    const plan = this.planFor(next, cfg);
+    return {
+      season: next.number,
+      day: addDays(next.startDate, cfg.startDay - 1),
+      plan: plan && summary(plan),
+    };
+  }
+
+  /** Where the league stands, for the settings tab (decision 230). */
+  status(): LeagueStatus {
+    const cfg = this.cfg();
+    const cur = this.seasons.current();
+    const run = cur ? this.run(cur.number) : undefined;
+    const today = this.udt.today();
+    const none = { test: false, start: null, now: null, progress: null, champion: null };
+    if (run?.status === 'running') {
+      const plan = this.plan(run);
+      const past = plan.evenings.filter((e) => e.day < today);
+      const next = plan.evenings.find((e) => e.day >= today);
+      return {
+        ...none,
+        state: 'running',
+        test: run.test,
+        progress: {
+          evenings: past.length,
+          eveningsTotal: plan.evenings.length,
+          matchdays: past.reduce((n, e) => n + e.matchdays.length, 0),
+          matchdaysTotal: matchdaysOf(run.size),
+          next: next ? { day: next.day, matchdays: next.matchdays.map((m) => m + 1) } : null,
+          relegation: plan.relegation,
+          final: plan.final,
+          time: plan.slotTime,
+          abortable: this.canAbort(run),
+        },
+      };
+    }
+    const start = cfg.enabled ? this.upcoming(cfg) : null;
+    // A start now: the rest of the running season, from tomorrow.
+    const fit =
+      cur && !run
+        ? fittedPlan({
+            start: nextDay(today),
+            end: cur.endDate,
+            weekdays: cfg.slotDays,
+            size: cfg.size,
+            slotTime: cfg.slotTime,
+          })
+        : null;
+    const now = fit && summary(fit);
+    if (run?.status === 'done')
+      return {
+        ...none,
+        state: 'done',
+        test: run.test,
+        start,
+        champion: run.champion ? (this.clubs().get(run.champion)?.name ?? null) : null,
+      };
+    if (!cfg.enabled) return { ...none, state: 'off', now };
+    return {
+      ...none,
+      state: start && cur && start.season === cur.number ? 'waiting' : 'nextSeason',
+      start,
+      now: start && cur && start.season === cur.number ? null : now,
     };
   }
 

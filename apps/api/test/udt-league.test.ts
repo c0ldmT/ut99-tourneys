@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { FakeClock } from '@tourney/bridge';
 import { eq } from 'drizzle-orm';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
@@ -214,6 +215,78 @@ describe('Dream Team league', () => {
     const ab = await admin.req('DELETE', '/udt/league/test');
     expect(ab.status).toBe(200);
     expect((ab.body as { run: unknown }).run).toBeNull();
+  });
+
+  it('status for the settings tab: waiting, running, called off only before the first game (decision 230)', async () => {
+    const { admin } = await setup();
+    let st = (await admin.get('/udt/league/admin')).body.status;
+    expect(st).toMatchObject({ state: 'waiting', test: false, now: null, progress: null });
+    expect(st.start).toMatchObject({ season: 1 });
+    expect(st.start.plan.first).toBe(st.start.day);
+    expect(st.start.plan.evenings).toBeGreaterThan(0);
+    await admin.post('/udt/test/advance', { hours: 3 * 24 });
+    st = (await admin.get('/udt/league/admin')).body.status;
+    expect(st).toMatchObject({ state: 'running', test: false, start: null });
+    expect(st.progress).toMatchObject({ evenings: 0, matchdays: 0, matchdaysTotal: 14 });
+    expect(st.progress.next.matchdays[0]).toBe(1);
+    // The first evening plays (AI games simulated at once): a regular league stays.
+    await admin.post('/udt/test/advance', { hours: 1 });
+    st = (await admin.get('/udt/league/admin')).body.status;
+    expect(st.progress.abortable).toBe(false);
+    expect((await admin.req('DELETE', '/udt/league/test')).status).toBe(409);
+  });
+
+  it('a regular league called off on its start day does not start again by itself (decision 230)', async () => {
+    ({ api } = await startApi(
+      { TEST_MODE: 'true' },
+      { clock: new FakeClock(Date.parse('2026-10-19T08:00:00Z')) },
+    ));
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.post('/agents', { id: 'pi', name: 'Raspberry' });
+    for (let i = 0; i < 6; i++) await admin.post('/bots', { name: `Lib${i}`, skill: 3 });
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin, 30);
+    await mario.post('/udt/team', { name: 'Nexus', tag: 'NX', starter: { name: 'NXbot' } });
+    await admin.req('PUT', '/settings/udt', { league: LEAGUE });
+    // Day 4, 10:00: started, the first evening at 18:00 still to come.
+    await admin.post('/udt/test/advance', { hours: 3 * 24 });
+    const st = (await admin.get('/udt/league/admin')).body.status;
+    expect(st).toMatchObject({ state: 'running', test: false });
+    expect(st.progress.abortable).toBe(true);
+    const ab = await admin.req('DELETE', '/udt/league/test');
+    expect(ab.status, JSON.stringify(ab.body)).toBe(200);
+    expect((await admin.get('/settings')).body.udt.league.enabled).toBe(false);
+    await admin.post('/udt/test/advance', { hours: 1 });
+    expect((await admin.get('/udt/league/admin')).body.run).toBeNull();
+  });
+
+  it('a regular league started in the running season after its start day (decision 230)', async () => {
+    const { admin, mario } = await setup();
+    await admin.req('PUT', '/settings/udt', { league: { ...LEAGUE, enabled: false } });
+    let st = (await admin.get('/udt/league/admin')).body.status;
+    expect(st).toMatchObject({ state: 'off', start: null });
+    expect(st.now.evenings).toBeGreaterThan(0);
+    // Switched on after the start day (and the day after): the league waits for the next season.
+    await admin.post('/udt/test/advance', { hours: 5 * 24 });
+    await admin.req('PUT', '/settings/udt', { league: LEAGUE });
+    st = (await admin.get('/udt/league/admin')).body.status;
+    expect(st.state).toBe('nextSeason');
+    expect(st.now).not.toBeNull();
+    await admin.post('/udt/test/advance', { hours: 24 });
+    expect((await admin.get('/udt/league/admin')).body.run).toBeNull();
+    expect((await mario.post('/udt/league/start', {})).status).toBe(403);
+    const r = await admin.post('/udt/league/start', { placement: 'one' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.run).toMatchObject({ test: false, status: 'running' });
+    expect(r.body.status).toMatchObject({ state: 'running', test: false });
+    expect(r.body.status.progress.abortable).toBe(true);
+    expect((await mario.get('/udt/league')).body.myClub.tier).toBe(0);
+    expect((await admin.post('/udt/league/start', {})).status).toBe(409);
+    // Nothing played yet: it can still be called off.
+    const ab = await admin.req('DELETE', '/udt/league/test');
+    expect(ab.status).toBe(200);
+    expect((ab.body as { status: { state: string } }).status.state).toBe('nextSeason');
   });
 
   it('a manager who founds a team later takes over an AI club of the lowest tier', async () => {
