@@ -285,6 +285,9 @@ export const ERRORS_DE: Record<string, string> = {
   'map {map} is not in the league pool': 'Die Map {map} ist nicht im Liga-Pool.',
   'the test league cannot start in the past':
     'Die Testliga kann nicht in der Vergangenheit starten.',
+  'the calendar range ends before it starts': 'Der Zeitraum des Kalenders endet vor seinem Beginn.',
+  'the calendar shows at most {n} days at once':
+    'Der Kalender zeigt höchstens {n} Tage auf einmal.',
   'the league cannot start in the past': 'Die Liga kann nicht in der Vergangenheit starten.',
   'a league can only be called off before its first game':
     'Eine Liga kann nur vor ihrem ersten Spiel abgebrochen werden.',

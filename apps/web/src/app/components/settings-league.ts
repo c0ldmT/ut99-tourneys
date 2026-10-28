@@ -587,7 +587,7 @@ interface StatusView {
                   {{ (s.abort === 'test' ? 'lgs.testAbort' : 'lgs.abort') | t }}
                 </button>
               }
-              <a routerLink="/udt/league" class="btn">{{ 'lgs.toLeague' | t }}</a>
+              <a routerLink="/calendar" class="btn">{{ 'lgs.toCalendar' | t }}</a>
             </div>
           </section>
         }

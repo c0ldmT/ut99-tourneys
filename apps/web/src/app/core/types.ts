@@ -1920,3 +1920,39 @@ export interface LookPreview {
   /** The skin has team colours. */
   teams: boolean;
 }
+
+/** The calendar (decision 231). */
+export type CalendarKind =
+  | 'seasonStart'
+  | 'seasonEnd'
+  | 'keepers'
+  | 'tournament'
+  | 'cup'
+  | 'leagueEvening'
+  | 'relegation'
+  | 'finalFour'
+  | 'payday';
+
+export interface CalendarItem {
+  id: string;
+  kind: CalendarKind;
+  day: string;
+  at: string | null;
+  until: string | null;
+  title: string | null;
+  state: 'projected' | 'planned' | 'open' | 'live' | 'done' | 'cancelled';
+  mine: boolean;
+  link: string | null;
+  meta: Record<string, unknown>;
+}
+
+export interface CalendarView {
+  timeZone: string;
+  today: string;
+  now: string;
+  from: string;
+  to: string;
+  seasons: { number: number; startDate: string; endDate: string; status: string }[];
+  udt: boolean;
+  items: CalendarItem[];
+}

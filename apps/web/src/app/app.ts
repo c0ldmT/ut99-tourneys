@@ -68,6 +68,7 @@ import { Loader } from './components/loader';
               [routerLinkActiveOptions]="{ exact: true }"
               >{{ 'nav.tournaments' | t }}</a
             >
+            <a routerLink="/calendar" routerLinkActive="active">{{ 'nav.calendar' | t }}</a>
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
             @if (me.isAdmin) {
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>

@@ -40,6 +40,8 @@ import { LooksController } from './bots/looks.controller.js';
 import { LookPreviewService } from './bots/look-preview.service.js';
 import { BotsService } from './bots/bots.service.js';
 import { SeriesController, SeriesOverviewController } from './series/series.controller.js';
+import { CalendarController } from './calendar/calendar.controller.js';
+import { CalendarService } from './calendar/calendar.service.js';
 import { ShopController } from './shop/shop.controller.js';
 import { LedgerService } from './ledger/ledger.service.js';
 import { NeuroHub } from './ledger/neuro-hub.js';
@@ -100,6 +102,7 @@ class AppModule {
         LooksController,
         BetsController,
         SeriesOverviewController,
+        CalendarController,
         SeriesController,
         ShopController,
         UdtController,
@@ -133,6 +136,7 @@ class AppModule {
         LiveRecorder,
         NeuroHub,
         ServerActivity,
+        CalendarService,
         EventLogService,
         AgentConnections,
         AgentsService,

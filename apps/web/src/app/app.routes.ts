@@ -15,6 +15,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tournament-list').then((m) => m.TournamentListPage),
       },
       {
+        path: 'calendar',
+        title: 'cal.title',
+        loadComponent: () => import('./pages/calendar').then((m) => m.CalendarPage),
+      },
+      {
         path: 'stats',
         title: 'nav.stats',
         loadComponent: () => import('./pages/stats').then((m) => m.StatsPage),

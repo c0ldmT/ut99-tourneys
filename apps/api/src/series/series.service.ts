@@ -26,6 +26,7 @@ import {
   type SeriesSchedule,
 } from './series-time.js';
 import { ServerActivity } from '../common/activity.js';
+import { estimateMs } from '../tournaments/server-calendar.js';
 
 type SeriesRow = typeof series.$inferSelect;
 type Template = Omit<CreateTournament, 'name' | 'scheduledAt' | 'id'>;
@@ -386,6 +387,61 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       );
     this.createNext(r, n.start);
     return this.view(this.row(id));
+  }
+
+  /**
+   * Starts of the active series in [from, to) that have no tournament yet (the calendar,
+   * decision 231): the plan, not moved behind a league evening. Dream Team series only inside a
+   * season while the Dream Team is on.
+   */
+  projected(
+    from: number,
+    to: number,
+    udtOn: boolean,
+  ): {
+    seriesId: string;
+    name: string;
+    at: number;
+    kind: string;
+    game: 'dm' | 'mh';
+    teamSize: number;
+    size: number;
+    estimateMs: number;
+  }[] {
+    const now = this.clock.now();
+    const out: ReturnType<SeriesService['projected']> = [];
+    for (const r of this.db.select().from(series).where(eq(series.active, true)).all()) {
+      const t = JSON.parse(r.templateJson) as Template;
+      const set = TournamentSettingsSchema.parse(t.settings);
+      const kind = t.kind ?? 'standard';
+      if (kind === 'udt' && !udtOn) continue;
+      const made = new Set(
+        this.db
+          .select({ at: tournaments.scheduledAt })
+          .from(tournaments)
+          .where(eq(tournaments.seriesId, r.id))
+          .all()
+          .map((x) => (x.at ? Date.parse(x.at) : 0)),
+      );
+      let after = Math.max(from - 1, now, r.lastStart ? Date.parse(r.lastStart) : 0);
+      for (let i = 0; i < 400; i++) {
+        const at = nextStarts(this.timing(r), after, this.tz, 1)[0];
+        if (at === undefined || !Number.isFinite(at) || at >= to) break;
+        after = at;
+        if (made.has(at) || (kind === 'udt' && !this.seasons.at(at))) continue;
+        out.push({
+          seriesId: r.id,
+          name: baseName(r.name),
+          at,
+          kind,
+          game: set.game.adapter === 'ut99-mh' ? 'mh' : 'dm',
+          teamSize: set.teamSize,
+          size: set.size,
+          estimateMs: estimateMs(set),
+        });
+      }
+    }
+    return out;
   }
 
   /** Every minute: creates the tournaments whose time has come. */

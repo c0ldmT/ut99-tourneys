@@ -197,6 +197,24 @@ export function fittedPlan(o: {
   return null;
 }
 
+/** The league in the calendar (decision 231). */
+export interface LeagueCalendarItem {
+  kind: 'evening' | 'relegation' | 'final' | 'payday';
+  season: number;
+  day: string;
+  at: string;
+  until: string | null;
+  state: 'projected' | 'planned' | 'live' | 'done';
+  /** Matchdays of an evening (1-based). */
+  matchdays: number[];
+  /** Games played on the server that day. */
+  games: number;
+  test: boolean;
+  /** The league's first evening. */
+  start: boolean;
+  myGame: { at: string; opponent: string; home: boolean; kind: FixtureKind } | null;
+}
+
 /** A plan in short (the settings tab, decision 230). */
 export interface PlanSummary {
   first: string;
@@ -516,6 +534,139 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           label: 'league',
           allows: (t: { kind: string; udtJson: string | null }) =>
             t.kind === 'udt' && !!t.udtJson && !!this.rulesOf(t.udtJson)?.league,
+        });
+    }
+    return out;
+  }
+
+  /**
+   * The league in the calendar (decision 231) for the days [from, to]: the evenings of a league
+   * run (played or planned) with their matchdays, played games and the user's game, relegation
+   * and final four, the Mondays with table money; without a run the plan of the next start by
+   * the settings (projected).
+   */
+  calendar(from: string, to: string, userId: string): LeagueCalendarItem[] {
+    const out: LeagueCalendarItem[] = [];
+    const cfg = this.cfg();
+    const today = this.udt.today();
+    const now = this.clock.now();
+    const clubs = this.clubs();
+    const mine = [...clubs.values()].find((c) => c.userId === userId)?.id ?? null;
+    const clubName = (id: string) => clubs.get(id)?.name ?? '?';
+    const marketTime = this.settings.get().udt.marketTime;
+    const add = (
+      plan: LeaguePlan,
+      season: number,
+      o: {
+        projected: boolean;
+        test: boolean;
+        money: boolean;
+        fixtures: FixtureRow[];
+        start: boolean;
+      },
+    ) => {
+      const games = new Map<string, number>();
+      for (const f of o.fixtures) if (f.real) games.set(f.day, (games.get(f.day) ?? 0) + 1);
+      const myGame = (day: string, kinds: readonly string[]) => {
+        const f = o.fixtures.find(
+          (x) =>
+            x.day === day &&
+            kinds.includes(x.kind) &&
+            mine !== null &&
+            (x.home === mine || x.away === mine),
+        );
+        return f
+          ? {
+              at: f.scheduledAt,
+              opponent: clubName(f.home === mine ? f.away : f.home),
+              home: f.home === mine,
+              kind: f.kind as FixtureKind,
+            }
+          : null;
+      };
+      const item = (
+        kind: LeagueCalendarItem['kind'],
+        day: string,
+        matchdays: number[],
+        fixtureKinds: readonly string[],
+      ) => {
+        if (day < from || day > to) return;
+        const at = zonedMs(day, plan.slotTime, this.tz);
+        const n = games.get(day) ?? 0;
+        const until = at + Math.max(1, n) * GAME_MINUTES * 60_000 + BUFFER_MS;
+        out.push({
+          kind,
+          season,
+          day,
+          at: new Date(at).toISOString(),
+          until: new Date(until).toISOString(),
+          state: o.projected
+            ? 'projected'
+            : day < today || now >= until
+              ? 'done'
+              : now >= at
+                ? 'live'
+                : 'planned',
+          matchdays: matchdays.map((m) => m + 1),
+          games: n,
+          test: o.test,
+          start: o.start && kind === 'evening' && day === plan.evenings[0]?.day,
+          myGame: o.projected ? null : myGame(day, fixtureKinds),
+        });
+      };
+      for (const e of plan.evenings) item('evening', e.day, e.matchdays, ['league']);
+      item('relegation', plan.relegation, [], ['relegation']);
+      item('final', plan.final, [], ['semi', 'final', 'third']);
+      // Table money and the cup bonus come on the market day of every Monday of the league.
+      if (o.money)
+        for (let d = plan.evenings[0]!.day; d <= plan.final; d = addDays(d, 1))
+          if (isoWeekday(d) === 1 && d > plan.evenings[0]!.day && d >= from && d <= to)
+            out.push({
+              kind: 'payday',
+              season,
+              day: d,
+              at: new Date(zonedMs(d, marketTime, this.tz)).toISOString(),
+              until: null,
+              state: o.projected ? 'projected' : d < today ? 'done' : 'planned',
+              matchdays: [],
+              games: 0,
+              test: o.test,
+              start: false,
+              myGame: null,
+            });
+    };
+    const seasons = this.seasons
+      .overview()
+      .seasons.filter((x) => x.startDate <= to && x.endDate >= from);
+    for (const x of seasons) {
+      const run = this.run(x.number);
+      if (!run || run.status === 'aborted') continue;
+      add(this.plan(run), x.number, {
+        projected: false,
+        test: run.test,
+        // Mondays pay table money (if on) and the cup bonus.
+        money: run.tableMoney || this.settings.get().udt.cupBonus.some((v) => v > 0),
+        fixtures: this.fixtures(x.number),
+        start: true,
+      });
+    }
+    const next = cfg.enabled ? this.upcoming(cfg) : null;
+    if (next?.plan && !seasons.some((x) => x.number === next.season && this.run(x.number))) {
+      const s = this.seasons.overview().seasons.find((x) => x.number === next.season);
+      const plan = s
+        ? this.planFor(
+            s,
+            cfg,
+            next.day > addDays(s.startDate, cfg.startDay - 1) ? next.day : undefined,
+          )
+        : null;
+      if (plan)
+        add(plan, next.season, {
+          projected: true,
+          test: false,
+          money: true,
+          fixtures: [],
+          start: true,
         });
     }
     return out;

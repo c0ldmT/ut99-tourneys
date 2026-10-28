@@ -29,6 +29,7 @@ import type {
   UdtBreeder,
   UdtGraduation,
   UdtKeepers,
+  CalendarView,
   LeagueAdmin,
   LeaguePlanSummary,
   LeagueEstimate,
@@ -388,6 +389,9 @@ export class Api {
       { map },
       { ok: 'ok.league.map' },
     );
+  /** The calendar of [from, to] (default: a week back, six weeks on; decision 231). */
+  calendar = (from?: string, to?: string) =>
+    this.call<CalendarView>('GET', `/calendar${from && to ? `?from=${from}&to=${to}` : ''}`);
   udtLeagueAdmin = () => this.call<LeagueAdmin>('GET', '/udt/league/admin');
   udtLeagueEstimate = (q: Record<string, string | number>) =>
     this.call<LeagueEstimate>(

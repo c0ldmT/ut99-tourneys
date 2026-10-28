@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Calendar (menu "Calendar"): tournaments, Dream Team cups and the planned starts of the series, league evenings with your game, relegation and final four (before the league starts its plan), season start and end, keeper window and paydays - as a month or a list, with filters, "only mine" and what comes next; on phones as a list and a month with dots.
 - Settings → UDT Liga: a status card shows where the league stands (off, starts on …, starts next season, evening x of y, champion) and starts a regular league or a test run in the running season at once (with its plan).
 - Activity bar under the header: everybody sees when the server sets up a league evening (with progress) or is very busy and pages take longer.
 - Dream Team league page: the table of every tier with zones, form and the season's timeline; the matchday with the games on the server and the AI games as a conference, a live table with moves; the fixtures (only yours at a tap); the season finale with final four, relegation and who goes up and down; the history. My team shows the next league game, the home team picks its map. Settings: tab "UDT Liga" with the server time per league evening and the test league.

@@ -70,6 +70,9 @@ describe('translations', () => {
         expect(DICT[lang][`league.formShort.${f}`]).toBeDefined();
       }
       for (const d of [0, 1, 2]) expect(DICT[lang][`lgs.day.${d}`]).toBeDefined();
+      for (const m of ['month', 'list']) expect(DICT[lang][`cal.mode.${m}`]).toBeDefined();
+      for (const g of ['all', 'tour', 'cup', 'league', 'season'])
+        expect(DICT[lang][`cal.group.${g}`]).toBeDefined();
       for (const m of ['real', 'test'])
         for (const k of ['mode', 'modeHint', 'modeNote'])
           expect(DICT[lang][`lgs.${k}.${m}`]).toBeDefined();
