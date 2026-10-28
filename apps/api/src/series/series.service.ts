@@ -25,6 +25,7 @@ import {
   seriesName,
   type SeriesSchedule,
 } from './series-time.js';
+import { ServerActivity } from '../common/activity.js';
 
 type SeriesRow = typeof series.$inferSelect;
 type Template = Omit<CreateTournament, 'name' | 'scheduledAt' | 'id'>;
@@ -95,13 +96,14 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     @Inject(DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(LOGGER) private readonly log: ApiLogger,
+    @Inject(ServerActivity) private readonly activity: ServerActivity,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => this.tick(), 60_000);
+    this.timer = setInterval(() => void this.activity.task('series', () => this.tick()), 60_000);
     this.timer.unref();
   }
 

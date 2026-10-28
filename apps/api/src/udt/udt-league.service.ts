@@ -275,7 +275,10 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       }
     });
     this.tournaments.onResetAll(() => this.wipe());
-    this.timer = setInterval(() => void this.tickAsync(), 30_000);
+    this.timer = setInterval(
+      () => void this.activity.task('league', () => this.tickAsync()),
+      30_000,
+    );
     this.timer.unref();
   }
 

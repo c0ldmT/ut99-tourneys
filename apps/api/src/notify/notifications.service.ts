@@ -23,6 +23,7 @@ import {
   type DiscordPost,
 } from './discord-out.js';
 import * as M from './messages.js';
+import { ServerActivity } from '../common/activity.js';
 
 type TournamentRow = typeof tournaments.$inferSelect;
 type UserRow = typeof users.$inferSelect;
@@ -43,6 +44,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     @Inject(DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: ApiConfig,
     @Inject(CLOCK) private readonly clock: ApiClock,
+    @Inject(ServerActivity) private readonly activity: ServerActivity,
     @Inject(LOGGER) private readonly log: ApiLogger,
     @Inject(EventLogService) private readonly events: EventLogService,
     @Inject(AgentsService) private readonly agents: AgentsService,
@@ -60,7 +62,13 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     );
     this.events.onAppend((id, stored, after, before) => this.onAppended(id, stored, after, before));
     if (n.remindMin > 0) {
-      this.timer = setInterval(() => this.safely('reminders', () => this.remindTick()), 60_000);
+      this.timer = setInterval(
+        () =>
+          void this.activity.task('reminders', () =>
+            this.safely('reminders', () => this.remindTick()),
+          ),
+        60_000,
+      );
       this.timer.unref();
     }
   }

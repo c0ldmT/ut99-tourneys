@@ -3,6 +3,7 @@ import { UsersService, type User } from '../auth/users.service.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, type ApiClock } from '../config.js';
 import { TournamentsService, type TournamentRow } from './tournaments.service.js';
+import { ServerActivity } from '../common/activity.js';
 
 /** How long a tournament waits for a free (online) server before it is called off. */
 export const AUTOSTART_WAIT_MS = 60 * 60_000;
@@ -24,12 +25,13 @@ export class AutoStartService implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(LOGGER) private readonly log: ApiLogger,
+    @Inject(ServerActivity) private readonly activity: ServerActivity,
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
   ) {}
 
   onModuleInit(): void {
-    this.timer = setInterval(() => void this.tick(), 30_000);
+    this.timer = setInterval(() => void this.activity.task('autoStart', () => this.tick()), 30_000);
     this.timer.unref();
   }
 

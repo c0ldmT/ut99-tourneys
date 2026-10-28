@@ -39,6 +39,7 @@ import { gameName, UdtService, type RosterBot } from './udt.service.js';
 import { pickTeamNames } from '../common/names.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { botsOf, lockedTournaments, playingIn, type LockedTournament } from './udt-playing.js';
+import { ServerActivity } from '../common/activity.js';
 
 /** Bots below this stamina are tired: they play worse and the bench comes first. */
 const TIRED = 40;
@@ -65,6 +66,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     @Inject(DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(SettingsService) private readonly settings: SettingsService,
+    @Inject(ServerActivity) private readonly activity: ServerActivity,
     @Inject(BotsService) private readonly bots: BotsService,
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
     @Inject(UdtService) private readonly udt: UdtService,
@@ -83,11 +85,13 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     this.tournaments.onResetAll(() => this.udt.wipeAll());
     // Sign-ups of a season that is over close by themselves (tickets back).
     this.timer = setInterval(() => {
-      try {
-        this.closeStale();
-      } catch {
-        // tried again in a minute
-      }
+      void this.activity.task('cupSignups', () => {
+        try {
+          this.closeStale();
+        } catch {
+          // tried again in a minute
+        }
+      });
     }, 60_000);
     this.timer.unref();
     // AI managers enter as soon as a Dream Team tournament opens its sign-up.

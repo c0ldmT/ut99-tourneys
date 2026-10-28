@@ -186,6 +186,7 @@ export async function createApi(
   app.setGlobalPrefix('api');
   app.disable('x-powered-by');
   app.set('trust proxy', 'loopback');
+  trackRequests(app);
   serveWebApp(app, config, log);
   await app.listen(config.port, config.host);
   const server = app.getHttpServer() as Server;
@@ -207,6 +208,19 @@ export async function createApi(
       app.get<Db>(DB).$client.close();
     },
   };
+}
+
+/**
+ * Notes every API request (method, path, time) for the log line of a long event loop block
+ * (decision 229); event streams stay open for hours and are left out.
+ */
+function trackRequests(app: NestExpressApplication) {
+  const activity = app.get(ServerActivity);
+  app.use((req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (!req.path.startsWith('/api/') || req.path.endsWith('/stream')) return next();
+    res.once('close', activity.track(`${req.method} ${req.path}`));
+    next();
+  });
 }
 
 /** Serves the built Angular app; unknown non-API paths get index.html (client-side routing). */

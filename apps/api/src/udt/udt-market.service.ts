@@ -45,6 +45,7 @@ import { EventLogService } from '../tournaments/event-log.service.js';
 import { UdtCareerService } from './udt-career.service.js';
 import { playingBots } from './udt-playing.js';
 import { UdtService, withTraits } from './udt.service.js';
+import { ServerActivity } from '../common/activity.js';
 
 /** At most this many bots per manager (5 + 2 on the bench). */
 export const ROSTER_MAX = 7;
@@ -83,6 +84,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     @Inject(DB) private readonly db: Db,
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(LOGGER) private readonly log: ApiLogger,
+    @Inject(ServerActivity) private readonly activity: ServerActivity,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(BotsService) private readonly bots: BotsService,
@@ -100,7 +102,10 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     } catch (e) {
       this.log.error(`udt old bids: ${e instanceof Error ? e.message : String(e)}`);
     }
-    this.timer = setInterval(() => this.tick(true), 60_000);
+    this.timer = setInterval(
+      () => void this.activity.task('market', () => this.tick(true)),
+      60_000,
+    );
     this.timer.unref();
   }
 

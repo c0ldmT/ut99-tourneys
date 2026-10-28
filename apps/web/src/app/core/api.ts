@@ -143,12 +143,11 @@ export class Api {
     opts: CallOptions<T> = {},
   ): Promise<T> {
     let res: T;
-    const done = this.loading.track({
-      get: method === 'GET',
-      background: !!(opts.read || opts.background) || this.loading.inBackground,
-    });
-    // Slow answers show the activity bar (the server may be blocked and unable to say so).
-    const ended = this.activity.call();
+    const background = !!(opts.read || opts.background) || this.loading.inBackground;
+    const done = this.loading.track({ get: method === 'GET', background });
+    // Slow answers show the activity bar (the server may be blocked and unable to say so); only
+    // calls someone waits for count, not background refreshes (decision 229).
+    const ended = background ? () => undefined : this.activity.call();
     try {
       res = await firstValueFrom(
         this.http.request<T>(method, `/api${url}`, {

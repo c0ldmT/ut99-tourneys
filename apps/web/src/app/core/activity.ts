@@ -1,7 +1,10 @@
 import { computed, Injectable, signal } from '@angular/core';
 
-/** A call taking longer than this (ms) makes the server count as busy. */
-export const SLOW_CALL_MS = 2000;
+/**
+ * A call someone waits for taking longer than this (ms) makes the server count as busy
+ * (decision 229: a Raspberry Pi often needs a second or two, that is not "busy" yet).
+ */
+export const SLOW_CALL_MS = 4000;
 /** Once shown, "busy" stays at least this long (ms), so the bar does not flicker. */
 const SLOW_HOLD_MS = 3000;
 
@@ -21,8 +24,8 @@ export interface ServerActivityState {
 const NONE: ServerActivityState = { jobs: [], busy: false };
 
 /**
- * What the server is working on, for the activity bar under the header (decision 227): the
- * jobs the server reports (with progress), its "busy" mark (the event loop was blocked) and
+ * What the server is working on, for the activity bar under the header (decisions 227, 229):
+ * the jobs the server reports (with progress), its "busy" mark (the event loop was blocked) and
  * slow answers seen here (a blocked server cannot report while it is blocked).
  */
 @Injectable({ providedIn: 'root' })
@@ -43,7 +46,7 @@ export class ServerActivity {
   /** The clock (tests set their own). */
   now: () => number = Date.now;
 
-  /** A call starts (every Api call); the returned function ends it. */
+  /** A call starts (Api calls in the foreground); the returned function ends it. */
   call(): () => void {
     const id = ++this.seq;
     this.calls.set(id, this.now());
