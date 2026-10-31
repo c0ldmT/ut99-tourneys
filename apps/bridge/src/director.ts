@@ -21,6 +21,7 @@ import {
   type ModToBridge,
   type NewTournamentEvent,
   type PlayerGameStats,
+  type TraitGameStats,
   type TeamEntrant,
   type TournamentEvent,
   type TournamentProjection,
@@ -212,6 +213,9 @@ interface StatLine {
   ps?: Extract<ModToBridge, { t: 'ps' }>;
   px?: Extract<ModToBridge, { t: 'px' }>;
   weapons: Record<string, number>;
+  /** Mod 0.17.0, trait log: counters per trait (pt) and its episodes (tv). */
+  traits?: Extract<ModToBridge, { t: 'pt' }>[];
+  episodes?: Extract<ModToBridge, { t: 'tv' }>[];
 }
 
 interface ReadyState {
@@ -1991,11 +1995,19 @@ export class MatchDirector extends EventEmitter {
         } satisfies KillFeedEntry);
         return;
       }
+      case 'ob': {
+        if (!this.isLiveGame(msg.mid, msg.g, msg.n)) return;
+        const s = this.stage;
+        if (s.kind === 'live') this.board.objective(msg, this.liveCtx(s));
+        return;
+      }
       case 'lr':
       case 'st':
       case 'sx':
       case 'pk':
-      case 'bt': {
+      case 'bt':
+      case 'tv': {
+        if (msg.t === 'tv') this.collectStat(msg);
         if (!this.isLiveGame(msg.mid, msg.g, msg.n)) return;
         const s = this.stage;
         if (s.kind === 'live') this.board.handle(msg, this.liveCtx(s));
@@ -2044,6 +2056,7 @@ export class MatchDirector extends EventEmitter {
       case 'ps':
       case 'px':
       case 'pw':
+      case 'pt':
         this.collectStat(msg);
         return;
       case 'pse':
@@ -2057,12 +2070,19 @@ export class MatchDirector extends EventEmitter {
     }
   }
 
-  private collectStat(msg: Extract<ModToBridge, { t: 'ps' | 'px' | 'pw' }>): void {
+  private collectStat(msg: Extract<ModToBridge, { t: 'ps' | 'px' | 'pw' | 'pt' | 'tv' }>): void {
     const key = `${msg.mid}/${msg.g}/${msg.n}/${msg.i}`;
     const line = this.statLines.get(key) ?? { weapons: {} };
     if (msg.t === 'ps') line.ps = msg;
     else if (msg.t === 'px') line.px = msg;
-    else line.weapons[msg.w] = (line.weapons[msg.w] ?? 0) + msg.c;
+    else if (msg.t === 'pt') {
+      // Sent again after a reconnect (pending end): the last line of a trait counts.
+      line.traits = [...(line.traits ?? []).filter((x) => x.c !== msg.c), msg];
+    } else if (msg.t === 'tv') {
+      // The final episodes come again with a resend: one per trait and start.
+      const eps = (line.episodes ?? []).filter((e) => e.c !== msg.c || e.s !== msg.s);
+      if (eps.length < 200) line.episodes = [...eps, msg];
+    } else line.weapons[msg.w] = (line.weapons[msg.w] ?? 0) + msg.c;
     this.statLines.set(key, line);
   }
 
@@ -2136,6 +2156,7 @@ export class MatchDirector extends EventEmitter {
         ...(x?.ua !== undefined
           ? { items: { amp: x.ua, belt: x.ub ?? 0, armor: x.ur ?? 0, keg: x.uk ?? 0 } }
           : {}),
+        ...(l.traits?.length ? { traits: traitStats(l) } : {}),
       });
     }
     await this.append({
@@ -2641,4 +2662,23 @@ export class MatchDirector extends EventEmitter {
 
 function clampAi(level: number | undefined): number {
   return Math.max(0, Math.min(2, Math.round(level ?? 0)));
+}
+
+/** The trait log of a player's game (mod 0.17.0): counters with up to 40 episodes per trait. */
+function traitStats(l: StatLine): TraitGameStats[] {
+  return (l.traits ?? []).slice(0, 16).map((t) => {
+    const eps = (l.episodes ?? []).filter((e) => e.c === t.c).slice(0, 40);
+    return {
+      code: t.c,
+      uses: t.a,
+      sec: t.s,
+      kills: t.k,
+      deaths: t.d,
+      value: t.v,
+      value2: t.w,
+      ...(eps.length
+        ? { episodes: eps.map((e) => ({ at: e.s, sec: e.d, kills: e.k, died: e.x === 1 })) }
+        : {}),
+    };
+  });
 }

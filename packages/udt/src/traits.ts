@@ -103,6 +103,35 @@ export function traitDef(code: string): TraitDef | undefined {
 
 export const isTraitCode = (code: string): code is TraitCode => BY_CODE.has(code as TraitCode);
 
+const BY_MOD = new Map(TRAITS.flatMap((t) => (t.mod ? [[t.mod, t] as const] : [])));
+
+/** A trait by its code in the mod's `btrt` line and trait log (mod 0.17.0). */
+export function traitByMod(mod: string): TraitDef | undefined {
+  return BY_MOD.get(mod);
+}
+
+/**
+ * How the trait log counts a trait (mod 0.17.0): "episode" traits switch on and off (uses =
+ * episodes with kills and deaths while active), "counter" traits count events and amounts
+ * (uses = dodges, hits, heals ...; value / value2 = amounts), "passive" ones (values traits on
+ * the skill curve) act all the time.
+ */
+export type TraitLogKind = 'episode' | 'counter' | 'passive';
+
+const LOG_COUNTERS = new Set<TraitCode>([
+  'kamikaze',
+  'shuffle-dancer',
+  'starter-armour',
+  'thick-skin',
+  'glass-cannon',
+  'vampire',
+]);
+
+export function traitLogKind(code: TraitCode): TraitLogKind {
+  if (traitDef(code)?.category === 'values') return 'passive';
+  return LOG_COUNTERS.has(code) ? 'counter' : 'episode';
+}
+
 /**
  * A pack draws a trait of the rolled rarity (uniformly among them); a rarity without traits of
  * its own falls back to the next lower one that has some.

@@ -1,4 +1,6 @@
 import { SeasonsService } from '../seasons/seasons.service.js';
+import { StatsService } from '../stats/stats.service.js';
+import { traitReport } from '../stats/trait-report.js';
 import { z } from 'zod';
 import {
   Body,
@@ -73,6 +75,7 @@ export class UdtController {
     @Inject(UdtKeepersService) private readonly keepers: UdtKeepersService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
+    @Inject(StatsService) private readonly stats: StatsService,
   ) {}
 
   @Get()
@@ -432,6 +435,19 @@ export class UdtController {
   @Delete('graduation/:botId')
   unnominate(@CurrentUser() user: User, @Param('botId') botId: string) {
     return this.career.withdraw(user, botId);
+  }
+
+  /**
+   * Trait report of a season (admins, decision 237): what every trait did in the Dream Team
+   * games, from the trait log of mod 0.17.0 - a summary per trait and one row per bot, game
+   * and trait (the settings tab downloads it as CSV for a review).
+   */
+  @AdminOnly()
+  @Get('traits/report')
+  traitReport(@Query('season') season?: string) {
+    const n =
+      Number(season) || this.udt.seasonNumber() || this.seasons.latestStarted()?.number || 0;
+    return { season: n, ...traitReport(n ? this.stats.udtFacts(n) : []) };
   }
 
   /** The league: tables, the matchday as a conference, fixtures, the viewer's next game. */

@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.16.0";
+const MOD_VERSION = "0.17.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -170,6 +170,15 @@ var float CfgNestNext[16];         // no new nest before then
 var float CfgDanceNext[16];        // shuffle dancer: next dodge not before then
 var byte CfgDanceSide[16];
 var Inventory CfgItem[16];         // item controller: the item it heads for or waits at
+// Mod 0.17.0: trait log. Per bot configuration c and tracked trait t (0-14, see TrCode) at
+// c * 15 + t: whether an episode runs, since when, and the game's counters.
+var byte TrOn[240];
+var float TrSince[240], TrSec[240];
+var int TrAct[240], TrKills[240], TrDeaths[240], TrVal[240], TrVal2[240], TrEpK[240];
+var int TrStartSec[240];           // game second the episode began (StGameSec, pauses excluded)
+var float TrLast[240];             // last time the condition held (traits that flicker end 3 s later)
+var bool bTrFinal;                 // SendTraitStats runs: "tv" lines are kept for a resend
+var float CfgPhxAt[16];            // phoenix: when it rose
 var float CfgItemUntil[16];
 var float CfgItemNext[16];
 var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
@@ -1371,6 +1380,7 @@ function int TimerStep()
 		AntiIdle();
 		AdrenalineTick();
 		BehaviourTick();
+		TraitTelemetryTick();
 	}
 	if (!bGameLive)
 	{
@@ -1914,6 +1924,7 @@ function SendStats(int N, int Sec)
 			SendStat();
 		}
 	}
+	SendTraitStats(N);
 	OutMsg.Begin("pse");
 	OutMsg.AddStr("mid", MatchId);
 	OutMsg.AddInt("g", GameNo);
@@ -2090,6 +2101,7 @@ function SendCounters(int i)
 	OutMsg.AddInt("dt", StDmgIn[i]);
 	OutMsg.AddInt("pg", Max(Pg, 0));
 	OutMsg.AddInt("pl", Max(Pl, 0));
+	OutMsg.AddInt("mk", StMon[i]); // mod 0.17.0: monsters killed (Monster Hunt)
 	Send();
 }
 
@@ -2371,6 +2383,8 @@ function SetTourneyPause(bool bOn, string Why)
 		return;
 	// Bot AI help: the clock ran on during the pause, start watching anew.
 	IdleCount = 0;
+	if (bOn)
+		TrPauseEnd(); // mod 0.17.0: trait episodes end with the pause
 	if (!bOn && bGameLive && !Game.bGameEnded && TeamSize <= 1)
 	{
 		// 1v1: do not resume while a human side is still missing; tell the bridge again.
@@ -4471,6 +4485,7 @@ function ShuffleDance(Bot B, int c)
 		Y = -Y;
 	CfgDanceNext[c] = Level.TimeSeconds + 0.9;
 	B.TryToDuck(Y, CfgDanceSide[c] == 1);
+	TrCount(c, 7, 1, 0);
 }
 
 // Once per map (first item controller): the armour, shield belts and damage amplifiers lying in
@@ -4992,6 +5007,21 @@ function ResetGameTraits()
 		CfgNestNext[c] = 0;
 		CfgItem[c] = None;
 		CfgItemNext[c] = 0;
+		CfgPhxAt[c] = 0;
+	}
+	for (c = 0; c < 240; c++)
+	{
+		TrOn[c] = 0;
+		TrSince[c] = 0;
+		TrSec[c] = 0;
+		TrAct[c] = 0;
+		TrKills[c] = 0;
+		TrDeaths[c] = 0;
+		TrVal[c] = 0;
+		TrVal2[c] = 0;
+		TrEpK[c] = 0;
+		TrStartSec[c] = 0;
+		TrLast[c] = 0;
 	}
 }
 
@@ -5000,7 +5030,7 @@ function ResetGameTraits()
 // per game leaves 50 health).
 function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name DamageType)
 {
-	local int cv, ci, Heal, ms;
+	local int cv, ci, Heal, ms, Before;
 	if (ActualDamage <= 0 || Victim == None)
 		return;
 	if (Curve != None)
@@ -5018,16 +5048,32 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 	if (cv < 0 && ci < 0)
 		return;
 	if (ci >= 0 && (CfgBody[ci] & 8) != 0)
+	{
+		Before = ActualDamage;
 		ActualDamage = int(ActualDamage * 1.2 + 0.5);
+		TrCount(ci, 12, ActualDamage - Before, 0);
+	}
 	if (cv >= 0 && (CfgBody[cv] & 8) != 0)
+	{
+		Before = ActualDamage;
 		ActualDamage = int(ActualDamage * 1.2 + 0.5);
+		TrCount(cv, 12, 0, ActualDamage - Before);
+	}
 	if (cv >= 0 && (CfgBody[cv] & 2) != 0)
+	{
+		Before = ActualDamage;
 		ActualDamage = Max(1, int(ActualDamage * 0.9 + 0.5));
+		TrCount(cv, 10, Before - ActualDamage, 0);
+	}
 	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
 	{
 		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.15 + 0.5);
+		Heal = Min(Heal, 100 - InstigatedBy.Health);
 		if (Heal > 0)
-			InstigatedBy.Health = Min(100, InstigatedBy.Health + Heal);
+		{
+			InstigatedBy.Health = InstigatedBy.Health + Heal;
+			TrCount(ci, 13, Heal, 0);
+		}
 	}
 	if (cv >= 0 && (CfgBody[cv] & 32) != 0 && CfgPhoenix[cv] == 0 && bGameLive && Victim.Health > 0 && ActualDamage >= Victim.Health && DamageType != 'Suicided')
 	{
@@ -5041,6 +5087,8 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 			ActualDamage = Victim.Health - 50;
 		Game.BroadcastMessage(CfgName[cv] @ "rises from the ashes!", false);
 		Log("game trait phoenix:" @ CfgName[cv] @ "survives", 'UTTourney');
+		CfgPhxAt[cv] = Level.TimeSeconds;
+		TrStart(cv, 14, None);
 	}
 }
 
@@ -5066,6 +5114,7 @@ function OnModifyPlayer(Pawn P)
 			A.Charge = 25;
 			A.bHeldItem = true;
 			A.GiveTo(P);
+			TrCount(c, 9, 25, 0);
 		}
 	}
 }
@@ -5075,6 +5124,7 @@ function OnModifyPlayer(Pawn P)
 function GameTraitKill(Pawn Killer, Pawn Other)
 {
 	local int c;
+	TraitKillStats(Killer, Other);
 	c = GameTraitCfg(Other);
 	if (c >= 0 && (CfgBeh[c] & 8) != 0 && Killer != None && Killer != Other && Killer.PlayerReplicationInfo != None && !SameTeam(Killer, Other))
 		CfgAvenge[c] = Killer.PlayerReplicationInfo.PlayerName;
@@ -5089,6 +5139,7 @@ function GameTraitKill(Pawn Killer, Pawn Other)
 		CfgAdrSpeed[c] = Killer.GroundSpeed;
 	Killer.GroundSpeed = CfgAdrSpeed[c] * 1.3;
 	CfgAdrUntil[c] = Level.TimeSeconds + 3.0;
+	TrStart(c, 11, Killer);
 }
 
 // Once a second: boosts that ran out.
@@ -5273,6 +5324,325 @@ function float BehaviourThreat(Bot B, Pawn Other)
 	if ((CfgBeh[c] & 64) != 0 && MateTarget(B, Other))
 		F += 0.5;
 	return F;
+}
+
+//=============================================================================
+// Mod 0.17.0: trait log. What the game traits of website bots did: episodes of the traits
+// that switch on and off (a "tv" line each, live; a log line each) and per game the counters
+// of every trait ("pt" lines before "pse", with the statistics). Tracked traits t: 0 vulture,
+// 1 kamikaze, 2 berserker, 3 revenant, 4 bounty hunter, 5 sniper's nest, 6 team player,
+// 7 shuffle dancer, 8 item controller (behaviour bits), 9 starter armour, 10 thick skin,
+// 11 adrenaline, 12 glass cannon, 13 vampire, 14 phoenix (body bits). Values traits act on the
+// skill curve all the time: they are listed as passive (only the seconds in the game).
+//=============================================================================
+
+function string TrCode(int t)
+{
+	switch (t)
+	{
+		case 0: return "aa";
+		case 1: return "kz";
+		case 2: return "bs";
+		case 3: return "rg";
+		case 4: return "bh";
+		case 5: return "sn";
+		case 6: return "tp";
+		case 7: return "sd";
+		case 8: return "ic";
+		case 9: return "sa";
+		case 10: return "tf";
+		case 11: return "ad";
+		case 12: return "gc";
+		case 13: return "vp";
+		case 14: return "px";
+	}
+	return "";
+}
+
+function string TrName(int t)
+{
+	switch (t)
+	{
+		case 0: return "vulture";
+		case 1: return "kamikaze";
+		case 2: return "berserker";
+		case 3: return "revenant";
+		case 4: return "bounty-hunter";
+		case 5: return "snipers-nest";
+		case 6: return "team-player";
+		case 7: return "shuffle-dancer";
+		case 8: return "item-controller";
+		case 9: return "starter-armour";
+		case 10: return "thick-skin";
+		case 11: return "adrenaline";
+		case 12: return "glass-cannon";
+		case 13: return "vampire";
+		case 14: return "phoenix";
+	}
+	return "?";
+}
+
+// Values traits (CfgVal bits 1-128) for the passive lines.
+function string TrValCode(int b)
+{
+	switch (b)
+	{
+		case 0: return "sh";
+		case 1: return "wd";
+		case 2: return "ss";
+		case 3: return "ph";
+		case 4: return "ee";
+		case 5: return "ar";
+		case 6: return "dd";
+		case 7: return "bo";
+	}
+	return "";
+}
+
+function bool TrHas(int c, int t)
+{
+	if (t <= 8)
+		return (CfgBeh[c] & (1 << t)) != 0;
+	return (CfgBody[c] & (1 << (t - 9))) != 0;
+}
+
+// The statistics slot of a bot configuration (-1: not in this game).
+function int TrStatIdx(int c)
+{
+	local int i;
+	for (i = 0; i < StCount; i++)
+		if (StKey[i] == "" && SameBotName(StBot[i], CfgName[c]))
+			return i;
+	return -1;
+}
+
+// A counted use: dodges, heals, hits, armour (Amount and Amount2 add to the values).
+function TrCount(int c, int t, int Amount, int Amount2)
+{
+	local int x;
+	if (c < 0 || !bGameLive)
+		return;
+	x = c * 15 + t;
+	TrAct[x]++;
+	TrVal[x] += Amount;
+	TrVal2[x] += Amount2;
+}
+
+// P: the bot for the log (None: no health in the line).
+function TrStart(int c, int t, Pawn P)
+{
+	local int x;
+	local string S;
+	if (c < 0 || !bGameLive)
+		return;
+	x = c * 15 + t;
+	TrLast[x] = Level.TimeSeconds;
+	if (TrOn[x] != 0)
+		return;
+	TrOn[x] = 1;
+	TrSince[x] = Level.TimeSeconds;
+	TrStartSec[x] = StGameSec;
+	TrAct[x]++;
+	TrEpK[x] = 0;
+	S = "trait" @ TrName(t) @ "on:" @ CfgName[c] @ "at" @ StGameSec $ "s";
+	if (P != None)
+		S = S $ ", health" @ P.Health;
+	Log(S, 'UTTourney');
+}
+
+// An episode ends now: Died = 1 when the bot died in it.
+function TrEnd(int c, int t, int Died)
+{
+	TrEndAt(c, t, Died, Level.TimeSeconds);
+}
+
+// An episode ends at EndAt (a flickering condition: when it last held). Sends the "tv" line.
+function TrEndAt(int c, int t, int Died, float EndAt)
+{
+	local int x, i, Dur;
+	local string S;
+	if (c < 0)
+		return;
+	x = c * 15 + t;
+	if (TrOn[x] == 0)
+		return;
+	TrOn[x] = 0;
+	EndAt = FMax(EndAt, TrSince[x]);
+	TrSec[x] += EndAt - TrSince[x];
+	Dur = int(EndAt - TrSince[x] + 0.5);
+	S = "trait" @ TrName(t) @ "off:" @ CfgName[c] @ "after" @ Dur $ "s," @ TrEpK[x] @ "kills";
+	if (Died != 0)
+		S = S $ ", died";
+	Log(S, 'UTTourney');
+	i = TrStatIdx(c);
+	if (i < 0)
+		return;
+	LiveHead("tv", i);
+	OutMsg.AddStr("c", TrCode(t));
+	OutMsg.AddInt("s", TrStartSec[x]);
+	OutMsg.AddInt("d", Dur);
+	OutMsg.AddInt("k", TrEpK[x]);
+	OutMsg.AddInt("x", Died);
+	if (bTrFinal)
+		SendStat(); // with the statistics: sent again after a reconnect
+	else
+		Send();
+}
+
+// A soft pause ends the running episodes (the game clock stops, Level.TimeSeconds does not).
+function TrPauseEnd()
+{
+	local int c, t;
+	for (c = 0; c < CfgCount; c++)
+		for (t = 0; t < 15; t++)
+			TrEnd(c, t, 0);
+}
+
+// From GameTraitKill: the victim's running episodes end (died), the killer's count the kill;
+// kamikaze counts its flak kills.
+function TraitKillStats(Pawn Killer, Pawn Other)
+{
+	local int c, t, x;
+	c = GameTraitCfg(Other);
+	if (c >= 0)
+		for (t = 0; t < 15; t++)
+		{
+			x = c * 15 + t;
+			if (TrOn[x] != 0)
+			{
+				TrDeaths[x]++;
+				TrEnd(c, t, 1);
+			}
+		}
+	if (Killer == None || Killer == Other)
+		return;
+	c = GameTraitCfg(Killer);
+	if (c < 0)
+		return;
+	for (t = 0; t < 15; t++)
+	{
+		x = c * 15 + t;
+		if (TrOn[x] != 0)
+		{
+			TrKills[x]++;
+			TrEpK[x]++;
+		}
+	}
+	if ((CfgBeh[c] & 2) != 0 && Killer.Weapon != None && Killer.Weapon.IsA('UT_FlakCannon'))
+		TrCount(c, 1, 1, 0);
+}
+
+// Once a second after BehaviourTick: which episodes run now.
+function TraitTelemetryTick()
+{
+	local int c, x;
+	local Bot B;
+	local bool bOn;
+	for (c = 0; c < CfgCount; c++)
+	{
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0)
+			continue;
+		B = FindBotPawn(CfgName[c]);
+		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
+			continue;
+		if ((CfgBeh[c] & 1) != 0)
+			TrSample(c, 0, B.Health < 50, B);
+		if ((CfgBeh[c] & 4) != 0)
+			TrSample(c, 2, B.Health < 40, B);
+		if ((CfgBeh[c] & 8) != 0)
+			TrSample(c, 3, CfgAvenge[c] != "", B);
+		// These three switch often: an episode ends when the condition was off for 3 s.
+		if ((CfgBeh[c] & 16) != 0)
+		{
+			bOn = B.Enemy != None && B.Enemy == LeaderFor(B);
+			TrSampleLate(c, 4, bOn, B);
+		}
+		if ((CfgBeh[c] & 32) != 0)
+		{
+			bOn = CfgNest[c] != None || (B.bCamping && HasSniper(B));
+			TrSampleLate(c, 5, bOn, B);
+		}
+		if ((CfgBeh[c] & 64) != 0)
+		{
+			bOn = B.Enemy != None && MateTarget(B, B.Enemy);
+			TrSampleLate(c, 6, bOn, B);
+		}
+		if ((CfgBeh[c] & 256) != 0)
+			TrSample(c, 8, CfgItem[c] != None, B);
+		if ((CfgBody[c] & 4) != 0)
+			TrSample(c, 11, CfgAdrUntil[c] > 0, B);
+		// The phoenix starts when it rises (OnTakeDamage) and counts 20 s of its second life.
+		x = c * 15 + 14;
+		if (TrOn[x] != 0 && Level.TimeSeconds - CfgPhxAt[c] >= 20)
+			TrEnd(c, 14, 0);
+	}
+}
+
+function TrSample(int c, int t, bool bOn, Pawn P)
+{
+	if (bOn)
+		TrStart(c, t, P);
+	else
+		TrEnd(c, t, 0);
+}
+
+// Like TrSample, but off only after 3 s without the condition (ends when it last held).
+function TrSampleLate(int c, int t, bool bOn, Pawn P)
+{
+	local int x;
+	x = c * 15 + t;
+	if (bOn)
+		TrStart(c, t, P);
+	else if (TrOn[x] != 0 && Level.TimeSeconds - TrLast[x] >= 3)
+		TrEndAt(c, t, 0, TrLast[x]);
+}
+
+// Before "pse": open episodes end with the game, then one "pt" line per trait of every bot.
+function SendTraitStats(int N)
+{
+	local int c, t, x, i, b;
+	bTrFinal = true;
+	for (c = 0; c < CfgCount; c++)
+	{
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && CfgVal[c] == 0)
+			continue;
+		i = TrStatIdx(c);
+		for (t = 0; t < 15; t++)
+		{
+			if (!TrHas(c, t))
+				continue;
+			TrEnd(c, t, 0);
+			if (i < 0)
+				continue;
+			x = c * 15 + t;
+			TraitStatLine(N, i, TrCode(t), TrAct[x], int(TrSec[x] + 0.5), TrKills[x], TrDeaths[x], TrVal[x], TrVal2[x]);
+			Log("trait summary:" @ CfgName[c] @ TrName(t) @ "uses" @ TrAct[x] @ "active" @ int(TrSec[x] + 0.5) $ "s kills"
+				@ TrKills[x] @ "deaths" @ TrDeaths[x] @ "value" @ TrVal[x] @ TrVal2[x], 'UTTourney');
+		}
+		if (i < 0)
+			continue;
+		for (b = 0; b < 8; b++)
+			if ((CfgVal[c] & (1 << b)) != 0)
+				TraitStatLine(N, i, TrValCode(b), 0, StSec[i], 0, 0, 0, 0);
+	}
+	bTrFinal = false;
+}
+
+function TraitStatLine(int N, int i, string Code, int A, int S, int K, int D, int V, int W)
+{
+	OutMsg.Begin("pt");
+	OutMsg.AddStr("mid", MatchId);
+	OutMsg.AddInt("g", GameNo);
+	OutMsg.AddInt("n", N);
+	OutMsg.AddInt("i", i);
+	OutMsg.AddStr("c", Code);
+	OutMsg.AddInt("a", A);
+	OutMsg.AddInt("s", S);
+	OutMsg.AddInt("k", K);
+	OutMsg.AddInt("d", D);
+	OutMsg.AddInt("v", V);
+	OutMsg.AddInt("w", W);
+	SendStat();
 }
 
 defaultproperties

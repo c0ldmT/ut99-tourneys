@@ -27,6 +27,27 @@ export const ActorSchema = z.object({
 const count = z.number().int().nonnegative();
 
 /**
+ * A Dream Team trait in one game (run) of a bot (mod 0.17.0): the mod code (btrt), uses
+ * (episodes, or counted events such as dodges and hits), seconds active (passive values
+ * traits: in the game), kills and deaths while active, the trait's values (healed, damage
+ * prevented, extra damage dealt / taken ...) and the episodes (start, length, kills, died).
+ */
+export const TraitGameStatsSchema = z.object({
+  code: z.string().min(1).max(4),
+  uses: count,
+  sec: count,
+  kills: count,
+  deaths: count,
+  value: count,
+  value2: count,
+  episodes: z
+    .array(z.object({ at: count, sec: count, kills: count, died: z.boolean() }))
+    .max(40)
+    .optional(),
+});
+export type TraitGameStats = z.infer<typeof TraitGameStatsSchema>;
+
+/**
  * One player's (or bot's) statistics of a game (Monster Hunt: of a run), counted by the mod.
  * Players are identified by their website user id, bots by their name.
  */
@@ -63,6 +84,8 @@ export const PlayerGameStatsSchema = z.object({
   damageTaken: count.optional(),
   /** Mod 0.16.0: items taken (damage amplifier, shield belt, body armour, keg o' health). */
   items: z.object({ amp: count, belt: count, armor: count, keg: count }).optional(),
+  /** Mod 0.17.0: what the bot's Dream Team traits did (trait log). */
+  traits: z.array(TraitGameStatsSchema).max(16).optional(),
 });
 export type PlayerGameStats = z.infer<typeof PlayerGameStatsSchema>;
 

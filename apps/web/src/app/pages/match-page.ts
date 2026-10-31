@@ -24,6 +24,7 @@ import { botRoute } from '../core/bots';
 import { Loading } from '../core/loading';
 import { I18n, TPipe } from '../core/i18n';
 import { MH_ADAPTER, raceTime } from '../core/race';
+import { TraitLog } from '../components/trait-log';
 import { playTime } from '../core/stats-format';
 import { BetColumns } from '../components/bet-columns';
 import type {
@@ -83,6 +84,7 @@ const SUM_KEYS = [
     MomentumChart,
     DamageItems,
     RacePanel,
+    TraitLog,
     NgTemplateOutlet,
   ],
   providers: [TournamentStream],
@@ -329,6 +331,7 @@ const SUM_KEYS = [
               }
             </div>
             <p class="muted small">{{ (race() ? 'match.mvpHintMh' : 'match.mvpHint') | t }}</p>
+            <app-trait-log [players]="v.players" [sideA]="d.entrants[0]!.id" [race]="race()" />
           }
           @if (!v.game?.live) {
             <ng-container *ngTemplateOutlet="extras; context: { $implicit: v, d: d }" />

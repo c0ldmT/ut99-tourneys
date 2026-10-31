@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.17.0, trait log: the match page shows what every Dream Team trait did in the game - when it switched on, how long, kills meanwhile and how it ended (kill, death or nothing), healed health, prevented damage, dodges and more; the feed has a "Traits" filter, the server log a line per trait episode, and admins download a trait report of the season (CSV/JSON) for balancing.
+- Monster Hunt run panel: the map's objectives with the running team's progress (mod 0.17.0).
 - Calendar (menu "Calendar"): tournaments, Dream Team cups and the planned starts of the series, league evenings with your game, relegation and final four (before the league starts its plan), season start and end, keeper window and paydays - as a month or a list, with filters, "only mine" and what comes next; on phones as a list and a month with dots.
 - Settings → UDT Liga: a status card shows where the league stands (off, starts on …, starts next season, evening x of y, champion) and starts a regular league or a test run in the running season at once (with its plan).
 - Activity bar under the header: everybody sees when the server sets up a league evening (with progress) or is very busy and pages take longer.

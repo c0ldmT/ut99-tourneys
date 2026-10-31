@@ -23,6 +23,11 @@ var bool bRunReported;
 var int LastRpDeaths, RpTicks;
 var int MonStart;           // mod 0.16.0: most monsters seen alive in this run (usually at its start)
 var int MonAlive, BossAlive;
+// Mod 0.17.0: the map's objectives for the website ("ob" line on every change).
+var MonsterHuntObjective Obj[32];
+var byte ObjSent[32];       // state last sent (0 inactive, 1 active, 2 completed), 255 = not yet
+var int ObjCount;
+var bool bObjFound;
 // Monster Hunt settings from the bridge (race line), applied when a level starts. MonsterHunt
 // reads its own config from MonsterHunt.ini, so the tournament sets them in code instead.
 var int HuntLives;          // 0 = unlimited, -1 = not known (Monster Hunt's own setting)
@@ -234,6 +239,7 @@ function LiveTick()
 		return;
 	StatTick();
 	LiveDataTick();
+	ObjectiveTick();
 	CaptainTick();
 	RpTicks++;
 	if (RpTicks >= 3 || RunDeaths != LastRpDeaths)
@@ -336,6 +342,58 @@ function SendProgress()
 	OutMsg.AddInt("mt", MonStart);
 	OutMsg.AddInt("bl", BossAlive);
 	Send();
+}
+
+// Mod 0.17.0: the objectives of the map (once per level) and every change of their state.
+function ObjectiveTick()
+{
+	local MonsterHuntObjective O;
+	local int j;
+	local byte St;
+
+	if (!bObjFound)
+	{
+		bObjFound = true;
+		foreach AllActors(class'MonsterHuntObjective', O)
+			if (ObjCount < 32)
+			{
+				Obj[ObjCount] = O;
+				ObjSent[ObjCount] = 255;
+				ObjCount++;
+			}
+		Log("objectives on this map:" @ ObjCount, 'UTTourney');
+	}
+	for (j = 0; j < ObjCount; j++)
+	{
+		if (Obj[j] == None)
+			continue;
+		St = 0;
+		if (Obj[j].bCompleted)
+			St = 2;
+		else if (Obj[j].bActive)
+			St = 1;
+		if (St == ObjSent[j])
+			continue;
+		ObjSent[j] = St;
+		OutMsg.Begin("ob");
+		OutMsg.AddStr("mid", MatchId);
+		OutMsg.AddInt("g", GameNo);
+		OutMsg.AddInt("n", LiveRun());
+		OutMsg.AddInt("j", j);
+		OutMsg.AddInt("of", ObjCount);
+		OutMsg.AddInt("st", St);
+		OutMsg.AddStr("m", OutMsg.FitWire(Obj[j].Message, 120));
+		Send();
+	}
+}
+
+// After a reconnect to the bridge: the objectives go out again.
+function ResetLiveSent()
+{
+	local int j;
+	Super.ResetLiveSent();
+	for (j = 0; j < ObjCount; j++)
+		ObjSent[j] = 255;
 }
 
 // Mod 0.16.0: the live lines carry the run.

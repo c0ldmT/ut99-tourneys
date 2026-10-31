@@ -518,7 +518,7 @@ export const KillFeedEntrySchema = z.object({
   /** Seconds since the game (Monster Hunt: run) went live. */
   sec: z.number().int().nonnegative().optional(),
   /** What the entry is; missing: a kill, or a chat line when `chat` is set (older bridges). */
-  kind: z.enum(['kill', 'chat', 'item', 'thought']).optional(),
+  kind: z.enum(['kill', 'chat', 'item', 'thought', 'trait']).optional(),
   /** A human plays in the game: the website shows items and thoughts with a delay. */
   humans: z.boolean().optional(),
   killer: z.string().max(64),
@@ -547,6 +547,18 @@ export const KillFeedEntrySchema = z.object({
     .object({
       state: z.enum(['atk', 'chg', 'tac', 'ret', 'hunt', 'roam', 'item', 'camp']),
       target: z.string().max(64),
+    })
+    .optional(),
+  /**
+   * kind "trait" (mod 0.17.0): an episode of the bot `killer`'s trait ended - its mod code,
+   * seconds it lasted, kills in it, whether the bot died in it.
+   */
+  trait: z
+    .object({
+      code: z.string().max(4),
+      dur: z.number().int().nonnegative(),
+      kills: z.number().int().nonnegative(),
+      died: z.boolean(),
     })
     .optional(),
 });
@@ -612,6 +624,11 @@ export const LiveStateSchema = z.object({
       total: z.number().int().nonnegative(),
       bosses: z.number().int().nonnegative(),
     })
+    .optional(),
+  /** Monster Hunt (mod 0.17.0): the map's objectives in their order, 0 open, 1 active, 2 done. */
+  objectives: z
+    .array(z.object({ text: z.string().max(160), state: z.number().int().min(0).max(2) }))
+    .max(32)
     .optional(),
 });
 export type LiveState = z.infer<typeof LiveStateSchema>;

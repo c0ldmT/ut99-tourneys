@@ -97,7 +97,9 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
     const { tournamentId: _t, matchId: _m, game: _g, run: _r, ...rest } = e;
     o.feed.push(rest);
     if (o.feed.length > REPLAY_FEED_MAX) {
-      const i = o.feed.findIndex((x) => x.kind === 'thought');
+      // thoughts go first, then trait episodes (mod 0.17.0), kills last
+      let i = o.feed.findIndex((x) => x.kind === 'thought');
+      if (i < 0) i = o.feed.findIndex((x) => x.kind === 'trait');
       o.feed.splice(i >= 0 ? i : 0, 1);
     }
   }

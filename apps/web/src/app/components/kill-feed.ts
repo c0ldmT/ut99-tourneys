@@ -11,6 +11,7 @@ import { NameTag } from '../core/looks';
 import { I18n, TPipe } from '../core/i18n';
 import { feedSec, meters, mmss } from '../core/live';
 import type { KillFeedEntry } from '../core/types';
+import { traitByMod } from '@tourney/udt';
 
 /** UT's spree messages by kills in a row. */
 const SPREES: Record<number, string> = {
@@ -26,7 +27,7 @@ const MULTIS: Record<number, string> = {
   4: 'Ultra Kill',
 };
 
-export type FeedKind = 'kill' | 'item' | 'thought' | 'chat';
+export type FeedKind = 'kill' | 'item' | 'thought' | 'chat' | 'trait';
 export type FeedRow = Omit<KillFeedEntry, 'tournamentId' | 'matchId' | 'game'>;
 
 /** A part of the feed: a game, or a run of a Monster Hunt game. */
@@ -44,7 +45,7 @@ export interface FeedSection {
 
 /** Entries shown per section at most (a stored feed can be long). */
 const SHOW_MAX = 300;
-const KINDS: FeedKind[] = ['kill', 'item', 'thought', 'chat'];
+const KINDS: FeedKind[] = ['kill', 'item', 'trait', 'thought', 'chat'];
 
 export const feedKind = (e: FeedRow): FeedKind =>
   e.kind ?? (e.chat !== undefined ? 'chat' : 'kill');
@@ -113,6 +114,17 @@ export const feedKind = (e: FeedRow): FeedKind =>
                         <span class="itm" [class]="r.e.item ?? ''">{{
                           'live.itemName.' + r.e.item | t
                         }}</span>
+                      }
+                      @case ('trait') {
+                        <span class="nm" [class]="r.kSide"><na-name [name]="r.e.killer" /></span>
+                        <span class="udt-trait r-{{ r.rarity }}">{{ r.traitName | t }}</span>
+                        <span class="muted"
+                          >{{ 'feed.traitDur' | t: { s: r.e.trait?.dur ?? 0 } }}
+                          @if (r.e.trait?.kills) {
+                            · {{ 'feed.traitKills' | t: { n: r.e.trait?.kills ?? 0 } }}
+                          }
+                          · {{ (r.e.trait?.died ? 'feed.traitDied' : 'feed.traitLived') | t }}</span
+                        >
                       }
                       @case ('thought') {
                         <span class="nm" [class]="r.kSide"><na-name [name]="r.e.killer" /></span>
@@ -374,7 +386,7 @@ export class KillFeed {
   protected readonly shown = linkedSignal<boolean, Record<FeedKind, boolean>>({
     source: this.thoughts,
     computation: (thought, prev) => ({
-      ...(prev?.value ?? { kill: true, item: true, chat: true }),
+      ...(prev?.value ?? { kill: true, item: true, chat: true, trait: true }),
       thought,
     }),
   });
@@ -382,7 +394,7 @@ export class KillFeed {
   private readonly flipped = signal<ReadonlySet<string>>(new Set());
 
   protected readonly chips = computed(() => {
-    const n: Record<FeedKind, number> = { kill: 0, item: 0, thought: 0, chat: 0 };
+    const n: Record<FeedKind, number> = { kill: 0, item: 0, thought: 0, chat: 0, trait: 0 };
     for (const s of this.sections()) for (const e of s.entries) n[feedKind(e)]++;
     const on = this.shown();
     return KINDS.filter((k) => n[k] > 0).map((kind) => ({ kind, n: n[kind], on: on[kind] }));
@@ -438,10 +450,13 @@ export class KillFeed {
       if (e.killerHealth !== undefined && e.distance !== undefined && !e.suicide)
         detail = this.i18n.t('feed.detail', { hp: e.killerHealth, m: meters(e.distance) });
     }
+    const def = e.trait ? traitByMod(e.trait.code) : undefined;
     return {
       key,
       kind,
       e,
+      traitName: def ? `udt.trait.${def.code}` : (e.trait?.code ?? ''),
+      rarity: def?.rarity ?? 'common',
       kSide: side(e.killerSide),
       vSide: side(e.victimSide),
       badges,

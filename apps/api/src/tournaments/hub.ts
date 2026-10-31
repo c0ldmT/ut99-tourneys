@@ -13,10 +13,17 @@ type Listener = (msg: HubMessage) => void;
 /** Feed entries kept per game and run for browsers that open the match page during a game. */
 export const FEED_SIZE = 40;
 
-/** Feed entries that help a player when shown live (a human plays): items and bot thoughts. */
+/**
+ * Feed entries that help a player when shown live (a human plays): items, bot thoughts and
+ * trait episodes (mod 0.17.0).
+ */
 export function heldBack(entry: KillFeedEntry): boolean {
-  return entry.humans === true && (entry.kind === 'item' || entry.kind === 'thought');
+  return entry.humans === true && byTheWay(entry);
 }
+
+/** Items, thoughts and trait episodes: kept apart from kills and chat lines, dropped first. */
+const byTheWay = (x: KillFeedEntry) =>
+  x.kind === 'item' || x.kind === 'thought' || x.kind === 'trait';
 
 /**
  * In-process fan-out of tournament updates to the browsers' event streams. Live state, items and
@@ -86,7 +93,7 @@ export class LiveHub implements OnModuleDestroy {
     }
     if (this.feedGame.get(tournamentId) !== key) return;
     const list = this.feed.get(tournamentId) ?? [];
-    const side = (x: KillFeedEntry) => (x.kind === 'item' || x.kind === 'thought' ? 1 : 0);
+    const side = (x: KillFeedEntry) => (byTheWay(x) ? 1 : 0);
     const group = (x: KillFeedEntry) => `${x.run ?? 0}/${side(x)}`;
     const g = group(e);
     const same = list.filter((x) => group(x) === g);

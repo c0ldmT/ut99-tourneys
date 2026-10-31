@@ -817,6 +817,29 @@ export interface MatchPlayerView {
   damageDealt?: number;
   damageTaken?: number;
   items?: ItemCounts;
+  /** Mod 0.17.0: what the bot's Dream Team traits did (trait log). */
+  traits?: TraitGameStats[];
+}
+
+/** Trait report of a season (admins, decision 237): summary per trait, one row per bot game. */
+export interface TraitReport {
+  season: number;
+  games: number;
+  baseline: { games: number; won: number; kills: number; deaths: number };
+  summary: Record<string, string | number>[];
+  rows: Record<string, string | number | boolean>[];
+}
+
+/** A trait in one game of a bot (mod code; see `traitByMod`, decision 237). */
+export interface TraitGameStats {
+  code: string;
+  uses: number;
+  sec: number;
+  kills: number;
+  deaths: number;
+  value: number;
+  value2: number;
+  episodes?: { at: number; sec: number; kills: number; died: boolean }[];
 }
 
 export interface ItemCounts {
@@ -928,7 +951,7 @@ export interface KillFeedEntry {
   at: number;
   /** Seconds since the game (run) went live. */
   sec?: number;
-  kind?: 'kill' | 'chat' | 'item' | 'thought';
+  kind?: 'kill' | 'chat' | 'item' | 'thought' | 'trait';
   humans?: boolean;
   killerHealth?: number;
   /** Unreal units. */
@@ -950,6 +973,8 @@ export interface KillFeedEntry {
   multi: number;
   /** A bot's chat line (mod 0.12.0): `killer` is the bot. */
   chat?: string;
+  /** kind "trait" (mod 0.17.0): an episode of the bot `killer`'s trait ended. */
+  trait?: { code: string; dur: number; kills: number; died: boolean };
 }
 
 /** A player or bot of the game in progress (mod 0.16.0). */
@@ -987,6 +1012,8 @@ export interface LiveStateView {
   humans: boolean;
   players: LivePlayer[];
   monsters?: { alive: number; total: number; bosses: number };
+  /** Monster Hunt (mod 0.17.0): the map's objectives, 0 open, 1 active, 2 done. */
+  objectives?: { text: string; state: number }[];
 }
 
 /** Timeline of the game in progress: `[sec, scoreA, scoreB]`; a race: `[sec, points, deaths, monstersAlive]`. */

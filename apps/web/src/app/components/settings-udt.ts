@@ -161,6 +161,29 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
         <button type="submit" class="primary" [disabled]="busy()">{{ 'common.save' | t }}</button>
       </div>
     </form>
+    <section class="card">
+      <h2>{{ 'trait.report.title' | t }}</h2>
+      <p class="muted small">{{ 'trait.report.hint' | t }}</p>
+      <div class="row gap">
+        <label
+          >{{ 'trait.report.season' | t }}
+          <input
+            type="number"
+            min="1"
+            name="trSeason"
+            [(ngModel)]="reportSeason"
+            [placeholder]="'trait.report.current' | t"
+            class="narrow"
+          />
+        </label>
+        <button type="button" [disabled]="busy()" (click)="report('csv')">
+          {{ 'trait.report.csv' | t }}
+        </button>
+        <button type="button" [disabled]="busy()" (click)="report('json')">
+          {{ 'trait.report.json' | t }}
+        </button>
+      </div>
+    </section>
   `,
   styles: [SETTINGS_STYLES],
 })
@@ -179,9 +202,46 @@ export class SettingsUdt {
   protected udtOffers = 8;
   protected udtBudget = 1500;
   protected udtExtra = 50;
+  /** Trait report (decision 237): empty = the running season. */
+  protected reportSeason: number | null = null;
 
   constructor() {
     void this.load();
+  }
+
+  /** Downloads the trait report of a season: rows as CSV (for a review) or everything as JSON. */
+  protected async report(format: 'csv' | 'json') {
+    this.busy.set(true);
+    try {
+      const r = await this.api.udtTraitReport(this.reportSeason ?? undefined);
+      // CSV for spreadsheets: quoted fields, no formulas, a BOM for umlauts in Excel.
+      const cell = (v: unknown) => {
+        const s = String(v).replace(/[\r\n]+/g, ' ');
+        return `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
+      };
+      const body =
+        format === 'json'
+          ? JSON.stringify(r, null, 2)
+          : '\uFEFF' +
+            [
+              Object.keys(r.rows[0] ?? { season: 0 })
+                .map(cell)
+                .join(';'),
+              ...r.rows.map((x) => Object.values(x).map(cell).join(';')),
+            ].join('\r\n');
+      const url = URL.createObjectURL(
+        new Blob([body], { type: format === 'json' ? 'application/json' : 'text/csv' }),
+      );
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trait-report-season-${r.season}.${format}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      // the toast shows the error
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   private async load() {

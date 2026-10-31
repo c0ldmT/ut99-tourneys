@@ -55,6 +55,25 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
               ><b>{{ l.points }}</b>
             </div>
           </div>
+          @if (objectives(); as o) {
+            <!-- mod 0.17.0: the map's objectives and how far the running team got -->
+            <div class="mon">
+              <div class="spread small">
+                <span class="muted">{{ 'live.objectives' | t }}</span>
+                <b class="mono">{{ o.done }} / {{ o.list.length }}</b>
+              </div>
+              <div class="lc-bar">
+                <span class="obar" [style.width.%]="(o.done / o.list.length) * 100"></span>
+              </div>
+              <ol class="olist small">
+                @for (x of o.list; track $index) {
+                  <li [class]="'s' + x.state">
+                    {{ x.text || ('live.objectiveN' | t: { n: $index + 1 }) }}
+                  </li>
+                }
+              </ol>
+            </div>
+          }
           @if (monsters(); as m) {
             <!-- monsters respawn: a count of those alive says nothing, the bosses do -->
             @if (m.bosses > 0) {
@@ -150,6 +169,26 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
       display: grid;
       gap: 4px;
     }
+    .obar {
+      background: linear-gradient(90deg, var(--side-b), var(--accent));
+    }
+    .olist {
+      margin: 4px 0 0;
+      padding-left: 18px;
+      display: grid;
+      gap: 2px;
+    }
+    .olist .s0 {
+      color: var(--muted);
+    }
+    .olist .s1 {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .olist .s2 {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
     .target {
       margin-top: 10px;
       color: var(--text-2);
@@ -181,6 +220,10 @@ export class RacePanel {
     return this.runs().find((r) => !live || r.entrantId !== live.runner) ?? null;
   });
   protected readonly monsters = computed(() => this.state()?.monsters ?? null);
+  protected readonly objectives = computed(() => {
+    const list = this.state()?.objectives ?? [];
+    return list.length ? { list, done: list.filter((o) => o.state === 2).length } : null;
+  });
   /** Time left to beat the finished run (negative: already slower), penalty included. */
   protected readonly target = computed(() => {
     const d = this.done();

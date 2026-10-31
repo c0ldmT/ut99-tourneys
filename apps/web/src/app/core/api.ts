@@ -9,6 +9,7 @@ import type { NeuroWallet } from './neuro';
 import { Toasts } from './toast';
 import type { UdtLooks } from '../components/udt-bot-look';
 import type {
+  TraitReport,
   UdtBotLookBody,
   UdtTeam,
   UdtSquad,
@@ -302,6 +303,8 @@ export class Api {
     this.call<UdtPacks>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}`, undefined, {
       ok: 'ok.udt.scrapped',
     });
+  udtTraitReport = (season?: number) =>
+    this.call<TraitReport>('GET', `/udt/traits/report${season ? `?season=${season}` : ''}`);
   udtScrapBlueprint = (id: string) =>
     this.call<UdtPacks>('DELETE', `/udt/blueprints/${encodeURIComponent(id)}`, undefined, {
       ok: 'ok.udt.bpScrapped',

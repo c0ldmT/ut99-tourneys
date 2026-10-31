@@ -101,6 +101,36 @@ describe('live data (mod 0.16.0)', () => {
     expect(s2.length).toBeGreaterThan(0);
     expect(s2.at(-1)!.monsters).toMatchObject({ total: 40 });
     expect(s2.at(-1)!.players.every((p) => p.side === runs[1].data.entrantId)).toBe(true);
+    // Mod 0.17.0: the map's objectives in the state (the first one done halfway through).
+    expect(s2.at(-1)!.objectives).toEqual([
+      { text: 'Open the castle gate', state: 2 },
+      { text: 'Kill the Titan', state: 1 },
+    ]);
+  });
+
+  it('trait log (mod 0.17.0): episodes in the feed, counters in the statistics', async () => {
+    env = await setup({});
+    const { feed } = record(env);
+    await env.run(() => events(env!, 'match.gameFinished').length > 0);
+    const stats = events(env, 'match.playerStats')[0].data.players as any[];
+    const bot = stats.find((p) => p.bot);
+    expect(bot, 'a bot plays in the default tournament').toBeTruthy();
+    expect(bot.traits).toEqual([
+      {
+        code: 'aa',
+        uses: 1,
+        sec: 6,
+        kills: 1,
+        deaths: 0,
+        value: 0,
+        value2: 0,
+        episodes: [{ at: 10, sec: 6, kills: 1, died: false }],
+      },
+      { code: 'wd', uses: 0, sec: expect.any(Number), kills: 0, deaths: 0, value: 0, value2: 0 },
+    ]);
+    expect(stats.filter((p) => !p.bot).every((p) => p.traits === undefined)).toBe(true);
+    const ep = feed.find((f) => f.kind === 'trait');
+    expect(ep).toMatchObject({ killer: bot.name, trait: { code: 'aa', dur: 6, kills: 1 } });
   });
 });
 

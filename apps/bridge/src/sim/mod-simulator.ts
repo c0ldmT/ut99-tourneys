@@ -496,6 +496,13 @@ export class ModSimulator {
         mt: 40,
         bl: left > 10 ? 1 : 0,
       });
+      // Mod 0.17.0: two objectives, the first done halfway through.
+      const half = elapsed >= ms / 2;
+      for (const [j, st, text] of [
+        [0, half ? 2 : 1, 'Open the castle gate'],
+        [1, half ? 1 : 0, 'Kill the Titan'],
+      ] as const)
+        this.send({ t: 'ob', mid: m.mid, g: m.g, n: race.n, j, of: 2, st, m: text });
       this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
     };
     this.gameTimers.push(this.later(this.b.scoreIntervalMs, tick));
@@ -634,6 +641,15 @@ export class ModSimulator {
         },
       ];
       if (k > 0) lines.push({ t: 'pw', mid: m.mid, g: m.g, n, i, w: 'Shock Rifle', c: k });
+      if (p.bn) {
+        // Mod 0.17.0, trait log: every bot as a vulture with one episode, and a watchdog.
+        const id = { mid: m.mid, g: m.g, n, i };
+        lines.push(
+          { t: 'tv', ...id, c: 'aa', s: 10, d: 6, k: 1, x: 0 },
+          { t: 'pt', ...id, c: 'aa', a: 1, s: 6, k: 1, d: 0, v: 0, w: 0 },
+          { t: 'pt', ...id, c: 'wd', a: 0, s: sec, k: 0, d: 0, v: 0, w: 0 },
+        );
+      }
       for (const l of lines) {
         this.statsSent.push(l);
         this.send(l);

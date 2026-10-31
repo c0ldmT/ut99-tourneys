@@ -2,7 +2,7 @@ import type { KillFeedEntry, LivePlayer, LiveState, ModToBridge } from '@tourney
 import type { Clock, TimerHandle } from './clock.js';
 
 /** The mod's live data lines (mod 0.16.0). */
-export type LiveLine = Extract<ModToBridge, { t: 'lr' | 'st' | 'sx' | 'pk' | 'bt' }>;
+export type LiveLine = Extract<ModToBridge, { t: 'lr' | 'st' | 'sx' | 'pk' | 'bt' | 'tv' }>;
 
 /** What the board needs to know about the game the lines belong to. */
 export interface LiveContext {
@@ -80,6 +80,7 @@ export class LiveBoard {
   /** Slots whose counters line carries the monster kills (mod 0.17.0): the feed count is off. */
   private monsterSx = new Set<number>();
   private monsterInfo?: LiveState['monsters'];
+  private objectiveList: NonNullable<LiveState['objectives']> = [];
   private ctx?: LiveContext;
   private lastEmit = 0;
   private timer?: TimerHandle;
@@ -99,6 +100,7 @@ export class LiveBoard {
     this.monsterKf.clear();
     this.monsterSx.clear();
     this.monsterInfo = undefined;
+    this.objectiveList = [];
     this.ctx = undefined;
     if (this.timer) this.clock.clearTimeout(this.timer);
     this.timer = undefined;
@@ -165,6 +167,17 @@ export class LiveBoard {
         });
         return this.changed();
       }
+      case 'tv':
+        // Mod 0.17.0: an episode of a trait ended (the statistics keep it too).
+        this.emitFeed({
+          ...blankFeed(ctx, this.clock.now()),
+          kind: 'trait',
+          humans: this.humans,
+          killer: p.name,
+          killerSide: p.side,
+          trait: { code: msg.c, dur: msg.d, kills: msg.k, died: msg.x === 1 },
+        });
+        return;
       case 'bt': {
         const at = this.clock.now();
         const sec = ctx.sec();
@@ -209,6 +222,19 @@ export class LiveBoard {
         if (p) p.monsters = k;
         return this.changed();
       }
+  }
+
+  /** Monster Hunt (mod 0.17.0): an objective of the map changed its state. */
+  objective(msg: Extract<ModToBridge, { t: 'ob' }>, ctx: LiveContext): void {
+    const head = this.key.split('/');
+    if (this.key && (head[0] !== msg.mid || Number(head[1]) !== msg.g || Number(head[2]) !== msg.n))
+      return;
+    this.ctx = ctx;
+    const list = this.objectiveList.slice(0, msg.of);
+    while (list.length < msg.of) list.push({ text: '', state: 0 });
+    list[msg.j] = { text: msg.m, state: msg.st };
+    this.objectiveList = list;
+    this.changed();
   }
 
   /** Monster Hunt: monsters alive, at the start and bosses alive (from the progress line). */
@@ -257,6 +283,9 @@ export class LiveBoard {
       humans: this.humans,
       players,
       ...(this.monsterInfo ? { monsters: { ...this.monsterInfo } } : {}),
+      ...(this.objectiveList.length
+        ? { objectives: this.objectiveList.map((o) => ({ ...o })) }
+        : {}),
     });
   }
 }

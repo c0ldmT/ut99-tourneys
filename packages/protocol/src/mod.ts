@@ -202,6 +202,49 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     w: str(32), // weapon name
     c: int.positive(), // kills with it
   }),
+  /**
+   * Mod 0.17.0, trait log: a Dream Team trait's counters in the game (run), one line per trait
+   * of a bot before `pse`: uses (episodes, dodges, hits ...), seconds active, kills and deaths
+   * while active, values (healed, damage prevented, extra damage dealt / taken ...).
+   */
+  z.object({
+    t: z.literal('pt'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    c: z.string().regex(/^[a-z]{2}$/), // the trait's mod code (btrt)
+    a: int.nonnegative(),
+    s: int.nonnegative(),
+    k: int.nonnegative(),
+    d: int.nonnegative(),
+    v: int.nonnegative(),
+    w: int.nonnegative(),
+  }),
+  /** Mod 0.17.0, trait log: an episode of a trait ended (live): start, length, kills, died. */
+  z.object({
+    t: z.literal('tv'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    c: z.string().regex(/^[a-z]{2}$/),
+    s: int.nonnegative(), // seconds into the game when it started
+    d: int.nonnegative(), // seconds it lasted
+    k: int.nonnegative(),
+    x: int.min(0).max(1), // 1: the bot died in it
+  }),
+  /** Mod 0.17.0, Monster Hunt: an objective of the map and its state (on every change). */
+  z.object({
+    t: z.literal('ob'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(1).max(2),
+    j: int.nonnegative().max(31), // its index
+    of: int.min(1).max(32), // objectives on the map
+    st: int.min(0).max(2), // 0 not yet active, 1 active, 2 completed
+    m: str(160),
+  }),
   z.object({
     t: z.literal('pse'),
     mid: str(16),
