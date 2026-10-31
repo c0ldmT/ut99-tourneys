@@ -325,17 +325,21 @@ export class StatsService {
     return d && scope === 'lifetime' ? { ...d, records: [], mapRecords: [] } : d;
   }
 
-  /** Records of a season (lifetime has none). */
+  /** Records of a season (lifetime has none); map records include the Dream Team runs. */
   records(
     season: number,
     mode: StatMode | undefined,
   ): { records: RecordEntry[]; maps: MapRecord[] } {
-    return records(this.facts(season), { ...(mode ? { mode } : {}), names: this.names() });
+    const r = records(this.facts(season), { ...(mode ? { mode } : {}), names: this.names() });
+    return mode && mode !== 'mh' ? r : { ...r, maps: this.mapRecords(season) };
   }
 
-  /** Monster Hunt map records of a season (per map and monster skill), for the in-game HUD. */
+  /**
+   * Monster Hunt map records of a season (per map and monster skill), for the in-game HUD and
+   * the records page: every season game counts, Dream Team games too (Mario 31.10.).
+   */
   mapRecords(season: number): MapRecord[] {
-    return mapRecords(this.facts(season), this.names());
+    return mapRecords([...this.facts(season), ...this.udtFacts(season)], this.names());
   }
 }
 

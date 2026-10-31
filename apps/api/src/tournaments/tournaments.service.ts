@@ -1777,8 +1777,8 @@ export class TournamentsService {
   private mapRecordsFor(t: TournamentRow): MapRecords | undefined {
     const settings = this.settings(t);
     if (settings.game.adapter !== 'ut99-mh') return undefined;
-    // Dream Team runs set no map records (they stay out of the statistics).
-    const counts = t.kind !== 'udt' && this.seasonOf(t) !== undefined;
+    // Every season game can set a map record, Dream Team games too (Mario 31.10.).
+    const counts = this.seasonOf(t) !== undefined;
     try {
       const season =
         this.seasonOf(t) ?? (this.seasons.current() ?? this.seasons.latestStarted())?.number;

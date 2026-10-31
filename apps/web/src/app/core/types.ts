@@ -964,6 +964,8 @@ export interface LivePlayer {
   powerups: number;
   ampSec: number;
   kills: number;
+  /** Monster Hunt: monsters killed. */
+  monsters?: number;
   deaths: number;
   suicides: number;
   damageDealt: number;

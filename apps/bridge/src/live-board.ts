@@ -74,6 +74,11 @@ export function blankFeed(
 export class LiveBoard {
   private key = '';
   private slots = new Map<number, LivePlayer>();
+  /** Per slot: the name the mod uses (kill feed lines name the killer) and monster kills. */
+  private modNames = new Map<number, string>();
+  private monsterKf = new Map<number, number>();
+  /** Slots whose counters line carries the monster kills (mod 0.17.0): the feed count is off. */
+  private monsterSx = new Set<number>();
   private monsterInfo?: LiveState['monsters'];
   private ctx?: LiveContext;
   private lastEmit = 0;
@@ -90,6 +95,9 @@ export class LiveBoard {
   reset(): void {
     this.key = '';
     this.slots.clear();
+    this.modNames.clear();
+    this.monsterKf.clear();
+    this.monsterSx.clear();
     this.monsterInfo = undefined;
     this.ctx = undefined;
     if (this.timer) this.clock.clearTimeout(this.timer);
@@ -107,6 +115,7 @@ export class LiveBoard {
     if (msg.t === 'lr') {
       const known = msg.tk ? ctx.player(msg.tk) : undefined;
       const prev = this.slots.get(msg.i);
+      this.modNames.set(msg.i, msg.nm.toLowerCase());
       this.slots.set(msg.i, {
         ...(prev ?? emptyPlayer()),
         name: (known?.name ?? msg.nm).slice(0, 64),
@@ -138,6 +147,10 @@ export class LiveBoard {
           damageTaken: msg.dt,
         });
         if (!p.bot) Object.assign(p, { ping: msg.pg, loss: msg.pl });
+        if (msg.mk !== undefined) {
+          this.monsterSx.add(msg.i);
+          p.monsters = msg.mk;
+        }
         return this.changed();
       case 'pk': {
         if (msg.it === 'amp' || msg.it === 'belt' || msg.it === 'armor' || msg.it === 'keg')
@@ -179,6 +192,23 @@ export class LiveBoard {
         return;
       }
     }
+  }
+
+  /**
+   * Monster Hunt: a monster kill from the kill feed (mods before 0.17.0 count no monsters in
+   * the counters line). The feed names the killer as the mod does; game must be the board's.
+   */
+  monsterKill(killer: string, game: number): void {
+    if (!this.key || Number(this.key.split('/')[1]) !== game) return;
+    const name = killer.toLowerCase();
+    for (const [i, n] of this.modNames)
+      if (n === name && !this.monsterSx.has(i)) {
+        const k = (this.monsterKf.get(i) ?? 0) + 1;
+        this.monsterKf.set(i, k);
+        const p = this.slots.get(i);
+        if (p) p.monsters = k;
+        return this.changed();
+      }
   }
 
   /** Monster Hunt: monsters alive, at the start and bosses alive (from the progress line). */

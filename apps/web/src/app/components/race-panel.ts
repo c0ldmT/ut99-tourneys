@@ -5,7 +5,7 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
 
 /**
  * Monster Hunt game in progress: the finished run of the other team and the run on the server
- * (time, deaths, penalty, points, monsters left, boss) with what is left to beat the first run.
+ * (time with the penalty, deaths, points, bosses left) with what is left to beat the first run.
  */
 @Component({
   selector: 'app-race-panel',
@@ -34,7 +34,13 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
             <span class="live">● {{ 'live.badge' | t }}</span>
             {{ 'live.runOf' | t: { n: l.run, team: name(l.runner) } }}
           </div>
-          <div class="rtime mono big">{{ time(l.timeMs) }}</div>
+          <!-- the time as it counts: running time plus the penalty for deaths -->
+          <div class="rtime mono big">{{ time(l.timeMs + l.penaltyMs) }}</div>
+          <div class="muted small">
+            {{ time(l.timeMs) }} + {{ time(l.penaltyMs, false) }} ({{
+              'match.deaths' | t: { n: l.deaths }
+            }})
+          </div>
           <div class="boxes">
             <div>
               <span>{{ 'match.deathsShort' | t }}</span
@@ -50,18 +56,12 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
             </div>
           </div>
           @if (monsters(); as m) {
-            <div class="mon">
-              <div class="spread small">
-                <span class="muted">{{ 'live.monstersLeft' | t }}</span>
-                <b class="mono">{{ m.alive }} / {{ m.total }}</b>
+            <!-- monsters respawn: a count of those alive says nothing, the bosses do -->
+            @if (m.bosses > 0) {
+              <div class="mon small">
+                <span class="muted">{{ 'live.bossesLeft' | t: { n: m.bosses } }}</span>
               </div>
-              <div class="lc-bar">
-                <span class="mbar" [style.width.%]="m.total ? (m.alive / m.total) * 100 : 0"></span>
-              </div>
-              @if (m.bosses > 0) {
-                <div class="muted small">{{ 'live.bossesLeft' | t: { n: m.bosses } }}</div>
-              }
-            </div>
+            }
           }
           @if (target(); as tg) {
             <div class="target small">
@@ -149,9 +149,6 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
       margin-top: 12px;
       display: grid;
       gap: 4px;
-    }
-    .mbar {
-      background: linear-gradient(90deg, var(--side-b), var(--accent));
     }
     .target {
       margin-top: 10px;

@@ -105,7 +105,7 @@ const MAX_ROWS = 5;
                   <span
                     class="lm-kd mono"
                     [title]="(race() ? 'live.monstersDeaths' : 'live.kd') | t"
-                    ><b>{{ p.kills }}</b> / {{ p.deaths }}</span
+                    ><b>{{ race() ? (p.monsters ?? p.kills) : p.kills }}</b> / {{ p.deaths }}</span
                   >
                 </div>
               }
@@ -371,9 +371,10 @@ export class LiveMini {
     const shown = this.race() ? sides.filter((s) => s.running) : sides;
     return shown
       .map((s) => {
+        const k = (p: LivePlayer) => (this.race() ? (p.monsters ?? p.kills) : p.kills);
         const list = ps
           .filter((p) => p.side === s.id)
-          .sort((a, b) => b.kills - a.kills || a.deaths - b.deaths || a.name.localeCompare(b.name));
+          .sort((a, b) => k(b) - k(a) || a.deaths - b.deaths || a.name.localeCompare(b.name));
         return {
           id: s.id,
           index: sides.indexOf(s),

@@ -245,7 +245,7 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
   /**
    * Counters of a player or bot every 5 s, all since the start of the game (run): kills, deaths,
    * suicides, damage dealt to opponents (and monsters), damage taken, ping and packet loss
-   * (players; 0 for bots).
+   * (players; 0 for bots); mod 0.17.0: monsters killed (Monster Hunt).
    */
   z.object({
     t: z.literal('sx'),
@@ -260,6 +260,7 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     dt: int.nonnegative(),
     pg: int.nonnegative(),
     pl: int.nonnegative(),
+    mk: int.nonnegative().optional(),
   }),
   /** A player or bot took an item. */
   z.object({

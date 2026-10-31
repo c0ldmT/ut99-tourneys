@@ -121,7 +121,7 @@ const ARMOR_FULL = 250;
                   }
                 </span>
                 <span class="tk mono" [title]="(race() ? 'live.monstersDeaths' : 'live.kd') | t">
-                  <b>{{ p.kills }}</b> / {{ p.deaths }}
+                  <b>{{ race() ? (p.monsters ?? p.kills) : p.kills }}</b> / {{ p.deaths }}
                 </span>
                 <span class="td mono" [title]="'live.damage' | t">{{ p.damageDealt }}</span>
                 <span class="tp">

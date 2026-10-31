@@ -144,6 +144,35 @@ describe('LiveBoard', () => {
     );
     expect(board.humans).toBe(false);
   });
+
+  it('Monster Hunt: counts monster kills from the feed until the counters carry them', () => {
+    const clock = new FakeClock();
+    const states: LiveState[] = [];
+    const board = new LiveBoard(
+      clock,
+      (s) => states.push(s),
+      () => {},
+    );
+    const base = { mid: 'm1', g: 1, n: 1 };
+    const c = ctx({ run: 1 });
+    board.handle({ t: 'lr', ...base, i: 0, nm: 'Mira', sd: 0, b: true, tk: '' }, c);
+    board.handle({ t: 'lr', ...base, i: 1, nm: 'mario', sd: 0, b: false, tk: 'tok' }, c);
+    board.monsterKill('Mira', 1);
+    board.monsterKill('MARIO', 1);
+    board.monsterKill('mira', 1);
+    board.monsterKill('Mira', 2); // another game: not this board's
+    clock.advance(1000);
+    expect(states.at(-1)!.players.map((p) => [p.name, p.monsters])).toEqual([
+      ['Mira', 2],
+      ['Mario', 1],
+    ]);
+    // Mod 0.17.0: the counters line has the monsters, the feed no longer counts.
+    const sx = { t: 'sx' as const, ...base, k: 0, d: 1, su: 0, dd: 50, dt: 0, pg: 0, pl: 0 };
+    board.handle({ ...sx, i: 0, mk: 5 }, c);
+    board.monsterKill('Mira', 1);
+    clock.advance(1000);
+    expect(states.at(-1)!.players[0]!.monsters).toBe(5);
+  });
 });
 
 describe('BotLog', () => {

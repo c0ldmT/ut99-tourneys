@@ -573,6 +573,8 @@ export const LivePlayerSchema = z.object({
   /** Seconds of damage amplifier left. */
   ampSec: z.number().int().nonnegative(),
   kills: z.number().int().nonnegative(),
+  /** Monster Hunt: monsters killed (mod 0.17.0 counts them, older mods: from the kill feed). */
+  monsters: z.number().int().nonnegative().optional(),
   deaths: z.number().int().nonnegative(),
   suicides: z.number().int().nonnegative(),
   damageDealt: z.number().int().nonnegative(),

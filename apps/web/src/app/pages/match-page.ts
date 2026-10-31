@@ -904,10 +904,6 @@ export class MatchPage {
       if ((x[0] ?? 0) > now) break;
       then = x;
     }
-    const m = this.liveState()?.monsters;
-    const total = m?.total ?? first.monsters?.total ?? 0;
-    const killedThen = total && (then[3] ?? -1) >= 0 ? total - then[3]! : null;
-    const killedNow = m ? m.total - m.alive : null;
     // left: side a's run, right: side b's run
     const firstIsA = first.sides[0] === d.entrants[0]!.id;
     const pair = (x: number, y: number) => (firstIsA ? { a: x, b: y } : { a: y, b: x });
@@ -915,8 +911,6 @@ export class MatchPage {
       { label: 'match.points', ...pair(then[1] ?? 0, lr.points) },
       { label: 'match.deathsShort', ...pair(then[2] ?? 0, lr.deaths) },
     ];
-    if (killedThen !== null && killedNow !== null)
-      rows.push({ label: 'match.monsters', ...pair(killedThen, killedNow) });
     return { at: raceTime(lr.timeMs, false), rows };
   });
 

@@ -1973,6 +1973,7 @@ export class MatchDirector extends EventEmitter {
           ...(msg.kd !== undefined && msg.k ? { distance: msg.kd } : {}),
           ...((msg.f & 32) !== 0 ? { amp: true } : {}),
         } satisfies KillFeedEntry);
+        if ((msg.f & 16) !== 0 && msg.k) this.board.monsterKill(msg.k, msg.g);
         return;
       }
       case 'bs': {

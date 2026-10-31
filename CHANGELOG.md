@@ -171,6 +171,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Monster Hunt match page: the "Monsters / deaths" column counts the monsters killed (it stayed at 0), the running time includes the death penalty like everywhere else, and the useless "monsters left" bar is gone (bosses left stay).
+- Monster Hunt map records: Dream Team games are season games and set records too.
 - Dream Team packs: a blueprint drawn with a full blueprint inventory is no longer scrapped by itself - you choose which blueprint goes (scrap or build one before the next pack); every blueprint can be scrapped from the inventory. As an apology every manager of the running season gets a legendary blueprint (outside the limit) and a message at the next login.
 - Dream Team league: setting up a league evening no longer blocks the website (games are made and simulated in steps), quiet minutes cost next to nothing and starting a league is about twice as fast.
 - Drawing a bracket again (after a reset or with "draw again") showed the old pairings in the bets panel and the bots bet on them; old bets could even move to another team (fill teams keep their ids like "udtbots-1"). A new draw now voids the bets placed so far (stakes back) and the bots bet on the new matches. Deleting a tournament and creating one with the same name no longer keeps the bots from betting.
