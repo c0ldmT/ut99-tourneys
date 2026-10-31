@@ -9,11 +9,14 @@ import {
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
-import { TPipe } from '../core/i18n';
+import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe, NeuroStore } from '../core/neuro';
 import type { UdtBox, UdtCatalogTrait, UdtInventoryCard, UdtPacks, UdtRarity } from '../core/types';
 import { RARITIES, SCRAP, UdtNav } from '../core/udt';
 import { BOX_STROKE, UdtPackStage } from './udt-pack-stage';
+
+/** Trait categories in the order of the crafting list. */
+const CATEGORIES = ['values', 'body', 'behaviour', 'manager'] as const;
 
 const BOX_RARITY: Record<UdtBox, UdtRarity> = {
   standard: 'common',
@@ -164,7 +167,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       <div class="lower">
         <section class="card" id="inventory">
           <h2>{{ 'udt.packs.inventory' | t }} ({{ v.inventory.length }})</h2>
-          @for (c of v.inventory; track c.id) {
+          @for (c of inventory(); track c.id) {
             <div class="irow">
               <span class="udt-trait r-{{ c.rarity }}">{{ 'udt.trait.' + c.code | t }}</span>
               <span class="grow muted small">{{ 'udt.traitE.' + c.code | t }}</span>
@@ -198,18 +201,22 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
         <section class="card" id="craft">
           <h2>{{ 'udt.packs.craftTitle' | t }}</h2>
           <p class="muted small">{{ 'udt.packs.craftText' | t }}</p>
-          @for (c of v.catalog; track c.code) {
-            <div class="irow">
-              <span class="udt-trait r-{{ c.rarity }}">{{ 'udt.trait.' + c.code | t }}</span>
-              <span class="grow muted small">{{ 'udt.traitE.' + c.code | t }}</span>
-              <button
-                type="button"
-                [disabled]="busy() || c.owned || v.scrap < c.craft || !v.hasTeam"
-                (click)="craft(c)"
-              >
-                {{ 'udt.packs.craft' | t }} · <span class="mono">{{ c.craft }}</span>
-              </button>
-            </div>
+          <!-- by category, then rarity (common first), then name -->
+          @for (g of craftGroups(); track g.category) {
+            <h3 class="cat">{{ 'udt.cat.' + g.category | t }}</h3>
+            @for (c of g.traits; track c.code) {
+              <div class="irow">
+                <span class="udt-trait r-{{ c.rarity }}">{{ 'udt.trait.' + c.code | t }}</span>
+                <span class="grow muted small">{{ 'udt.traitE.' + c.code | t }}</span>
+                <button
+                  type="button"
+                  [disabled]="busy() || c.owned || v.scrap < c.craft || !v.hasTeam"
+                  (click)="craft(c)"
+                >
+                  {{ 'udt.packs.craft' | t }} · <span class="mono">{{ c.craft }}</span>
+                </button>
+              </div>
+            }
           }
         </section>
       </div>
@@ -345,6 +352,13 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       flex: 1 1 160px;
       min-width: 0;
     }
+    .cat {
+      margin: 16px 0 2px;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
     .bp-full {
       border-color: var(--hot-text);
       box-shadow: inset 0 3px 0 var(--hot-text);
@@ -372,6 +386,28 @@ export class UdtPacksPage {
   protected readonly spendable = inject(NeuroStore).spendable;
   protected readonly busy = signal(false);
   protected readonly rarities = RARITIES;
+  private readonly i18n = inject(I18n);
+  /** Category, then rarity (common first), then the name in the viewer's language. */
+  private readonly order = <T extends { code: string; rarity: UdtRarity; category: string }>(
+    a: T,
+    b: T,
+  ) =>
+    CATEGORIES.indexOf(a.category as (typeof CATEGORIES)[number]) -
+      CATEGORIES.indexOf(b.category as (typeof CATEGORIES)[number]) ||
+    RARITIES.indexOf(a.rarity) - RARITIES.indexOf(b.rarity) ||
+    this.i18n.t(`udt.trait.${a.code}`).localeCompare(this.i18n.t(`udt.trait.${b.code}`));
+  /** The trait inventory in the crafting order. */
+  protected readonly inventory = computed(() =>
+    [...(this.view()?.inventory ?? [])].sort(this.order),
+  );
+  /** The crafting list grouped by category (values, body, behaviour, manager). */
+  protected readonly craftGroups = computed(() => {
+    const all = [...(this.view()?.catalog ?? [])].sort(this.order);
+    return CATEGORIES.map((category) => ({
+      category,
+      traits: all.filter((t) => t.category === category),
+    })).filter((g) => g.traits.length);
+  });
   protected readonly max = Math.max;
   private readonly stage = viewChild<UdtPackStage>('stage');
 
