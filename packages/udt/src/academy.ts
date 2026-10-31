@@ -102,10 +102,14 @@ function pick<T>(options: readonly T[], weights: readonly number[], rng: () => n
  * Three talents of a scout: skill 1-3 (mostly low), values around average, potential 1-4 skill
  * steps above (higher steps rarer), at most Godlike.
  */
-export function scoutTalents(rng: () => number, taken: readonly string[] = []): Talent[] {
+export function scoutTalents(
+  rng: () => number,
+  taken: readonly string[] = [],
+  count = 3,
+): Talent[] {
   const names = TALENT_NAMES.filter((n) => !taken.includes(n));
   const out: Talent[] = [];
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < count; i++) {
     const skill = pick([1, 2, 3], [3, 4, 2], rng);
     const up = pick([1, 2, 3, 4], [30, 40, 22, 8], rng);
     const v = () => r3((rng() * 2 - 1) * 0.6);

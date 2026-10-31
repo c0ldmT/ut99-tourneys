@@ -30,6 +30,26 @@ const COUNTER: Record<string, { uses: string; effect: string }> = {
   'thick-skin': { uses: 'trait.log.hits', effect: 'trait.log.prevented' },
   'glass-cannon': { uses: 'trait.log.hits', effect: 'trait.log.glass' },
   vampire: { uses: 'trait.log.heals', effect: 'trait.log.healed' },
+  // mod 0.18.0 (decision 242)
+  'ammo-hoarder': { uses: 'trait.log.ammoTimes', effect: 'trait.log.ammo' },
+  'monster-bane': { uses: 'trait.log.hits', effect: 'trait.log.extra' },
+  'splash-expert': { uses: 'trait.log.hits', effect: 'trait.log.extra' },
+  'titan-slayer': { uses: 'trait.log.hits', effect: 'trait.log.extra' },
+  assassin: { uses: 'trait.log.backstabs', effect: 'trait.log.extra' },
+  pathfinder: { uses: 'trait.log.boosted', effect: '' },
+  regeneration: { uses: 'trait.log.heals', effect: 'trait.log.healed' },
+  juggernaut: { uses: 'trait.log.hits', effect: 'trait.log.prevented' },
+  warden: { uses: 'trait.log.taunts', effect: 'trait.log.taunted' },
+  'deemer-dream': { uses: 'trait.log.redeemer', effect: 'trait.log.redeemerKills' },
+  hivemind: { uses: 'trait.log.joins', effect: '' },
+  'monster-whisperer': { uses: 'trait.log.ignored', effect: 'trait.log.prevented' },
+  'weapon-master': { uses: 'trait.log.favSec', effect: '' },
+};
+
+/** Episode traits with a value of their own (mod 0.18.0): what it means. */
+const EPISODE_VALUE: Record<string, string> = {
+  'second-wind': 'trait.log.healed',
+  'item-controller': 'trait.log.items',
 };
 
 /**
@@ -85,6 +105,9 @@ const COUNTER: Record<string, { uses: string; effect: string }> = {
                           <span class="muted">{{ 'trait.log.quiet' | t: { n: o.quiet } }}</span>
                         } @else {
                           · {{ 'trait.log.kd' | t: { k: r.kills, d: r.deaths } }}
+                        }
+                        @if (r.effect; as e) {
+                          · <b>{{ e.key | t: { v: e.v, w: e.w } }}</b>
                         }
                       } @else {
                         <span class="muted">{{ 'trait.log.never' | t }}</span>
@@ -208,7 +231,11 @@ function row(t: TraitGameStats): TraitRow {
     rarity: def?.rarity ?? 'common',
     kind,
     uses: { key: counter?.uses ?? 'trait.log.uses', n: t.uses },
-    effect: counter?.effect ? { key: counter.effect, v: t.value, w: t.value2 } : null,
+    effect: counter?.effect
+      ? { key: counter.effect, v: t.value, w: t.value2 }
+      : EPISODE_VALUE[code]
+        ? { key: EPISODE_VALUE[code]!, v: t.value, w: t.value2 }
+        : null,
     sec: t.sec,
     kills: t.kills,
     deaths: t.deaths,

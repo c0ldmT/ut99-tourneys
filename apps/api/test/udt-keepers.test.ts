@@ -87,6 +87,25 @@ describe('Dream Team keepers', () => {
     expect(by(lib.Nomi!)).toMatchObject({ ok: false, why: 'nominated' });
     expect(by(lib.Blue!)).toMatchObject({ ok: true, skill: 5, nextSkill: 4 });
     expect(by(starter)).toMatchObject({ ok: true, skill: 3, nextSkill: 3 });
+    // Dynasty (decision 242): a keeper without the skill loss.
+    db.insert(udtTraits)
+      .values({
+        id: 'trD',
+        season: 1,
+        userId: marioId,
+        code: 'dynasty',
+        botId: lib.Blue!,
+        source: 'pack',
+        createdAt: OLD,
+        assignedAt: OLD,
+      })
+      .run();
+    const dyn = (await mario.get('/udt/keepers')).body.bots;
+    expect(dyn.find((b: { botId: string }) => b.botId === lib.Blue)).toMatchObject({
+      skill: 5,
+      nextSkill: 5,
+    });
+    db.delete(udtTraits).where(eq(udtTraits.id, 'trD')).run();
 
     const bought = await mario.req('PUT', '/udt/keepers', { botIds: [lib.Bought!] });
     expect(bought.status).toBe(409);

@@ -7,7 +7,14 @@
  * numbers are to be read relative to each other. Deterministic for a seed.
  */
 import { FORM_EFFECT, PHASE_EFFECT, type CareerForm, type CareerPhase } from './career.js';
-import { effectiveValues, gameEdge, modCodes, type GameEdge, type TraitOnBot } from './traits.js';
+import {
+  effectiveValues,
+  gameEdge,
+  modCodes,
+  RUNTIME_EDGES,
+  type GameEdge,
+  type TraitOnBot,
+} from './traits.js';
 
 // ---------- the skill curve ----------
 
@@ -304,10 +311,44 @@ export interface ResolvedBot {
   combatStyle: number;
   jumpy: boolean;
   stock: boolean;
-  body: { armour: boolean; thick: boolean; glass: boolean; vampire: boolean; phoenix: boolean };
+  body: {
+    armour: boolean;
+    thick: boolean;
+    glass: boolean;
+    vampire: boolean;
+    phoenix: boolean;
+    /** Rewind: back where it died with 35 health (a duel goes on like with the phoenix). */
+    rewind: boolean;
+    /** Mod 0.18.0 (decision 242): speed × (light feet, juggernaut), damage taken ×. */
+    speed: number;
+    taken: number;
+    /** Splash expert: rocket damage ×. */
+    splash: number;
+    secondWind: boolean;
+    regen: boolean;
+    /** Assassin: first hit on an enemy that has not noticed it ×. */
+    backstab: number;
+    /** Counter-attacker: turns to a hit from out of view this much faster. */
+    counter: number;
+  };
   /** Values traits in the game (mod 0.14.0): multipliers on the curve. */
   edge: GameEdge;
+  /** Mod 0.18.0: aim edge below 50 health (cold blood). */
+  hurtAim: number;
+  /** Mod 0.18.0: weapon master - its weapon (sim code; null: every weapon), aim and rate. */
+  master: { weapon: WeaponCode | null; aim: number; rate: number } | null;
 }
+
+/** Weapon classes of the game to the duel's weapon codes (the favourite of a weapon master). */
+const WEAPON_CLASS: Readonly<Record<string, WeaponCode>> = {
+  'botpack.enforcer': 'enforcer',
+  'botpack.shockrifle': 'shock',
+  'botpack.minigun2': 'minigun',
+  'botpack.sniperrifle': 'sniper',
+  'botpack.pulsegun': 'pulse',
+  'botpack.ut_eightball': 'rocket',
+  'botpack.ut_flakcannon': 'flak',
+};
 
 /** The values the game gets for a bot (traits, tiredness, career phase and form as the website sends). */
 export function resolveBot(b: DuelBotSpec): ResolvedBot {
@@ -340,9 +381,29 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
       thick: codes.has('tf'),
       glass: codes.has('gc'),
       vampire: codes.has('vp'),
+      // Rewind comes back where it died with 50 health: in a duel like the phoenix.
       phoenix: codes.has('px'),
+      rewind: codes.has('rw'),
+      speed: (codes.has('lf') ? 1.1 : 1) * (codes.has('jg') ? 0.92 : 1),
+      taken: codes.has('jg') ? 0.8 : 1,
+      splash: codes.has('se') ? 1.25 : 1,
+      secondWind: codes.has('sw'),
+      regen: codes.has('rn'),
+      backstab: codes.has('as') ? 1.25 : 1,
+      counter: codes.has('ca') ? 0.25 : 1,
     },
     edge: gameEdge(b.traits ?? []),
+    hurtAim: codes.has('cb') ? RUNTIME_EDGES['cold-blood']!.aim : 1,
+    master: (() => {
+      const t = (b.traits ?? []).find((x) => x.code === 'weapon-master');
+      const e = RUNTIME_EDGES['weapon-master']!;
+      if (!t) return null;
+      return {
+        weapon: t.weapon ? (WEAPON_CLASS[t.weapon.toLowerCase()] ?? null) : null,
+        aim: e.aim,
+        rate: e.rate ?? 1,
+      };
+    })(),
   };
 }
 
@@ -432,6 +493,10 @@ interface Fighter {
   hp: number;
   armour: number;
   phoenixUsed: boolean;
+  /** Mod 0.18.0: last hit taken, second wind used and running until. */
+  hurtAt: number;
+  windUsed: boolean;
+  windUntil: number;
   aware: boolean;
   awareAt: number;
   turnAt: number;
@@ -500,6 +565,9 @@ function fighter(
     hp: 100,
     armour: r.body.armour ? 25 : 0,
     phoenixUsed: false,
+    hurtAt: -99,
+    windUsed: false,
+    windUntil: -1,
     aware: false,
     awareAt: Infinity,
     turnAt: Infinity,
@@ -511,7 +579,7 @@ function fighter(
     lockIn: true,
     nextShot: 0,
     y: 0,
-    vy: (2 * rng() - 1) * 0.7 * GROUND_SPEED * c.speed[lv.speed]!,
+    vy: (2 * rng() - 1) * 0.7 * GROUND_SPEED * r.body.speed * c.speed[lv.speed]!,
     moveUntil: 0.5 + rng(),
     strafeDir: rng() < 0.5 ? -1 : 1,
     vr: 0,
@@ -632,6 +700,14 @@ function play(
     const x = f[i]!;
     const e = f[1 - i]!;
     if (x.hp <= 0 || e.hp <= 0) return;
+    // Mod 0.18.0: second wind (once below 25: +2/s for 10 s), regeneration (+1/s after 5 s
+    // without a hit), both up to 100.
+    if (x.r.body.secondWind && !x.windUsed && x.hp < 35) {
+      x.windUsed = true;
+      x.windUntil = t + 10;
+    }
+    if (t < x.windUntil) x.hp = Math.min(100, x.hp + 3 * STEP);
+    if (x.r.body.regen && t - x.hurtAt >= 4) x.hp = Math.min(100, x.hp + 2 * STEP);
     // Awareness: sight (polled), hearing the enemy's shots of the last step.
     if (!x.aware) {
       if (sees(x, c)) becomeAware(x, t, rng() * 0.1 + c.sightReact[x.lv.react]! * x.r.edge.react);
@@ -679,7 +755,7 @@ function play(
   }
 
   function move(x: Fighter, t: number) {
-    const spd = GROUND_SPEED * c.speed[x.lv.speed]!;
+    const spd = GROUND_SPEED * x.r.body.speed * c.speed[x.lv.speed]!;
     if (t < x.flinchUntil) {
       x.vy = 0;
       x.vr = 0;
@@ -739,6 +815,11 @@ function play(
     x.y += x.vy * STEP;
   }
 
+  /** Weapon master with its favourite weapon in this meeting (or no weapon set: always). */
+  function masters(x: Fighter): boolean {
+    return !!x.r.master && (x.r.master.weapon === null || x.r.master.weapon === w.code);
+  }
+
   /** Dodge chances ×: the trait edge and (mod 0.15.0) the strafing value. */
   function dodgeMul(x: Fighter): number {
     return x.r.edge.dodge * Math.max(0, 1 + c.strafeDodge[x.lv.dodge]! * x.r.strafing);
@@ -768,6 +849,9 @@ function play(
     }
     const acc = c.acc[L]! + c.accGain[L]! * x.r.accuracy;
     E *= x.r.edge.aim;
+    // Mod 0.18.0: cold blood when hurt, weapon master with its weapon.
+    if (x.hp < 50) E *= x.r.hurtAim;
+    if (masters(x)) E *= x.r.master!.aim;
     if (x.r.stock) E *= Math.max(0, 1 - acc);
     else if (w.speed === 0 || acc < 0) E -= E * acc;
     return Math.max(0, E * aimModel);
@@ -790,7 +874,12 @@ function play(
   function fire(i: number, t: number) {
     const x = f[i]!;
     const e = f[1 - i]!;
-    x.nextShot = t + w.interval * (0.9 + 0.2 * rng()) * (1 + c.fireDelay[x.lv.react]!);
+    x.nextShot =
+      t +
+      w.interval *
+        (0.9 + 0.2 * rng()) *
+        (1 + c.fireDelay[x.lv.react]!) *
+        (masters(x) ? x.r.master!.rate : 1);
     x.lastFire = t;
     x.shotSeq++;
     x.shots++;
@@ -852,9 +941,13 @@ function play(
     const v = f[1 - from]!;
     if (v.hp <= 0) return;
     let dmg = raw;
+    if (w.splash && x.r.body.splash !== 1) dmg = Math.round(dmg * x.r.body.splash);
+    if (!v.aware && x.r.body.backstab !== 1) dmg = Math.round(dmg * x.r.body.backstab);
     if (x.r.body.glass) dmg = Math.round(dmg * 1.2);
     if (v.r.body.glass) dmg = Math.round(dmg * 1.2);
     if (v.r.body.thick) dmg = Math.max(1, Math.round(dmg * 0.9));
+    if (v.r.body.taken !== 1) dmg = Math.max(1, Math.round(dmg * v.r.body.taken));
+    v.hurtAt = t;
     if (v.armour > 0) {
       const a = Math.min(v.armour, Math.floor(dmg * 0.5));
       v.armour -= a;
@@ -866,6 +959,12 @@ function play(
       v.phoenixUsed = true;
       dmg = Math.max(0, v.hp - 50);
       if (v.hp <= 50) v.hp = 50;
+    }
+    if (v.r.body.rewind && !v.phoenixUsed && dmg >= v.hp) {
+      v.phoenixUsed = true;
+      dmg = 0;
+      v.hp = 35;
+      v.armour = 0;
     }
     v.hp -= dmg;
     x.hits++;
@@ -898,7 +997,7 @@ function play(
       if (flinched) v.turnAt = v.flinchUntil;
       else if (internal(L) > 3 * rng()) v.turnAt = t + 0.05;
       else {
-        v.turnAt = t + c.react[L]! * v.r.edge.react * (0.8 + 0.4 * rng());
+        v.turnAt = t + c.react[L]! * v.r.edge.react * v.r.body.counter * (0.8 + 0.4 * rng());
         if (rng() >= c.right[L]!) v.wrongAt = v.turnAt;
       }
     }

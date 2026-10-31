@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team: 29 new traits in every rarity (now 62) - e.g. light feet, scavenger, second wind, health hound, talent scout, cold blood, regeneration, captain, juggernaut, overload, weapon master (pick a favourite weapon), warden, deemer dream, rewind, hivemind, monster whisperer and dynasty, Monster Hunt traits among them; the bouncer no longer jumps all the time but dodges more often (mod 0.18.0).
 - Dream Team: a Monster Hunt focus for your team on My team - from Hunter (fights every monster, big ones too) over Standard to Sprinter (runs past, only fights what is in the way) (mod 0.17.0).
 - Mod 0.17.0, trait log: the match page shows what every Dream Team trait did in the game - when it switched on, how long, kills meanwhile and how it ended (kill, death or nothing), healed health, prevented damage, dodges and more; the feed has a "Traits" filter, the server log a line per trait episode, and admins download a trait report of the season (CSV/JSON) for balancing.
 - Monster Hunt run panel: the map's objectives with the running team's progress (mod 0.17.0).

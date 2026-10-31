@@ -9,6 +9,7 @@ import {
   fromPct,
   resolveBot,
   toPct,
+  RUNTIME_EDGES,
   VALUE_EDGES,
   withCurve,
 } from '../src/index.js';
@@ -32,6 +33,12 @@ describe('skill curve data', () => {
       }
       if (e.view) expect(uc, `${trait} view`).toContain(`CEView[s] += ${e.view}`);
     }
+  });
+
+  it('has the run-time aim edges of cold blood and weapon master in the mod (242)', () => {
+    const core = file('../../../mods/ut99-tournament/Classes/TourneyCore.uc');
+    for (const [trait, e] of Object.entries(RUNTIME_EDGES))
+      expect(core, trait).toContain(`F *= ${e.aim};`);
   });
 
   it('has the plan for mod 0.15.0 in the mod', () => {

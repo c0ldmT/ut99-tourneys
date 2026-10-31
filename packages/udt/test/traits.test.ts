@@ -11,7 +11,9 @@ import {
   managerEffects,
   rewardFactor,
   traitDef,
+  traitLogKind,
   traitOfRarity,
+  teamFactor,
   traitSlots,
   traitValueFactor,
   TRAITS,
@@ -75,13 +77,48 @@ describe('values traits', () => {
     expect(edgeScore([{ code: 'eagle-eye' }])).toBeCloseTo(0.45 * 0.15);
   });
 
-  it('gives the gun nut its weapon and the bouncer its jumps', () => {
+  it('gives the gun nut and the weapon master their weapon; the bouncer no jumps (242)', () => {
     const e = effectiveValues(2, {}, [
       { code: 'gun-nut', weapon: 'Botpack.ShockRifle' },
       { code: 'bouncer' },
     ]);
     expect(e.values.favoriteWeapon).toBe('Botpack.ShockRifle');
-    expect(e.values.jumpy).toBe(true);
+    expect(e.values.jumpy).toBeUndefined();
+    expect(
+      effectiveValues(2, {}, [{ code: 'weapon-master', weapon: 'Botpack.UT_FlakCannon' }]).values
+        .favoriteWeapon,
+    ).toBe('Botpack.UT_FlakCannon');
+    // One favourite weapon trait per bot.
+    expect(cannotAssign('weapon-master', ['gun-nut'], 5)).toBe('weapon');
+  });
+
+  it('catalogue v2 (decision 242): codes, kinds and manager effects', () => {
+    for (const t of TRAITS) {
+      // The website plays these (values / favourite weapon), not the mod.
+      if (t.category === 'manager' || t.code === 'gun-nut' || t.code === 'claudius')
+        expect(t.mod, t.code).toBeUndefined();
+      else expect(t.mod, t.code).toMatch(/^[a-z]{2}$/);
+    }
+    expect(new Set(TRAITS.flatMap((t) => (t.mod ? [t.mod] : []))).size).toBe(
+      TRAITS.filter((t) => t.mod).length,
+    );
+    expect(traitLogKind('light-feet')).toBe('passive');
+    expect(traitLogKind('cold-blood')).toBe('episode');
+    expect(traitLogKind('juggernaut')).toBe('counter');
+    expect(traitLogKind('second-wind')).toBe('episode');
+    const fx = managerEffects([
+      { code: 'loyal' },
+      { code: 'thrifty' },
+      { code: 'franchise-player' },
+      { code: 'dynasty' },
+    ]);
+    expect(fx).toMatchObject({ salary: 0.85, restPrice: 0.75, team: 1.05, keepsSkill: true });
+    expect(fx.recovery).toBeCloseTo(1.2);
+    expect(teamFactor([[{ code: 'midas' }], [{ code: 'franchise-player' }]])).toBeCloseTo(1.155);
+    expect(managerEffects([{ code: 'captain' }, { code: 'showman' }])).toMatchObject({
+      lineupXp: 1.1,
+      showman: 1.15,
+    });
   });
 
   it("lets Claudius' heir add a skill step and overflow at Godlike", () => {
@@ -122,7 +159,7 @@ describe('manager traits', () => {
 describe('packs', () => {
   it('draws a trait of the rarity', () => {
     expect(traitOfRarity('epic', () => 0).code).toBe('watchdog');
-    expect(traitOfRarity('epic', () => 0.99).code).toBe('item-controller');
+    expect(traitOfRarity('epic', () => 0.99).code).toBe('franchise-player');
     expect(traitOfRarity('legendary', () => 0).rarity).toBe('legendary');
     for (const r of ['common', 'uncommon', 'rare'] as const)
       expect(traitOfRarity(r, () => 0.99).rarity).toBe(r);
@@ -136,7 +173,7 @@ describe('packs', () => {
   it('crafting costs four times the scrap', () => {
     expect(craftCost('midas')).toBe(600);
     expect(craftCost('steady-hand')).toBe(20);
-    expect(TRAITS.length).toBe(33);
+    expect(TRAITS.length).toBe(62);
   });
 
   it('gives the mod the game trait codes and values them', () => {

@@ -55,6 +55,7 @@ var byte CInTact[32];             // 1: in the current fighting move (TacticalMo
 var float CBlindLog[32];
 // Trait edges (mod 0.14.0): aim error x, reaction times x, view + degrees, turn rate x, dodges x.
 var float CEAim[32], CEReact[32], CEView[32], CETurn[32], CEDodge[32];
+var float CERun[32];             // mod 0.18.0: run-time aim edge (cold blood, weapon master), 1 = none
 var Pawn CLastEnemy[32];          // the enemy it last reacted to (a new one: TSightReact)
 var Pawn CPrevEnemy[32];          // the one before (switching back costs no reaction)
 var float CFreezeUntil[32];       // no turning before this time (reaction to a new enemy)
@@ -153,6 +154,7 @@ function int Slot(Bot B, bool bCreate)
 		return -1;
 	CBot[Free] = B;
 	SetEdges(Free, 0);
+	CERun[Free] = 1.0;
 	CLastEnemy[Free] = None;
 	CPrevEnemy[Free] = None;
 	CFreezeUntil[Free] = 0;
@@ -266,7 +268,7 @@ function SetCurve(Bot B)
 
 // The values traits as edges on the curve (the same numbers as gameEdge in packages/udt
 // traits.ts): 1 steady hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16 eagle eye,
-// 32 all-rounder, 64 daredevil, 128 bouncer.
+// 32 all-rounder, 64 daredevil, 128 bouncer (mod 0.18.0: reacts and dodges, no longer jumpy).
 function SetEdges(int s, int Bits)
 {
 	CEAim[s] = 1.0;
@@ -299,7 +301,25 @@ function SetEdges(int s, int Bits)
 	if ((Bits & 64) != 0)
 		CEReact[s] *= 0.9;
 	if ((Bits & 128) != 0)
-		CEDodge[s] *= 1.2;
+	{
+		CEReact[s] *= 0.9;
+		CEDodge[s] *= 1.6;
+	}
+}
+
+// Mod 0.18.0: a run-time aim edge on top of the traits' edges (TourneyCore sets it once a
+// second: cold blood below 50 health, weapon master with its favourite weapon).
+function SetRunAim(Bot B, float F)
+{
+	local int s, L;
+	s = Slot(B, false);
+	if (s < 0 || CERun[s] == F)
+		return;
+	CERun[s] = F;
+	if (!bOn)
+		return;
+	L = CLv[s];
+	B.Accuracy = 1.0 - CEAim[s] * CERun[s] * (1.0 - (TAcc[L] + TAccGain[L] * CTraitAcc[s]));
 }
 
 // Dodge chances x: the trait edge and the strafing value (TStrafeDodge).
@@ -359,7 +379,7 @@ function ApplyBase(Bot B, int s)
 	B.SetPeripheralVision();
 	// The bot's own accuracy counts by level; the aim edge scales the remaining error
 	// (the aim error is multiplied by 1 - Accuracy).
-	B.Accuracy = 1.0 - CEAim[s] * (1.0 - (TAcc[L] + TAccGain[L] * CTraitAcc[s]));
+	B.Accuracy = 1.0 - CEAim[s] * CERun[s] * (1.0 - (TAcc[L] + TAccGain[L] * CTraitAcc[s]));
 	B.HearingThreshold = FMax(0.05, B.default.HearingThreshold + 0.5 * (1.0 - THear[L]));
 	B.MaxDesiredSpeed = TSpeed[L];
 	B.RotationRate.Yaw = YawOf(s);

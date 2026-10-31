@@ -177,7 +177,11 @@ const runs = curves.map(({ curve }) => {
     const b = bot(3, 50, more);
     traits.push({ label, win: win(b, ref, o), ambush: survives(b) - ambRef });
   };
-  for (const t of TRAITS.filter((x) => x.category === 'values' || x.category === 'body')) {
+  // Behaviour traits that act in a duel (decision 242): assassin, counter-attacker.
+  const inDuel = new Set(['assassin', 'counter-attacker']);
+  for (const t of TRAITS.filter(
+    (x) => x.category === 'values' || x.category === 'body' || inDuel.has(x.code),
+  )) {
     if (t.code === 'gun-nut') continue;
     state(t.code, { traits: [{ code: t.code as TraitCode }] });
   }

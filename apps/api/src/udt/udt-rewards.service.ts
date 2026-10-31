@@ -9,6 +9,7 @@ import {
   matchReward,
   placeReward,
   rewardFactor,
+  teamFactor,
   roundNeuro,
 } from '@tourney/udt';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
@@ -111,8 +112,12 @@ export class UdtRewardsService implements OnModuleInit {
     }
   }
 
-  /** The side whose player scored most in the match (frags, Monster Hunt: monster points). */
-  private mvpSide(tournamentId: string, matchId: string, mh: boolean): string | undefined {
+  /** The player who scored most in the match: side and name (showman, decision 242). */
+  private mvp(
+    tournamentId: string,
+    matchId: string,
+    mh: boolean,
+  ): { entrantId: string; name: string } | undefined {
     const score = new Map<string, number>();
     for (const e of this.events.load(tournamentId))
       if (e.type === 'match.playerStats' && e.data.matchId === matchId)
@@ -124,7 +129,9 @@ export class UdtRewardsService implements OnModuleInit {
         }
     let best: [string, number] | undefined;
     for (const [k, v] of score) if (!best || v > best[1]) best = [k, v];
-    return best?.[0].split('|')[0];
+    if (!best) return undefined;
+    const cut = best[0].indexOf('|');
+    return { entrantId: best[0].slice(0, cut), name: best[0].slice(cut + 1) };
   }
 
   private matchDone(
@@ -140,7 +147,8 @@ export class UdtRewardsService implements OnModuleInit {
     // League matchdays (fixtures) pay no game money (L-E8: table money instead); stamina and
     // experience count like in a cup. (An admin's corrected result counts them once more.)
     const league = isLeague(proj);
-    const mvp = this.mvpSide(tournamentId, result.matchId, mh) ?? result.winnerId;
+    const top = this.mvp(tournamentId, result.matchId, mh);
+    const mvp = top?.entrantId ?? result.winnerId;
     for (const [me, other] of [
       [result.entrants[0], result.entrants[1]],
       [result.entrants[1], result.entrants[0]],
@@ -160,11 +168,22 @@ export class UdtRewardsService implements OnModuleInit {
         .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
         .all()
         .map((r) => r.botId);
-      const factor = rewardFactor(
-        ids.map((id) => onBots.get(id) ?? []),
-        teamSize,
-        rosterIds.map((id) => onBots.get(id) ?? []),
-      );
+      // Showman (decision 242): its bot scored most in the match (stats name = game name).
+      const lineup = e?.kind === 'bot' ? [e.bot] : e?.kind === 'team' ? e.bots : [];
+      const showman =
+        top?.entrantId === me &&
+        lineup.some(
+          (b) =>
+            b.id &&
+            b.name.toLowerCase().slice(0, 32) === top.name.toLowerCase() &&
+            managerEffects(onBots.get(b.id) ?? []).showman > 1,
+        );
+      const factor =
+        rewardFactor(
+          ids.map((id) => onBots.get(id) ?? []),
+          teamSize,
+          rosterIds.map((id) => onBots.get(id) ?? []),
+        ) * (showman ? 1.15 : 1);
       const amount = roundNeuro(
         matchReward({ won, mvp: mvp === me, teamSize, vsBaseBots: !udtManagerOf(other) }, index) *
           factor,
@@ -183,6 +202,8 @@ export class UdtRewardsService implements OnModuleInit {
       if (!ids.length) continue;
       // Apprentices learn faster while their mentor is in the same roster (decision 209).
       const mentors = this.mentorsIn(season, userId, ids);
+      // Captain (decision 242): the other bots of the lineup gain more experience.
+      const captains = ids.filter((id) => managerEffects(onBots.get(id) ?? []).lineupXp > 1);
       // Only while the bot is still this manager's (never another roster's row of the same bot).
       for (const r of this.db
         .select()
@@ -196,7 +217,9 @@ export class UdtRewardsService implements OnModuleInit {
         )
         .all()) {
         const fx = managerEffects(onBots.get(r.botId) ?? []);
-        const taught = mentors.has(r.botId) ? APPRENTICE_XP : 1;
+        const taught =
+          (mentors.has(r.botId) ? APPRENTICE_XP : 1) *
+          (captains.some((c) => c !== r.botId) ? 1.1 : 1);
         const lost = Math.round(games * DEFAULT_ECONOMY.stamina.perGame * fx.fatigue);
         this.db
           .update(udtRoster)
@@ -249,16 +272,18 @@ export class UdtRewardsService implements OnModuleInit {
     for (const s of managers) {
       const userId = udtManagerOf(s.entrantId)!;
       const place = s.placement ?? 99;
-      // Midas anywhere in the roster: +10 %.
-      const midas = this.db
-        .select({ botId: udtRoster.botId })
-        .from(udtRoster)
-        .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
-        .all()
-        .some((r) => managerEffects(onBots.get(r.botId) ?? []).team > 1);
+      // Midas (+10 %) and franchise player (+5 %) anywhere in the roster.
+      const team = teamFactor(
+        this.db
+          .select({ botId: udtRoster.botId })
+          .from(udtRoster)
+          .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
+          .all()
+          .map((r) => onBots.get(r.botId) ?? []),
+      );
       const amount = roundNeuro(
         placeReward(place <= 4 ? place : 99, teamSize, index, onlyBase, undefined, highStakes) *
-          (midas ? 1.1 : 1),
+          team,
       );
       this.ledger.book({
         season,

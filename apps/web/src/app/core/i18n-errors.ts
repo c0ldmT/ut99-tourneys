@@ -181,6 +181,8 @@ export const ERRORS_DE: Record<string, string> = {
   // --- Dream Team: team, lineup, own bots
   'the Dream Team is switched off': 'Das Dream Team ist ausgeschaltet.',
   'found your team first': 'Gründe zuerst dein Team.',
+  'at most one favourite weapon trait per bot':
+    'Höchstens ein Lieblingswaffen-Trait pro Bot (Gun nut oder Weapon master).',
   'league games have no sign-up: the league sets both clubs':
     'Ligaspiele haben keine Anmeldung: Die Liga stellt beide Clubs.',
   'your blueprint inventory is full: scrap or build a blueprint first':

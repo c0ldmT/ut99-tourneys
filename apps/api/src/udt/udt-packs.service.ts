@@ -343,6 +343,7 @@ export class UdtPacksService {
     if (why === 'same') throw conflict('the bot has this trait');
     if (why === 'legendary') throw conflict('at most one legendary trait per bot');
     if (why === 'body') throw conflict('at most one body trait per bot');
+    if (why === 'weapon') throw conflict('at most one favourite weapon trait per bot');
     this.db
       .update(udtTraits)
       .set({

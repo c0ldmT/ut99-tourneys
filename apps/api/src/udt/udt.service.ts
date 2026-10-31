@@ -10,6 +10,7 @@ import {
   economyIndex,
   effectiveValues,
   levelOf,
+  managerEffects,
   developPoints,
   DEVELOP_VALUES,
   marketValue,
@@ -159,6 +160,8 @@ export interface RosterBot {
   games: number;
   /** Monster Hunt focus: -2 hunter, -1 thorough, 0 standard, 1 brisk, 2 sprinter (decision 239). */
   mhFocus: number;
+  /** Neuro per stamina point for this bot (thrifty: less, decision 242). */
+  restPrice: number;
   /** A bot the manager made: origin, potential (exact from level 5, else a range), points. */
   own: {
     origin: string;
@@ -551,10 +554,12 @@ export class UdtService {
     if (!r) throw notFound('bot in your roster');
     const n = Math.min(Math.round(points), 100 - r.stamina);
     if (n <= 0) throw conflict('the bot is fully rested');
+    // Thrifty (decision 242): this bot rests for less.
+    const price = REST_PRICE * managerEffects(this.botTraits(season, botId)).restPrice;
     this.ledger.charge({
       userId: user.id,
       kind: 'udt_rest',
-      amount: n * REST_PRICE,
+      amount: Math.round(n * price),
       ref: `rest:${season}:${botId}:${this.clock.now()}`,
       meta: { botId, points: n },
     });
@@ -651,6 +656,7 @@ export class UdtService {
             salaryDue: r.salaryDue,
             games: r.games,
             mhFocus: r.mhFocus,
+            restPrice: REST_PRICE * managerEffects(cards).restPrice,
             own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}, mentorOf),
           },
         ];
@@ -879,7 +885,8 @@ export class UdtService {
         name: r.name,
         origin: o?.origin ?? null,
         skill: r.skill,
-        nextSkill: keeperSkill(r.skill, loss),
+        // Dynasty (decision 242): a keeper without the skill loss.
+        nextSkill: managerEffects(r.udtTraits).keepsSkill ? r.skill : keeperSkill(r.skill, loss),
         rarity: r.rarity,
         traits: r.traits,
         level: r.level,

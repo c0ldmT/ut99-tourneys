@@ -1141,6 +1141,8 @@ export interface UdtRosterBot {
   games: number;
   /** Monster Hunt focus: -2 hunter … 0 standard … 2 sprinter (decision 239). */
   mhFocus?: number;
+  /** Neuro per stamina point (thrifty: less, decision 242). */
+  restPrice?: number;
   /** A bot the manager made: potential (a range until level 5), development points. */
   own: {
     origin: string;

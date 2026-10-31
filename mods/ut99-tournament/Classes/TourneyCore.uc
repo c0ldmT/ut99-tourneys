@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.17.0";
+const MOD_VERSION = "0.18.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -148,7 +148,7 @@ var byte CfgBet[16];               // latest bet with Neuro: 0 none, 1 won, 2 lo
 var int CfgBetAmt[16];             // Neuro won or lost
 var string CfgBetPick[16];         // whom the bot backed
 var int CfgCount;
-var byte CfgBody[16];              // Dream Team game traits (btrt): 1 start armour, 2 thick skin,
+var int CfgBody[16];               // Dream Team game traits (btrt): 1 start armour, 2 thick skin,
                                    // 4 adrenaline, 8 glass cannon, 16 vampire, 32 phoenix
 var byte CfgPhoenix[16];           // 1 = the phoenix was used this game
 var float CfgAdrUntil[16];         // adrenaline: faster until then (0 = not boosted)
@@ -156,7 +156,7 @@ var float CfgAdrSpeed[16];         // the ground speed before the boost
 var int CfgBeh[16];                // behaviour traits (btrt, mod 0.10.0): 1 vulture, 2 kamikaze,
                                    // 4 berserker, 8 revenant, 16 bounty hunter
 var byte CfgAggr[16];              // 1 = the hurt bot's aggressiveness was changed by a trait
-var byte CfgVal[16];               // values traits as curve edges (btrt, mod 0.14.0): 1 steady
+var int CfgVal[16];                // values traits as curve edges (btrt, mod 0.14.0): 1 steady
                                    // hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16
                                    // eagle eye, 32 all-rounder, 0.15.0: 64 daredevil, 128
                                    // bouncer (TourneySkillCurve.SetEdges)
@@ -170,14 +170,38 @@ var float CfgNestNext[16];         // no new nest before then
 var float CfgDanceNext[16];        // shuffle dancer: next dodge not before then
 var byte CfgDanceSide[16];
 var Inventory CfgItem[16];         // item controller: the item it heads for or waits at
-// Mod 0.17.0: trait log. Per bot configuration c and tracked trait t (0-14, see TrCode) at
-// c * 15 + t: whether an episode runs, since when, and the game's counters.
-var byte TrOn[240];
-var float TrSince[240], TrSec[240];
-var int TrAct[240], TrKills[240], TrDeaths[240], TrVal[240], TrVal2[240], TrEpK[240];
-var int TrStartSec[240];           // game second the episode began (StGameSec, pauses excluded)
-var float TrLast[240];             // last time the condition held (traits that flicker end 3 s later)
+// Mod 0.17.0: trait log; mod 0.18.0: per bot configuration c up to 8 game traits in slots
+// c * 8 + s (TrId: the trait, see TrCode): whether an episode runs, since when, the counters.
+var byte TrId[128];
+var int CfgTrN[16];
+var byte TrOn[128];
+var float TrSince[128], TrSec[128];
+var int TrAct[128], TrKills[128], TrDeaths[128], TrVal[128], TrVal2[128], TrEpK[128];
+var int TrStartSec[128];           // game second the episode began (StGameSec, pauses excluded)
+var float TrLast[128];             // last time the condition held (traits that flicker end 3 s later)
 var bool bTrFinal;                 // SendTraitStats runs: "tv" lines are kept for a resend
+var name TrKillDmg;                // damage type of the kill GameTraitKill looks at
+// Mod 0.18.0 (catalogue v2, decision 242): per bot configuration.
+var float CfgHitAt[16];            // regeneration: last hit taken
+var byte CfgSwUsed[16];            // second wind: used in this life, running until
+var float CfgSwUntil[16];
+var int CfgOlKills[16];            // overload: kills in this life
+var byte CfgDrUsed[16];            // deemer dream: the redeemer was given this game
+var byte CfgRwUsed[16];            // rewind: used this game, pending for the next spawn
+var byte CfgRwPend[16];
+var vector CfgRwLoc[16];
+var float CfgRwAt[16];
+var float CfgCaUntil[16];          // counter-attacker: more aggressive until then
+var float CfgMwHitAt[16];          // monster whisperer: it last hurt a monster then
+var float CfgWnNext[16];           // warden: next taunt not before then
+var vector CfgSvLoc[16];           // scavenger: where its victim died, until when it looks there
+var float CfgSvUntil[16];
+var Actor CfgGoal[16];             // scavenger / health hound: the item it heads for
+var float CfgGoalUntil[16];
+var float CfgGoalNext[16];
+var Weapon CfgAmmoW[16];           // ammo hoarder: the weapon held at the last tick, its ammo
+var int CfgAmmoN[16];
+var float CfgRunAim[16];           // cold blood / weapon master: the run-time aim edge set
 var float CfgPhxAt[16];            // phoenix: when it rose
 var int CfgFocus[16];              // mod 0.17.0: Monster Hunt focus of its manager, -2 hunter .. 2 sprinter
 var float CfgItemUntil[16];
@@ -502,9 +526,10 @@ function HandleBridgeMessage(TourneyMsg M)
 			i = FindCfg(M.Get("name"), true);
 			if (i >= 0)
 			{
-				CfgBody[i] = byte(ParseGameTraits(M.Get("c")));
+				CfgBody[i] = ParseGameTraits(M.Get("c"));
 				CfgBeh[i] = ParseBehaviourTraits(M.Get("c"));
-				CfgVal[i] = byte(ParseValueTraits(M.Get("c")));
+				CfgVal[i] = ParseValueTraits(M.Get("c"));
+				BuildTraitSlots(i, M.Get("c"));
 				CfgFocus[i] = Clamp(M.GetInt("mf"), -2, 2);
 			}
 			break;
@@ -1685,6 +1710,7 @@ function OnKilled(Pawn Killer, Pawn Other, name DamageType)
 	FeedMulti = 0;
 	CountKill(Killer, Other, DamageType);
 	SendFeed(Killer, Other, DamageType);
+	TrKillDmg = DamageType;
 	GameTraitKill(Killer, Other);
 }
 
@@ -2227,6 +2253,7 @@ function CheckPickups()
 		if (i < 0)
 			continue;
 		CountPickup(i, PkCode[j]);
+		TrItemTaken(P, PkCode[j]);
 		LiveHead("pk", i);
 		OutMsg.AddStr("it", PkCode[j]);
 		Send();
@@ -3141,6 +3168,7 @@ function int FindCfg(string BName, bool bCreate)
 	CfgBetPick[i] = "";
 	CfgBody[i] = 0;
 	CfgFocus[i] = 0;
+	CfgTrN[i] = 0;
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
 	CfgBeh[i] = 0;
@@ -4172,7 +4200,7 @@ function bool OnTraitErrand(Bot B)
 	c = GameTraitCfg(B);
 	if (c < 0)
 		return false;
-	return CfgNest[c] != None || CfgItem[c] != None;
+	return CfgNest[c] != None || CfgItem[c] != None || CfgGoal[c] != None;
 }
 
 // A bot with a trait that camps on purpose (sniper's nest, item controller).
@@ -4194,6 +4222,7 @@ function DropTraitErrand(Bot B, float Secs)
 		CfgLastNest[c] = CfgNest[c];
 	CfgNest[c] = None;
 	CfgItem[c] = None;
+	CfgGoal[c] = None;
 	if (Secs > 0)
 	{
 		CfgNestNext[c] = Level.TimeSeconds + Secs;
@@ -4944,6 +4973,10 @@ function int ParseValueTraits(string S)
 			Bits = Bits | 64;
 		else if (Code == "bo")
 			Bits = Bits | 128;
+		else if (Code == "cb")
+			Bits = Bits | 256; // mod 0.18.0: run-time edges, not on the curve's SetEdges
+		else if (Code == "wm")
+			Bits = Bits | 512;
 	}
 	return Bits;
 }
@@ -4979,6 +5012,28 @@ function int ParseGameTraits(string S)
 			Bits = Bits | 16;
 		else if (Code == "px")
 			Bits = Bits | 32;
+		else if (Code == "lf")
+			Bits = Bits | 64; // mod 0.18.0
+		else if (Code == "ah")
+			Bits = Bits | 128;
+		else if (Code == "mb")
+			Bits = Bits | 256;
+		else if (Code == "sw")
+			Bits = Bits | 512;
+		else if (Code == "se")
+			Bits = Bits | 1024;
+		else if (Code == "rn")
+			Bits = Bits | 2048;
+		else if (Code == "ts")
+			Bits = Bits | 4096;
+		else if (Code == "jg")
+			Bits = Bits | 8192;
+		else if (Code == "ol")
+			Bits = Bits | 16384;
+		else if (Code == "dr")
+			Bits = Bits | 32768;
+		else if (Code == "rw")
+			Bits = Bits | 65536;
 	}
 	return Bits;
 }
@@ -5002,7 +5057,7 @@ function int GameTraitCfg(Pawn P)
 	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
 		return -1;
 	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
-	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0)
+	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 768) == 0)
 		return -1;
 	return c;
 }
@@ -5023,8 +5078,25 @@ function ResetGameTraits()
 		CfgItem[c] = None;
 		CfgItemNext[c] = 0;
 		CfgPhxAt[c] = 0;
+		CfgHitAt[c] = 0;
+		CfgSwUsed[c] = 0;
+		CfgSwUntil[c] = 0;
+		CfgOlKills[c] = 0;
+		CfgDrUsed[c] = 0;
+		CfgRwUsed[c] = 0;
+		CfgRwPend[c] = 0;
+		CfgRwAt[c] = 0;
+		CfgCaUntil[c] = 0;
+		CfgMwHitAt[c] = -10;
+		CfgWnNext[c] = 0;
+		CfgSvUntil[c] = 0;
+		CfgGoal[c] = None;
+		CfgGoalNext[c] = 0;
+		CfgAmmoW[c] = None;
+		CfgAmmoN[c] = 0;
+		CfgRunAim[c] = 1.0;
 	}
-	for (c = 0; c < 240; c++)
+	for (c = 0; c < 128; c++)
 	{
 		TrOn[c] = 0;
 		TrSince[c] = 0;
@@ -5062,6 +5134,8 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		ci = GameTraitCfg(InstigatedBy);
 	if (cv < 0 && ci < 0)
 		return;
+	if (TraitDamage(ActualDamage, Victim, InstigatedBy, DamageType, cv, ci))
+		return; // monster whisperer: no damage
 	if (ci >= 0 && (CfgBody[ci] & 8) != 0)
 	{
 		Before = ActualDamage;
@@ -5107,7 +5181,8 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 	}
 }
 
-// From the mutator's ModifyPlayer at every spawn: start armour (25), the boost ends.
+// From the mutator's ModifyPlayer at every spawn: start armour (25), the boost ends; mod
+// 0.18.0: speed, ammo, second wind and overload anew, rewind back where it died.
 function OnModifyPlayer(Pawn P)
 {
 	local int c;
@@ -5115,11 +5190,8 @@ function OnModifyPlayer(Pawn P)
 	c = GameTraitCfg(P);
 	if (c < 0)
 		return;
-	if (CfgAdrUntil[c] > 0)
-	{
-		P.GroundSpeed = CfgAdrSpeed[c];
-		CfgAdrUntil[c] = 0;
-	}
+	CfgAdrUntil[c] = 0;
+	TraitSpawn(P, c);
 	if ((CfgBody[c] & 1) != 0 && P.FindInventoryType(class'Botpack.ThighPads') == None)
 	{
 		A = Spawn(class'Botpack.ThighPads', P,, P.Location);
@@ -5140,6 +5212,7 @@ function GameTraitKill(Pawn Killer, Pawn Other)
 {
 	local int c;
 	TraitKillStats(Killer, Other);
+	TraitDeath(Other);
 	c = GameTraitCfg(Other);
 	if (c >= 0 && (CfgBeh[c] & 8) != 0 && Killer != None && Killer != Other && Killer.PlayerReplicationInfo != None && !SameTeam(Killer, Other))
 		CfgAvenge[c] = Killer.PlayerReplicationInfo.PlayerName;
@@ -5148,12 +5221,13 @@ function GameTraitKill(Pawn Killer, Pawn Other)
 	c = GameTraitCfg(Killer);
 	if (c >= 0 && CfgAvenge[c] != "" && Other != None && Other.PlayerReplicationInfo != None && SameBotName(CfgAvenge[c], Other.PlayerReplicationInfo.PlayerName))
 		CfgAvenge[c] = "";
-	if (c < 0 || (CfgBody[c] & 4) == 0)
+	if (c < 0)
 		return;
-	if (CfgAdrUntil[c] <= 0)
-		CfgAdrSpeed[c] = Killer.GroundSpeed;
-	Killer.GroundSpeed = CfgAdrSpeed[c] * 1.3;
+	TraitKill(Killer, Other, c);
+	if ((CfgBody[c] & 4) == 0)
+		return;
 	CfgAdrUntil[c] = Level.TimeSeconds + 3.0;
+	ApplySpeed(Killer, c);
 	TrStart(c, 11, Killer);
 }
 
@@ -5165,10 +5239,10 @@ function AdrenalineTick()
 	for (c = 0; c < CfgCount; c++)
 		if (CfgAdrUntil[c] > 0 && Level.TimeSeconds >= CfgAdrUntil[c])
 		{
+			CfgAdrUntil[c] = 0;
 			B = FindBotPawn(CfgName[c]);
 			if (B != None)
-				B.GroundSpeed = CfgAdrSpeed[c];
-			CfgAdrUntil[c] = 0;
+				ApplySpeed(B, c);
 		}
 }
 
@@ -5209,6 +5283,22 @@ function int ParseBehaviourTraits(string S)
 			Bits = Bits | 128;
 		else if (Code == "ic")
 			Bits = Bits | 256;
+		else if (Code == "sv")
+			Bits = Bits | 512; // mod 0.18.0
+		else if (Code == "hh")
+			Bits = Bits | 1024;
+		else if (Code == "pf")
+			Bits = Bits | 2048;
+		else if (Code == "ca")
+			Bits = Bits | 4096;
+		else if (Code == "as")
+			Bits = Bits | 8192;
+		else if (Code == "wn")
+			Bits = Bits | 16384;
+		else if (Code == "hm")
+			Bits = Bits | 32768;
+		else if (Code == "mw")
+			Bits = Bits | 65536;
 	}
 	return Bits;
 }
@@ -5284,6 +5374,8 @@ function BehaviourTick()
 			A -= 0.6;
 		if ((CfgBeh[c] & 4) != 0 && B.Health < 40)
 			A += 0.6;
+		if ((CfgBeh[c] & 4096) != 0 && Level.TimeSeconds < CfgCaUntil[c])
+			A += 0.5; // counter-attacker after a hit from behind
 		if (A != B.BaseAggressiveness)
 		{
 			B.Aggressiveness = FClamp(A, -1.0, 1.5);
@@ -5304,9 +5396,15 @@ function BehaviourTick()
 				continue;
 			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c))
 				continue;
+			if ((CfgBeh[c] & (512 | 1024)) != 0 && GoalErrand(B, c))
+				continue;
+			if ((CfgBeh[c] & 32768) != 0)
+				Hivemind(B, c);
 		}
-		else if (CfgNest[c] != None || CfgItem[c] != None)
+		else if (CfgNest[c] != None || CfgItem[c] != None || CfgGoal[c] != None)
 			DropTraitErrand(B, 0);
+		if ((CfgBeh[c] & 16384) != 0)
+			WardenTick(B, c);
 		if (B.bCamping && (CfgBeh[c] & (32 | 256)) != 0)
 			continue; // in its nest or waiting for an item
 		if (!AntiIdleAllowed() || B.Enemy != None || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
@@ -5338,17 +5436,20 @@ function float BehaviourThreat(Bot B, Pawn Other)
 		F += 0.5;
 	if ((CfgBeh[c] & 64) != 0 && MateTarget(B, Other))
 		F += 0.5;
+	if ((CfgBeh[c] & 8192) != 0 && Other.Health > 0 && Other.Health < 50)
+		F += 0.4; // assassin: the hurt first
 	return F;
 }
 
 //=============================================================================
 // Mod 0.17.0: trait log. What the game traits of website bots did: episodes of the traits
 // that switch on and off (a "tv" line each, live; a log line each) and per game the counters
-// of every trait ("pt" lines before "pse", with the statistics). Tracked traits t: 0 vulture,
+// of every trait ("pt" lines before "pse", with the statistics). Mod 0.18.0: the traits of a
+// bot sit in slots (TrId), so every trait can be logged. Trait ids (TrCode): 0 vulture,
 // 1 kamikaze, 2 berserker, 3 revenant, 4 bounty hunter, 5 sniper's nest, 6 team player,
-// 7 shuffle dancer, 8 item controller (behaviour bits), 9 starter armour, 10 thick skin,
-// 11 adrenaline, 12 glass cannon, 13 vampire, 14 phoenix (body bits). Values traits act on the
-// skill curve all the time: they are listed as passive (only the seconds in the game).
+// 7 shuffle dancer, 8 item controller, 9 starter armour, 10 thick skin, 11 adrenaline,
+// 12 glass cannon, 13 vampire, 14 phoenix, 15-22 values traits on the curve (passive), 23 light
+// feet (passive), 24-43 the catalogue v2 (decision 242).
 //=============================================================================
 
 function string TrCode(int t)
@@ -5370,8 +5471,92 @@ function string TrCode(int t)
 		case 12: return "gc";
 		case 13: return "vp";
 		case 14: return "px";
+		case 15: return "sh";
+		case 16: return "wd";
+		case 17: return "ss";
+		case 18: return "ph";
+		case 19: return "ee";
+		case 20: return "ar";
+		case 21: return "dd";
+		case 22: return "bo";
+		case 23: return "lf";
+		case 24: return "ah";
+		case 25: return "mb";
+		case 26: return "sv";
+		case 27: return "sw";
+		case 28: return "se";
+		case 29: return "hh";
+		case 30: return "pf";
+		case 31: return "cb";
+		case 32: return "rn";
+		case 33: return "ts";
+		case 34: return "ca";
+		case 35: return "wm";
+		case 36: return "jg";
+		case 37: return "ol";
+		case 38: return "as";
+		case 39: return "wn";
+		case 40: return "dr";
+		case 41: return "rw";
+		case 42: return "hm";
+		case 43: return "mw";
 	}
 	return "";
+}
+
+// The id of a trait code (-1: unknown).
+function int TrIdOf(string Code)
+{
+	local int t;
+	for (t = 0; t < 44; t++)
+		if (TrCode(t) == Code)
+			return t;
+	return -1;
+}
+
+// Values traits on the curve and light feet: nothing to count, the seconds in the game.
+function bool TrPassive(int t)
+{
+	return t >= 15 && t <= 23;
+}
+
+// From the btrt line: the bot's game traits in its slots (up to 8; unknown codes left out).
+function BuildTraitSlots(int c, string S)
+{
+	local int p, t;
+	local string Code;
+	CfgTrN[c] = 0;
+	while (S != "" && CfgTrN[c] < 8)
+	{
+		p = InStr(S, ",");
+		if (p < 0)
+		{
+			Code = S;
+			S = "";
+		}
+		else
+		{
+			Code = Left(S, p);
+			S = Mid(S, p + 1);
+		}
+		t = TrIdOf(Code);
+		if (t < 0)
+			continue;
+		TrId[c * 8 + CfgTrN[c]] = byte(t);
+		CfgTrN[c]++;
+	}
+}
+
+// The slot of trait t of configuration c (-1: the bot does not have it).
+function int TrX(int c, int t)
+{
+	local int s;
+	if (c < 0)
+		return -1;
+	for (s = 0; s < CfgTrN[c]; s++)
+		if (TrId[c * 8 + s] == t)
+			return c * 8 + s;
+	return -1;
 }
 
 function string TrName(int t)
@@ -5393,32 +5578,15 @@ function string TrName(int t)
 		case 12: return "glass-cannon";
 		case 13: return "vampire";
 		case 14: return "phoenix";
+		case 26: return "scavenger";
+		case 27: return "second-wind";
+		case 29: return "health-hound";
+		case 31: return "cold-blood";
+		case 34: return "counter-attacker";
+		case 37: return "overload";
+		case 41: return "rewind";
 	}
-	return "?";
-}
-
-// Values traits (CfgVal bits 1-128) for the passive lines.
-function string TrValCode(int b)
-{
-	switch (b)
-	{
-		case 0: return "sh";
-		case 1: return "wd";
-		case 2: return "ss";
-		case 3: return "ph";
-		case 4: return "ee";
-		case 5: return "ar";
-		case 6: return "dd";
-		case 7: return "bo";
-	}
-	return "";
-}
-
-function bool TrHas(int c, int t)
-{
-	if (t <= 8)
-		return (CfgBeh[c] & (1 << t)) != 0;
-	return (CfgBody[c] & (1 << (t - 9))) != 0;
+	return TrCode(t);
 }
 
 // The statistics slot of a bot configuration (-1: not in this game).
@@ -5435,12 +5603,22 @@ function int TrStatIdx(int c)
 function TrCount(int c, int t, int Amount, int Amount2)
 {
 	local int x;
-	if (c < 0 || !bGameLive)
+	x = TrX(c, t);
+	if (x < 0 || !bGameLive)
 		return;
-	x = c * 15 + t;
 	TrAct[x]++;
 	TrVal[x] += Amount;
 	TrVal2[x] += Amount2;
+}
+
+// Adds to a trait's value without a use (items an item controller took, seconds boosted).
+function TrAddVal(int c, int t, int Amount)
+{
+	local int x;
+	x = TrX(c, t);
+	if (x < 0 || !bGameLive)
+		return;
+	TrVal[x] += Amount;
 }
 
 // P: the bot for the log (None: no health in the line).
@@ -5448,9 +5626,9 @@ function TrStart(int c, int t, Pawn P)
 {
 	local int x;
 	local string S;
-	if (c < 0 || !bGameLive)
+	x = TrX(c, t);
+	if (x < 0 || !bGameLive)
 		return;
-	x = c * 15 + t;
 	TrLast[x] = Level.TimeSeconds;
 	if (TrOn[x] != 0)
 		return;
@@ -5476,10 +5654,8 @@ function TrEndAt(int c, int t, int Died, float EndAt)
 {
 	local int x, i, Dur;
 	local string S;
-	if (c < 0)
-		return;
-	x = c * 15 + t;
-	if (TrOn[x] == 0)
+	x = TrX(c, t);
+	if (x < 0 || TrOn[x] == 0)
 		return;
 	TrOn[x] = 0;
 	EndAt = FMax(EndAt, TrSince[x]);
@@ -5507,26 +5683,26 @@ function TrEndAt(int c, int t, int Died, float EndAt)
 // A soft pause ends the running episodes (the game clock stops, Level.TimeSeconds does not).
 function TrPauseEnd()
 {
-	local int c, t;
+	local int c, s;
 	for (c = 0; c < CfgCount; c++)
-		for (t = 0; t < 15; t++)
-			TrEnd(c, t, 0);
+		for (s = 0; s < CfgTrN[c]; s++)
+			TrEnd(c, TrId[c * 8 + s], 0);
 }
 
 // From GameTraitKill: the victim's running episodes end (died), the killer's count the kill;
-// kamikaze counts its flak kills.
+// kamikaze counts its flak kills, deemer dream its redeemer kills.
 function TraitKillStats(Pawn Killer, Pawn Other)
 {
-	local int c, t, x;
+	local int c, s, x;
 	c = GameTraitCfg(Other);
 	if (c >= 0)
-		for (t = 0; t < 15; t++)
+		for (s = 0; s < CfgTrN[c]; s++)
 		{
-			x = c * 15 + t;
+			x = c * 8 + s;
 			if (TrOn[x] != 0)
 			{
 				TrDeaths[x]++;
-				TrEnd(c, t, 1);
+				TrEnd(c, TrId[x], 1);
 			}
 		}
 	if (Killer == None || Killer == Other)
@@ -5534,9 +5710,9 @@ function TraitKillStats(Pawn Killer, Pawn Other)
 	c = GameTraitCfg(Killer);
 	if (c < 0)
 		return;
-	for (t = 0; t < 15; t++)
+	for (s = 0; s < CfgTrN[c]; s++)
 	{
-		x = c * 15 + t;
+		x = c * 8 + s;
 		if (TrOn[x] != 0)
 		{
 			TrKills[x]++;
@@ -5545,9 +5721,24 @@ function TraitKillStats(Pawn Killer, Pawn Other)
 	}
 	if ((CfgBeh[c] & 2) != 0 && Killer.Weapon != None && Killer.Weapon.IsA('UT_FlakCannon'))
 		TrCount(c, 1, 1, 0);
+	if ((CfgBody[c] & 32768) != 0 && TrKillDmg == 'RedeemerDeath')
+		TrAddVal(c, 40, 1);
 }
 
-// Once a second after BehaviourTick: which episodes run now.
+// Item controller (mod 0.18.0): power items taken during its item runs count as its value.
+function TrItemTaken(Pawn P, string Code)
+{
+	local int c, x;
+	if (Code != "amp" && Code != "belt" && Code != "armor" && Code != "keg")
+		return;
+	c = GameTraitCfg(P);
+	x = TrX(c, 8);
+	if (x >= 0 && (TrOn[x] != 0 || Level.TimeSeconds - TrLast[x] < 3))
+		TrAddVal(c, 8, 1);
+}
+
+// Once a second after BehaviourTick: which episodes run now; mod 0.18.0: second wind,
+// regeneration, cold blood, weapon master, pathfinder, ammo hoarder, deemer dream, rewind.
 function TraitTelemetryTick()
 {
 	local int c, x;
@@ -5555,7 +5746,7 @@ function TraitTelemetryTick()
 	local bool bOn;
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0 && CfgBody[c] == 0)
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 768) == 0)
 			continue;
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
@@ -5583,13 +5774,391 @@ function TraitTelemetryTick()
 			TrSampleLate(c, 6, bOn, B);
 		}
 		if ((CfgBeh[c] & 256) != 0)
-			TrSample(c, 8, CfgItem[c] != None, B);
+			TrSampleLate(c, 8, CfgItem[c] != None, B);
+		if ((CfgBeh[c] & 512) != 0)
+			TrSampleLate(c, 26, CfgGoal[c] != None && Weapon(CfgGoal[c]) != None, B);
+		if ((CfgBeh[c] & 1024) != 0)
+			TrSampleLate(c, 29, CfgGoal[c] != None && Weapon(CfgGoal[c]) == None, B);
+		if ((CfgBeh[c] & 4096) != 0)
+			TrSample(c, 34, Level.TimeSeconds < CfgCaUntil[c], B);
 		if ((CfgBody[c] & 4) != 0)
 			TrSample(c, 11, CfgAdrUntil[c] > 0, B);
 		// The phoenix starts when it rises (OnTakeDamage) and counts 20 s of its second life.
-		x = c * 15 + 14;
-		if (TrOn[x] != 0 && Level.TimeSeconds - CfgPhxAt[c] >= 20)
+		x = TrX(c, 14);
+		if (x >= 0 && TrOn[x] != 0 && Level.TimeSeconds - CfgPhxAt[c] >= 20)
 			TrEnd(c, 14, 0);
+		x = TrX(c, 41);
+		if (x >= 0 && TrOn[x] != 0 && Level.TimeSeconds - CfgRwAt[c] >= 20)
+			TrEnd(c, 41, 0);
+		TraitBodyTick(B, c);
+	}
+}
+
+// Mod 0.18.0, once a second for a living bot with game traits.
+function TraitBodyTick(Bot B, int c)
+{
+	local int Heal, Got;
+	local float F;
+	local bool bFav;
+	// Second wind: once per life below 35 health, +3 health a second for 10 s.
+	if ((CfgBody[c] & 512) != 0)
+	{
+		if (CfgSwUsed[c] == 0 && B.Health < 35)
+		{
+			CfgSwUsed[c] = 1;
+			CfgSwUntil[c] = Level.TimeSeconds + 10;
+			TrStart(c, 27, B);
+		}
+		if (Level.TimeSeconds < CfgSwUntil[c] && B.Health < 100)
+		{
+			Heal = Min(3, 100 - B.Health);
+			B.Health += Heal;
+			TrAddVal(c, 27, Heal);
+		}
+		else
+			TrEnd(c, 27, 0);
+	}
+	// Regeneration: +2 health a second after 4 s without a hit.
+	if ((CfgBody[c] & 2048) != 0 && B.Health < 100 && Level.TimeSeconds - CfgHitAt[c] >= 4)
+	{
+		Heal = Min(2, 100 - B.Health);
+		B.Health += Heal;
+		TrCount(c, 32, Heal, 0);
+	}
+	// Cold blood (below 50 health) and weapon master (its favourite weapon in hand): aim edges.
+	F = 1.0;
+	if ((CfgVal[c] & 256) != 0)
+	{
+		TrSample(c, 31, B.Health < 50, B);
+		if (B.Health < 50)
+			F *= 0.7;
+	}
+	if ((CfgVal[c] & 512) != 0)
+	{
+		bFav = B.Weapon != None && B.FavoriteWeapon != None && B.Weapon.Class == B.FavoriteWeapon;
+		if (bFav)
+		{
+			F *= 0.7;
+			TrCount(c, 35, 1, 0); // seconds with it
+		}
+	}
+	CfgRunAim[c] = F;
+	if (Curve != None)
+		Curve.SetRunAim(B, F);
+	// Pathfinder: faster without an enemy (seconds boosted as its value).
+	if ((CfgBeh[c] & 2048) != 0)
+	{
+		ApplySpeed(B, c);
+		if (B.Enemy == None)
+			TrCount(c, 30, 1, 0);
+	}
+	// Ammo hoarder: ammo the held weapon gained since the last tick (a pickup) +25 %.
+	if ((CfgBody[c] & 128) != 0 && B.Weapon != None && B.Weapon.AmmoType != None)
+	{
+		if (CfgAmmoW[c] == B.Weapon && B.Weapon.AmmoType.AmmoAmount >= CfgAmmoN[c] + 2)
+		{
+			Got = (B.Weapon.AmmoType.AmmoAmount - CfgAmmoN[c] + 2) / 4;
+			Got = Min(Got, B.Weapon.AmmoType.MaxAmmo - B.Weapon.AmmoType.AmmoAmount);
+			if (Got > 0)
+			{
+				B.Weapon.AmmoType.AmmoAmount += Got;
+				TrCount(c, 24, Got, 0);
+			}
+		}
+		CfgAmmoW[c] = B.Weapon;
+		CfgAmmoN[c] = B.Weapon.AmmoType.AmmoAmount;
+	}
+	// Deemer dream: once per game a redeemer.
+	if ((CfgBody[c] & 32768) != 0 && CfgDrUsed[c] == 0 && B.Weapon != None && B.FindInventoryType(class'Botpack.WarheadLauncher') == None)
+	{
+		CfgDrUsed[c] = 1;
+		Game.GiveWeapon(B, "Botpack.WarheadLauncher");
+		TrCount(c, 40, 0, 0);
+		Log("game trait deemer dream:" @ CfgName[c] @ "gets a redeemer", 'UTTourney');
+	}
+}
+
+// Speed of a bot with speed traits: light feet x1.1, juggernaut x0.92, adrenaline boost x1.3,
+// pathfinder without an enemy x1.1 (on the class's ground speed).
+function ApplySpeed(Pawn P, int c)
+{
+	local float F;
+	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & 2048) == 0))
+		return;
+	F = 1.0;
+	if ((CfgBody[c] & 64) != 0)
+		F *= 1.1;
+	if ((CfgBody[c] & 8192) != 0)
+		F *= 0.92;
+	if (CfgAdrUntil[c] > 0)
+		F *= 1.3;
+	if ((CfgBeh[c] & 2048) != 0 && P.Enemy == None)
+		F *= 1.1;
+	P.GroundSpeed = P.default.GroundSpeed * F;
+}
+
+// From OnModifyPlayer at every spawn (mod 0.18.0).
+function TraitSpawn(Pawn P, int c)
+{
+	local Weapon W;
+	local int Before;
+	CfgSwUsed[c] = 0;
+	CfgSwUntil[c] = 0;
+	CfgOlKills[c] = 0;
+	CfgHitAt[c] = Level.TimeSeconds;
+	CfgAmmoW[c] = None;
+	ApplySpeed(P, c);
+	// Ammo hoarder: the start weapon with +50 % ammo.
+	W = P.Weapon;
+	if ((CfgBody[c] & 128) != 0 && W != None && W.AmmoType != None && bGameLive)
+	{
+		Before = W.AmmoType.AmmoAmount;
+		W.AmmoType.AmmoAmount = Min(W.AmmoType.MaxAmmo, Before + Before / 2);
+		TrCount(c, 24, W.AmmoType.AmmoAmount - Before, 0);
+	}
+	// Rewind: once per game the bot comes back where it died, with 35 health.
+	if (CfgRwPend[c] != 0)
+	{
+		CfgRwPend[c] = 0;
+		if (P.SetLocation(CfgRwLoc[c]))
+		{
+			CfgRwUsed[c] = 1;
+			CfgRwAt[c] = Level.TimeSeconds;
+			P.Health = 35;
+			Log("game trait rewind:" @ CfgName[c] @ "back at" @ Where(CfgRwLoc[c]), 'UTTourney');
+			TrStart(c, 41, None);
+		}
+	}
+}
+
+// From GameTraitKill for the killer (mod 0.18.0, no team kills): overload, scavenger.
+function TraitKill(Pawn Killer, Pawn Other, int c)
+{
+	local UDamage Amp;
+	if (Other == None || Other == Killer || SameTeam(Killer, Other))
+		return;
+	if ((CfgBody[c] & 16384) != 0)
+	{
+		CfgOlKills[c]++;
+		if (CfgOlKills[c] - (CfgOlKills[c] / 5) * 5 == 0 && Killer.FindInventoryType(class'Botpack.UDamage') == None)
+		{
+			Amp = Spawn(class'Botpack.UDamage', Killer,, Killer.Location);
+			if (Amp != None)
+			{
+				Amp.RespawnTime = 0.0;
+				Amp.bHeldItem = true;
+				Amp.Charge = 100; // 10 s
+				Amp.GiveTo(Killer);
+				Amp.Activate();
+				TrCount(c, 37, 0, 0);
+				Log("game trait overload:" @ CfgName[c] @ "amplified", 'UTTourney');
+			}
+		}
+	}
+	if ((CfgBeh[c] & 512) != 0)
+	{
+		CfgSvLoc[c] = Other.Location;
+		CfgSvUntil[c] = Level.TimeSeconds + 6;
+	}
+}
+
+// From OnKilled through GameTraitKill (victim side): rewind remembers where it died.
+function TraitDeath(Pawn Other)
+{
+	local int c;
+	c = GameTraitCfg(Other);
+	if (c < 0 || (CfgBody[c] & 65536) == 0 || CfgRwUsed[c] != 0 || !bGameLive)
+		return;
+	if (TrKillDmg == 'Fell' || TrKillDmg == 'Drowned' || TrKillDmg == 'Burned' || TrKillDmg == 'Corroded' || TrKillDmg == 'Suicided')
+		return;
+	if (Other.Region.Zone != None && (Other.Region.Zone.bPainZone || Other.Region.Zone.bKillZone))
+		return;
+	CfgRwPend[c] = 1;
+	CfgRwLoc[c] = Other.Location;
+}
+
+// Mod 0.18.0, from OnTakeDamage before the other body traits. True: no damage at all (monster
+// whisperer). Monster bane, titan slayer, splash expert, assassin (from behind), juggernaut,
+// counter-attacker, regeneration (last hit).
+function bool TraitDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name DamageType, int cv, int ci)
+{
+	local int Before;
+	local vector Dir;
+	local bool bMonster;
+	bMonster = ScriptedPawn(Victim) != None;
+	if (ci >= 0)
+	{
+		if (bMonster)
+			CfgMwHitAt[ci] = Level.TimeSeconds;
+		if ((CfgBody[ci] & 256) != 0 && bMonster)
+		{
+			Before = ActualDamage;
+			ActualDamage = int(ActualDamage * 1.1 + 0.5);
+			TrCount(ci, 25, ActualDamage - Before, 0);
+		}
+		if ((CfgBody[ci] & 4096) != 0 && bMonster && (ScriptedPawn(Victim).bIsBoss || Victim.CollisionHeight >= 50))
+		{
+			Before = ActualDamage;
+			ActualDamage = int(ActualDamage * 1.3 + 0.5);
+			TrCount(ci, 33, ActualDamage - Before, 0);
+		}
+		if ((CfgBody[ci] & 1024) != 0 && (DamageType == 'RocketDeath' || DamageType == 'GrenadeDeath' || DamageType == 'FlakDeath'))
+		{
+			Before = ActualDamage;
+			ActualDamage = int(ActualDamage * 1.25 + 0.5);
+			TrCount(ci, 28, ActualDamage - Before, 0);
+		}
+		if ((CfgBeh[ci] & 8192) != 0 && InstigatedBy != None && !bMonster)
+		{
+			Dir = Normal(InstigatedBy.Location - Victim.Location);
+			if ((vector(Victim.Rotation) Dot Dir) < 0)
+			{
+				Before = ActualDamage;
+				ActualDamage = int(ActualDamage * 1.25 + 0.5);
+				TrCount(ci, 38, ActualDamage - Before, 0);
+			}
+		}
+	}
+	if (cv < 0)
+		return false;
+	if ((CfgBeh[cv] & 65536) != 0 && ScriptedPawn(InstigatedBy) != None && Level.TimeSeconds - CfgMwHitAt[cv] > 5)
+	{
+		TrCount(cv, 43, ActualDamage, 0);
+		ActualDamage = 0;
+		return true;
+	}
+	CfgHitAt[cv] = Level.TimeSeconds;
+	if ((CfgBody[cv] & 8192) != 0)
+	{
+		Before = ActualDamage;
+		ActualDamage = Max(1, int(ActualDamage * 0.8 + 0.5));
+		TrCount(cv, 36, Before - ActualDamage, 0);
+	}
+	if ((CfgBeh[cv] & 4096) != 0 && Bot(Victim) != None && InstigatedBy != None && InstigatedBy != Victim
+		&& InstigatedBy.PlayerReplicationInfo != None && !SameTeam(InstigatedBy, Victim) && Level.TimeSeconds >= CfgCaUntil[cv])
+	{
+		Dir = Normal(InstigatedBy.Location - Victim.Location);
+		if ((vector(Victim.Rotation) Dot Dir) < 0.3)
+		{
+			CfgCaUntil[cv] = Level.TimeSeconds + 3;
+			Bot(Victim).SetEnemy(InstigatedBy);
+			TrStart(cv, 34, Victim);
+		}
+	}
+	return false;
+}
+
+// Scavenger (the weapon its victim dropped) and health hound (health below 70) when no enemy is
+// in sight. True: the bot heads for the item.
+function bool GoalErrand(Bot B, int c)
+{
+	local Weapon W, BestW;
+	local TournamentHealth H, BestH;
+	local float D, BestD;
+	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
+		return false;
+	if (CfgGoal[c] != None)
+	{
+		if (CfgGoal[c].bDeleteMe || CfgGoal[c].Owner != None || CfgGoal[c].IsInState('Sleeping') || Level.TimeSeconds > CfgGoalUntil[c]
+			|| VSize(CfgGoal[c].Location - B.Location) < 40 || !SteerTo(B, CfgGoal[c]))
+		{
+			CfgGoal[c] = None;
+			CfgGoalNext[c] = Level.TimeSeconds + 4;
+			return false;
+		}
+		return true;
+	}
+	if (Level.TimeSeconds < CfgGoalNext[c] || B.bCamping || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
+		return false;
+	if ((CfgBeh[c] & 512) != 0 && Level.TimeSeconds < CfgSvUntil[c])
+	{
+		BestD = 800;
+		foreach RadiusActors(class'Weapon', W, 800, CfgSvLoc[c])
+			if (W.Owner == None && !W.bHidden && !W.IsInState('Sleeping'))
+			{
+				D = VSize(W.Location - B.Location);
+				if (D < BestD || BestW == None)
+				{
+					BestW = W;
+					BestD = D;
+				}
+			}
+		CfgSvUntil[c] = 0;
+		if (BestW != None && B.FindInventoryType(BestW.Class) == None && SteerTo(B, BestW))
+		{
+			CfgGoal[c] = BestW;
+			CfgGoalUntil[c] = Level.TimeSeconds + 8;
+			BotLog(BName(B) $ ": scavenger heads for" @ BestW.Name);
+			return true;
+		}
+	}
+	if ((CfgBeh[c] & 1024) != 0 && B.Health < 70)
+	{
+		BestD = 2500;
+		foreach AllActors(class'TournamentHealth', H)
+			if (H.Owner == None && !H.IsInState('Sleeping') && !H.bHidden)
+			{
+				D = VSize(H.Location - B.Location);
+				if (D < BestD)
+				{
+					BestH = H;
+					BestD = D;
+				}
+			}
+		if (BestH != None && SteerTo(B, BestH))
+		{
+			CfgGoal[c] = BestH;
+			CfgGoalUntil[c] = Level.TimeSeconds + 10;
+			BotLog(BName(B) $ ": health hound heads for" @ BestH.Name);
+			return true;
+		}
+		CfgGoalNext[c] = Level.TimeSeconds + 3;
+	}
+	return false;
+}
+
+// Hivemind (team games): every bot of its team without an enemy in sight joins a team mate's
+// fight (team player for the whole team).
+function Hivemind(Bot B, int c)
+{
+	local Pawn P;
+	local int k;
+	// Only the first hivemind bot of the team leads (two of them would double the work).
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (P != B && Bot(P) != None && P.Health > 0 && SameTeam(P, B))
+		{
+			k = GameTraitCfg(P);
+			if (k >= 0 && k < c && (CfgBeh[k] & 32768) != 0)
+				return;
+		}
+	for (P = Level.PawnList; P != None; P = P.NextPawn)
+		if (P != B && Bot(P) != None && P.Health > 0 && SameTeam(P, B) && !OnTraitErrand(Bot(P))
+			&& (Bot(P).Orders == '' || Bot(P).Orders == 'FreeLance' || Bot(P).Orders == 'Attack') && TeamPlay(Bot(P)))
+			TrCount(c, 42, 1, 0);
+}
+
+// Warden (Monster Hunt): monsters within 600 units that attack another hunter turn on it, at most
+// every 3 s.
+function WardenTick(Bot B, int c)
+{
+	local ScriptedPawn M;
+	local int n;
+	if (Level.TimeSeconds < CfgWnNext[c])
+		return;
+	foreach RadiusActors(class'ScriptedPawn', M, 600, B.Location)
+	{
+		if (M.Health <= 0 || M.Enemy == None || M.Enemy == B || M.Enemy.PlayerReplicationInfo == None)
+			continue;
+		if (!M.LineOfSightTo(B))
+			continue;
+		M.OldEnemy = M.Enemy;
+		M.Enemy = B;
+		n++;
+	}
+	if (n > 0)
+	{
+		CfgWnNext[c] = Level.TimeSeconds + 3;
+		TrCount(c, 39, n, 0);
 	}
 }
 
@@ -5605,40 +6174,43 @@ function TrSample(int c, int t, bool bOn, Pawn P)
 function TrSampleLate(int c, int t, bool bOn, Pawn P)
 {
 	local int x;
-	x = c * 15 + t;
+	x = TrX(c, t);
+	if (x < 0)
+		return;
 	if (bOn)
 		TrStart(c, t, P);
 	else if (TrOn[x] != 0 && Level.TimeSeconds - TrLast[x] >= 3)
 		TrEndAt(c, t, 0, TrLast[x]);
 }
 
-// Before "pse": open episodes end with the game, then one "pt" line per trait of every bot.
+// Before "pse": open episodes end with the game, then one "pt" line per trait of every bot
+// (values traits on the curve and light feet as passive lines with the seconds in the game).
 function SendTraitStats(int N)
 {
-	local int c, t, x, i, b;
+	local int c, s, x, i, t;
 	bTrFinal = true;
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && CfgVal[c] == 0)
+		if (CfgTrN[c] == 0)
 			continue;
 		i = TrStatIdx(c);
-		for (t = 0; t < 15; t++)
+		for (s = 0; s < CfgTrN[c]; s++)
 		{
-			if (!TrHas(c, t))
+			x = c * 8 + s;
+			t = TrId[x];
+			if (TrPassive(t))
+			{
+				if (i >= 0)
+					TraitStatLine(N, i, TrCode(t), 0, StSec[i], 0, 0, 0, 0);
 				continue;
+			}
 			TrEnd(c, t, 0);
 			if (i < 0)
 				continue;
-			x = c * 15 + t;
 			TraitStatLine(N, i, TrCode(t), TrAct[x], int(TrSec[x] + 0.5), TrKills[x], TrDeaths[x], TrVal[x], TrVal2[x]);
 			Log("trait summary:" @ CfgName[c] @ TrName(t) @ "uses" @ TrAct[x] @ "active" @ int(TrSec[x] + 0.5) $ "s kills"
 				@ TrKills[x] @ "deaths" @ TrDeaths[x] @ "value" @ TrVal[x] @ TrVal2[x], 'UTTourney');
 		}
-		if (i < 0)
-			continue;
-		for (b = 0; b < 8; b++)
-			if ((CfgVal[c] & (1 << b)) != 0)
-				TraitStatLine(N, i, TrValCode(b), 0, StSec[i], 0, 0, 0, 0);
 	}
 	bTrFinal = false;
 }

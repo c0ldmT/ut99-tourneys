@@ -3,7 +3,7 @@ import type { RunningApi } from '../src/app.js';
 import { BotsService } from '../src/bots/bots.service.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
-import { udtBlueprints, udtBots, udtRoster } from '../src/db/schema.js';
+import { udtBlueprints, udtBots, udtRoster, udtTraits } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
@@ -32,6 +32,28 @@ async function setup() {
 }
 
 describe('Unreal Dream Team: academy', () => {
+  it('talent scout in the roster: reports 25 % cheaper with four talents (decision 242)', async () => {
+    const { mario, marioId, db, ledger } = await setup();
+    const mira = (await mario.get('/udt')).body.roster[0].botId as string;
+    db.insert(udtTraits)
+      .values({
+        id: 'tS',
+        season: 1,
+        userId: marioId,
+        code: 'talent-scout',
+        botId: mira,
+        source: 'pack',
+        createdAt: 'x',
+        assignedAt: 'x',
+      })
+      .run();
+    expect((await mario.get('/udt/academy')).body.scoutPrice).toBe(270);
+    const before = ledger.spendable(marioId).balance;
+    const v = (await mario.post('/udt/academy/scout')).body;
+    expect(v.report).toHaveLength(4);
+    expect(ledger.spendable(marioId).balance).toBe(before - 270);
+  });
+
   it('scouts, signs a talent with a licence, develops it up to its potential', async () => {
     const { mario, marioId, db, ledger } = await setup();
     let v = (await mario.get('/udt/academy')).body;

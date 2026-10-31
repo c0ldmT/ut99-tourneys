@@ -151,7 +151,7 @@ export class UdtAcademyService {
       hasTeam: !!team,
       tag: team?.tag ?? '',
       index,
-      scoutPrice: scoutPrice(index),
+      scoutPrice: Math.round(scoutPrice(index) * this.scoutFx(season, user.id).price),
       licence: { made, nextPrice: licencePrice(made, index) },
       rosterFull: roster.length >= ROSTER_MAX,
       report: s ? (JSON.parse(s.reportJson) as TalentReport[]) : null,
@@ -237,12 +237,21 @@ export class UdtAcademyService {
       });
   }
 
+  /** Talent scout in the roster (decision 242): reports cheaper, one talent more. */
+  private scoutFx(season: number, userId: string): { price: number; extra: number } {
+    const scout = this.udt
+      .roster(userId, season)
+      .some((r) => r.udtTraits.some((t) => t.code === 'talent-scout'));
+    return scout ? { price: 0.75, extra: 1 } : { price: 1, extra: 0 };
+  }
+
   /** A new scout report: three talents (replaces the last report). */
   scoutNow(user: User) {
     this.udt.assertOn();
     const season = this.udt.season().number;
     if (!this.udt.team(user.id, season)) throw conflict('found your team first');
-    const price = scoutPrice(this.udt.index(season));
+    const fx = this.scoutFx(season, user.id);
+    const price = Math.round(scoutPrice(this.udt.index(season)) * fx.price);
     this.ledger.charge({
       userId: user.id,
       kind: 'udt_scout',
@@ -250,7 +259,7 @@ export class UdtAcademyService {
       ref: `scout:${season}:${user.id}:${randomId(8)}`,
     });
     const taken = this.bots.list().map((b) => b.name);
-    const talents = scoutTalents(rng, taken);
+    const talents = scoutTalents(rng, taken, 3 + fx.extra);
     const report = talents.map((t) => talentReport(t, rng));
     this.db
       .insert(udtScouts)

@@ -252,11 +252,13 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 <button
                   type="button"
                   [disabled]="
-                    busy() || (spendable() !== null && restPoints() * restPrice > spendable()!)
+                    busy() ||
+                    (spendable() !== null &&
+                      restPoints() * (b.restPrice ?? restPrice) > spendable()!)
                   "
                   (click)="rest(b)"
                 >
-                  {{ 'udt.rest.buy' | t }} · {{ restPoints() * restPrice | neuro }}
+                  {{ 'udt.rest.buy' | t }} · {{ restPoints() * (b.restPrice ?? restPrice) | neuro }}
                 </button>
               }
             </section>

@@ -337,6 +337,25 @@ describe('Unreal Dream Team: events', () => {
     expect(rested.body.roster[0].stamina).toBe(100);
     expect(before.wallet.spendable - rested.body.wallet.spendable).toBe(280); // 40 points × 7
     expect((await mario.post(`/udt/roster/${bot}/rest`, { points: 5 })).status).toBe(409);
+    // Thrifty (decision 242): this bot rests for 75 %.
+    db.insert(udtTraits)
+      .values({
+        id: 'tT',
+        season: 1,
+        userId: marioId,
+        code: 'thrifty',
+        botId: bot,
+        source: 'pack',
+        createdAt: 'x',
+        assignedAt: 'x',
+      })
+      .run();
+    db.update(udtRoster).set({ stamina: 60 }).where(eq(udtRoster.userId, marioId)).run();
+    const mid = (await mario.get('/udt')).body;
+    expect(mid.roster[0].restPrice).toBeCloseTo(5.25);
+    const cheap = await mario.post(`/udt/roster/${bot}/rest`, { points: 40 });
+    expect(cheap.status, JSON.stringify(cheap.body)).toBe(201);
+    expect(mid.wallet.spendable - cheap.body.wallet.spendable).toBe(210); // 40 × 7 × 0.75
   });
 
   it('Monster Hunt: every bot plays its own focus (decisions 238, 239)', async () => {

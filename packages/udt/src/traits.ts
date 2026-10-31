@@ -41,7 +41,37 @@ export type TraitCode =
   | 'team-player'
   | 'shuffle-dancer'
   | 'item-controller'
-  | 'mentor';
+  | 'mentor'
+  // Catalogue v2 (owner approved 31.10., decision 242).
+  | 'light-feet'
+  | 'ammo-hoarder'
+  | 'scavenger'
+  | 'monster-bane'
+  | 'thrifty'
+  | 'fan-mail'
+  | 'second-wind'
+  | 'splash-expert'
+  | 'health-hound'
+  | 'pathfinder'
+  | 'talent-scout'
+  | 'loyal'
+  | 'cold-blood'
+  | 'regeneration'
+  | 'counter-attacker'
+  | 'titan-slayer'
+  | 'captain'
+  | 'showman'
+  | 'juggernaut'
+  | 'assassin'
+  | 'overload'
+  | 'weapon-master'
+  | 'warden'
+  | 'franchise-player'
+  | 'deemer-dream'
+  | 'hivemind'
+  | 'monster-whisperer'
+  | 'dynasty'
+  | 'rewind';
 
 export interface TraitDef {
   code: TraitCode;
@@ -93,6 +123,36 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'team-player', rarity: 'rare', category: 'behaviour', mod: 'tp' },
   { code: 'shuffle-dancer', rarity: 'epic', category: 'behaviour', mod: 'sd' },
   { code: 'item-controller', rarity: 'epic', category: 'behaviour', mod: 'ic' },
+  // Catalogue v2 (decision 242, mod 0.18.0). MH: mostly for Monster Hunt.
+  { code: 'light-feet', rarity: 'common', category: 'body', mod: 'lf' },
+  { code: 'ammo-hoarder', rarity: 'common', category: 'body', mod: 'ah' },
+  { code: 'monster-bane', rarity: 'common', category: 'body', mod: 'mb' },
+  { code: 'scavenger', rarity: 'common', category: 'behaviour', mod: 'sv' },
+  { code: 'thrifty', rarity: 'common', category: 'manager' },
+  { code: 'fan-mail', rarity: 'common', category: 'manager' },
+  { code: 'second-wind', rarity: 'uncommon', category: 'body', mod: 'sw' },
+  { code: 'splash-expert', rarity: 'uncommon', category: 'body', mod: 'se' },
+  { code: 'health-hound', rarity: 'uncommon', category: 'behaviour', mod: 'hh' },
+  { code: 'pathfinder', rarity: 'uncommon', category: 'behaviour', mod: 'pf' },
+  { code: 'talent-scout', rarity: 'uncommon', category: 'manager' },
+  { code: 'loyal', rarity: 'uncommon', category: 'manager' },
+  { code: 'cold-blood', rarity: 'rare', category: 'values', mod: 'cb' },
+  { code: 'regeneration', rarity: 'rare', category: 'body', mod: 'rn' },
+  { code: 'titan-slayer', rarity: 'rare', category: 'body', mod: 'ts' },
+  { code: 'counter-attacker', rarity: 'rare', category: 'behaviour', mod: 'ca' },
+  { code: 'captain', rarity: 'rare', category: 'manager' },
+  { code: 'showman', rarity: 'rare', category: 'manager' },
+  { code: 'weapon-master', rarity: 'epic', category: 'values', needsWeapon: true, mod: 'wm' },
+  { code: 'juggernaut', rarity: 'epic', category: 'body', mod: 'jg' },
+  { code: 'overload', rarity: 'epic', category: 'body', mod: 'ol' },
+  { code: 'assassin', rarity: 'epic', category: 'behaviour', mod: 'as' },
+  { code: 'warden', rarity: 'epic', category: 'behaviour', mod: 'wn' },
+  { code: 'franchise-player', rarity: 'epic', category: 'manager' },
+  { code: 'deemer-dream', rarity: 'legendary', category: 'body', mod: 'dr' },
+  { code: 'rewind', rarity: 'legendary', category: 'body', mod: 'rw' },
+  { code: 'hivemind', rarity: 'legendary', category: 'behaviour', mod: 'hm' },
+  { code: 'monster-whisperer', rarity: 'legendary', category: 'behaviour', mod: 'mw' },
+  { code: 'dynasty', rarity: 'legendary', category: 'manager' },
 ];
 
 const BY_CODE = new Map(TRAITS.map((t) => [t.code, t]));
@@ -125,11 +185,33 @@ const LOG_COUNTERS = new Set<TraitCode>([
   'thick-skin',
   'glass-cannon',
   'vampire',
+  // mod 0.18.0
+  'ammo-hoarder',
+  'monster-bane',
+  'splash-expert',
+  'pathfinder',
+  'regeneration',
+  'titan-slayer',
+  'juggernaut',
+  'assassin',
+  'warden',
+  'deemer-dream',
+  'hivemind',
+  'monster-whisperer',
+  'weapon-master',
 ]);
 
+/** Values traits that act only at times (mod 0.18.0): logged like body traits. */
+const LOG_EPISODE_VALUES = new Set<TraitCode>(['cold-blood']);
+/** Body traits with nothing to count (the seconds in the game, like values traits). */
+const LOG_PASSIVE = new Set<TraitCode>(['light-feet']);
+
 export function traitLogKind(code: TraitCode): TraitLogKind {
+  if (LOG_PASSIVE.has(code)) return 'passive';
+  if (LOG_EPISODE_VALUES.has(code)) return 'episode';
+  if (LOG_COUNTERS.has(code)) return 'counter';
   if (traitDef(code)?.category === 'values') return 'passive';
-  return LOG_COUNTERS.has(code) ? 'counter' : 'episode';
+  return 'episode';
 }
 
 /**
@@ -163,7 +245,7 @@ export function cannotAssign(
   code: TraitCode,
   onBot: readonly TraitCode[],
   level: number,
-): 'slots' | 'same' | 'legendary' | 'body' | null {
+): 'slots' | 'same' | 'legendary' | 'body' | 'weapon' | null {
   if (onBot.includes(code)) return 'same';
   if (onBot.length >= traitSlots(level)) return 'slots';
   if (traitDef(code)?.category === 'body' && onBot.some((c) => traitDef(c)?.category === 'body'))
@@ -173,6 +255,9 @@ export function cannotAssign(
     onBot.some((c) => traitDef(c)?.rarity === 'legendary')
   )
     return 'legendary';
+  // Gun nut and weapon master both choose the favourite weapon: one of them per bot.
+  if (traitDef(code)?.needsWeapon && onBot.some((c) => c !== code && traitDef(c)?.needsWeapon))
+    return 'weapon';
   return null;
 }
 
@@ -234,8 +319,8 @@ export function effectiveValues<T extends PlayValues>(
   // Steady hand, watchdog, eagle eye and the all-rounder act in the game (gameEdge), not on
   // the values; the side-stepper also strafes more, the patient hunter camps.
   if (has('side-stepper')) v.strafing = up(v.strafing, 10);
-  if (has('bouncer')) v.jumpy = true;
-  const gun = has('gun-nut');
+  // Bouncer (decision 242): no longer jumpy all the time (that cost duels), it dodges more.
+  const gun = has('gun-nut') ?? has('weapon-master');
   if (gun?.weapon) v.favoriteWeapon = gun.weapon;
   if (has('daredevil')) v.combatStyle = up(v.combatStyle, 25);
   if (has('patient-hunter')) v.camping = Math.max(v.camping ?? 0, 0.8);
@@ -287,7 +372,19 @@ export const VALUE_EDGES: Readonly<
   'all-rounder': { aim: 0.88, react: 0.75, view: 20, turn: 1.05, dodge: 1.3, score: 0.08 },
   // Mod 0.15.0 (decision 175): style traits with a small edge.
   daredevil: { react: 0.9, score: 0.02 },
-  bouncer: { dodge: 1.2, score: 0.01 },
+  bouncer: { react: 0.9, dodge: 1.6, score: 0.02 },
+};
+
+/**
+ * Values traits that act only at times (mod 0.18.0, decision 242): an aim edge while a
+ * condition holds - cold blood below 50 health, weapon master with its favourite weapon. The
+ * mod sets them at run time (TourneySkillCurve.SetRunAim), the duel simulator per shot.
+ */
+export const RUNTIME_EDGES: Readonly<
+  Partial<Record<TraitCode, { aim: number; rate?: number; score: number }>>
+> = {
+  'cold-blood': { aim: 0.7, score: 0.04 },
+  'weapon-master': { aim: 0.7, score: 0.06 },
 };
 
 /** The bot's edges in the game: multipliers multiply, degrees add. */
@@ -307,7 +404,10 @@ export function gameEdge(traits: readonly TraitOnBot[]): GameEdge {
 
 /** What the edges of the traits add to the value score (market value). */
 export const edgeScore = (traits: readonly TraitOnBot[]): number =>
-  traits.reduce((n, t) => n + (VALUE_EDGES[t.code]?.score ?? 0), 0);
+  traits.reduce(
+    (n, t) => n + (VALUE_EDGES[t.code]?.score ?? 0) + (RUNTIME_EDGES[t.code]?.score ?? 0),
+    0,
+  );
 
 // ---------- category D: manager effects ----------
 
@@ -321,21 +421,47 @@ export interface ManagerEffects {
   rewards: number;
   marketValue: number;
   xp: number;
-  /** Midas: every Dream Team reward of the team × this while the bot is in the roster. */
+  /** Midas, franchise player: every Dream Team reward of the team × this (in the roster). */
   team: number;
+  /** Thrifty: Neuro per stamina point bought for this bot × this. */
+  restPrice: number;
+  /** Captain: the other bots of the lineup gain experience × this. */
+  lineupXp: number;
+  /** Showman: the match reward × this when the bot has the most frags of the match. */
+  showman: number;
+  /** Talent scout (in the roster): scout reports × this price, one talent more. */
+  scoutPrice: number;
+  scoutTalents: number;
+  /** Dynasty: as a keeper it keeps its skill. */
+  keepsSkill: boolean;
 }
 
 export function managerEffects(traits: readonly TraitOnBot[]): ManagerEffects {
   const has = (c: TraitCode) => traits.some((t) => t.code === c);
   return {
-    recovery: has('quick-recovery') ? 1.5 : 1,
+    recovery: (has('quick-recovery') ? 1.5 : 1) * (has('loyal') ? 1.2 : 1),
     fatigue: has('iron-lung') ? 0.6 : 1,
-    salary: has('penny-pincher') ? 0.7 : 1,
+    salary: (has('penny-pincher') ? 0.7 : 1) * (has('loyal') ? 0.85 : 1),
     rewards: has('crowd-favourite') ? 1.25 : 1,
-    marketValue: has('market-darling') ? 1.15 : 1,
+    marketValue:
+      (has('market-darling') ? 1.15 : 1) *
+      (has('fan-mail') ? 1.05 : 1) *
+      (has('franchise-player') ? 1.2 : 1),
     xp: has('training-champion') ? 1.3 : 1,
-    team: has('midas') ? 1.1 : 1,
+    team: (has('midas') ? 1.1 : 1) * (has('franchise-player') ? 1.05 : 1),
+    restPrice: has('thrifty') ? 0.75 : 1,
+    lineupXp: has('captain') ? 1.1 : 1,
+    showman: has('showman') ? 1.15 : 1,
+    scoutPrice: has('talent-scout') ? 0.75 : 1,
+    scoutTalents: has('talent-scout') ? 1 : 0,
+    keepsSkill: has('dynasty'),
   };
+}
+
+/** The team factor of a roster (Midas and franchise player count once each). */
+export function teamFactor(roster: readonly (readonly TraitOnBot[])[]): number {
+  const any = (c: TraitCode) => roster.some((t) => t.some((x) => x.code === c));
+  return (any('midas') ? 1.1 : 1) * (any('franchise-player') ? 1.05 : 1);
 }
 
 /** Body and behaviour traits raise the market value by rarity (they act in the game). */
@@ -391,6 +517,5 @@ export function rewardFactor(
     (n, t) => n + (managerEffects(t).rewards - 1) / Math.max(1, teamSize),
     0,
   );
-  const midas = roster.some((t) => t.some((x) => x.code === 'midas')) ? 1.1 : 1;
-  return (1 + share) * midas;
+  return (1 + share) * teamFactor(roster);
 }
