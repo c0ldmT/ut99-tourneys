@@ -218,6 +218,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Trait report: each row shows the bot's skill and all its traits in that game, the summary the average skill - so a trait's numbers can be told apart from a strong bot.
 - Dream Team packs: the crafting list is grouped by category and sorted by rarity, the trait inventory in the same order.
 - Dream Team: the Monster Hunt focus is set per bot in its details (e.g. one Hunter who clears the way, one Sprinter); the Monster Hunt lineup shows it under the card. Bots keep the focus their team had.
 - Dream Team trait rarities: watchdog is epic now (effect unchanged), starter armour rare; daredevil, berserker and revenant uncommon. Scrap and crafting costs follow.

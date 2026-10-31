@@ -35,6 +35,7 @@ const player = (name: string, won: boolean, s: Partial<PlayerGameStats>): Player
   won,
   map: 'DM-Deck16][',
   at: '2026-10-31T18:00:00.000Z',
+  skill: 4,
   stats: stats({ name, ...s }),
 });
 
@@ -97,6 +98,8 @@ describe('trait report (decision 237)', () => {
       episodesQuiet: 0,
       botKills: 12,
       won: true,
+      skill: 4,
+      with: 'vulture + watchdog',
     });
     expect(r.rows[1]).toMatchObject({ trait: 'watchdog', rarity: 'epic', kind: 'passive' });
     expect(r.summary.find((s) => s.trait === 'vampire')).toMatchObject({
@@ -106,6 +109,7 @@ describe('trait report (decision 237)', () => {
       uses: 14,
       value: 63,
       won: 0,
+      avgSkill: 4,
     });
   });
 });

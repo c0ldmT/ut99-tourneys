@@ -17,6 +17,10 @@ export interface TraitReportRow {
   map: string;
   at: string;
   bot: string;
+  /** The skill (0 Novice … 7 Godlike) the bot played with: the strongest confounder. */
+  skill: number | null;
+  /** The bot's traits in this game (all of them: traits come in combinations). */
+  with: string;
   /** Website trait code (mod code when unknown). */
   trait: string;
   rarity: string;
@@ -58,6 +62,8 @@ export interface TraitSummary {
   won: number;
   botKills: number;
   botDeaths: number;
+  /** Average skill of the bots in those games (null: unknown). */
+  avgSkill: number | null;
 }
 
 export interface TraitReport {
@@ -81,6 +87,7 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
       const kills = t.mode === 'mh' ? s.monsters : s.kills;
       baseline.kills += kills;
       baseline.deaths += s.deaths;
+      const names = s.traits.map((x) => traitByMod(x.code)?.code ?? x.code);
       for (const x of s.traits) {
         const def = traitByMod(x.code);
         const eps = x.episodes ?? [];
@@ -93,6 +100,8 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
           map: p.map,
           at: p.at,
           bot: p.name,
+          skill: p.skill ?? null,
+          with: names.join(' + '),
           trait: def?.code ?? x.code,
           rarity: def?.rarity ?? '',
           kind: def ? traitLogKind(def.code) : 'unknown',
@@ -112,12 +121,13 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
         });
       }
     }
-  const by = new Map<string, { s: TraitSummary; bots: Set<string> }>();
+  const by = new Map<string, { s: TraitSummary; bots: Set<string>; skills: number[] }>();
   for (const r of rows) {
     let x = by.get(r.trait);
     if (!x) {
       x = {
         bots: new Set(),
+        skills: [],
         s: {
           trait: r.trait,
           rarity: r.rarity,
@@ -137,12 +147,14 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
           won: 0,
           botKills: 0,
           botDeaths: 0,
+          avgSkill: null,
         },
       };
       by.set(r.trait, x);
     }
     const s = x.s;
     x.bots.add(r.bot.toLowerCase());
+    if (r.skill !== null) x.skills.push(r.skill);
     s.games++;
     s.uses += r.uses;
     s.sec += r.sec;
@@ -159,7 +171,13 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
     s.botDeaths += r.botDeaths;
   }
   const summary = [...by.values()]
-    .map(({ s, bots }) => ({ ...s, bots: bots.size }))
+    .map(({ s, bots, skills }) => ({
+      ...s,
+      bots: bots.size,
+      avgSkill: skills.length
+        ? Math.round((skills.reduce((a, b) => a + b, 0) / skills.length) * 10) / 10
+        : null,
+    }))
     .sort((a, b) => b.games - a.games || a.trait.localeCompare(b.trait));
   return { games: baseline.games, baseline, summary, rows };
 }
