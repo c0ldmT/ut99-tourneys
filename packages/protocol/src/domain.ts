@@ -101,6 +101,11 @@ export const BotSpecSchema = z.object({
     .array(z.string().regex(/^[a-z]{2}$/))
     .max(5)
     .optional(),
+  /**
+   * Unreal Dream Team, Monster Hunt (mod 0.17.0): the manager's focus, -2 hunter (fights every
+   * monster) … 2 sprinter (only what is in the way); missing or 0: the standard behaviour.
+   */
+  mhFocus: z.number().int().min(-2).max(2).optional(),
 });
 export type BotSpec = z.infer<typeof BotSpecSchema>;
 

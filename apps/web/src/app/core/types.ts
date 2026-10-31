@@ -1237,6 +1237,8 @@ export interface UdtTeam {
   createdAt: string;
   /** Enters open Dream Team tournaments automatically when possible. */
   autoEnter?: boolean;
+  /** Monster Hunt focus: -2 hunter … 0 standard … 2 sprinter (decision 238). */
+  mhFocus?: number;
 }
 
 export interface UdtWallet {

@@ -449,9 +449,15 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * in a fight), ic item controller (armour, belts and amplifiers at respawn time); mod 0.14.0
    * values traits as edges on the skill curve: sh steady hand, wd watchdog, ss side-stepper, ph
    * patient hunter, ee eagle eye, ar all-rounder; mod 0.15.0: dd daredevil, bo bouncer. Unknown
-   * codes are ignored.
+   * codes are ignored. Mod 0.17.0: `mf` the Monster Hunt focus (-2 … 2, missing: 0); `c` may
+   * then be empty.
    */
-  z.object({ t: z.literal('btrt'), name: str(MAX_NAME_CHARS), c: str(64) }),
+  z.object({
+    t: z.literal('btrt'),
+    name: str(MAX_NAME_CHARS),
+    c: str(64),
+    mf: int.min(-2).max(2).optional(),
+  }),
   /**
    * A bot's personality (sent with its config): `tk` chance in percent to say something on an
    * occasion; then up to BOT_MAX_LINES `bsay` lines (`k` occasion, `x` text with placeholders

@@ -36,6 +36,14 @@
 //    opens.
 // 9. Empty weapons: a bot whose weapon has no ammo switches weapons; when no weapon has ammo
 //    any more it fetches ammo or a weapon lying around instead of dodging about.
+// 10. Focus (mod 0.17.0, Dream Team): the manager's Monster Hunt focus per bot (btrt "mf").
+//    -2 hunter: big monsters are fought instead of feared, hostile monsters in sight within
+//    1500 units are attacked; -1 thorough: the same while healthy (> 60), within 900 units.
+//    1 brisk: monsters further than 1200 units are ignored, a fight with one monster that
+//    lasts 8 s is broken off (that monster is left alone for 12 s unless it comes within 350
+//    units); 2 sprinter: 600 units, 3 s, 20 s. Monsters whose death opens the way (key
+//    monsters) and shielded targets keep their own rules (6, 8); behaviour traits keep acting
+//    (a hurt vulture still retreats). 0: Monster Hunt's own behaviour.
 // Debug log: also which pawn made a mover turn back, objectives and the death
 // of monsters whose death triggers an event.
 // Every step is written to the server log only (tag UTTourney, lines start
@@ -81,6 +89,12 @@ var float SAmmoSince[32];
 var float SAmmoLogAt[32];
 var Inventory SAmmoSkip[32];    // item the last ammo run failed on, left out until SAmmoSkipUntil
 var float SAmmoSkipUntil[32];
+var Pawn SFightMon[32];         // 10. focus: the monster the bot fights, since when
+var float SFightSince[32];
+var Pawn SDropMon[32];          // the monster it broke off from, left alone until SDropUntil
+var float SDropUntil[32];
+var byte SFocusLogged[32];
+var byte SFocus[32];            // the bot's focus + 3 (0: not looked up yet), refreshed once a second
 var Actor NearGoal[16];         // PathNear cache: goal -> path point next to it
 var NavigationPoint NearNode[16];
 var int NumNear;
@@ -241,6 +255,10 @@ function ClearSlot(int k)
 	SEngaged[k] = None;
 	SAmmoGoal[k] = None;
 	SAmmoSkip[k] = None;
+	SFightMon[k] = None;
+	SDropMon[k] = None;
+	SFocusLogged[k] = 0;
+	SFocus[k] = 0;
 	ClearHold(k);
 }
 
@@ -614,6 +632,7 @@ function Timer()
 				SStill[k] = 0;
 				SEngaged[k] = None;
 				SAmmoGoal[k] = None;
+				SFightMon[k] = None;
 			}
 			continue;
 		}
@@ -629,6 +648,7 @@ function Timer()
 			StuckCheck(B, k);
 			ShieldCheck(B, k);
 			AmmoCheck(B, k);
+			FocusCheck(B, k);
 		}
 	}
 	if (bSecond)
@@ -1724,7 +1744,146 @@ function byte AssessBotAttitude(Bot aBot, Pawn Other)
 					return 1; // ATTITUDE_Hate
 				break;
 			}
+	if (ScriptedPawn(Other) != None && Other.Health > 0 && Huntable(ScriptedPawn(Other), aBot) && !IsKeyMonster(Other))
+		return FocusAttitude(aBot, k, Other);
 	return Super.AssessBotAttitude(aBot, Other);
+}
+
+//-----------------------------------------------------------------------------
+// 10. Focus
+
+function int BotFocus(Bot B)
+{
+	local TourneyCoreMH C;
+	C = Core();
+	if (C == None)
+		return 0;
+	return C.MHFocus(B);
+}
+
+function bool IsKeyMonster(Pawn P)
+{
+	local int i;
+	for (i = 0; i < NumKeyMonsters; i++)
+		if (KeyMonsters[i] == P)
+			return true;
+	return false;
+}
+
+// The attitude to a hostile monster by the bot's focus (k: its slot or -1).
+function byte FocusAttitude(Bot B, int k, Pawn Other)
+{
+	local int F;
+	local byte A;
+	local float D;
+
+	// Looked up once a second (FocusCheck); the game asks for attitudes many times a second.
+	if (k >= 0 && SFocus[k] != 0)
+		F = SFocus[k] - 3;
+	else
+		F = BotFocus(B);
+	A = Super.AssessBotAttitude(B, Other);
+	if (F == 0)
+		return A;
+	if (F < 0)
+	{
+		// Hunters fight big monsters instead of fleeing (thorough: while healthy).
+		if (A == 0 && (F <= -2 || B.Health > 60))
+			return 1;
+		return A;
+	}
+	D = VSize(Other.Location - B.Location);
+	if (k >= 0 && SDropMon[k] == Other && Level.TimeSeconds < SDropUntil[k] && D > 350)
+		return 2; // broken off: left alone for a while
+	if (F >= 2 && D > 600)
+		return 2;
+	if (D > 1200)
+		return 2;
+	return A;
+}
+
+// Once a second per bot: hunters look for monsters in sight, brisk bots and sprinters break
+// off a fight that takes too long.
+function FocusCheck(Bot B, int k)
+{
+	local int F;
+	local Pawn P, Best;
+	local float D, BestD, Limit;
+	local ScriptedPawn E;
+
+	F = BotFocus(B);
+	SFocus[k] = byte(F + 3);
+	if (F == 0)
+		return;
+	if (SFocusLogged[k] == 0)
+	{
+		SFocusLogged[k] = 1;
+		BotLog(BName(B) $ ": focus" @ F);
+	}
+	if (F < 0)
+	{
+		if (B.Enemy != None || !B.IsInState('Roaming') || SErrand[k] != None || SAmmoGoal[k] != None)
+			return;
+		if (F == -1 && B.Health <= 60)
+			return;
+		BestD = 1500;
+		if (F == -1)
+			BestD = 900;
+		for (P = Level.PawnList; P != None; P = P.NextPawn)
+		{
+			E = ScriptedPawn(P);
+			if (E == None || E.Health <= 0 || E.bDeleteMe || !Huntable(E, B) || ShieldIndex(E) >= 0)
+				continue;
+			if (int(E.AttitudeToPlayer) >= 5)
+				continue; // friendly or following
+			D = VSize(E.Location - B.Location);
+			if (D >= BestD || !B.LineOfSightTo(E))
+				continue;
+			Best = E;
+			BestD = D;
+		}
+		// SetEnemy starts the attack itself (WhatToDoNext would bring back the old enemy, none).
+		if (Best != None && B.SetEnemy(Best))
+		{
+			if (B.bNovice)
+			{
+				B.OldEnemy = Best; // as KeepHunting: novices give up in Acquisition otherwise
+				B.bMustHunt = true;
+			}
+			BotLog(BName(B) $ ": focus" @ F @ "- attacks" @ What(Best));
+		}
+		return;
+	}
+	E = ScriptedPawn(B.Enemy);
+	if (E == None || E.Health <= 0 || IsKeyMonster(E))
+	{
+		SFightMon[k] = None;
+		return;
+	}
+	if (SFightMon[k] != E)
+	{
+		SFightMon[k] = E;
+		SFightSince[k] = Level.TimeSeconds;
+		return;
+	}
+	Limit = 8;
+	if (F >= 2)
+		Limit = 3;
+	if (Level.TimeSeconds - SFightSince[k] < Limit || VSize(E.Location - B.Location) < 350)
+		return;
+	SDropMon[k] = E;
+	SDropUntil[k] = Level.TimeSeconds + 12;
+	if (F >= 2)
+		SDropUntil[k] = Level.TimeSeconds + 20;
+	SFightMon[k] = None;
+	BotLog(BName(B) $ ": focus" @ F @ "- breaks off from" @ What(E) @ "and moves on");
+	if (B.OldEnemy == E)
+		B.OldEnemy = None;
+	// WhatToDoNext takes up the old enemy: not a monster this bot ignores now.
+	if (ScriptedPawn(B.OldEnemy) != None && FocusAttitude(B, k, B.OldEnemy) == 2)
+		B.OldEnemy = None;
+	B.Enemy = None;
+	B.WhatToDoNext('', '');
 }
 
 //-----------------------------------------------------------------------------

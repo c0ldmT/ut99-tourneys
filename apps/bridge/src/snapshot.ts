@@ -138,7 +138,13 @@ export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMo
       jmp: !!t.jumpy,
     },
   ];
-  if (b.gameTraits?.length) lines.push({ t: 'btrt', name, c: b.gameTraits.join(',') });
+  if (b.gameTraits?.length || b.mhFocus)
+    lines.push({
+      t: 'btrt',
+      name,
+      c: (b.gameTraits ?? []).join(','),
+      ...(b.mhFocus ? { mf: b.mhFocus } : {}),
+    });
   const p = personas?.get(b.name.toLowerCase());
   if (p) {
     lines.push({ t: 'bpers', name, tk: p.talk });

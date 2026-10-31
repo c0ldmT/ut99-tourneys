@@ -173,6 +173,26 @@ describe('website bot lines', () => {
     for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
   });
 
+  it('sends the Monster Hunt focus with the game traits, also without traits (mod 0.17.0)', async () => {
+    const { botConfigLines } = await import('../src/snapshot.js');
+    const { encodeModLine } = await import('@tourney/protocol');
+    const runner = botConfigLines({ id: 'bY', name: '[NX]Rex', skill: 4, mhFocus: 2 });
+    expect(runner.at(-1)).toEqual({ t: 'btrt', name: '[NX]Rex', c: '', mf: 2 });
+    const both = botConfigLines({
+      id: 'bZ',
+      name: '[NX]Ivy',
+      skill: 4,
+      gameTraits: ['aa'],
+      mhFocus: -2,
+    });
+    expect(both.at(-1)).toEqual({ t: 'btrt', name: '[NX]Ivy', c: 'aa', mf: -2 });
+    for (const l of [...runner, ...both]) expect(() => encodeModLine(l)).not.toThrow();
+    expect(botConfigLines({ id: 'bW', name: 'Plain', skill: 4 }).map((l) => l.t)).toEqual([
+      'bcfg',
+      'btr',
+    ]);
+  });
+
   it("sends the players' dedications (Neuro shop), empty lines left out", async () => {
     const { dedicationLines } = await import('../src/snapshot.js');
     const { encodeModLine } = await import('@tourney/protocol');

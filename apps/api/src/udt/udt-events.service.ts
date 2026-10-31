@@ -581,9 +581,11 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         }
         continue;
       }
+      // Monster Hunt: the manager's focus goes with every bot (decision 238).
+      const focus = settings.game.adapter === ADAPTER_MH ? team.mhFocus : 0;
       const specs = l.bots
         .map((r) => this.spec(r, team.tag, lib, careers))
-        .map((s) => ({ ...s, name: named(s.name) }));
+        .map((s) => ({ ...s, name: named(s.name), ...(focus ? { mhFocus: focus } : {}) }));
       skills.push(...l.bots.map((r) => r.effective.skill));
       main.push(
         settings.teamSize > 1

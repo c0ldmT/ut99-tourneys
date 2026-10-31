@@ -179,6 +179,7 @@ var int TrStartSec[240];           // game second the episode began (StGameSec, 
 var float TrLast[240];             // last time the condition held (traits that flicker end 3 s later)
 var bool bTrFinal;                 // SendTraitStats runs: "tv" lines are kept for a resend
 var float CfgPhxAt[16];            // phoenix: when it rose
+var int CfgFocus[16];              // mod 0.17.0: Monster Hunt focus of its manager, -2 hunter .. 2 sprinter
 var float CfgItemUntil[16];
 var float CfgItemNext[16];
 var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
@@ -504,6 +505,7 @@ function HandleBridgeMessage(TourneyMsg M)
 				CfgBody[i] = byte(ParseGameTraits(M.Get("c")));
 				CfgBeh[i] = ParseBehaviourTraits(M.Get("c"));
 				CfgVal[i] = byte(ParseValueTraits(M.Get("c")));
+				CfgFocus[i] = Clamp(M.GetInt("mf"), -2, 2);
 			}
 			break;
 		case "bpers":
@@ -3138,6 +3140,7 @@ function int FindCfg(string BName, bool bCreate)
 	CfgBetAmt[i] = 0;
 	CfgBetPick[i] = "";
 	CfgBody[i] = 0;
+	CfgFocus[i] = 0;
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
 	CfgBeh[i] = 0;
@@ -4978,6 +4981,18 @@ function int ParseGameTraits(string S)
 			Bits = Bits | 32;
 	}
 	return Bits;
+}
+
+// Mod 0.17.0: the Monster Hunt focus of a website bot (btrt "mf"): -2 hunter .. 0 .. 2 sprinter.
+function int MHFocus(Pawn P)
+{
+	local int c;
+	if (P == None || P.PlayerReplicationInfo == None || CfgCount == 0)
+		return 0;
+	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
+	if (c < 0)
+		return 0;
+	return CfgFocus[c];
 }
 
 // The configuration of a website bot with game traits (-1: none).

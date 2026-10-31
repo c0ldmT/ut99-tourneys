@@ -691,4 +691,8 @@ export const MIGRATIONS: string[] = [
       '{"rarity":"legendary","season":' || season || '}', created_at
     FROM udt_blueprints WHERE source = 'gift';
   `,
+  // 43: the manager's Monster Hunt focus (-2 hunter … 2 sprinter, 0 the standard behaviour).
+  `
+  ALTER TABLE udt_teams ADD COLUMN mh_focus INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

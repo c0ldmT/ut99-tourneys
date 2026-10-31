@@ -199,6 +199,8 @@ export interface UdtTeam {
   createdAt: string;
   /** Enters open Dream Team tournaments automatically when possible. */
   autoEnter: boolean;
+  /** Monster Hunt focus: -2 hunter, -1 thorough, 0 standard, 1 brisk, 2 sprinter (decision 238). */
+  mhFocus: number;
 }
 
 /** Neuro per stamina point bought (rest with Neuro, not indexed). */
@@ -485,6 +487,7 @@ export class UdtService {
           tag: t.tag,
           createdAt: t.createdAt,
           autoEnter: t.autoEnter,
+          mhFocus: t.mhFocus,
         }
       : null;
   }
@@ -508,6 +511,19 @@ export class UdtService {
     this.db
       .update(udtTeams)
       .set({ autoEnter: on })
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, user.id)))
+      .run();
+    return this.team(user.id, season)!;
+  }
+
+  /** The team's Monster Hunt focus (decision 238); counts from the next draw. */
+  setMhFocus(user: User, focus: number): UdtTeam {
+    this.assertOn();
+    const season = this.season().number;
+    if (!this.team(user.id, season)) throw conflict('found your team first');
+    this.db
+      .update(udtTeams)
+      .set({ mhFocus: Math.max(-2, Math.min(2, Math.round(focus))) })
       .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, user.id)))
       .run();
     return this.team(user.id, season)!;
@@ -558,6 +574,7 @@ export class UdtService {
         tag: t.tag,
         createdAt: t.createdAt,
         autoEnter: t.autoEnter,
+        mhFocus: t.mhFocus,
       }));
   }
 

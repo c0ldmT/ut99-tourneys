@@ -1346,6 +1346,23 @@ const en = {
   'udt.events.autoHint':
     'Your team enters every open Dream Team tournament it can play, also while you are away: the right number of bots that can play, within the value cap and star limit. High stakes (ticket) and the finale are left out. A bracket full of AI teams makes room.',
   'udt.staminaHelp.title': 'How stamina works',
+  'udt.mhFocus.title': 'Monster Hunt focus',
+  'udt.mhFocus.-2': 'Hunter',
+  'udt.mhFocus.-1': 'Thorough',
+  'udt.mhFocus.0': 'Standard',
+  'udt.mhFocus.1': 'Brisk',
+  'udt.mhFocus.2': 'Sprinter',
+  'udt.mhFocus.hint.-2':
+    'Clears the way: fights every monster it sees – big ones too – and goes after monsters nearby. Safe but slow.',
+  'udt.mhFocus.hint.-1':
+    'Fights big monsters too while healthy (above 60 health) and takes on monsters close by.',
+  'udt.mhFocus.hint.0':
+    "Monster Hunt's own behaviour with the tournament's bot help: fights what it meets, avoids big monsters.",
+  'udt.mhFocus.hint.1':
+    'Heads for the objectives: monsters further than ~25 m are left alone, a fight that drags on (8 s) is broken off – fires back at what comes close.',
+  'udt.mhFocus.hint.2':
+    'Runs past: only fights monsters right in its way (~12 m), breaks off after 3 s. Fastest, but more deaths cost penalty time.',
+  'ok.udt.mhFocus': 'Monster Hunt focus saved (counts from the next draw).',
   'udt.staminaHelp.loss':
     'Every Dream Team game a bot plays costs 6 stamina (a 4-team double elimination: about 30 at most).',
   'udt.staminaHelp.rest':
@@ -3839,6 +3856,23 @@ const de: Record<TKey, string> = {
   'udt.events.autoHint':
     'Dein Team meldet sich bei jedem offenen Dream-Team-Turnier an, das es spielen kann – auch wenn du nicht auf der Seite bist: die richtige Zahl spielfähiger Bots, innerhalb von Wertgrenze und Star-Limit. High Stakes (Ticket) und das Finale bleiben außen vor. Ist das Bracket mit KI-Teams voll, machen sie Platz.',
   'udt.staminaHelp.title': 'So funktioniert Ausdauer',
+  'udt.mhFocus.title': 'Monster-Hunt-Fokus',
+  'udt.mhFocus.-2': 'Jäger',
+  'udt.mhFocus.-1': 'Gründlich',
+  'udt.mhFocus.0': 'Standard',
+  'udt.mhFocus.1': 'Zügig',
+  'udt.mhFocus.2': 'Sprinter',
+  'udt.mhFocus.hint.-2':
+    'Räumt den Weg frei: kämpft gegen jedes Monster, das er sieht – auch große – und geht auf Monster in der Nähe los. Sicher, aber langsam.',
+  'udt.mhFocus.hint.-1':
+    'Kämpft gesund (über 60 Leben) auch gegen große Monster und nimmt Monster in der Nähe mit.',
+  'udt.mhFocus.hint.0':
+    'Das Verhalten von Monster Hunt mit der Bot-Hilfe des Turniers: kämpft, was ihm begegnet, meidet große Monster.',
+  'udt.mhFocus.hint.1':
+    'Will zu den Zielen: Monster weiter als ~25 m bleiben links liegen, ein Kampf, der sich zieht (8 s), wird abgebrochen – schießt zurück, was nahe kommt.',
+  'udt.mhFocus.hint.2':
+    'Rennt durch: kämpft nur gegen Monster direkt im Weg (~12 m), bricht nach 3 s ab. Am schnellsten, aber mehr Tode kosten Strafzeit.',
+  'ok.udt.mhFocus': 'Monster-Hunt-Fokus gespeichert (zählt ab der nächsten Auslosung).',
   'udt.staminaHelp.loss':
     'Jedes Dream-Team-Spiel eines Bots kostet 6 Ausdauer (ein 4er-Turnier mit Double Elimination: höchstens etwa 30).',
   'udt.staminaHelp.rest':

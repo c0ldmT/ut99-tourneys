@@ -339,6 +339,43 @@ describe('Unreal Dream Team: events', () => {
     expect((await mario.post(`/udt/roster/${bot}/rest`, { points: 5 })).status).toBe(409);
   });
 
+  it('Monster Hunt: the team focus goes with every bot of the lineup (decision 238)', async () => {
+    const { admin, mario } = await setup();
+    const set = await mario.req('PUT', '/udt/team/mh-focus', { focus: 2 });
+    expect(set.status).toBe(200);
+    expect((set.body as any).team.mhFocus).toBe(2);
+    expect((await mario.req('PUT', '/udt/team/mh-focus', { focus: 3 })).status).toBe(400);
+    expect((await mario.get('/udt')).body.team.mhFocus).toBe(2);
+    // A second bot for the 2on2 (Monster Hunt is played by teams).
+    const mid = (await mario.get('/me')).body.id as string;
+    const lib = ((await admin.get('/bots')).body.bots as { id: string; name: string }[]).find(
+      (x) => x.name === 'Lib1',
+    )!;
+    api!.app
+      .get<Db>(DB)
+      .insert(udtRoster)
+      .values({ season: 1, botId: lib.id, userId: mid, price: 100, acquiredAt: 'x', mhSlot: 2 })
+      .run();
+    const body = udtCup(2) as any;
+    body.settings.game = {
+      adapter: 'ut99-mh',
+      rules: { mapPool: ['MH-NaliVillage'], timeLimitMin: 20, fragLimit: 0 },
+    };
+    const t = await admin.post('/tournaments', body);
+    expect(t.status, JSON.stringify(t.body)).toBe(201);
+    const id = t.body.id as string;
+    const entered = await mario.post(`/udt/events/${id}/enter`);
+    expect(entered.status, JSON.stringify(entered.body)).toBe(200);
+    const seeded = await admin.post(`/tournaments/${id}/seed`, { mode: 'auto', rngSeed: 's' });
+    expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
+    const entrants = Object.values(seeded.body.projection.entrants) as any[];
+    const nexus = entrants.find((e) => e.displayName === 'Nexus');
+    expect(nexus.bots.map((b: any) => b.mhFocus)).toEqual([2, 2]);
+    // Bots of other teams play as Monster Hunt sets them.
+    for (const e of entrants.filter((x) => x !== nexus))
+      expect(e.bots.every((b: any) => b.mhFocus === undefined)).toBe(true);
+  });
+
   it('2v2: a team needs two playable bots; value cap and star limit apply', async () => {
     const { admin, mario } = await setup();
     const t = await admin.post('/tournaments', udtCup(2, { starLimit: 0 }));

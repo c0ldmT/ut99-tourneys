@@ -298,6 +298,8 @@ export const udtTeams = sqliteTable(
     scrap: integer('scrap').notNull().default(0),
     /** The manager's switch: enter open Dream Team tournaments automatically when possible. */
     autoEnter: integer('auto_enter', { mode: 'boolean' }).notNull().default(false),
+    /** Monster Hunt focus of the team's bots: -2 hunter … 0 standard … 2 sprinter (238). */
+    mhFocus: integer('mh_focus').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.userId] })],
 );
