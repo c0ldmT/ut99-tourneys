@@ -171,6 +171,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- League games: their page no longer offers a sign-up or organizer buttons like "Draw bracket" - it shows the two clubs, the matchday and your lineup link, and you can bet as before.
 - Monster Hunt match page: the "Monsters / deaths" column counts the monsters killed (it stayed at 0), the running time includes the death penalty like everywhere else, and the useless "monsters left" bar is gone (bosses left stay).
 - Monster Hunt map records: Dream Team games are season games and set records too.
 - Dream Team packs: a blueprint drawn with a full blueprint inventory is no longer scrapped by itself - you choose which blueprint goes (scrap or build one before the next pack); every blueprint can be scrapped from the inventory. As an apology every manager of the running season gets a legendary blueprint (outside the limit) and a message at the next login.

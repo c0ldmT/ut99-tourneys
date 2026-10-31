@@ -231,6 +231,8 @@ export interface TournamentDetail {
   /** "udt": Dream Team managers' lineups play. */
   kind?: 'standard' | 'udt';
   udt?: UdtEventRules | null;
+  /** A game of the Dream Team league (the league sets the clubs, draws and starts it). */
+  league?: LeagueTag;
   /** Dream Team: whether AI managers play (and how many); where the viewer's bots play. */
   signup?: { aiOn?: boolean; aiCount?: number; busyIn?: string[] };
   /** Answer of a Dream Team draw: teams that signed up but are not in the bracket. */

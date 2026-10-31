@@ -66,7 +66,14 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <div class="head-l">
           <div class="row">
             <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
-            @if (udtMode()) {
+            @if (leagueMode()) {
+              <a class="badge udt" routerLink="/udt/league/day"
+                ><na-udt-mark [size]="16" />{{ 'league.title' | t }}
+                @if (t.league; as lg) {
+                  · {{ 'league.kind.' + lg.kind | t }}
+                }
+              </a>
+            } @else if (udtMode()) {
               <a class="badge udt" routerLink="/udt/events"
                 ><na-udt-mark [size]="16" />{{ 'udt.title' | t }}
                 @if (t.udt?.finale) {
@@ -161,7 +168,35 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           !(teamMode() && !udtMode() && t.phase === 'draft')
         ) {
           <div class="card" [class.udt-signup]="udtMode() && t.phase === 'draft'">
-            @if (t.phase === 'draft' && udtMode()) {
+            @if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
+              <!-- League games: the league sets both clubs, draws and starts (decision 234). -->
+              <h2><na-udt-mark [size]="24" /> {{ 'tp.league.title' | t }}</h2>
+              @if (t.league; as lg) {
+                <p class="lg-vs">
+                  <b>{{ lg.home }}</b> <span class="muted">vs</span> <b>{{ lg.away }}</b>
+                </p>
+                <p class="muted small">
+                  @if (lg.matchday) {
+                    {{ 'league.matchday' | t: { n: lg.matchday } }} ·
+                  }
+                  {{ 'league.kind.' + lg.kind | t }}
+                  @if (t.scheduledAt) {
+                    · {{ i18n.date(t.scheduledAt) }}
+                  }
+                </p>
+                <p class="small">
+                  {{ (lg.mine ? 'tp.league.mine' : 'tp.league.text') | t }}
+                </p>
+              } @else {
+                <p class="small">{{ 'tp.league.text' | t }}</p>
+              }
+              <div class="row">
+                @if (t.league?.mine) {
+                  <a class="btn primary udt" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
+                }
+                <a class="btn" routerLink="/udt/league/day">{{ 'tp.league.toDay' | t }}</a>
+              </div>
+            } @else if (t.phase === 'draft' && udtMode()) {
               <h2><na-udt-mark [size]="24" /> {{ 'tp.udtSignup' | t }}</h2>
               <p class="muted small">{{ 'tp.udtHint' | t }}</p>
               @if (t.udt?.finale) {
@@ -517,7 +552,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         </div>
       }
 
-      @if (t.phase === 'draft' && (!teamMode() || udtMode()) && !t.udt?.finale) {
+      @if (t.phase === 'draft' && (!teamMode() || udtMode()) && !t.udt?.finale && !leagueMode()) {
         <div class="card">
           <h2>
             {{ (udtMode() ? 'tp.udtTeams' : 'tp.players') | t }} ({{ t.registrations.length }})
@@ -560,7 +595,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             <button [class.active]="tab() === 'control'" (click)="tab.set('control')">
               {{ 'admin.control' | t }}
             </button>
-            @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode()) {
+            @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode() && !leagueMode()) {
               <button [class.active]="tab() === 'seeding'" (click)="tab.set('seeding')">
                 {{ 'admin.seeding' | t }}
               </button>
@@ -580,7 +615,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     'series.makeFrom' | t
                   }}</a>
                 }
-                @if (t.phase === 'draft') {
+                @if (t.phase === 'draft' && !leagueMode()) {
                   <button
                     (click)="
                       act(api.updateTournament(t.id, { registrationOpen: !t.registrationOpen }))
@@ -592,11 +627,18 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     }}
                   </button>
                 }
-                @if (!isActive()) {
+                <!-- League games stay (the league owns them) unless over, aborted or orphaned. -->
+                @if (
+                  !isActive() &&
+                  (!leagueMode() || !t.league || t.phase === 'aborted' || t.phase === 'finished')
+                ) {
                   <button class="danger" (click)="remove()">{{ 'common.delete' | t }}</button>
                 }
               </div>
-              @if ((t.phase === 'draft' || t.phase === 'seeded') && udtMode()) {
+              @if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
+                <p class="muted small">{{ 'tp.league.admin' | t }}</p>
+              }
+              @if ((t.phase === 'draft' || t.phase === 'seeded') && udtMode() && !leagueMode()) {
                 <div class="udt-seed">
                   <b><na-udt-mark [size]="18" /> {{ 'tp.udtSeedTitle' | t }}</b>
                   <ul class="small">
@@ -638,7 +680,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                   </div>
                 </div>
               }
-              @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode()) {
+              @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode() && !leagueMode()) {
                 <div class="row">
                   <button
                     (click)="act(api.seed(t.id, { mode: 'auto', humanOrder: 'random' }))"
@@ -804,6 +846,10 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
+    .lg-vs {
+      font-size: 1.15rem;
+      margin: 6px 0 2px;
+    }
     table.ratings td {
       vertical-align: top;
       padding-right: 16px;
@@ -1102,6 +1148,10 @@ export class TournamentPage {
   protected readonly teamMode = computed(() => (this.t()?.settings.teamSize ?? 1) > 1);
   /** Dream Team: managers enter their teams, the lineups play. */
   protected readonly udtMode = computed(() => this.t()?.kind === 'udt');
+  /** A game of the Dream Team league: no sign-up, no draw, no start by hand (decision 234). */
+  protected readonly leagueMode = computed(
+    () => !!this.t()?.league || this.t()?.settings.format === 'fixtures',
+  );
   protected readonly botRoute = botRoute;
 
   protected humanTeams(t: TournamentDetail): number {

@@ -2153,6 +2153,13 @@ const en = {
   'league.runHint': 'Bots, lives and feed on the match page →',
   'league.bet': 'Bet',
   'league.toGame': 'Game',
+  'tp.league.title': 'League game',
+  'tp.league.text':
+    'The league sets both clubs, draws the game and starts it on the league evening – there is no sign-up. You can bet on it below.',
+  'tp.league.mine': 'Your club plays: your lineup counts until the draw shortly before the game.',
+  'tp.league.toDay': 'To the matchday',
+  'tp.league.admin':
+    'League games are run by the league: it draws and starts them by itself (Settings → UDT Liga). Start one here only if it got stuck.',
   'league.approx': 'about',
   'league.noReal': 'No game on the server this evening.',
   'league.conference': 'Conference',
@@ -4605,6 +4612,14 @@ const de: Record<TKey, string> = {
   'league.runHint': 'Bots, Leben und Feed auf der Matchseite →',
   'league.bet': 'Wetten',
   'league.toGame': 'Spiel',
+  'tp.league.title': 'Ligaspiel',
+  'tp.league.text':
+    'Die Liga stellt beide Clubs, lost das Spiel aus und startet es am Ligaabend – eine Anmeldung gibt es nicht. Unten kannst du darauf wetten.',
+  'tp.league.mine':
+    'Dein Club spielt: Deine Aufstellung zählt bis zur Auslosung kurz vor dem Spiel.',
+  'tp.league.toDay': 'Zum Spieltag',
+  'tp.league.admin':
+    'Ligaspiele steuert die Liga: Sie lost sie selbst aus und startet sie (Einstellungen → UDT Liga). Starte eins hier nur, wenn es hängt.',
   'league.approx': 'ca.',
   'league.noReal': 'Heute Abend keine Partie auf dem Server.',
   'league.conference': 'Konferenz',

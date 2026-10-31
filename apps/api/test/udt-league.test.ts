@@ -144,6 +144,11 @@ describe('Dream Team league', () => {
     const own = tagged.filter((x) => x.league!.mine);
     expect(own.length).toBeGreaterThan(0);
     for (const x of own) expect(x.registeredMe).toBe(true);
+    // The game's page knows it is a league game; nobody signs up for it (decision 234).
+    const page = (await mario.get(`/tournaments/${own[0]!.id}`)).body;
+    expect(page.league).toMatchObject({ kind: 'league', mine: true });
+    const signUp = await mario.post(`/tournaments/${own[0]!.id}/registration`, {});
+    expect(signUp.status).toBe(409);
     // Archive filters: "league" only league games, "Dream Team" only the cups.
     for (const g of games.slice(0, 2)) await admin.post(`/udt/test/simulate/${g.tournamentId}`);
     const done = async (kind: string) =>

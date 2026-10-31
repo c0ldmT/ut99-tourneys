@@ -2162,6 +2162,7 @@ export class TournamentsService {
       ACTIVE_PHASES.includes(t.phase) || t.phase === 'seeded'
         ? this.access(t).some((a) => a.userId === user.id)
         : false;
+    const league = this.leagueOf(t, user.id);
     return {
       id: t.id,
       name: t.name,
@@ -2182,6 +2183,8 @@ export class TournamentsService {
       season: this.seasonOf(t) ?? null,
       kind: t.kind,
       udt: this.udtRules(t),
+      // A league game: the league sets both clubs, draws and starts it (no sign-up, decision 234).
+      ...(league ? { league } : {}),
       ...(this.signupProviders.get(t.kind)?.info
         ? { signup: this.signupProviders.get(t.kind)!.info!(t, user) }
         : {}),

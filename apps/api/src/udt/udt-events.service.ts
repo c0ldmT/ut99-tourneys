@@ -802,6 +802,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
   signUp(user: User, id: string): void {
     this.udt.assertOn();
     const t = this.row(id);
+    if (this.rules(t).league)
+      throw conflict('league games have no sign-up: the league sets both clubs');
     if (t.phase !== 'draft' || !t.registrationOpen || !this.inSeason(t))
       throw conflict('the sign-up is closed');
     if (this.rules(t).finale)
