@@ -10,12 +10,14 @@ import {
 } from '../src/bets/betting.js';
 import { BetsService } from '../src/bets/bets.service.js';
 import {
+  bettingStyle,
   bettingType,
   botBet,
   drawBettors,
   judgementNoise,
   stakeShare,
   type BetSide,
+  type BettingStyle,
   type BettingBot,
   type BotFeelings,
 } from '../src/bets/bot-betting.js';
@@ -455,6 +457,42 @@ describe('bots betting (pure)', () => {
     expect(bettingType({ ...bot(), jumpy: true })).toBe('hunch');
     expect(bettingType(bot({ skill: 6, accuracy: 0.5 }))).toBe('analyst');
     expect(bettingType(bot({ combatStyle: 1 }))).toBe('gambler');
+  });
+
+  it('styles drawn by id: drunk, value hunters, underdog fans, halfway, hunch (decision 235)', () => {
+    // Stable by id; about 45 % of the bots get a drawn style, the rest bet by their values.
+    const styles = Array.from({ length: 2000 }, (_, i) => bettingStyle(bot({ id: `bot${i}` })));
+    const share = (x: string) => styles.filter((s) => s === x).length / styles.length;
+    expect(share('drunk')).toBeGreaterThan(0.03);
+    expect(share('drunk')).toBeLessThan(0.1);
+    expect(share('value')).toBeGreaterThan(0.07);
+    expect(share('average')).toBeGreaterThan(0.45);
+    expect(bettingStyle(bot({ id: 'bot7' }))).toBe(bettingStyle(bot({ id: 'bot7' })));
+    const sides = [side('a', 1800), side('b', 1400)] as const;
+    const favourite = (style: BettingStyle, pool = { a: 0, b: 0 }) => {
+      let fav = 0;
+      let n = 0;
+      for (let i = 0; i < 400; i++) {
+        const d = botBet(bot({ style }), sides, none, 1000, createRng(`st${i}`), pool);
+        if (!d) continue;
+        n++;
+        if (d.pick === 'a') fav++;
+      }
+      return { fav: fav / Math.max(1, n), n };
+    };
+    const classic = favourite('average').fav;
+    expect(classic).toBeGreaterThan(0.85);
+    // Mistakes on purpose, but not pure chance (except the drunk).
+    expect(favourite('halfway').fav).toBeLessThan(classic);
+    expect(favourite('underdog').fav).toBeLessThan(0.75);
+    expect(favourite('hunch').fav).toBeLessThan(classic);
+    expect(Math.abs(favourite('drunk').fav - 0.5)).toBeLessThan(0.1);
+    // Value hunters fill the empty side when everybody backs the favourite (no refund).
+    const lopsided = favourite('value', { a: 5000, b: 0 });
+    expect(lopsided.n).toBeGreaterThan(300);
+    expect(lopsided.fav).toBeLessThan(0.05);
+    // With an even pool they back the side their belief favours.
+    expect(favourite('value', { a: 1000, b: 1000 }).fav).toBeGreaterThan(0.8);
   });
 
   it('draws at most n bettors, alert bots more often', () => {

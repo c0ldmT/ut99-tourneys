@@ -45,9 +45,10 @@ import {
   type Wallet,
 } from './betting.js';
 import {
-  bettingType,
+  bettingStyle,
   botBet,
   drawBettors,
+  type BetPool,
   type BetSide,
   type BettingBot,
   type BotFeelings,
@@ -743,20 +744,25 @@ export class BetsService {
     round: BetRound,
     perMatch: number,
   ): void {
-    const existing = new Set(
-      this.db
-        .select({ botId: bets.botId })
-        .from(bets)
-        .where(and(eq(bets.tournamentId, tournamentId), eq(bets.matchId, m.matchId)))
-        .all()
-        .flatMap((r) => (r.botId ? [r.botId] : [])),
-    );
+    const placed = this.db
+      .select({ botId: bets.botId, pick: bets.pick, amount: bets.amount })
+      .from(bets)
+      .where(and(eq(bets.tournamentId, tournamentId), eq(bets.matchId, m.matchId)))
+      .all();
+    const existing = new Set(placed.flatMap((r) => (r.botId ? [r.botId] : [])));
     const seed = `${season.number}|${tournamentId}|${m.matchId}`;
     const candidates = library
       .filter((x) => !m.participants.includes(botBettor(x.id)) && !existing.has(x.id))
       .map((x) => ({ ...toBettingBot(x), lib: x }));
     const n = Math.max(0, perMatch - existing.size);
     const sides = m.entrants!.map((id) => betSide(id, proj, library)) as [BetSide, BetSide];
+    // What is on each side so far: value hunters bet where the pool pays more.
+    const pool: BetPool = { a: 0, b: 0 };
+    const add = (pick: string, amount: number) => {
+      if (pick === sides[0].entrantId) pool.a += amount;
+      else if (pick === sides[1].entrantId) pool.b += amount;
+    };
+    for (const r of placed) add(r.pick, r.amount);
     for (const bot of drawBettors(candidates, n, createRng(seed))) {
       const feelings: BotFeelings = {
         rivals: new Map(
@@ -768,8 +774,9 @@ export class BetsService {
         ...(revenge.get(bot.id) ? { revenge: revenge.get(bot.id)! } : {}),
       };
       const w = this.rescue(botBettor(bot.id), season, round);
-      const d = botBet(bot, sides, feelings, w.free, createRng(`${seed}|${bot.id}`));
+      const d = botBet(bot, sides, feelings, w.free, createRng(`${seed}|${bot.id}`), pool);
       if (!d) continue;
+      add(d.pick, d.amount);
       const row = {
         id: `w${randomId(12)}`,
         season: season.number,
@@ -1014,7 +1021,7 @@ export class BetsService {
     if (!bot) throw notFound('bot {botId}', { botId });
     return {
       name: bot.gameName,
-      type: bettingType(toBettingBot(bot)),
+      type: bettingStyle(toBettingBot(bot)),
       ...this.bettorView(botBettor(bot.id), seasonNo),
     };
   }
@@ -1056,7 +1063,7 @@ export class BetsService {
 
 /** The betting view of a library bot. */
 function toBettingBot(b: LibraryBot): BettingBot {
-  return {
+  const bot = {
     id: b.id,
     skill: b.skill,
     accuracy: b.traits.accuracy ?? 0,
@@ -1066,6 +1073,7 @@ function toBettingBot(b: LibraryBot): BettingBot {
     jumpy: !!b.traits.jumpy,
     clanId: b.clanId,
   };
+  return { ...bot, style: bettingStyle(bot) };
 }
 
 /** What a bot knows about one side: rating, clans of its bots, who plays. */
