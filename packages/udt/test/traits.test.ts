@@ -10,6 +10,7 @@ import {
   modCodes,
   managerEffects,
   rewardFactor,
+  traitDef,
   traitOfRarity,
   traitSlots,
   traitValueFactor,
@@ -120,11 +121,16 @@ describe('manager traits', () => {
 
 describe('packs', () => {
   it('draws a trait of the rarity', () => {
-    expect(traitOfRarity('epic', () => 0).code).toBe('all-rounder');
+    expect(traitOfRarity('epic', () => 0).code).toBe('watchdog');
     expect(traitOfRarity('epic', () => 0.99).code).toBe('item-controller');
     expect(traitOfRarity('legendary', () => 0).rarity).toBe('legendary');
     for (const r of ['common', 'uncommon', 'rare'] as const)
       expect(traitOfRarity(r, () => 0.99).rarity).toBe(r);
+    // Review 31.10. (decision 236).
+    expect(traitDef('watchdog')?.rarity).toBe('epic');
+    expect(traitDef('starter-armour')?.rarity).toBe('rare');
+    for (const c of ['berserker', 'revenant', 'daredevil'])
+      expect(traitDef(c)?.rarity).toBe('uncommon');
   });
 
   it('crafting costs four times the scrap', () => {

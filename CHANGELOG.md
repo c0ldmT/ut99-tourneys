@@ -215,6 +215,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team trait rarities: watchdog is epic now (effect unchanged), starter armour rare; daredevil, berserker and revenant uncommon. Scrap and crafting costs follow.
 - Bots bet with more variety: some bet half-informed, back the underdog, hunt value where the pool pays more (they fill an empty side, so fewer bets are refunded) or simply bet tipsy; the bot profile shows the betting type.
 - Settings → UDT Liga tidied: tiers, teams, start day and keepers as buttons, server and maps like the tournament form (automatic pool or own choice), table money as a table per place and tier with the weekly amounts, cup bonus as a podium, AI strength as sliders; no more lists like "1200 · 700 · 400 · 200".
 - Activity bar: "very busy" only shows after two long blocks of the server (1.5 s or more) within 10 s or when a page waits 4 s or more for an answer; background refreshes no longer count. The server log names what ran during each long block.

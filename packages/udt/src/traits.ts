@@ -53,14 +53,18 @@ export interface TraitDef {
   mod?: string;
 }
 
-/** The catalogue v1 (owner approved), phase 2 part: values and manager traits. */
+/**
+ * The catalogue v1 (owner approved), phase 2 part: values and manager traits. Rarities reviewed
+ * 31.10. (decision 236): watchdog epic, starter armour rare; berserker, revenant and daredevil
+ * uncommon - the fine tuning follows the trait logs (decision 237).
+ */
 export const TRAITS: readonly TraitDef[] = [
   { code: 'steady-hand', rarity: 'common', category: 'values', mod: 'sh' },
   { code: 'bouncer', rarity: 'common', category: 'values', mod: 'bo' },
-  { code: 'watchdog', rarity: 'uncommon', category: 'values', mod: 'wd' },
+  { code: 'watchdog', rarity: 'epic', category: 'values', mod: 'wd' },
   { code: 'side-stepper', rarity: 'uncommon', category: 'values', mod: 'ss' },
   { code: 'gun-nut', rarity: 'uncommon', category: 'values', needsWeapon: true },
-  { code: 'daredevil', rarity: 'rare', category: 'values', mod: 'dd' },
+  { code: 'daredevil', rarity: 'uncommon', category: 'values', mod: 'dd' },
   { code: 'patient-hunter', rarity: 'rare', category: 'values', mod: 'ph' },
   { code: 'eagle-eye', rarity: 'rare', category: 'values', mod: 'ee' },
   { code: 'all-rounder', rarity: 'epic', category: 'values', mod: 'ar' },
@@ -73,7 +77,7 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'training-champion', rarity: 'rare', category: 'manager' },
   { code: 'midas', rarity: 'legendary', category: 'manager' },
   { code: 'mentor', rarity: 'epic', category: 'manager' },
-  { code: 'starter-armour', rarity: 'uncommon', category: 'body', mod: 'sa' },
+  { code: 'starter-armour', rarity: 'rare', category: 'body', mod: 'sa' },
   { code: 'thick-skin', rarity: 'rare', category: 'body', mod: 'tf' },
   { code: 'adrenaline', rarity: 'rare', category: 'body', mod: 'ad' },
   { code: 'glass-cannon', rarity: 'epic', category: 'body', mod: 'gc' },
@@ -81,8 +85,8 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'phoenix', rarity: 'legendary', category: 'body', mod: 'px' },
   { code: 'vulture', rarity: 'uncommon', category: 'behaviour', mod: 'aa' },
   { code: 'kamikaze', rarity: 'uncommon', category: 'behaviour', mod: 'kz' },
-  { code: 'berserker', rarity: 'rare', category: 'behaviour', mod: 'bs' },
-  { code: 'revenant', rarity: 'rare', category: 'behaviour', mod: 'rg' },
+  { code: 'berserker', rarity: 'uncommon', category: 'behaviour', mod: 'bs' },
+  { code: 'revenant', rarity: 'uncommon', category: 'behaviour', mod: 'rg' },
   { code: 'bounty-hunter', rarity: 'epic', category: 'behaviour', mod: 'bh' },
   // Second behaviour group (mod 0.11.0).
   { code: 'snipers-nest', rarity: 'rare', category: 'behaviour', mod: 'sn' },
