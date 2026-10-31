@@ -16,6 +16,7 @@ import { z } from 'zod';
 import { CONFIG, type ApiConfig } from '../config.js';
 import { cookie, forbidden, parseCookies, ZodPipe } from '../common/http.js';
 import { randomId } from '../common/ids.js';
+import { LATEST_PATCH, PATCH_NOTES } from '../common/patch-notes.js';
 import type { ApiLogger } from '../common/logger.js';
 import { LOGGER } from '../common/logger.js';
 import { DISCORD, type DiscordApi } from './discord.js';
@@ -38,6 +39,7 @@ const MeBody = z.object({
   notifyDm: z.boolean().optional(),
 });
 const AdminBody = z.object({ isAdmin: z.boolean() });
+const PatchSeenBody = z.object({ id: z.number().int().min(0) });
 
 @Controller()
 export class AuthController {
@@ -64,11 +66,20 @@ export class AuthController {
       /** The Dream Team league shows (its area in Dream Team, decision 228). */
       udtLeague: this.settings.get().udt.enabled && this.league.visible(),
       testMode: this.config.testMode,
+      /** The newest patch note (decision 243): above what the visitor saw, the modal shows. */
+      patchLatest: LATEST_PATCH,
       notify: {
         directMessages: Boolean(this.config.notify.botToken),
         defaultChannel: isWebhookUrl(this.config.notify.webhookUrl),
       },
     };
+  }
+
+  /** All patch notes, newest first (decision 243; the footer opens them). */
+  @Public()
+  @Get('patch-notes')
+  patchNotes() {
+    return { latest: LATEST_PATCH, notes: PATCH_NOTES };
   }
 
   @Public()
@@ -162,7 +173,19 @@ export class AuthController {
       discordAccount: /^\d+$/.test(user.discordId),
       /** Messages to show once (a modal after login). */
       notices: this.users.notices(user.id),
+      /** The last patch note the user saw (decision 243). */
+      patchSeen: user.patchSeen,
     };
+  }
+
+  /** The update modal was closed: the patch notes up to `id` do not come again. */
+  @Post('me/patch-notes/seen')
+  @HttpCode(200)
+  seePatch(
+    @CurrentUser() user: User,
+    @Body(new ZodPipe(PatchSeenBody)) body: z.infer<typeof PatchSeenBody>,
+  ) {
+    return { patchSeen: this.users.seePatch(user.id, body.id) };
   }
 
   /** A notice was shown: it does not come again. */

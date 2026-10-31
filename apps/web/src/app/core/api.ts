@@ -56,6 +56,7 @@ import type {
   LibraryBot,
   MatchDetailView,
   Me,
+  PatchNote,
   MapRecord,
   PlayerRatings,
   PublicUser,
@@ -204,6 +205,18 @@ export class Api {
       quiet: true,
       background: true,
     });
+  patchNotes = () =>
+    this.call<{ latest: number; notes: PatchNote[] }>('GET', '/patch-notes', undefined, {
+      quiet: true,
+      background: true,
+    });
+  seePatch = (id: number) =>
+    this.call<{ patchSeen: number }>(
+      'POST',
+      '/me/patch-notes/seen',
+      { id },
+      { quiet: true, background: true },
+    );
   updateMe = (displayName: string) =>
     this.call<Me>('PATCH', '/me', { displayName }, { ok: 'ok.profile' });
   setNotifyDm = (notifyDm: boolean) =>

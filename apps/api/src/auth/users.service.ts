@@ -6,6 +6,7 @@ import { userNotices, users } from '../db/schema.js';
 import { newJoinToken, randomId } from '../common/ids.js';
 import { conflict, badRequest, notFound } from '../common/http.js';
 import { nameKey, sanitizeName, uniqueName } from '../common/names.js';
+import { LATEST_PATCH } from '../common/patch-notes.js';
 
 export type User = typeof users.$inferSelect;
 
@@ -59,6 +60,15 @@ export class UsersService {
       .set({ seenAt: new Date(this.clock.now()).toISOString() })
       .where(and(eq(userNotices.id, id), eq(userNotices.userId, userId)))
       .run();
+  }
+
+  /** The user saw the patch notes up to `id` (never backwards, not above the latest). */
+  seePatch(userId: string, id: number): number {
+    const u = this.require(userId);
+    const seen = Math.max(u.patchSeen, Math.min(Math.floor(id), LATEST_PATCH));
+    if (seen !== u.patchSeen)
+      this.db.update(users).set({ patchSeen: seen }).where(eq(users.id, userId)).run();
+    return seen;
   }
 
   /** Adds a notice for a user. */
@@ -135,6 +145,8 @@ export class UsersService {
         joinToken: newJoinToken(),
         createdAt: now,
         lastLoginAt: now,
+        // A new user has nothing to catch up on (decision 243).
+        patchSeen: LATEST_PATCH,
       })
       .run();
     return this.require(id);

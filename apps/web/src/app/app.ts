@@ -22,6 +22,7 @@ import { Loading } from './core/loading';
 import { ActivityBar } from './components/activity-bar';
 import { Loader } from './components/loader';
 import { NoticeModal } from './components/notice-modal';
+import { PatchNotes } from './components/patch-notes';
 
 @Component({
   selector: 'app-root',
@@ -42,6 +43,7 @@ import { NoticeModal } from './components/notice-modal';
     Loader,
     ActivityBar,
     NoticeModal,
+    PatchNotes,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -176,13 +178,19 @@ import { NoticeModal } from './components/notice-modal';
         <span class="fbrand"
           ><na-logo [size]="18" /> <na-wordmark [name]="auth.config().siteName"
         /></span>
-        <span class="muted small">{{ 'footer.line' | t }} · v{{ version }}</span>
+        <span class="muted small"
+          >{{ 'footer.line' | t }} · v{{ version }} ·
+          <button type="button" class="link fpatch" (click)="patchNotes.openAll()">
+            {{ 'patch.footer' | t }}
+          </button></span
+        >
       </div>
     </footer>
     <app-toasts />
     @if (auth.me()) {
       <na-notice-modal />
     }
+    <na-patch-notes #patchNotes />
   `,
   styles: `
     :host {
@@ -372,6 +380,9 @@ import { NoticeModal } from './components/notice-modal';
       justify-content: space-between;
       gap: 12px;
       flex-wrap: wrap;
+    }
+    .fpatch {
+      font-size: inherit;
     }
     .fbrand {
       display: inline-flex;

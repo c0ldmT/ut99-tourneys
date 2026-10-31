@@ -34,6 +34,18 @@ export interface SiteConfig {
   testMode?: boolean;
   /** The Dream Team league shows (its area in Dream Team). */
   udtLeague?: boolean;
+  /** The newest patch note's id (decision 243). */
+  patchLatest?: number;
+}
+
+/** A patch note (`GET /patch-notes`, decision 243), newest first. */
+export interface PatchNote {
+  id: number;
+  date: string;
+  /** Mod version the patch needs on the game servers. */
+  mod?: string;
+  en: { title: string; items: string[] };
+  de: { title: string; items: string[] };
 }
 
 /** The Dream Team hub (`GET /udt/hub`): a short state per area. */
@@ -84,6 +96,8 @@ export interface Me {
   discordAccount?: boolean;
   /** Messages to show once after login (a modal). */
   notices?: UserNotice[];
+  /** The last patch note the user saw: newer ones show once (decision 243). */
+  patchSeen?: number;
 }
 
 export interface UserNotice {

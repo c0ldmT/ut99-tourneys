@@ -17,6 +17,8 @@ export const users = sqliteTable('users', {
   notifyDm: integer('notify_dm', { mode: 'boolean' }).notNull().default(true),
   /** Worn shop items per slot (title, color, frame, badge, banner, fanfare). */
   lookJson: text('look_json'),
+  /** The last patch note the user saw (decision 243): newer ones show once after login. */
+  patchSeen: integer('patch_seen').notNull().default(0),
 });
 
 /** Neuro shop purchases: paid with the Neuro of a season, owned for good. */

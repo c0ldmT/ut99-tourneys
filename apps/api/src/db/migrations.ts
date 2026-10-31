@@ -703,4 +703,10 @@ export const MIGRATIONS: string[] = [
     (SELECT t.mh_focus FROM udt_teams t
       WHERE t.season = udt_roster.season AND t.user_id = udt_roster.user_id), 0);
   `,
+  // 45: the last patch note a user saw (decision 243). Everybody so far saw up to 241: the
+  // first update modal shows the notes from 242 on.
+  `
+  ALTER TABLE users ADD COLUMN patch_seen INTEGER NOT NULL DEFAULT 0;
+  UPDATE users SET patch_seen = 241;
+  `,
 ];
