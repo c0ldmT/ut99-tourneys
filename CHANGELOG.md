@@ -218,6 +218,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team: the Monster Hunt focus is set per bot in its details (e.g. one Hunter who clears the way, one Sprinter); the Monster Hunt lineup shows it under the card. Bots keep the focus their team had.
 - Dream Team trait rarities: watchdog is epic now (effect unchanged), starter armour rare; daredevil, berserker and revenant uncommon. Scrap and crafting costs follow.
 - Bots bet with more variety: some bet half-informed, back the underdog, hunt value where the pool pays more (they fill an empty side, so fewer bets are refunded) or simply bet tipsy; the bot profile shows the betting type.
 - Settings → UDT Liga tidied: tiers, teams, start day and keepers as buttons, server and maps like the tournament form (automatic pool or own choice), table money as a table per place and tier with the weekly amounts, cup bonus as a podium, AI strength as sliders; no more lists like "1200 · 700 · 400 · 200".

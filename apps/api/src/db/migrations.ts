@@ -695,4 +695,12 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE udt_teams ADD COLUMN mh_focus INTEGER NOT NULL DEFAULT 0;
   `,
+  // 44: the Monster Hunt focus per bot (Mario 31.10.: not for the whole lineup); each roster bot
+  // starts with its team's focus. udt_teams.mh_focus stays unused.
+  `
+  ALTER TABLE udt_roster ADD COLUMN mh_focus INTEGER NOT NULL DEFAULT 0;
+  UPDATE udt_roster SET mh_focus = COALESCE(
+    (SELECT t.mh_focus FROM udt_teams t
+      WHERE t.season = udt_roster.season AND t.user_id = udt_roster.user_id), 0);
+  `,
 ];

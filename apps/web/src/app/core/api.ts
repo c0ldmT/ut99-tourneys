@@ -348,8 +348,13 @@ export class Api {
     look?: UdtBotLookBody;
   }) => this.call<UdtAcademy>('POST', '/udt/academy/build', body, { ok: 'ok.udt.built' });
   udtLooks = () => this.call<UdtLooks>('GET', '/udt/looks');
-  udtMhFocus = (focus: number) =>
-    this.call<{ team: UdtTeam }>('PUT', '/udt/team/mh-focus', { focus }, { ok: 'ok.udt.mhFocus' });
+  udtMhFocus = (botId: string, focus: number) =>
+    this.call<UdtView>(
+      'PUT',
+      `/udt/roster/${encodeURIComponent(botId)}/mh-focus`,
+      { focus },
+      { ok: 'ok.udt.mhFocus' },
+    );
   udtAutoEnter = (on: boolean) =>
     this.call<{ team: UdtTeam; entered: number; events: UdtEvent[] }>(
       'PUT',

@@ -339,13 +339,8 @@ describe('Unreal Dream Team: events', () => {
     expect((await mario.post(`/udt/roster/${bot}/rest`, { points: 5 })).status).toBe(409);
   });
 
-  it('Monster Hunt: the team focus goes with every bot of the lineup (decision 238)', async () => {
+  it('Monster Hunt: every bot plays its own focus (decisions 238, 239)', async () => {
     const { admin, mario } = await setup();
-    const set = await mario.req('PUT', '/udt/team/mh-focus', { focus: 2 });
-    expect(set.status).toBe(200);
-    expect((set.body as any).team.mhFocus).toBe(2);
-    expect((await mario.req('PUT', '/udt/team/mh-focus', { focus: 3 })).status).toBe(400);
-    expect((await mario.get('/udt')).body.team.mhFocus).toBe(2);
     // A second bot for the 2on2 (Monster Hunt is played by teams).
     const mid = (await mario.get('/me')).body.id as string;
     const lib = ((await admin.get('/bots')).body.bots as { id: string; name: string }[]).find(
@@ -356,6 +351,15 @@ describe('Unreal Dream Team: events', () => {
       .insert(udtRoster)
       .values({ season: 1, botId: lib.id, userId: mid, price: 100, acquiredAt: 'x', mhSlot: 2 })
       .run();
+    const mira = ((await mario.get('/udt')).body.roster as any[]).find((r) => r.starter).botId;
+    const set = await mario.req('PUT', `/udt/roster/${mira}/mh-focus`, { focus: 2 });
+    expect(set.status).toBe(200);
+    expect((set.body as any).roster.find((r: any) => r.botId === mira).mhFocus).toBe(2);
+    expect((await mario.req('PUT', `/udt/roster/${mira}/mh-focus`, { focus: 3 })).status).toBe(400);
+    expect((await mario.req('PUT', `/udt/roster/nope/mh-focus`, { focus: 1 })).status).toBe(404);
+    expect((await mario.req('PUT', `/udt/roster/${lib.id}/mh-focus`, { focus: -2 })).status).toBe(
+      200,
+    );
     const body = udtCup(2) as any;
     body.settings.game = {
       adapter: 'ut99-mh',
@@ -370,7 +374,7 @@ describe('Unreal Dream Team: events', () => {
     expect(seeded.status, JSON.stringify(seeded.body)).toBe(200);
     const entrants = Object.values(seeded.body.projection.entrants) as any[];
     const nexus = entrants.find((e) => e.displayName === 'Nexus');
-    expect(nexus.bots.map((b: any) => b.mhFocus)).toEqual([2, 2]);
+    expect(nexus.bots.map((b: any) => b.mhFocus).sort()).toEqual([-2, 2]);
     // Bots of other teams play as Monster Hunt sets them.
     for (const e of entrants.filter((x) => x !== nexus))
       expect(e.bots.every((b: any) => b.mhFocus === undefined)).toBe(true);

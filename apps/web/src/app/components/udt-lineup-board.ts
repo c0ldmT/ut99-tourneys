@@ -120,6 +120,12 @@ export interface TraitDrop {
                   [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
                   (pointsClick)="open.emit(b.botId)"
                 />
+                @if (mode() === 'mh' && b.mhFocus) {
+                  <!-- the bot's Monster Hunt focus (set in its details, decision 239) -->
+                  <span class="mf-chip" [title]="'udt.mhFocus.hint.' + b.mhFocus | t">{{
+                    'udt.mhFocus.' + b.mhFocus | t
+                  }}</span>
+                }
                 <div class="ph" *cdkDragPlaceholder></div>
               </div>
             } @else {
@@ -170,6 +176,12 @@ export interface TraitDrop {
                   [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
                   (pointsClick)="open.emit(b.botId)"
                 />
+                @if (mode() === 'mh' && b.mhFocus) {
+                  <!-- the bot's Monster Hunt focus (set in its details, decision 239) -->
+                  <span class="mf-chip" [title]="'udt.mhFocus.hint.' + b.mhFocus | t">{{
+                    'udt.mhFocus.' + b.mhFocus | t
+                  }}</span>
+                }
                 <div class="ph" *cdkDragPlaceholder></div>
               </div>
             } @else {
@@ -367,6 +379,16 @@ export interface TraitDrop {
     </div>
   `,
   styles: `
+    .mf-chip {
+      display: block;
+      margin-top: 4px;
+      text-align: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--udt);
+    }
     .dcard.dup {
       opacity: 0.55;
       outline: 1px dashed var(--muted);

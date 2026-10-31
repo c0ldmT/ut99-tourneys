@@ -169,23 +169,6 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
             (trait)="assign($event)"
             (open)="openBot($event)"
           />
-          <div class="mh-focus">
-            <h3>{{ 'udt.mhFocus.title' | t }}</h3>
-            <div class="seg" role="group" [attr.aria-label]="'udt.mhFocus.title' | t">
-              @for (f of focusSteps; track f) {
-                <button
-                  type="button"
-                  [class.on]="(v.team.mhFocus ?? 0) === f"
-                  [attr.aria-pressed]="(v.team.mhFocus ?? 0) === f"
-                  [disabled]="busy()"
-                  (click)="setFocus(f)"
-                >
-                  {{ 'udt.mhFocus.' + f | t }}
-                </button>
-              }
-            </div>
-            <p class="muted small">{{ 'udt.mhFocus.hint.' + (v.team.mhFocus ?? 0) | t }}</p>
-          </div>
           <details class="help small">
             <summary>{{ 'udt.staminaHelp.title' | t }}</summary>
             <ul>
@@ -223,17 +206,6 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
     }
   `,
   styles: `
-    .mh-focus {
-      margin-top: 14px;
-      padding-top: 12px;
-      border-top: 1px solid var(--border);
-    }
-    .mh-focus h3 {
-      margin: 0 0 8px;
-    }
-    .mh-focus p {
-      margin: 6px 0 0;
-    }
     .found .cols {
       display: flex;
       flex-wrap: wrap;
@@ -318,8 +290,6 @@ export class UdtTeamPage {
   protected readonly panelBot = computed(
     () => this.view()?.roster.find((b) => b.botId === this.panelId()) ?? null,
   );
-  /** Monster Hunt focus steps: hunter … sprinter (decision 238). */
-  protected readonly focusSteps = [-2, -1, 0, 1, 2] as const;
   /** Saves one after the other (fast drops). */
   private saving: Promise<void> = Promise.resolve();
   /** Lineup saves not yet answered; a failed one reloads once all are answered. */
@@ -439,13 +409,6 @@ export class UdtTeamPage {
         this.failed = false;
         await this.load();
       } else if (v) this.resetDraft(v);
-    });
-  }
-
-  protected async setFocus(focus: number) {
-    await this.act(async () => {
-      const r = await this.api.udtMhFocus(focus);
-      this.view.update((v) => (v && v.team ? { ...v, team: { ...v.team, ...r.team } } : v));
     });
   }
 

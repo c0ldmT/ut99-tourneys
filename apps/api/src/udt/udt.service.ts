@@ -157,6 +157,8 @@ export interface RosterBot {
   salaryDue: number;
   /** Dream Team games this season. */
   games: number;
+  /** Monster Hunt focus: -2 hunter, -1 thorough, 0 standard, 1 brisk, 2 sprinter (decision 239). */
+  mhFocus: number;
   /** A bot the manager made: origin, potential (exact from level 5, else a range), points. */
   own: {
     origin: string;
@@ -199,8 +201,6 @@ export interface UdtTeam {
   createdAt: string;
   /** Enters open Dream Team tournaments automatically when possible. */
   autoEnter: boolean;
-  /** Monster Hunt focus: -2 hunter, -1 thorough, 0 standard, 1 brisk, 2 sprinter (decision 238). */
-  mhFocus: number;
 }
 
 /** Neuro per stamina point bought (rest with Neuro, not indexed). */
@@ -487,7 +487,6 @@ export class UdtService {
           tag: t.tag,
           createdAt: t.createdAt,
           autoEnter: t.autoEnter,
-          mhFocus: t.mhFocus,
         }
       : null;
   }
@@ -516,17 +515,22 @@ export class UdtService {
     return this.team(user.id, season)!;
   }
 
-  /** The team's Monster Hunt focus (decision 238); counts from the next draw. */
-  setMhFocus(user: User, focus: number): UdtTeam {
+  /** A roster bot's Monster Hunt focus (decision 239); counts from the next draw. */
+  setMhFocus(user: User, botId: string, focus: number) {
     this.assertOn();
     const season = this.season().number;
-    if (!this.team(user.id, season)) throw conflict('found your team first');
+    const where = and(
+      eq(udtRoster.season, season),
+      eq(udtRoster.botId, botId),
+      eq(udtRoster.userId, user.id),
+    );
+    if (!this.db.select().from(udtRoster).where(where).get()) throw notFound('bot in your roster');
     this.db
-      .update(udtTeams)
+      .update(udtRoster)
       .set({ mhFocus: Math.max(-2, Math.min(2, Math.round(focus))) })
-      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, user.id)))
+      .where(where)
       .run();
-    return this.team(user.id, season)!;
+    return this.view(user);
   }
 
   /** Buys stamina for a bot of the roster: REST_PRICE Neuro per point, up to 100. */
@@ -574,7 +578,6 @@ export class UdtService {
         tag: t.tag,
         createdAt: t.createdAt,
         autoEnter: t.autoEnter,
-        mhFocus: t.mhFocus,
       }));
   }
 
@@ -647,6 +650,7 @@ export class UdtService {
             striking: r.striking,
             salaryDue: r.salaryDue,
             games: r.games,
+            mhFocus: r.mhFocus,
             own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}, mentorOf),
           },
         ];

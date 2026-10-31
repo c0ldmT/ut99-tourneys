@@ -261,6 +261,24 @@ const SHORT: Readonly<Record<Stat, string>> = {
               }
             </section>
 
+            <section>
+              <h3>{{ 'udt.mhFocus.title' | t }}</h3>
+              <div class="seg" role="group" [attr.aria-label]="'udt.mhFocus.title' | t">
+                @for (f of focusSteps; track f) {
+                  <button
+                    type="button"
+                    [class.on]="(b.mhFocus ?? 0) === f"
+                    [attr.aria-pressed]="(b.mhFocus ?? 0) === f"
+                    [disabled]="busy()"
+                    (click)="setFocus(b, f)"
+                  >
+                    {{ 'udt.mhFocus.' + f | t }}
+                  </button>
+                }
+              </div>
+              <p class="muted small">{{ 'udt.mhFocus.hint.' + (b.mhFocus ?? 0) | t }}</p>
+            </section>
+
             @if (b.own) {
               <section>
                 @if (b.own.canRename) {
@@ -564,6 +582,14 @@ export class UdtBotPanel {
 
   protected async develop(b: UdtRosterBot, s: Stat) {
     await this.act(() => this.api.udtDevelop(b.botId, s));
+  }
+
+  /** Monster Hunt focus steps: hunter … sprinter (decisions 238, 239). */
+  protected readonly focusSteps = [-2, -1, 0, 1, 2] as const;
+
+  protected async setFocus(b: UdtRosterBot, focus: number) {
+    if ((b.mhFocus ?? 0) === focus) return;
+    await this.act(() => this.api.udtMhFocus(b.botId, focus));
   }
 
   protected async rest(b: UdtRosterBot) {

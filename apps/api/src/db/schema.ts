@@ -298,7 +298,7 @@ export const udtTeams = sqliteTable(
     scrap: integer('scrap').notNull().default(0),
     /** The manager's switch: enter open Dream Team tournaments automatically when possible. */
     autoEnter: integer('auto_enter', { mode: 'boolean' }).notNull().default(false),
-    /** Monster Hunt focus of the team's bots: -2 hunter … 0 standard … 2 sprinter (238). */
+    /** Unused since decision 239 (the focus is per bot: `udt_roster.mh_focus`). */
     mhFocus: integer('mh_focus').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.userId] })],
@@ -325,6 +325,8 @@ export const udtRoster = sqliteTable(
     striking: integer('striking', { mode: 'boolean' }).notNull().default(false),
     /** Salary owed (weeks not paid): collected on the next market day that can, or on a sale. */
     salaryDue: integer('salary_due').notNull().default(0),
+    /** Monster Hunt focus: -2 hunter … 0 standard … 2 sprinter (decision 239). */
+    mhFocus: integer('mh_focus').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.botId] })],
 );

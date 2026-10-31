@@ -214,14 +214,15 @@ export class UdtController {
     return { team, entered, events: this.events.events(user) };
   }
 
-  /** The team's Monster Hunt focus: -2 hunter … 0 standard … 2 sprinter (decision 238). */
-  @Put('team/mh-focus')
+  /** A roster bot's Monster Hunt focus: -2 hunter … 0 standard … 2 sprinter (decision 239). */
+  @Put('roster/:botId/mh-focus')
   mhFocus(
     @CurrentUser() user: User,
+    @Param('botId') botId: string,
     @Body(new ZodPipe(z.object({ focus: z.number().int().min(-2).max(2) })))
     body: { focus: number },
   ) {
-    return { team: this.udt.setMhFocus(user, body.focus) };
+    return this.udt.setMhFocus(user, botId, body.focus);
   }
 
   /** Rest with Neuro: stamina points for a roster bot (REST_PRICE Neuro each). */

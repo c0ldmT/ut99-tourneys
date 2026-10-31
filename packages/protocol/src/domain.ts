@@ -102,8 +102,8 @@ export const BotSpecSchema = z.object({
     .max(5)
     .optional(),
   /**
-   * Unreal Dream Team, Monster Hunt (mod 0.17.0): the manager's focus, -2 hunter (fights every
-   * monster) … 2 sprinter (only what is in the way); missing or 0: the standard behaviour.
+   * Unreal Dream Team, Monster Hunt (mod 0.17.0): the bot's focus set by its manager, -2 hunter
+   * (fights every monster) … 2 sprinter (only what is in the way); missing or 0: standard.
    */
   mhFocus: z.number().int().min(-2).max(2).optional(),
 });
