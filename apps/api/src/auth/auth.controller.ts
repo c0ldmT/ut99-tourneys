@@ -160,7 +160,16 @@ export class AuthController {
       notifyDm: user.notifyDm,
       // Direct messages need a Discord account (not a development login).
       discordAccount: /^\d+$/.test(user.discordId),
+      /** Messages to show once (a modal after login). */
+      notices: this.users.notices(user.id),
     };
+  }
+
+  /** A notice was shown: it does not come again. */
+  @Post('me/notices/:id/seen')
+  @HttpCode(204)
+  seeNotice(@CurrentUser() user: User, @Param('id') id: string) {
+    this.users.seeNotice(user.id, id);
   }
 
   @Patch('me')

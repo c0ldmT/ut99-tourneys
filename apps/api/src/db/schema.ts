@@ -521,6 +521,18 @@ export const udtBlueprints = sqliteTable('udt_blueprints', {
   createdAt: text('created_at').notNull(),
   usedAt: text('used_at'),
   botId: text('bot_id'),
+  /** "pack" (counts towards the limit) or "gift" (an apology or prize, outside the limit). */
+  source: text('source').notNull().default('pack'),
+});
+
+/** Messages a user sees once after logging in (a modal), e.g. an apology with a gift. */
+export const userNotices = sqliteTable('user_notices', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  kind: text('kind').notNull(),
+  dataJson: text('data_json'),
+  createdAt: text('created_at').notNull(),
+  seenAt: text('seen_at'),
 });
 
 /** Retired bots (hall of fame) with their career when they retired. */

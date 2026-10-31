@@ -1,8 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { users } from '../db/schema.js';
+import { userNotices, users } from '../db/schema.js';
 import { newJoinToken, randomId } from '../common/ids.js';
 import { conflict, badRequest, notFound } from '../common/http.js';
 import { nameKey, sanitizeName, uniqueName } from '../common/names.js';
@@ -40,6 +40,40 @@ export class UsersService {
     @Inject(CONFIG) private readonly config: ApiConfig,
     @Inject(CLOCK) private readonly clock: ApiClock,
   ) {}
+
+  /** Notices the user has not seen yet (shown once after login, oldest first). */
+  notices(userId: string): { id: string; kind: string; data: Record<string, unknown> }[] {
+    return this.db
+      .select()
+      .from(userNotices)
+      .where(and(eq(userNotices.userId, userId), isNull(userNotices.seenAt)))
+      .orderBy(asc(userNotices.createdAt))
+      .all()
+      .map((n) => ({ id: n.id, kind: n.kind, data: parseData(n.dataJson) }));
+  }
+
+  /** Marks a notice as seen (it does not come again). */
+  seeNotice(userId: string, id: string): void {
+    this.db
+      .update(userNotices)
+      .set({ seenAt: new Date(this.clock.now()).toISOString() })
+      .where(and(eq(userNotices.id, id), eq(userNotices.userId, userId)))
+      .run();
+  }
+
+  /** Adds a notice for a user. */
+  notify(userId: string, kind: string, data: Record<string, unknown> = {}): void {
+    this.db
+      .insert(userNotices)
+      .values({
+        id: `n${randomId(12)}`,
+        userId,
+        kind,
+        dataJson: JSON.stringify(data),
+        createdAt: new Date(this.clock.now()).toISOString(),
+      })
+      .run();
+  }
 
   private now() {
     return new Date(this.clock.now()).toISOString();
@@ -138,5 +172,14 @@ export class UsersService {
     this.require(userId);
     this.db.update(users).set({ isAdmin }).where(eq(users.id, userId)).run();
     return this.require(userId);
+  }
+}
+
+function parseData(json: string | null): Record<string, unknown> {
+  try {
+    const v: unknown = json ? JSON.parse(json) : {};
+    return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
   }
 }

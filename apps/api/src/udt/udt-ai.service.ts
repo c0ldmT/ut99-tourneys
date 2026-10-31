@@ -6,12 +6,14 @@ import {
   cannotBreakthrough,
   DEVELOP_VALUES,
   levelOf,
+  RARITIES,
   STARTER_SKILL,
   TALENT_NAMES,
   traitDef,
   traitSlots,
   valueAtTop,
   valueReady,
+  type Rarity,
 } from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
@@ -356,7 +358,14 @@ export class UdtAiService implements OnModuleInit {
   }
 
   private openPack(user: User): number {
-    const v = this.packs.view(user);
+    let v = this.packs.view(user);
+    // Over the blueprint limit: the AI scraps its lowest pack blueprints (a human chooses).
+    const rank = (r: string) => RARITIES.indexOf(r as Rarity);
+    for (const bp of v.blueprints
+      .filter((b) => !b.gift)
+      .sort((a, b) => rank(a.rarity) - rank(b.rarity))
+      .slice(0, v.blueprintsOver))
+      v = this.packs.scrapBlueprint(user, bp.id);
     const box = v.boxes.find((b) => b.box === 'premium' && v.spendable > b.price * 4)
       ? 'premium'
       : 'standard';

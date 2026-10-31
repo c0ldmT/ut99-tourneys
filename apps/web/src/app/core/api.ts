@@ -198,6 +198,11 @@ export class Api {
   devLogin = (name: string, admin: boolean) =>
     this.call<Me>('POST', '/auth/dev-login', { name, admin });
   logout = () => this.call<void>('POST', '/auth/logout');
+  seeNotice = (id: string) =>
+    this.call<void>('POST', `/me/notices/${encodeURIComponent(id)}/seen`, undefined, {
+      quiet: true,
+      background: true,
+    });
   updateMe = (displayName: string) =>
     this.call<Me>('PATCH', '/me', { displayName }, { ok: 'ok.profile' });
   setNotifyDm = (notifyDm: boolean) =>
@@ -296,6 +301,10 @@ export class Api {
   udtScrap = (cardId: string) =>
     this.call<UdtPacks>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}`, undefined, {
       ok: 'ok.udt.scrapped',
+    });
+  udtScrapBlueprint = (id: string) =>
+    this.call<UdtPacks>('DELETE', `/udt/blueprints/${encodeURIComponent(id)}`, undefined, {
+      ok: 'ok.udt.bpScrapped',
     });
   udtTrades = (quiet = false) => this.call<UdtTrades>('GET', '/udt/trades', undefined, { quiet });
   udtPartners = () => this.call<UdtPartner[]>('GET', '/udt/trades/partners');

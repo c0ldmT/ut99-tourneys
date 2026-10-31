@@ -50,6 +50,7 @@ import {
   udtTrades,
   udtTraits,
   udtValues,
+  userNotices,
   users,
 } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -258,6 +259,8 @@ export class UdtService {
         udtTeams,
       ])
         tx.delete(t).run();
+      // The apology notice points to a gift blueprint that is gone now (decision 232).
+      tx.delete(userNotices).where(eq(userNotices.kind, 'blueprint-apology')).run();
       if (own.length) tx.delete(bots).where(inArray(bots.id, own)).run();
       tx.update(bots).set({ udtOrigin: null }).run();
       if (ai.length) tx.delete(users).where(inArray(users.id, ai)).run();

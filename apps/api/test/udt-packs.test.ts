@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { effectiveValues } from '@tourney/udt';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { udtRoster, udtTraits } from '../src/db/schema.js';
+import { udtBlueprints, udtRoster, udtTraits } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtService } from '../src/udt/udt.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -134,6 +134,39 @@ describe('Unreal Dream Team: packs and traits', () => {
     packs = (await mario.req('DELETE', `/udt/traits/${card}`)).body as typeof packs;
     expect(packs.scrap).toBe(135);
     expect(packs.inventory).toHaveLength(0);
+  });
+
+  it('never scraps a blueprint by itself: over the limit the manager chooses', async () => {
+    const { mario, marioId } = await setup();
+    const db = api!.app.get<Db>(DB);
+    const now = new Date().toISOString();
+    const bp = (id: string, rarity: string, source = 'pack') =>
+      db
+        .insert(udtBlueprints)
+        .values({ id, season: 1, userId: marioId, rarity, createdAt: now, source })
+        .run();
+    bp('pA', 'rare');
+    bp('pB', 'epic');
+    bp('pC', 'legendary');
+    bp('pG', 'legendary', 'gift');
+    let v = (await mario.get('/udt/packs')).body;
+    // Gifts come on top of the limit of three.
+    expect(v).toMatchObject({ blueprintMax: 3, blueprintsOver: 0 });
+    expect(v.blueprints).toHaveLength(4);
+    expect(v.blueprints.find((b: { id: string }) => b.id === 'pG')).toMatchObject({ gift: true });
+    // A fourth blueprint from a pack (as if drawn) is kept: the next pack waits for the choice.
+    bp('pD', 'legendary');
+    v = (await mario.get('/udt/packs')).body;
+    expect(v.blueprintsOver).toBe(1);
+    const blocked = await mario.post('/udt/packs/open', { box: 'standard' });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.message).toMatch(/blueprint inventory is full/);
+    // Scrapping one (by rarity, like a trait card) frees the way.
+    const scrapped = await mario.req('DELETE', '/udt/blueprints/pA');
+    expect(scrapped.status).toBe(200);
+    expect(scrapped.body).toMatchObject({ blueprintsOver: 0, scrap: 25 });
+    expect((await mario.post('/udt/packs/open', { box: 'standard' })).status).toBe(200);
+    expect((await mario.req('DELETE', '/udt/blueprints/nope')).status).toBe(404);
   });
 
   it('needs a weapon for the gun nut', async () => {

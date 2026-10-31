@@ -58,6 +58,8 @@ export interface PullCard {
   /** Already in the inventory: turned into scrap. */
   duplicate: boolean;
   scrap: number;
+  /** A blueprint kept over the limit: the manager chooses which blueprint to scrap. */
+  full?: boolean;
 }
 
 /** Random 0..1 for the draws (not seeded: packs are not replayed). */
@@ -125,6 +127,14 @@ export class UdtPacksService {
     };
   }
 
+  /** Blueprints from packs over the limit: the manager has to scrap (or build) one first. */
+  private blueprintsOver(season: number, userId: string): number {
+    return Math.max(
+      0,
+      this.blueprints(season, userId).filter((b) => b.source !== 'gift').length - BLUEPRINTS_MAX,
+    );
+  }
+
   /** Unused blueprints of the manager this season. */
   blueprints(season: number, userId: string) {
     return this.db
@@ -174,7 +184,16 @@ export class UdtPacksService {
         category: traitDef(t.code)?.category ?? 'values',
         needsWeapon: !!traitDef(t.code)?.needsWeapon,
       })),
-      blueprints: this.blueprints(season, user.id).map((b) => ({ id: b.id, rarity: b.rarity })),
+      blueprints: this.blueprints(season, user.id).map((b) => ({
+        id: b.id,
+        rarity: b.rarity,
+        scrap: SCRAP[b.rarity as Rarity] ?? 0,
+        ...(b.source === 'gift' ? { gift: true } : {}),
+      })),
+      /** Pack blueprints a manager keeps; gifts come on top. */
+      blueprintMax: BLUEPRINTS_MAX,
+      /** Pack blueprints over the limit: scrap or build that many before the next pack. */
+      blueprintsOver: this.blueprintsOver(season, user.id),
       /** For the gun nut: the weapons of the game. */
       weapons: this.bots.assets().weapons,
       catalog: TRAITS.map((t) => ({
@@ -191,6 +210,8 @@ export class UdtPacksService {
     this.udt.assertOn();
     const season = this.udt.season().number;
     if (!this.udt.team(user.id, season)) throw conflict('found your team first');
+    if (this.blueprintsOver(season, user.id) > 0)
+      throw conflict('your blueprint inventory is full: scrap or build a blueprint first');
     const price = packPrice(body.box, this.udt.index(season), !!body.ten);
     const id = `p${randomId(12)}`;
     this.ledger.charge({
@@ -230,29 +251,27 @@ export class UdtPacksService {
     const held = new Set(this.inventory(season, user.id).map((t) => t.code));
     const cards: PullCard[] = [];
     let scrap = 0;
-    let blueprints = this.blueprints(season, user.id).length;
+    let blueprints = this.blueprints(season, user.id).filter((b) => b.source !== 'gift').length;
     for (const rarity of drawn.rarities) {
-      // Now and then a blueprint instead of a trait, one rarity above the draw.
+      // Now and then a blueprint instead of a trait, one rarity above the draw. A blueprint is
+      // never scrapped by itself: over the limit it is kept and the manager chooses which one
+      // goes (the next pack waits for that choice).
       if (rng() < BLUEPRINT_CHANCE) {
         const bp = blueprintRarity(rarity);
-        if (blueprints >= BLUEPRINTS_MAX) {
-          scrap += SCRAP[bp];
-          cards.push({
-            id: null,
-            code: 'blueprint',
-            rarity: bp,
-            duplicate: true,
-            scrap: SCRAP[bp],
-          });
-          continue;
-        }
         const bpId = `p${randomId(12)}`;
         this.db
           .insert(udtBlueprints)
           .values({ id: bpId, season, userId: user.id, rarity: bp, createdAt: this.now() })
           .run();
         blueprints++;
-        cards.push({ id: bpId, code: 'blueprint', rarity: bp, duplicate: false, scrap: 0 });
+        cards.push({
+          id: bpId,
+          code: 'blueprint',
+          rarity: bp,
+          duplicate: false,
+          scrap: 0,
+          ...(blueprints > BLUEPRINTS_MAX ? { full: true } : {}),
+        });
         continue;
       }
       const t = traitOfRarity(rarity, rng);
@@ -353,6 +372,17 @@ export class UdtPacksService {
     const card = this.card(season, user.id, cardId);
     if (card.botId) throw conflict('take the trait off the bot first');
     this.destroy(season, user.id, card.id, card.code);
+    return this.view(user);
+  }
+
+  /** Turns an unused blueprint into scrap (by its rarity, like a trait card). */
+  scrapBlueprint(user: User, id: string) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const bp = this.blueprints(season, user.id).find((b) => b.id === id);
+    if (!bp) throw notFound('blueprint');
+    this.db.delete(udtBlueprints).where(eq(udtBlueprints.id, bp.id)).run();
+    this.udt.addScrap(season, user.id, SCRAP[bp.rarity as Rarity] ?? 0);
     return this.view(user);
   }
 

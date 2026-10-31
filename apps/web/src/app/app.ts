@@ -21,6 +21,7 @@ import { ToastHost } from './core/toast';
 import { Loading } from './core/loading';
 import { ActivityBar } from './components/activity-bar';
 import { Loader } from './components/loader';
+import { NoticeModal } from './components/notice-modal';
 
 @Component({
   selector: 'app-root',
@@ -40,6 +41,7 @@ import { Loader } from './components/loader';
     ToastHost,
     Loader,
     ActivityBar,
+    NoticeModal,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -178,6 +180,9 @@ import { Loader } from './components/loader';
       </div>
     </footer>
     <app-toasts />
+    @if (auth.me()) {
+      <na-notice-modal />
+    }
   `,
   styles: `
     :host {

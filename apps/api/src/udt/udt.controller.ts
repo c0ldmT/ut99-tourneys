@@ -314,6 +314,12 @@ export class UdtController {
     return this.packs.scrap(user, id);
   }
 
+  /** Turns an unused blueprint into scrap. */
+  @Delete('blueprints/:id')
+  scrapBlueprint(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.packs.scrapBlueprint(user, id);
+  }
+
   /** Open and recent trade offers of the manager, the trade rules. */
   @Get('trades')
   tradeList(@CurrentUser() user: User) {

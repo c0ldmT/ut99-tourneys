@@ -82,6 +82,15 @@ export interface Me {
   notifyDm?: boolean;
   /** Logged in with Discord (development logins cannot get direct messages). */
   discordAccount?: boolean;
+  /** Messages to show once after login (a modal). */
+  notices?: UserNotice[];
+}
+
+export interface UserNotice {
+  id: string;
+  /** "blueprint-apology": a legendary blueprint for the blueprints a full inventory scrapped. */
+  kind: string;
+  data: Record<string, unknown>;
 }
 
 export interface PublicUser {
@@ -1163,7 +1172,11 @@ export interface UdtPacks {
   spendable: number;
   boxes: UdtPackBox[];
   inventory: UdtInventoryCard[];
-  blueprints: { id: string; rarity: UdtRarity }[];
+  blueprints: { id: string; rarity: UdtRarity; scrap: number; gift?: boolean }[];
+  /** Pack blueprints a manager keeps (gifts on top). */
+  blueprintMax: number;
+  /** Pack blueprints over the limit: scrap or build that many before the next pack. */
+  blueprintsOver: number;
   weapons: AssetItem[];
   catalog: UdtCatalogTrait[];
 }
@@ -1174,6 +1187,8 @@ export interface UdtPullCard {
   rarity: UdtRarity;
   duplicate: boolean;
   scrap: number;
+  /** A blueprint kept over the limit: choose which blueprint to scrap. */
+  full?: boolean;
 }
 
 export interface UdtPull {

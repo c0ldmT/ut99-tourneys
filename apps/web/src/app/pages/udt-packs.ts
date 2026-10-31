@@ -59,6 +59,31 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
         </p>
       }
 
+      @if (v.blueprintsOver > 0) {
+        <section class="card bp-full" role="alert" aria-labelledby="bp-full-h">
+          <h2 id="bp-full-h">{{ 'udt.packs.bpFullTitle' | t }}</h2>
+          <p class="small">
+            {{
+              'udt.packs.bpFullText'
+                | t: { n: v.blueprints.length - giftCount(v), max: v.blueprintMax }
+            }}
+          </p>
+          <!-- gifts do not count towards the limit: scrapping one would not free the packs -->
+          @for (b of v.blueprints; track b.id) {
+            @if (!b.gift) {
+              <div class="irow">
+                <span class="udt-trait r-{{ b.rarity }}">{{ 'udt.bp.' + b.rarity | t }}</span>
+                <span class="grow muted small">{{ 'udt.bpE.' + b.rarity | t }}</span>
+                <button type="button" [disabled]="busy()" (click)="scrapBlueprint(b.id)">
+                  {{ 'udt.packs.scrapIt' | t }} +{{ b.scrap }}
+                </button>
+              </div>
+            }
+          }
+          <a class="btn" routerLink="/udt/academy">{{ 'udt.packs.bpBuild' | t }}</a>
+        </section>
+      }
+
       <div class="boxes">
         @for (b of v.boxes; track b.box) {
           <section class="box r-{{ boxRarity(b.box) }}">
@@ -155,8 +180,16 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
             @for (b of v.blueprints; track b.id) {
               <div class="irow">
                 <span class="udt-trait r-{{ b.rarity }}">{{ 'udt.bp.' + b.rarity | t }}</span>
-                <span class="grow muted small">{{ 'udt.bpE.' + b.rarity | t }}</span>
+                <span class="grow muted small">
+                  @if (b.gift) {
+                    {{ 'udt.packs.bpGift' | t }} ·
+                  }
+                  {{ 'udt.bpE.' + b.rarity | t }}
+                </span>
                 <a routerLink="/udt/academy">{{ 'udt.nav.academy' | t }}</a>
+                <button type="button" [disabled]="busy()" (click)="scrapBlueprint(b.id)">
+                  {{ 'udt.packs.scrapIt' | t }} +{{ b.scrap }}
+                </button>
               </div>
             }
           }
@@ -312,6 +345,16 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       flex: 1 1 160px;
       min-width: 0;
     }
+    .bp-full {
+      border-color: var(--hot-text);
+      box-shadow: inset 0 3px 0 var(--hot-text);
+    }
+    .bp-full h2 {
+      margin-top: 0;
+    }
+    .bp-full .btn {
+      margin-top: 10px;
+    }
   `,
 })
 export class UdtPacksPage {
@@ -365,6 +408,7 @@ export class UdtPacksPage {
     return (
       !!v &&
       v.hasTeam &&
+      v.blueprintsOver === 0 &&
       !this.busy() &&
       !this.stage()?.animating() &&
       (this.spendable() ?? v.spendable) >= price
@@ -382,6 +426,14 @@ export class UdtPacksPage {
 
   protected async scrap(c: UdtInventoryCard) {
     await this.act(async () => this.view.set(await this.api.udtScrap(c.id)));
+  }
+
+  protected giftCount(v: UdtPacks): number {
+    return v.blueprints.filter((b) => b.gift).length;
+  }
+
+  protected async scrapBlueprint(id: string) {
+    await this.act(async () => this.view.set(await this.api.udtScrapBlueprint(id)));
   }
 
   protected async craft(c: UdtCatalogTrait) {

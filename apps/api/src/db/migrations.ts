@@ -665,4 +665,30 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE league_fixtures ADD COLUMN home_wins INTEGER;
   ALTER TABLE league_fixtures ADD COLUMN away_wins INTEGER;
   `,
+  // 42: blueprints given as a gift (outside the limit), notices shown once after login, and the
+  // owner's apology for blueprints lost to a full inventory: one legendary blueprint for every
+  // manager of the latest Dream Team season (AI managers left out).
+  `
+  ALTER TABLE udt_blueprints ADD COLUMN source TEXT NOT NULL DEFAULT 'pack';
+  CREATE TABLE user_notices (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    data_json TEXT,
+    created_at TEXT NOT NULL,
+    seen_at TEXT
+  );
+  CREATE INDEX user_notices_user ON user_notices(user_id, seen_at);
+  INSERT INTO udt_blueprints (id, season, user_id, rarity, created_at, source)
+    SELECT 'g' || lower(hex(randomblob(6))), t.season, t.user_id, 'legendary',
+      strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), 'gift'
+    FROM udt_teams t
+    WHERE t.season = (SELECT MAX(season) FROM udt_teams)
+      AND t.user_id NOT IN (SELECT user_id FROM udt_ai)
+      AND t.user_id IN (SELECT id FROM users);
+  INSERT INTO user_notices (id, user_id, kind, data_json, created_at)
+    SELECT 'n' || lower(hex(randomblob(6))), user_id, 'blueprint-apology',
+      '{"rarity":"legendary","season":' || season || '}', created_at
+    FROM udt_blueprints WHERE source = 'gift';
+  `,
 ];

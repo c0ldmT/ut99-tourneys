@@ -181,6 +181,8 @@ export const ERRORS_DE: Record<string, string> = {
   // --- Dream Team: team, lineup, own bots
   'the Dream Team is switched off': 'Das Dream Team ist ausgeschaltet.',
   'found your team first': 'Gründe zuerst dein Team.',
+  'your blueprint inventory is full: scrap or build a blueprint first':
+    'Dein Blueprint-Inventar ist voll: Mach zuerst einen Blueprint zu Schrott oder bau einen.',
   'team not found': 'Team nicht gefunden.',
   'you have a team this season': 'Du hast in dieser Season schon ein Team.',
   'the team name {name} is taken': 'Der Teamname {name} ist vergeben.',

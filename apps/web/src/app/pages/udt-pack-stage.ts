@@ -234,6 +234,8 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
                         <span class="muted te">
                           @if (c.duplicate) {
                             {{ 'udt.packs.dup' | t: { n: c.scrap } }}
+                          } @else if (c.full) {
+                            <b class="full">{{ 'udt.packs.bpFull' | t }}</b>
                           } @else {
                             {{ 'udt.cat.' + category(c.code) | t }} ·
                             {{ effectKey(c) | t }}
@@ -592,6 +594,9 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
     .te {
       font-size: 0.7rem;
       line-height: 1.3;
+    }
+    .te .full {
+      color: var(--hot-text);
     }
     .sp {
       position: absolute;
