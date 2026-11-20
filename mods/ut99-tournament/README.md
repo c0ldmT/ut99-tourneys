@@ -163,6 +163,15 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > health hound below 85 health (was 70), team player joins fights within 3500 (was 2500). Weaker: overload every 6th
 > kill (was 5th), vampire 11 % (was 15 %), weapon master aim x0.8 (was x0.7).
 
+> Mod 0.20.0: Dream Team prestige (decision 261, plan Season 3 P3). New line `bprs` after `btrt` (`p`: one digit 0-3
+> per stat: aim, react, dodge, view, tough, fire, armour, sprint, ammo). Aim error -3 %, reaction -6 %, dodges +8 %,
+> view +4 degrees and turning +5 % a point as edges on the skill curve (only with the curve on, like the values
+> traits); damage dealt +3 % and taken -3 % a point in the damage mutator (after armour, a share rounds by chance);
+> +5 armour a point at every spawn (thigh pads, together with starter armour, at most 50); +5 % speed a point on the
+> way to items and on the retreat (like light feet); ammo +15 % a point from pickups and on the start weapon (like the
+> ammo hoarder). Bots with prestige only count as bots with game traits. No trait log lines for prestige (the website
+> keeps the points per game).
+
 ## Classes
 
 | Class | Role |
@@ -363,6 +372,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 70 | **Bot measures** (mod 0.19.0) | Bridge and website updated, mod 0.19.0 built. A Dream Team or bot-only game with 4+ bots on a map with power items and a pit (DM-Deck16][ or DM-Morpheus), 5 minutes. Bridge: no `bad line` for `pm`/`pu`. Settings → Dream Team → Trait report: "Bot measures per skill (CSV)" has a row per skill with switches, fight switches, seconds to the shot (about 0.3-2 s), fight and enforcer seconds, retreats (most with health 90+ in the first column group if the old pattern holds), items taken and quick ones; "Suicides per map (CSV)" lists e.g. `Fell` or `RocketDeath` with the map. Server log: no `Accessed None` in `MeasureFrame`/`MeasureItemTick`. |
 | 71 | **Base AI by level** (mod 0.19.1) | Skill curve on, mod 0.19.1 built. 1) Bot-only 1v1s Godlike vs Godlike with rocket launcher and flak on DM-Deck16][ (10 min): fewer suicides than before (Settings → Dream Team → Trait report → "Suicides per map", `RocketDeath`/`FlakDeath`); in close fights a bot now and then fires flak primary or takes another weapon instead of the rocket. 2) Same on DM-Morpheus or DM-SpaceNoxx: fewer `Fell` deaths after rocket hits at the edge. 3) Inhuman/Godlike bots in a 2on2 on a map with a belt/amp: server log `item timing heads for … back in n s` (n ≤ 8) for bots without the item controller. 4) "Bot measures per skill": fewer fight switches per minute at Masterful+ than at Novice, `enemySwitches` filled. No `Accessed None` in `BotSwitch`/`PitPush`. |
 | 72 | **Trait rework** (mod 0.19.2) | Mod 0.19.2 built, website updated. Dream Team DM with roster bots carrying the reworked traits. 1) Light feet: spectate - faster only while it runs to items or flees, normal speed in a fight; match page → "Traits in this game": light feet with a count (seconds of sprint). 2) Sniper's nest on DM-Deck16][ or DM-Morpheus: server log `heads for the sniper's nest …` only while it holds the sniper rifle, shock rifle or minigun, it camps 5-9 s; shoot it on the way or in the nest → `given up after a hit` / `leaves the sniper's nest …`, no new nest for 30 s. 3) Overload: `game trait overload: <bot> amplified` on every 6th kill of a life. 4) Thick skin/vampire/weapon master/regeneration: counters on the match page in line with the new numbers. Trait texts on the website (packs, bot details) show the new numbers. No `Accessed None` |
+| 73 | **Prestige** (mod 0.20.0) | Mod 0.20.0 built, bridge updated. Test instance: a Dream Team bot with prestige points (test mode: set them on the bot, or in the database `prestige_json`), e.g. armour 3 and sprint 3, in a 1v1 against a bot without. 1) Bridge log: `bprs` line after `btrt` with nine digits. 2) Spectate: the bot spawns with 15 armour (HUD of the bot view; 40 with starter armour), it runs visibly faster to items and when it flees, not in a fight. 3) Aim/firepower/toughness: no visible check, `pnpm --filter @tourney/api bot:sim` shows their sizes. 4) A bot without points and a normal tournament behave as in 0.19.2. No `Accessed None` |
 
 ## SmartStockBots (optional)
 

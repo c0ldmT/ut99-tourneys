@@ -106,6 +106,11 @@ export const BotSpecSchema = z.object({
    * (fights every monster) … 2 sprinter (only what is in the way); missing or 0: standard.
    */
   mhFocus: z.number().int().min(-2).max(2).optional(),
+  /** Unreal Dream Team prestige (mod 0.20.0, `bprs`): one digit 0-3 per stat, see `prestigeCode`. */
+  prestige: z
+    .string()
+    .regex(/^[0-3]{9}$/)
+    .optional(),
 });
 export type BotSpec = z.infer<typeof BotSpecSchema>;
 

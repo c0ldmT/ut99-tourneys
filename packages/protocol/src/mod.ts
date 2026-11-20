@@ -504,6 +504,16 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     mf: int.min(-2).max(2).optional(),
   }),
   /**
+   * Mod 0.20.0, Unreal Dream Team prestige (after `btrt`): one digit 0-3 per stat in the order
+   * aim, react, dodge, view, tough, fire, armour, sprint, ammo (`prestigeCode` in packages/udt).
+   * Without the line the bot has none.
+   */
+  z.object({
+    t: z.literal('bprs'),
+    name: str(MAX_NAME_CHARS),
+    p: z.string().regex(/^[0-3]{9}$/),
+  }),
+  /**
    * A bot's personality (sent with its config): `tk` chance in percent to say something on an
    * occasion; then up to BOT_MAX_LINES `bsay` lines (`k` occasion, `x` text with placeholders
    * {me} {victim} {killer} {map}) and `brv` lines (`r` rival's name in the game, `lv` 1 rival,

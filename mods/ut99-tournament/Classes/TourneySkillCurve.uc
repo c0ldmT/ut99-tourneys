@@ -235,8 +235,9 @@ function TraitValues(Bot B)
 
 // After InitializeSkill and the bot's traits (the core's ApplyBotConfig). Lv: tournament
 // skill 0..7, -1 = as before (a new bot: from its game skill). Edges: the Dream Team values
-// traits of the bot (bits, TourneyCore.ParseValueTraits).
-function Setup(Bot B, int Lv, int Edges)
+// traits of the bot (bits, TourneyCore.ParseValueTraits). Pres (mod 0.20.0): its prestige
+// points on the curve, base 4 (TourneyCore.PrestigeEdges).
+function Setup(Bot B, int Lv, int Edges, optional int Pres)
 {
 	local int s;
 	local bool bNew;
@@ -259,6 +260,7 @@ function Setup(Bot B, int Lv, int Edges)
 		CTraitJumpy[s] = 1;
 	CTraitStrafe[s] = FClamp(B.StrafingAbility, -1, 1);
 	SetEdges(s, Edges);
+	PrestigeOn(s, Pres);
 	if (bNew)
 	{
 		CLastEnemy[s] = None;
@@ -324,6 +326,25 @@ function SetEdges(int s, int Bits)
 		CEReact[s] *= 0.9;
 		CEDodge[s] *= 1.6;
 	}
+}
+
+// Mod 0.20.0: prestige points on top of the traits' edges (the same numbers as prestigeEdge in
+// packages/udt duel.ts): aim error -3 %, reaction -6 %, dodges +8 %, view +4 degrees and turning
+// +5 % a point. Pres: aim + 4 react + 16 dodge + 64 view.
+function PrestigeOn(int s, int Pres)
+{
+	local int A, R, D, V;
+	if (Pres <= 0)
+		return;
+	A = Pres & 3;
+	R = (Pres / 4) & 3;
+	D = (Pres / 16) & 3;
+	V = (Pres / 64) & 3;
+	CEAim[s] *= 1.0 - 0.03 * A;
+	CEReact[s] *= 1.0 - 0.06 * R;
+	CEDodge[s] *= 1.0 + 0.08 * D;
+	CEView[s] += 4 * V;
+	CETurn[s] *= 1.0 + 0.05 * V;
 }
 
 // Mod 0.18.0: a run-time aim edge on top of the traits' edges (TourneyCore sets it once a

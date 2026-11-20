@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.19.2";
+const MOD_VERSION = "0.20.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -99,7 +99,7 @@ var string SavedKey[16];           // 1v1: the side (a/b), team games: the playe
 var float SavedScore[16], SavedDeaths[16];
 var string PendingAddr;
 var string PendingEnd;
-var string PendingStat[400];       // statistics lines of the end, sent again with PendingEnd
+var string PendingStat[600];       // statistics lines of the end, sent again with PendingEnd (600 since 0.20.0)
 var int PendingStatCount;
 var bool bTokenFromAddress;
 var float ReleaseAt; // see ReleaseScoreboards
@@ -229,6 +229,10 @@ var int CfgAmmoN[16];
 var float CfgRunAim[16];           // cold blood / weapon master: the run-time aim edge set
 var float CfgPhxAt[16];            // phoenix: when it rose
 var int CfgFocus[16];              // mod 0.17.0: Monster Hunt focus of its manager, -2 hunter .. 2 sprinter
+// Mod 0.20.0: prestige points of a website bot (bprs): 9 per configuration (c * 9 + k, k in the
+// order aim, react, dodge, view, tough, fire, armour, sprint, ammo), 0..3 each, and their sum.
+var byte CfgPr[144];
+var int CfgPrSum[16];
 var float CfgItemUntil[16];
 var float CfgItemNext[16];
 var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
@@ -557,6 +561,11 @@ function HandleBridgeMessage(TourneyMsg M)
 				BuildTraitSlots(i, M.Get("c"));
 				CfgFocus[i] = Clamp(M.GetInt("mf"), -2, 2);
 			}
+			break;
+		case "bprs":
+			i = FindCfg(M.Get("name"), true);
+			if (i >= 0)
+				ParsePrestige(i, M.Get("p"));
 			break;
 		case "bpers":
 			i = FindCfg(M.Get("name"), true);
@@ -2003,7 +2012,7 @@ function SendStat()
 	local string Line;
 
 	Line = OutMsg.Finish();
-	if (PendingStatCount < 400)
+	if (PendingStatCount < 600)
 	{
 		PendingStat[PendingStatCount] = Line;
 		PendingStatCount++;
@@ -3180,7 +3189,7 @@ function SayTo(int Pid, string Msg)
 // The configuration of a website bot by its name in the game (-1: none; bCreate adds one).
 function int FindCfg(string BName, bool bCreate)
 {
-	local int i;
+	local int i, k;
 	if (BName == "")
 		return -1;
 	for (i = 0; i < CfgCount; i++)
@@ -3211,6 +3220,9 @@ function int FindCfg(string BName, bool bCreate)
 	CfgBody[i] = 0;
 	CfgFocus[i] = 0;
 	CfgTrN[i] = 0;
+	CfgPrSum[i] = 0;
+	for (k = 0; k < 9; k++)
+		CfgPr[i * 9 + k] = 0;
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
 	CfgBeh[i] = 0;
@@ -3317,7 +3329,14 @@ function ApplyBotConfig(Bot B, string BName)
 	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
 		B.PlayerReplicationInfo.VoiceType = class<VoicePack>(DynamicLoadObject(B.VoiceType, class'Class'));
 	if (Curve != None)
-		Curve.Setup(B, BotLevel(BName), Edges);
+		Curve.Setup(B, BotLevel(BName), Edges, PrestigeEdges(c));
+}
+
+// Mod 0.20.0: the prestige points that act on the curve (aim, react, dodge, view) packed for
+// TourneySkillCurve.Setup, base 4: aim + 4 react + 16 dodge + 64 view.
+function int PrestigeEdges(int c)
+{
+	return PrPts(c, 0) + 4 * PrPts(c, 1) + 16 * PrPts(c, 2) + 64 * PrPts(c, 3);
 }
 
 // The tournament skill (0..7) of a bot of the match, -1 = not in the list.
@@ -5197,9 +5216,42 @@ function int GameTraitCfg(Pawn P)
 	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
 		return -1;
 	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
-	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 768) == 0)
+	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0)
 		return -1;
 	return c;
+}
+
+// Mod 0.20.0: the bprs line, one digit 0..3 per prestige stat (see CfgPr).
+function ParsePrestige(int c, string Code)
+{
+	local int k, v;
+	CfgPrSum[c] = 0;
+	for (k = 0; k < 9; k++)
+	{
+		v = 0;
+		if (k < Len(Code))
+			v = Clamp(int(Mid(Code, k, 1)), 0, 3);
+		CfgPr[c * 9 + k] = v;
+		CfgPrSum[c] += v;
+	}
+}
+
+// Prestige points of configuration c on stat k (0 aim .. 8 ammo).
+function int PrPts(int c, int k)
+{
+	if (c < 0 || k < 0 || k > 8)
+		return 0;
+	return CfgPr[c * 9 + k];
+}
+
+// A damage share rounded by chance (the duel simulator does the same): 10.3 is 11 in 30 %.
+function int PrRound(float X)
+{
+	local int N;
+	N = int(X);
+	if (FRand() < X - N)
+		N++;
+	return N;
 }
 
 // A new game: the phoenix can rise again, no boost is left over.
@@ -5296,6 +5348,11 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		ActualDamage = Max(1, int(ActualDamage * 0.85 + 0.5));
 		TrCount(cv, 10, Before - ActualDamage, 0);
 	}
+	// Mod 0.20.0: prestige firepower (+3 % a point) and toughness (-3 % a point).
+	if (ci >= 0 && PrPts(ci, 5) > 0)
+		ActualDamage = PrRound(ActualDamage * (1.0 + 0.03 * PrPts(ci, 5)));
+	if (cv >= 0 && PrPts(cv, 4) > 0)
+		ActualDamage = Max(1, PrRound(ActualDamage * (1.0 - 0.03 * PrPts(cv, 4))));
 	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
 	{
 		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.11 + 0.5);
@@ -5327,23 +5384,29 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 // 0.18.0: speed, ammo, second wind and overload anew, rewind back where it died.
 function OnModifyPlayer(Pawn P)
 {
-	local int c;
+	local int c, Arm;
 	local Pickup A;
 	c = GameTraitCfg(P);
 	if (c < 0)
 		return;
 	CfgAdrUntil[c] = 0;
 	TraitSpawn(P, c);
-	if ((CfgBody[c] & 1) != 0 && P.FindInventoryType(class'Botpack.ThighPads') == None)
+	// Starter armour 25 and mod 0.20.0 prestige armour (+5 a point) as one pair of thigh pads.
+	Arm = 5 * PrPts(c, 6);
+	if ((CfgBody[c] & 1) != 0)
+		Arm += 25;
+	Arm = Min(Arm, 50);
+	if (Arm > 0 && P.FindInventoryType(class'Botpack.ThighPads') == None)
 	{
 		A = Spawn(class'Botpack.ThighPads', P,, P.Location);
 		if (A != None)
 		{
 			A.RespawnTime = 0.0;
-			A.Charge = 25;
+			A.Charge = Arm;
 			A.bHeldItem = true;
 			A.GiveTo(P);
-			TrCount(c, 9, 25, 0);
+			if ((CfgBody[c] & 1) != 0)
+				TrCount(c, 9, 25, 0);
 		}
 	}
 }
@@ -5890,7 +5953,7 @@ function TraitTelemetryTick()
 	local bool bOn;
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 768) == 0)
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0)
 			continue;
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
@@ -5941,7 +6004,7 @@ function TraitTelemetryTick()
 // Mod 0.18.0, once a second for a living bot with game traits.
 function TraitBodyTick(Bot B, int c)
 {
-	local int Heal, Got;
+	local int Heal, Got, Gain, Pct;
 	local float F;
 	local bool bFav;
 	// Second wind: once per life below 35 health, +3 health a second for 10 s.
@@ -5991,23 +6054,29 @@ function TraitBodyTick(Bot B, int c)
 		Curve.SetRunAim(B, F);
 	// Pathfinder: faster without an enemy (seconds boosted as its value). Light feet (mod
 	// 0.19.2): faster on the way to items and on the retreat (seconds of sprint as its uses).
-	if ((CfgBeh[c] & 2048) != 0 || (CfgBody[c] & 64) != 0)
+	if ((CfgBeh[c] & 2048) != 0 || (CfgBody[c] & 64) != 0 || PrPts(c, 7) > 0)
 		ApplySpeed(B, c);
 	if ((CfgBeh[c] & 2048) != 0 && B.Enemy == None)
 		TrCount(c, 30, 1, 0);
 	if ((CfgBody[c] & 64) != 0 && LightSprint(B))
 		TrCount(c, 23, 1, 0);
-	// Ammo hoarder: ammo the held weapon gained since the last tick (a pickup) +25 %.
-	if ((CfgBody[c] & 128) != 0 && B.Weapon != None && B.Weapon.AmmoType != None)
+	// Ammo hoarder: ammo the held weapon gained since the last tick (a pickup) +25 %; mod 0.20.0
+	// prestige supply +15 % a point.
+	Pct = 15 * PrPts(c, 8);
+	if ((CfgBody[c] & 128) != 0)
+		Pct += 25;
+	if (Pct > 0 && B.Weapon != None && B.Weapon.AmmoType != None)
 	{
 		if (CfgAmmoW[c] == B.Weapon && B.Weapon.AmmoType.AmmoAmount >= CfgAmmoN[c] + 2)
 		{
-			Got = (B.Weapon.AmmoType.AmmoAmount - CfgAmmoN[c] + 2) / 4;
+			Gain = B.Weapon.AmmoType.AmmoAmount - CfgAmmoN[c];
+			Got = (Gain * Pct + 50) / 100;
 			Got = Min(Got, B.Weapon.AmmoType.MaxAmmo - B.Weapon.AmmoType.AmmoAmount);
 			if (Got > 0)
 			{
 				B.Weapon.AmmoType.AmmoAmount += Got;
-				TrCount(c, 24, Got, 0);
+				if ((CfgBody[c] & 128) != 0)
+					TrCount(c, 24, Min(Got, (Gain * 25 + 50) / 100), 0);
 			}
 		}
 		CfgAmmoW[c] = B.Weapon;
@@ -6040,11 +6109,13 @@ function bool LightSprint(Pawn P)
 function ApplySpeed(Pawn P, int c)
 {
 	local float F;
-	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & 2048) == 0))
+	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & 2048) == 0 && PrPts(c, 7) == 0))
 		return;
 	F = 1.0;
 	if ((CfgBody[c] & 64) != 0 && LightSprint(P))
 		F *= 1.12;
+	if (PrPts(c, 7) > 0 && LightSprint(P))
+		F *= 1.0 + 0.05 * PrPts(c, 7); // mod 0.20.0: prestige sprint
 	if ((CfgBody[c] & 8192) != 0)
 		F *= 0.92;
 	if (CfgAdrUntil[c] > 0)
@@ -6058,20 +6129,24 @@ function ApplySpeed(Pawn P, int c)
 function TraitSpawn(Pawn P, int c)
 {
 	local Weapon W;
-	local int Before;
+	local int Before, Pct;
 	CfgSwUsed[c] = 0;
 	CfgSwUntil[c] = 0;
 	CfgOlKills[c] = 0;
 	CfgHitAt[c] = Level.TimeSeconds;
 	CfgAmmoW[c] = None;
 	ApplySpeed(P, c);
-	// Ammo hoarder: the start weapon with +50 % ammo.
+	// Ammo hoarder: the start weapon with +50 % ammo; mod 0.20.0 prestige supply +15 % a point.
 	W = P.Weapon;
-	if ((CfgBody[c] & 128) != 0 && W != None && W.AmmoType != None && bGameLive)
+	Pct = 15 * PrPts(c, 8);
+	if ((CfgBody[c] & 128) != 0)
+		Pct += 50;
+	if (Pct > 0 && W != None && W.AmmoType != None && bGameLive)
 	{
 		Before = W.AmmoType.AmmoAmount;
-		W.AmmoType.AmmoAmount = Min(W.AmmoType.MaxAmmo, Before + Before / 2);
-		TrCount(c, 24, W.AmmoType.AmmoAmount - Before, 0);
+		W.AmmoType.AmmoAmount = Min(W.AmmoType.MaxAmmo, Before + (Before * Pct + 50) / 100);
+		if ((CfgBody[c] & 128) != 0)
+			TrCount(c, 24, Min(W.AmmoType.AmmoAmount - Before, (Before * 50 + 50) / 100), 0);
 	}
 	// Rewind: once per game the bot comes back where it died, with 35 health.
 	if (CfgRwPend[c] != 0)

@@ -145,6 +145,7 @@ export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMo
       c: (b.gameTraits ?? []).join(','),
       ...(b.mhFocus ? { mf: b.mhFocus } : {}),
     });
+  if (b.prestige && /[1-3]/.test(b.prestige)) lines.push({ t: 'bprs', name, p: b.prestige });
   const p = personas?.get(b.name.toLowerCase());
   if (p) {
     lines.push({ t: 'bpers', name, tk: p.talk });

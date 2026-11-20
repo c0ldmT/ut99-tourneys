@@ -173,6 +173,24 @@ describe('website bot lines', () => {
     for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
   });
 
+  it('sends the prestige points after the game traits (mod 0.20.0)', async () => {
+    const { botConfigLines } = await import('../src/snapshot.js');
+    const { encodeModLine } = await import('@tourney/protocol');
+    const lines = botConfigLines({
+      id: 'bP',
+      name: '[NX]Vex',
+      skill: 7,
+      gameTraits: ['ee'],
+      prestige: '210010000',
+    });
+    expect(lines.map((l) => l.t)).toEqual(['bcfg', 'btr', 'btrt', 'bprs']);
+    expect(lines[3]).toEqual({ t: 'bprs', name: '[NX]Vex', p: '210010000' });
+    for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
+    // Without points (or all zero) no line.
+    const none = botConfigLines({ id: 'bQ', name: '[NX]Ash', skill: 7, prestige: '000000000' });
+    expect(none.map((l) => l.t)).toEqual(['bcfg', 'btr']);
+  });
+
   it('sends the Monster Hunt focus with the game traits, also without traits (mod 0.17.0)', async () => {
     const { botConfigLines } = await import('../src/snapshot.js');
     const { encodeModLine } = await import('@tourney/protocol');
