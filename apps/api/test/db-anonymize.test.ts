@@ -245,7 +245,7 @@ describe('anonymised database copy', () => {
       'Umbenannt',
       'Mr. Pink',
       'Mr__Pink',
-      'Sgt',
+      'Sgt.', // with the dot: random ids may contain "Sgt"
       'Loque',
       '192.168',
       'discord.com',
