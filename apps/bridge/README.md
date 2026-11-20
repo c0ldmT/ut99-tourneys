@@ -37,6 +37,11 @@ The bridge keeps a copy of each tournament log in `dataDir/website/`. If the web
 tournament, the current game goes on and the result is stored as soon as the connection is back. After a
 bridge restart the website tells it to resume the running tournament.
 
+With mod 0.16.0 or newer the bridge also writes what the bots were up to in every game (state, target,
+health, armour, weapon) to `dataDir/bot-logs/`, one file per UTC day; earlier days are gzipped. They are
+kept for `botLogDays` days (default 90, `0` = for good), e.g. `"botLogDays": 180` next to `dataDir`. The
+website's analysis export (`website/dist/export-cli.js --bot-logs …`) packs them anonymised.
+
 ## Server section (`bridge.json`)
 
 ```json

@@ -13,6 +13,11 @@ export const BridgeConfigSchema = z.object({
   /** Event logs and other state. */
   dataDir: z.string().default('./data'),
   /**
+   * Days the bot logs (`<dataDir>/bot-logs`, what the bots were up to in every game) are kept;
+   * 0 = for good. Days before today are gzipped (decision 246).
+   */
+  botLogDays: z.number().int().min(0).max(3650).default(90),
+  /**
    * The UT server on this machine. With manage=true the bridge writes Tourney.ini, starts the
    * server for the tournament, restarts it after a crash and stops it afterwards.
    */

@@ -22,6 +22,8 @@ export interface LiveContext {
 /** What a bot was doing, for the bridge's bot log (calibration of the skill curve). */
 export interface BotThought {
   at: number;
+  /** The tournament (decision 246; older log lines have none). */
+  tournamentId: string;
   matchId: string;
   game: number;
   run?: number;
@@ -191,6 +193,7 @@ export class LiveBoard {
         });
         this.onThought?.({
           at,
+          tournamentId: ctx.tournamentId,
           matchId: ctx.matchId,
           game: ctx.game,
           ...(ctx.run ? { run: ctx.run } : {}),

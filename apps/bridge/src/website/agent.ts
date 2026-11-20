@@ -97,7 +97,11 @@ export class WebsiteAgent {
     const { config, log } = o;
     if (config.server) this.lookAssets = new LookAssets(config.server.installDir);
     if (!o.memoryOnly)
-      this.botLog = new BotLog(path.resolve(o.baseDir, config.dataDir, 'bot-logs'), log);
+      this.botLog = new BotLog(
+        path.resolve(o.baseDir, config.dataDir, 'bot-logs'),
+        log,
+        config.botLogDays,
+      );
     if (config.server)
       this.models = new ModelCatalog({
         installDir: config.server.installDir,

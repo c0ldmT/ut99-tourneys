@@ -2,6 +2,7 @@ import type { KillFeedEntry, LiveState } from '@tourney/protocol';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import { BotLog } from '../src/bot-log.js';
 import { FakeClock } from '../src/clock.js';
@@ -209,9 +210,11 @@ describe('BotLog', () => {
   it('writes one line per thought into a file per day and drops old days', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'botlog-'));
     fs.writeFileSync(path.join(dir, 'bot-thoughts-2020-01-01.jsonl'), '{}\n');
+    fs.writeFileSync(path.join(dir, 'bot-thoughts-2020-01-02.jsonl.gz'), '');
     const log = new BotLog(dir, memoryLogger());
     const t = {
       at: Date.parse('2026-10-22T10:00:00Z'),
+      tournamentId: 't1',
       matchId: 'm1',
       game: 1,
       bot: 'Xan',
@@ -228,6 +231,59 @@ describe('BotLog', () => {
     expect(files).toEqual(['bot-thoughts-2026-10-22.jsonl']);
     const lines = fs.readFileSync(path.join(dir, files[0]!), 'utf8').trim().split('\n');
     expect(lines.map((l) => JSON.parse(l).state)).toEqual(['atk', 'ret']);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('gzips the days before today and keeps the days set in bridge.json (decision 246)', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'botlog-'));
+    const at = (d: string) => Date.parse(`${d}T10:00:00Z`);
+    const t = {
+      at: at('2026-11-01'),
+      tournamentId: 't1',
+      matchId: 'm1',
+      game: 1,
+      bot: 'Xan',
+      state: 'atk',
+      target: 'Mario',
+      health: 80,
+      armor: 0,
+      weapon: 'Shock Rifle',
+    };
+    // 0 = for good: an old day stays, but is gzipped once a later day starts.
+    fs.writeFileSync(path.join(dir, 'bot-thoughts-2020-01-01.jsonl'), '{"old":1}\n');
+    const forGood = new BotLog(dir, memoryLogger(), 0);
+    forGood.add(t);
+    forGood.add({ ...t, state: 'ret' });
+    await forGood.flush();
+    expect(fs.readdirSync(dir).sort()).toEqual([
+      'bot-thoughts-2020-01-01.jsonl.gz',
+      'bot-thoughts-2026-11-01.jsonl',
+    ]);
+    forGood.add({ ...t, at: at('2026-11-02') });
+    await forGood.flush();
+    expect(fs.readdirSync(dir).sort()).toEqual([
+      'bot-thoughts-2020-01-01.jsonl.gz',
+      'bot-thoughts-2026-11-01.jsonl.gz',
+      'bot-thoughts-2026-11-02.jsonl',
+    ]);
+    const unzipped = zlib
+      .gunzipSync(fs.readFileSync(path.join(dir, 'bot-thoughts-2026-11-01.jsonl.gz')))
+      .toString('utf8')
+      .trim()
+      .split('\n')
+      .map((l) => JSON.parse(l));
+    expect(unzipped.map((x) => [x.tournamentId, x.state])).toEqual([
+      ['t1', 'atk'],
+      ['t1', 'ret'],
+    ]);
+    // Two days kept: the next day drops 01.11. (gzipped) and the old one.
+    const two = new BotLog(dir, memoryLogger(), 2);
+    two.add({ ...t, at: at('2026-11-03') });
+    await two.flush();
+    expect(fs.readdirSync(dir).sort()).toEqual([
+      'bot-thoughts-2026-11-02.jsonl.gz',
+      'bot-thoughts-2026-11-03.jsonl',
+    ]);
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });
