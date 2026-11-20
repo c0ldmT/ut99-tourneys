@@ -28,12 +28,14 @@ import {
   curveFromUc,
   duelSeries,
   fromPct,
+  prestigeSpent,
   withCurve,
   type Component,
   type CurveKey,
   type DuelBotSpec,
   type DuelOptions,
   type DuelSeries,
+  type PrestigeAlloc,
   type SkillCurve,
   type TraitCode,
 } from '@tourney/udt';
@@ -96,6 +98,8 @@ interface CurveRun {
   robust: { g1: number[]; g2: number[] };
   traits: { label: string; win: number; ambush: number }[];
   values: ValueRow[];
+  /** Prestige (plan P3) at Inhuman against Inhuman: the win and its share of a skill step (logits). */
+  prestige: { label: string; points: number; win: number; frac: number }[];
 }
 
 // Play-style values: each at 100 against 0 (the rest 50) per level; camping does not act in a duel.
@@ -211,7 +215,34 @@ const runs = curves.map(({ curve }) => {
       });
     }
   }
+  // Prestige at Inhuman (the endgame's level): each stat at 3 points, then typical sets of the stages.
+  const po = opts(curve, { duels: duels * 3 });
+  const logit = (p: number) => Math.log(Math.max(1e-6, p) / Math.max(1e-6, 1 - p));
+  const stepLogit = logit(win(bot(7), bot(6), po));
+  const prestige: CurveRun['prestige'] = [];
+  const pres = (label: string, p: PrestigeAlloc) => {
+    const w = win(bot(6, 50, { prestige: p }), bot(6), po);
+    prestige.push({ label, points: prestigeSpent(p), win: w, frac: logit(w) / stepLogit });
+  };
+  for (const k of ['aim', 'react', 'dodge', 'view', 'tough', 'fire', 'armour'] as const)
+    pres(`${k} ×3`, { [k]: 3 });
+  pres('Ausgereift (4): aim, react, tough, fire', { aim: 1, react: 1, tough: 1, fire: 1 });
+  pres('Godlike (6): aim 2, react, dodge, tough, fire', {
+    aim: 2,
+    react: 1,
+    dodge: 1,
+    tough: 1,
+    fire: 1,
+  });
+  pres('Aufgestiegen ★5 (11): aim 3, react 2, dodge 2, tough 2, fire 2', {
+    aim: 3,
+    react: 2,
+    dodge: 2,
+    tough: 2,
+    fire: 2,
+  });
   const run: CurveRun = {
+    prestige,
     values,
     g1,
     g2,
@@ -237,6 +268,11 @@ for (const [i, c] of curves.entries()) {
     `${c.name.padEnd(36)} G1 ${r.g1.map((s) => pct(s.winDecided)).join(' ')} | G2 ${r.g2.map((x) => pct(x)).join(' ')} | Skill 3/80 vs 5/45 ${pct(r.mario.winDecided)}`,
   );
 }
+
+for (const p of runs[0]!.prestige)
+  console.log(
+    `Prestige ${p.label.padEnd(64)} ${pct(p.win)}  ${(p.frac * 100).toFixed(0)} % einer Stufe (${p.points ? ((p.frac / p.points) * 100).toFixed(1) : '-'} % je Punkt)`,
+  );
 
 // --- Report --------------------------------------------------------------------------------------
 const G1_LO = 0.6;
@@ -404,6 +440,13 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${valuesHtml(runs[i]
 <div class="card"><p class="muted">Werte-Traits über die Website-Regeln (effectiveValues), Körper-Traits wie im Mod. Nicht im Duell: Adrenaline (erst nach einem Kill), Verhaltens-Traits (Entscheidungen auf der Map), Lieblingswaffe. Phoenix wirkt im Spiel nur einmal pro Match, im Duell daher überschätzt. Werte-Traits wirken seit Mod 0.14.0 als Vorteile auf der Kurve (Zielfehler, Reaktion, Sicht, Drehen, Ausweichen). Spalten: Siegquote im offenen Duell gegen denselben Bot ohne Trait, und Punkte mehr Überleben beim Überfall (wo Wahrnehmung zählt).</p>
 <table><tr><th>Trait / Zustand</th>${curves.map((c) => `<th>Duell ${c.key}</th>`).join('')}${curves.map((c) => `<th>Überfall ${c.key}</th>`).join('')}</tr>${traitRows}</table></div>
 
+<h2>Prestige (Inhuman gegen Inhuman, Anteil an der Stufe Inhuman → Godlike)</h2>
+<div class="wrap"><table><tr><th>Prestige</th><th>Punkte</th><th>Duell</th><th>Anteil einer Stufe</th><th>je Punkt</th></tr>${runs[0]!.prestige
+  .map(
+    (p) =>
+      `<tr><td>${p.label}</td><td>${p.points}</td><td>${pct(p.win)}</td><td>${(p.frac * 100).toFixed(0)} %</td><td>${p.points ? ((p.frac / p.points) * 100).toFixed(1) : '-'} %</td></tr>`,
+  )
+  .join('')}</table></div>
 <h2>Marios Fall je Waffe: Skill 3/Acc 80 gegen Skill 5/Acc 45</h2>
 <div class="card"><table><tr><th>Waffe</th>${curves.map((c) => `<th>${c.name}</th>`).join('')}</tr>${marioWeapons}</table></div>
 

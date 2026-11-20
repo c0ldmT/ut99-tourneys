@@ -7,6 +7,7 @@
  * numbers are to be read relative to each other. Deterministic for a seed.
  */
 import { FORM_EFFECT, PHASE_EFFECT, type CareerForm, type CareerPhase } from './career.js';
+import { PRESTIGE_EFFECT, PRESTIGE_VIEW_DEGREES, type PrestigeAlloc } from './prestige.js';
 import {
   effectiveValues,
   gameEdge,
@@ -321,6 +322,8 @@ export interface DuelBotSpec {
   phase?: CareerPhase;
   /** Form of the day (Dream Team). */
   form?: CareerForm;
+  /** Prestige points per stat (plan P3): edges, damage, armour (sprint and ammo not in a duel). */
+  prestige?: PrestigeAlloc;
 }
 
 /** 0..100 (Dream Team pages) to the stored -1..1. */
@@ -355,6 +358,10 @@ export interface ResolvedBot {
     backstab: number;
     /** Counter-attacker: turns to a hit from out of view this much faster. */
     counter: number;
+    /** Prestige: damage dealt × (firepower) and taken × (toughness), armour at the start (on top of starter armour). */
+    dealt: number;
+    tough: number;
+    extraArmour: number;
   };
   /** Values traits in the game (mod 0.14.0): multipliers on the curve. */
   edge: GameEdge;
@@ -374,6 +381,18 @@ const WEAPON_CLASS: Readonly<Record<string, WeaponCode>> = {
   'botpack.ut_eightball': 'rocket',
   'botpack.ut_flakcannon': 'flak',
 };
+
+/** Prestige points on top of the trait edges (multipliers multiply, degrees add). */
+export function prestigeEdge(e: GameEdge, p: PrestigeAlloc | undefined): GameEdge {
+  if (!p) return e;
+  return {
+    aim: e.aim * (1 - PRESTIGE_EFFECT.aim * (p.aim ?? 0)),
+    react: e.react * (1 - PRESTIGE_EFFECT.react * (p.react ?? 0)),
+    dodge: e.dodge * (1 + PRESTIGE_EFFECT.dodge * (p.dodge ?? 0)),
+    view: e.view + PRESTIGE_VIEW_DEGREES * (p.view ?? 0),
+    turn: e.turn * (1 + PRESTIGE_EFFECT.view * (p.view ?? 0)),
+  };
+}
 
 /** The values the game gets for a bot (traits, tiredness, career phase and form as the website sends). */
 export function resolveBot(b: DuelBotSpec): ResolvedBot {
@@ -417,8 +436,11 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
       regen: codes.has('rn'),
       backstab: codes.has('as') ? 1.25 : 1,
       counter: codes.has('ca') ? 0.25 : 1,
+      dealt: 1 + PRESTIGE_EFFECT.fire * (b.prestige?.fire ?? 0),
+      tough: 1 - PRESTIGE_EFFECT.tough * (b.prestige?.tough ?? 0),
+      extraArmour: PRESTIGE_EFFECT.armour * (b.prestige?.armour ?? 0),
     },
-    edge: gameEdge(b.traits ?? []),
+    edge: prestigeEdge(gameEdge(b.traits ?? []), b.prestige),
     hurtAim: codes.has('cb') ? RUNTIME_EDGES['cold-blood']!.aim : 1,
     master: (() => {
       const t = (b.traits ?? []).find((x) => x.code === 'weapon-master');
@@ -589,7 +611,7 @@ function fighter(
     r,
     lv,
     hp: 100,
-    armour: r.body.armour ? 25 : 0,
+    armour: (r.body.armour ? 25 : 0) + r.body.extraArmour,
     phoenixUsed: false,
     hurtAt: -99,
     windUsed: false,
@@ -973,6 +995,9 @@ function play(
     if (v.r.body.glass) dmg = Math.round(dmg * 1.2);
     if (v.r.body.thick) dmg = Math.max(1, Math.round(dmg * 0.85));
     if (v.r.body.taken !== 1) dmg = Math.max(1, Math.round(dmg * v.r.body.taken));
+    // Prestige (firepower, toughness): a share of a point rounds by chance, as in the mod.
+    if (x.r.body.dealt !== 1) dmg = Math.floor(dmg * x.r.body.dealt + rng());
+    if (v.r.body.tough !== 1) dmg = Math.max(1, Math.floor(dmg * v.r.body.tough + rng()));
     v.hurtAt = t;
     if (v.armour > 0) {
       const a = Math.min(v.armour, Math.floor(dmg * 0.5));
