@@ -186,6 +186,16 @@ describe('website bot lines', () => {
     expect(lines.map((l) => l.t)).toEqual(['bcfg', 'btr', 'btrt', 'bprs']);
     expect(lines[3]).toEqual({ t: 'bprs', name: '[NX]Vex', p: '210010000' });
     for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
+    // An AI club's bot of the league (no library id, its own values and traits): lines too.
+    const club = botConfigLines({
+      name: '[AI]Rook',
+      skill: 5,
+      traits: { accuracy: 0.4 },
+      gameTraits: ['tf'],
+      prestige: '100000000',
+    });
+    expect(club.map((l) => l.t)).toEqual(['bcfg', 'btr', 'btrt', 'bprs']);
+    expect(botConfigLines({ name: 'Loque', skill: 5 })).toEqual([]);
     // Without points (or all zero) no line.
     const none = botConfigLines({ id: 'bQ', name: '[NX]Ash', skill: 7, prestige: '000000000' });
     expect(none.map((l) => l.t)).toEqual(['bcfg', 'btr']);

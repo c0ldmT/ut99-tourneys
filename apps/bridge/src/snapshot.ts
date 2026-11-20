@@ -118,10 +118,13 @@ const SAY_KIND = {
 
 /**
  * Config lines of a website bot (look, play style, personality), sent before its `bot` or
- * `botadd` line. Bots of the server's configuration (no id) get none: the mod uses the ini.
+ * `botadd` line. Bots of the server's configuration (no id and no play style) get none: the mod
+ * uses the ini. Decision 263: the Dream Team league's AI club bots have no library id but their
+ * own values, traits and prestige - they get the lines too (before, the game played them with
+ * the class defaults).
  */
 export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMod[] {
-  if (!b.id) return [];
+  if (!b.id && !b.traits && !b.gameTraits?.length && !b.prestige) return [];
   const name = wireName(b.name);
   const t = b.traits ?? {};
   const lines: BridgeToMod[] = [

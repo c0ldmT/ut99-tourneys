@@ -70,6 +70,26 @@ describe('Dream Team AI managers (decision 249)', () => {
     expect(sum(bot.traits)).toBeCloseTo(sum(values) + 0.1, 5);
   });
 
+  it('buy prestige points from their share and place them by personality (decision 263)', async () => {
+    const { db, userId, udt, ai, season, starter } = await oneAi();
+    api!.app
+      .get(LedgerService)
+      .book({ season, userId, kind: 'udt_reward', amount: 100_000, ref: 'ai-gift' });
+    // The starter at its potential (mature): four points of room, none yet.
+    db.update(udtBots).set({ potential: 3 }).where(eq(udtBots.botId, starter.botId)).run();
+    db.update(udtRoster)
+      .set({ xp: xpForLevel(6) })
+      .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, starter.botId)))
+      .run();
+    const pres = () => udt.roster(userId, season).find((r) => r.starter)!.own!.prestige!;
+    expect(pres()).toMatchObject({ stage: 'mature', points: 0 });
+    ai.daily({ number: season } as never, udt.today());
+    // Two a day at most, placed at once (a tactician aims first).
+    expect(pres()).toMatchObject({ points: 2, spent: 2, free: 0, alloc: { aim: 2 } });
+    ai.daily({ number: season } as never, udt.today());
+    expect(pres()).toMatchObject({ points: 4, spent: 4, alloc: { aim: 3, react: 1 } });
+  });
+
   it('a full roster swaps its weakest bought bot for a clearly stronger offer, never a bot it made', async () => {
     // The market offers come from the library: weak ones for the roster, strong ones to buy.
     const { admin, db, userId, udt, ai, season } = await oneAi([1, 1, 1, 1, 1, 1, 6, 6, 6, 6]);

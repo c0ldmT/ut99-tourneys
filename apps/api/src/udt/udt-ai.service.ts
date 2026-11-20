@@ -15,6 +15,7 @@ import {
   traitSlots,
   valueAtTop,
   valueReady,
+  type PrestigeStat,
   type Rarity,
 } from '@tourney/udt';
 import type { User } from '../auth/users.service.js';
@@ -60,6 +61,19 @@ const SWAP_GAIN = 1;
 const SWAP_SAVINGS = 2;
 /** Packs an AI manager opens per market day at most when it has savings (decision 249). */
 const MAX_PACKS = 3;
+/** Prestige points an AI manager buys per market day at most (decision 263). */
+const MAX_PRESTIGE_BUYS = 2;
+/**
+ * The prestige stats an AI manager prefers, by personality (decision 263): the tactician aims
+ * and reacts, the gambler hits hard, the saver lasts, the breeder dodges; a gambler mixes the
+ * order every day (worse decisions than a good human's).
+ */
+const PRESTIGE_ORDER: Readonly<Record<AiPersonality, readonly PrestigeStat[]>> = {
+  tactician: ['aim', 'react', 'dodge', 'tough', 'fire', 'view', 'armour', 'sprint', 'ammo'],
+  gambler: ['fire', 'aim', 'armour', 'tough', 'dodge', 'react', 'sprint', 'ammo', 'view'],
+  saver: ['tough', 'armour', 'aim', 'dodge', 'react', 'ammo', 'fire', 'view', 'sprint'],
+  breeder: ['aim', 'dodge', 'react', 'view', 'tough', 'fire', 'sprint', 'armour', 'ammo'],
+};
 /**
  * AI managers do not bet: a sponsor pays them this much per market day (× index × style) so
  * that they can keep up with managers who win bets.
@@ -261,6 +275,9 @@ export class UdtAiService implements OnModuleInit {
       };
       act('trades', () => (out.trades += this.answerTrades(m.user, style.tradeMin)));
       act('develop', () => this.develop(m.user, season.number));
+      act('prestige', () =>
+        this.prestige(m.user, season.number, style.spend * strength, m.personality, rng),
+      );
       if (style.scout || rng() < 0.05) act('academy', () => this.scoutAndSign(m.user, rng));
       act('packs', () => (out.packs += this.openPacks(m.user, style.packs * strength, rng)));
       act('blueprints', () => this.buildBlueprint(m.user, season.number, style.spend * strength));
@@ -529,6 +546,56 @@ export class UdtAiService implements OnModuleInit {
           else break;
         }
       }
+    }
+  }
+
+  /**
+   * Prestige (decision 263, concept section 4): free points go on the stats its personality
+   * prefers; points, the ascension and stars are bought from its share of the spendable Neuro
+   * (at most `MAX_PRESTIGE_BUYS` points a day), the ascension and stars before more points.
+   */
+  private prestige(
+    user: User,
+    season: number,
+    share: number,
+    personality: AiPersonality,
+    rng: () => number,
+  ) {
+    const order =
+      personality === 'gambler'
+        ? [...PRESTIGE_ORDER.gambler].sort(() => rng() - 0.5)
+        : PRESTIGE_ORDER[personality];
+    const now = (id: string) =>
+      this.udt.roster(user.id, season).find((x) => x.botId === id)?.own?.prestige ?? null;
+    const place = (id: string) => {
+      for (let guard = 0; guard < 30; guard++) {
+        const p = now(id);
+        if (!p || p.free <= 0) return;
+        const stat = order.find((k) => (p.alloc[k] ?? 0) < 3);
+        if (!stat) return;
+        this.academy.prestigeAllocate(user, id, stat);
+      }
+    };
+    const budget = () => this.spendable(user) * Math.min(0.9, share);
+    let bought = 0;
+    const bots = this.udt
+      .roster(user.id, season)
+      .filter((r) => r.own?.prestige)
+      .sort((a, b) => b.skill - a.skill);
+    for (const r of bots) {
+      place(r.botId);
+      let p = now(r.botId);
+      if (p && p.prices.ascend !== null && p.prices.ascend <= budget())
+        this.academy.ascend(user, r.botId);
+      p = now(r.botId);
+      if (p && p.prices.star !== null && p.prices.star <= budget())
+        this.academy.buyStar(user, r.botId);
+      for (; bought < MAX_PRESTIGE_BUYS; bought++) {
+        p = now(r.botId);
+        if (!p || p.prices.point === null || p.prices.point > budget()) break;
+        this.academy.prestigeBuy(user, r.botId);
+      }
+      place(r.botId);
     }
   }
 

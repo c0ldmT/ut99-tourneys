@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 263,
+    date: '2026-11-21',
+    en: {
+      title: 'AI clubs play with their traits',
+      items: [
+        'League AI clubs now play real games with their own values and traits (before, the game left them out). The self-regulating band adjusts their strength to the results.',
+        'AI managers will use prestige like you once it is there.',
+      ],
+    },
+    de: {
+      title: 'KI-Clubs spielen mit ihren Traits',
+      items: [
+        'KI-Clubs der Liga spielen echte Spiele jetzt mit ihren eigenen Werten und Traits (bisher ließ das Spiel sie weg). Das selbstregelnde Gummiband passt ihre Stärke an die Ergebnisse an.',
+        'KI-Manager nutzen Prestige wie du, sobald es da ist.',
+      ],
+    },
+  },
+  {
     id: 262,
     date: '2026-11-21',
     en: {

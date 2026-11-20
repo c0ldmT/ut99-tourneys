@@ -3,8 +3,11 @@ import {
   AUTO_BAND,
   autoBandStep,
   botStrength,
+  clubPrestige,
   clubTraitPool,
   clubTraits,
+  prestigeEffect,
+  prestigeSpent,
   eveningsOf,
   finalFour,
   leagueBots,
@@ -275,6 +278,29 @@ describe('AI clubs', () => {
     }
     // Four average traits: about one skill step (strength ×1.6, skill 5 → 6 is ×1.57).
     expect(botStrength(5, 0.5, 4 * 0.48) / botStrength(5, 0.5)).toBeCloseTo(1.62, 1);
+  });
+
+  it('AI clubs get prestige like the humans of their tier and keep the strength (decision 263)', () => {
+    const p = clubPrestige('club-z', 3, 4);
+    expect(p).toHaveLength(5);
+    for (const a of p) {
+      expect(prestigeSpent(a)).toBe(4);
+      expect(Object.values(a).every((v) => v! >= 1 && v! <= 3)).toBe(true);
+    }
+    // Seeded: more points later in the season keep the earlier ones.
+    const more = clubPrestige('club-z', 3, 6);
+    for (const [i, a] of p.entries())
+      for (const [k, v] of Object.entries(a))
+        expect(more[i]![k as keyof typeof a]).toBeGreaterThanOrEqual(v!);
+    expect(clubPrestige('club-z', 3, 0).every((a) => prestigeSpent(a) === 0)).toBe(true);
+    const bots = leagueBots('club-z', 30, 5, [], p);
+    const got = bots.reduce(
+      (s, b) =>
+        s + botStrength(b.skill, valueScore(b.traits), prestigeEffect(prestigeSpent(b.prestige))),
+      0,
+    );
+    expect(Math.abs(got - 30) / 30).toBeLessThan(0.06);
+    expect(bots.every((b) => prestigeSpent(b.prestige) === 4)).toBe(true);
   });
 
   it('the self-regulating band (decision 252): up above 70 %, down below 55 %, within 0.8-1.3', () => {

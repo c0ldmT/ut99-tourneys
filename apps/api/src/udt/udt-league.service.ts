@@ -35,6 +35,9 @@ import {
   type LeagueResult,
   type TableRow,
   prestigeEffect,
+  CLUB_PRESTIGE_MAX,
+  clubPrestige,
+  prestigeCode,
 } from '@tourney/udt';
 import { z } from 'zod';
 import { UsersService, type User } from '../auth/users.service.js';
@@ -83,6 +86,8 @@ const CLUB_POOL = new Set<string>(clubTraitPool(true));
 export interface LeagueBand {
   /** Traits per bot of the tier's AI clubs: the humans' median, at most `CLUB_TRAITS_MAX`. */
   traits: number;
+  /** Prestige points per bot (decision 263): the humans' median, at most `CLUB_PRESTIGE_MAX`. */
+  prestige: number;
   /** The self-regulating factor (× the tier's factor of the settings, `AUTO_BAND`). */
   factor: number;
   /** The humans' wins against AI clubs in their last played games of the tier (null: none). */
@@ -96,6 +101,7 @@ export interface LeagueBand {
 
 const NO_BAND: LeagueBand = {
   traits: 0,
+  prestige: 0,
   factor: AUTO_BAND.start,
   rate: null,
   games: 0,
@@ -1391,6 +1397,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       return x.length % 2 ? x[mid]! : (x[mid - 1]! + x[mid]!) / 2;
     };
     const all = sides.flatMap((x) => x.traits);
+    const allPrestige = sides.flatMap((x) => x.prestige);
     // The humans' played games against AI clubs per tier, oldest first (simulated games and
     // forfeits say nothing about the strength).
     const wins: boolean[][] = Array.from({ length: run.tiers }, () => []);
@@ -1409,12 +1416,19 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       const mine = sides.filter((x) => x.tier === t).flatMap((x) => x.traits);
       const max = CLUB_TRAITS_MAX[Math.min(t, CLUB_TRAITS_MAX.length - 1)]!;
       const traits = Math.min(max, Math.round(median(mine.length ? mine : all)));
+      // Prestige the same way (decision 263): the median of the tier's humans' lineup bots.
+      const minePrestige = sides.filter((x) => x.tier === t).flatMap((x) => x.prestige);
+      const prestige = Math.min(
+        CLUB_PRESTIGE_MAX[Math.min(t, CLUB_PRESTIGE_MAX.length - 1)]!,
+        Math.floor(median(minePrestige.length ? minePrestige : allPrestige)),
+      );
       const step = autoBandStep(b.factor, wins[t] ?? []);
       // Once per evening and only with new games (not on the relegation or final days).
       const total = wins[t]?.length ?? 0;
       const moves = b.day !== today && total > b.seen;
       return {
         traits,
+        prestige,
         factor: moves ? step.factor : b.factor,
         rate: step.rate,
         games: step.games,
@@ -1462,7 +1476,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   private lineupOf(
     userId: string,
     settings: TournamentSettings,
-  ): { strength: number; traits: number[] } {
+  ): { strength: number; traits: number[]; prestige: number[] } {
     try {
       const rules = {
         valueCap: null,
@@ -1489,9 +1503,10 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         strength: s + (settings.teamSize - l.bots.length) * botStrength(1, 0.5),
         // Traits that act in a league game (what AI clubs can draw: no manager or MH ones).
         traits: l.bots.map((r) => r.udtTraits.filter((t) => CLUB_POOL.has(t.code)).length),
+        prestige: l.bots.map((r) => r.own?.prestige?.spent ?? 0),
       };
     } catch {
-      return { strength: settings.teamSize * botStrength(1, 0.5), traits: [] };
+      return { strength: settings.teamSize * botStrength(1, 0.5), traits: [], prestige: [] };
     }
   }
 
@@ -1731,20 +1746,24 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         .where(and(eq(leagueSeasons.season, season), eq(leagueSeasons.clubId, clubId)))
         .get()?.tier ?? 0;
     const perBot = run ? (this.bands(run)[tier]?.traits ?? 0) : 0;
+    const prestigePerBot = run ? (this.bands(run)[tier]?.prestige ?? 0) : 0;
     const weapons = this.bots.assets().weapons.map((w) => w.name);
     const bots: BotSpec[] = leagueBots(
       club.seed,
       this.strengthOf(season, clubId),
       settings.teamSize,
       clubTraits(club.seed, season, tier, perBot, settings.teamSize, weapons),
+      clubPrestige(club.seed, season, prestigePerBot, settings.teamSize),
     ).map((b) => {
       const codes = modCodes(b.udtTraits.map((code) => ({ code })));
+      const prestige = prestigeCode(b.prestige);
       return {
         name: gameName(club.tag, b.name),
         skill: b.skill,
         traits: b.weapon ? { ...b.traits, favoriteWeapon: b.weapon } : b.traits,
         botClass: b.botClass,
         ...(codes.length ? { gameTraits: codes } : {}),
+        ...(prestige ? { prestige } : {}),
       };
     });
     return {

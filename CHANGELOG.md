@@ -234,6 +234,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team AI managers buy and set prestige points by their personality; AI clubs get prestige like the median human of their tier. Fix: the league's AI club bots now play with their own values and traits in real games (the bridge did not send them).
 - Dream Team: a breakthrough needs level 15 (was 10). Prestige in the API (migration 49): points on a menu of nine stats, bought points, reset, ascension and stars for own bots at the end of their development; the manager's bots take their prestige into the game (mod 0.20.0). The pages follow.
 - Mod 0.19.2: trait rework - light feet sprints only to items and on the retreat, sniper's nest only with a hitscan weapon and shorter (a hit ends it), assassin without the hunt; thick skin, regeneration, counter-attacker, health hound and team player stronger; overload, vampire and weapon master a little weaker.
 - Dream Team: salaries, standard packs and creation licences follow the economy index only with its square root above 1 (at index 5 about ×2.2 instead of ×5); premium and elite packs, the market and scouting stay fully indexed.

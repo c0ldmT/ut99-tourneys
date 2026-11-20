@@ -8,6 +8,13 @@
 import { SKILL_STRENGTH, TRAIT_STRENGTH, botStrength, gameChance } from './model.js';
 import { RARITIES, VALUE_WEIGHTS, type BotValues, type Rarity } from './economy.js';
 import { TRAITS, cannotAssign, traitEffect, type TraitCode } from './traits.js';
+import {
+  PRESTIGE_STATS,
+  PRESTIGE_STAT_MAX,
+  prestigeEffect,
+  prestigeSpent,
+  type PrestigeAlloc,
+} from './prestige.js';
 
 // ---------- random numbers ----------
 
@@ -419,6 +426,8 @@ export interface LeagueBotSpec {
   /** Its traits (website codes, decision 251; the weapon of weapon master in `weapon`). */
   udtTraits: TraitCode[];
   weapon?: string;
+  /** Its prestige points (decision 263): as many as the tier's humans' median. */
+  prestige?: PrestigeAlloc;
 }
 
 /** Play styles of AI clubs: how the value score is split over the values. */
@@ -597,18 +606,49 @@ export function clubTraits(
   });
 }
 
+// ---------- prestige of AI clubs (decision 263) ----------
+
+/** Prestige points per bot of an AI club at most, per tier (Pro Series first); the humans' median caps. */
+export const CLUB_PRESTIGE_MAX = [6, 4, 3, 2] as const;
+
+/**
+ * The prestige of an AI club's bots (concept section 4: like the humans of its tier, never like
+ * the top): per bot an order of stat draws seeded by the club and the season (at most 3 a stat),
+ * the first `perBot` of them - so they stay all season and only grow.
+ */
+export function clubPrestige(
+  seed: string,
+  season: number,
+  perBot: number,
+  teamSize = 5,
+): PrestigeAlloc[] {
+  const n = Math.max(0, Math.min(PRESTIGE_STATS.length * PRESTIGE_STAT_MAX, Math.round(perBot)));
+  return Array.from({ length: teamSize }, (_, i) => {
+    const rng = leagueRng(`prestige:${seed}:${season}:${i}`);
+    const out: PrestigeAlloc = {};
+    for (let k = 0, guard = 0; k < n && guard < 200; guard++) {
+      const stat = PRESTIGE_STATS[Math.floor(rng() * PRESTIGE_STATS.length)]!;
+      if ((out[stat] ?? 0) >= PRESTIGE_STAT_MAX) continue;
+      out[stat] = (out[stat] ?? 0) + 1;
+      k++;
+    }
+    return out;
+  });
+}
+
 /**
  * The five (team size) bots of an AI club for a lineup strength (sum of the bots' strengths,
  * the rubber band × the club's factor). Names, models and the play style come from the club's
  * seed and stay all season; skill and values follow the strength (new every market week). With
  * traits (decision 251) a bot's skill and values are what is left of its share after its traits
- * (`botStrength` counts them), so the lineup keeps the strength.
+ * (`botStrength` counts them), so the lineup keeps the strength; prestige the same (decision 263).
  */
 export function leagueBots(
   seed: string,
   strength: number,
   teamSize = 5,
   traits: readonly { codes: TraitCode[]; weapon?: string }[] = [],
+  prestige: readonly PrestigeAlloc[] = [],
 ): LeagueBotSpec[] {
   const rng = leagueRng(`bots:${seed}`);
   const profile = PROFILES[Math.floor(rng() * PROFILES.length)]!;
@@ -633,17 +673,28 @@ export function leagueBots(
     );
   }
   const classes = shuffled(CLASSES, rng);
+  // Two bots of a lineup never share a name (the game would merge them; decision 263).
+  const names: string[] = [];
+  for (let i = 0; i < targets.length; i++) {
+    const n = leagueBotName(seed, i);
+    names.push(names.includes(n) ? `${n.slice(0, 9)}${i + 1}` : n);
+  }
   return targets.map((t, i) => {
     const own = traits[i] ?? { codes: [] };
-    const boost = Math.exp(TRAIT_STRENGTH * own.codes.reduce((n, c) => n + traitEffect(c), 0));
+    const pres = prestige[i] ?? {};
+    const boost = Math.exp(
+      TRAIT_STRENGTH *
+        (own.codes.reduce((n, c) => n + traitEffect(c), 0) + prestigeEffect(prestigeSpent(pres))),
+    );
     const { skill, score } = botFor(Math.max(lo, Math.min(hi, t / boost)));
     return {
-      name: leagueBotName(seed, i),
+      name: names[i]!,
       skill,
       traits: valuesFor(score, profile),
       botClass: classes[i % classes.length]!,
       udtTraits: own.codes,
       ...(own.weapon ? { weapon: own.weapon } : {}),
+      ...(prestigeSpent(pres) ? { prestige: pres } : {}),
     };
   });
 }
