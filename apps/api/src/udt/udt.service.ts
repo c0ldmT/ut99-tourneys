@@ -13,9 +13,8 @@ import {
   levelOf,
   managerEffects,
   developPoints,
-  DEVELOP_VALUES,
+  fullyDeveloped,
   marketValue,
-  valueAtTop,
   potentialWindow,
   shownWindow,
   drawPotentialWindow,
@@ -469,10 +468,26 @@ export class UdtService {
         .all()
         .map((b) => [b.botId, b]),
     );
+    // Points to give: not those of fully developed bots (decision 256).
+    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     let points = 0;
     for (const r of roster) {
       const b = own.get(r.botId);
-      if (b) points += Math.max(0, developPoints(levelOf(r.xp), b.pointsSpent));
+      const bot = lib.get(r.botId);
+      if (!b || !bot) continue;
+      const level = levelOf(r.xp);
+      const values = bot.traits ?? {};
+      if (
+        fullyDeveloped({
+          level,
+          skill: bot.skill,
+          potential: b.potential,
+          breakthrough: b.breakthrough,
+          values,
+        })
+      )
+        continue;
+      points += Math.max(0, developPoints(level, b.pointsSpent));
     }
     return {
       name: team.name,
@@ -1120,7 +1135,14 @@ function ownView(
 ) {
   if (!b) return null;
   const p = b.potential;
-  const full = DEVELOP_VALUES.every((k) => valueAtTop(values[k]));
+  const maxed = fullyDeveloped({
+    level,
+    skill,
+    potential: p,
+    breakthrough: b.breakthrough,
+    values,
+  });
+  const points = developPoints(level, b.pointsSpent);
   return {
     origin: b.origin,
     potential: (level >= 5
@@ -1128,13 +1150,16 @@ function ownView(
       : b.windowLo !== null && b.windowHi !== null
         ? shownWindow([b.windowLo, b.windowHi], skill)
         : potentialWindow(p, skill, b.botId)) as [number, number],
-    points: developPoints(level, b.pointsSpent),
+    // Points to give: none once fully developed (decision 256); those wait for prestige (P3).
+    points: maxed ? 0 : points,
+    /** Level points of a fully developed bot: kept for the prestige points (plan P3). */
+    banked: maxed ? points : 0,
     spent: b.pointsSpent,
     canRename: !b.renamed && b.status === 'own',
     /** The mentor it learned from (it gains XP faster while the mentor is in the roster). */
     mentor: b.mentorSeason === b.season ? mentorOf(b.mentorId) : null,
     breakthrough: b.breakthrough,
     keptFrom: b.keptFrom,
-    maxed: level >= 5 && full && Math.round(skill) >= p && (b.breakthrough || p >= 7),
+    maxed,
   };
 }

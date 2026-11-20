@@ -22,6 +22,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 256,
+    date: '2026-11-21',
+    en: {
+      title: 'Fully developed bots',
+      items: [
+        'A bot that is fully developed (skill at its potential, every value at 100, breakthrough done) no longer counts as having development points to give - the hub and My team stop asking. Its further level points are kept for prestige later.',
+      ],
+    },
+    de: {
+      title: 'Voll entwickelte Bots',
+      items: [
+        'Ein voll entwickelter Bot (Skill am Potenzial, alle Werte bei 100, Durchbruch erledigt) hat keine Entwicklungspunkte mehr zu vergeben – Hub und Mein Team melden sich dafür nicht mehr. Seine weiteren Level-Punkte werden für das spätere Prestige aufbewahrt.',
+      ],
+    },
+  },
+  {
     id: 255,
     date: '2026-11-20',
     en: {

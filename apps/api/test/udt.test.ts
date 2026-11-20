@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { xpForLevel } from '@tourney/udt';
 import type { RunningApi } from '../src/app.js';
+import { DB, type Db } from '../src/db/database.js';
+import { udtBots, udtRoster } from '../src/db/schema.js';
 import { BotsService } from '../src/bots/bots.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -173,6 +177,44 @@ describe('Unreal Dream Team: training camp (decision 254)', () => {
     // Only own roster bots.
     const tim = await Client.login(api, 'Tim');
     expect((await tim.post(`/udt/roster/${bot.botId}/camp`)).status).toBe(404);
+  });
+});
+
+describe('Unreal Dream Team: fully developed bots (decision 256)', () => {
+  it('have no points to give any more: not in the roster, not in the hub; they are kept', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    await mario.post('/udt/team', team());
+    const bot = (await mario.get('/udt')).body.roster[0];
+    const db = api.app.get<Db>(DB);
+    // Level 10 (9 points), 2 spent; skill at the potential, every value at 100, breakthrough done.
+    db.update(udtRoster)
+      .set({ xp: xpForLevel(10) })
+      .where(eq(udtRoster.botId, bot.botId))
+      .run();
+    db.update(udtBots)
+      .set({ potential: 3, breakthrough: true, pointsSpent: 2 })
+      .where(eq(udtBots.botId, bot.botId))
+      .run();
+    api.app.get(BotsService).update(bot.botId, {
+      traits: { ...bot.traits, accuracy: 1, alertness: 1, strafing: 1 },
+    });
+    const own = (await mario.get('/udt')).body.roster[0].own;
+    expect(own).toMatchObject({ maxed: true, points: 0, banked: 7 });
+    expect((await mario.get('/udt/hub')).body.team.points).toBe(0);
+    // One value below 100: the points are to give again.
+    api.app.get(BotsService).update(bot.botId, {
+      traits: { ...bot.traits, accuracy: 0.9, alertness: 1, strafing: 1 },
+    });
+    expect((await mario.get('/udt')).body.roster[0].own).toMatchObject({
+      maxed: false,
+      points: 7,
+      banked: 0,
+    });
+    expect((await mario.get('/udt/hub')).body.team.points).toBe(7);
   });
 });
 

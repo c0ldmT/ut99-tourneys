@@ -2191,6 +2191,7 @@ const en = {
   'udt.bt.confirm':
     'Breakthrough {from} → {to}: skill and potential +1, every value −{cut} %. Only once per bot. Go ahead?',
   'udt.bt.maxed': 'Fully developed: further points have no use any more.',
+  'udt.bt.banked': '{n} level points are kept for prestige later.',
   'udt.bt.done': 'Breakthrough',
   'udt.pot.chip': 'Pot {p}',
   'udt.pot.chipMax': 'Pot max',
@@ -4899,6 +4900,7 @@ const de: Record<TKey, string> = {
   'udt.bt.confirm':
     'Durchbruch {from} → {to}: Skill und Potenzial +1, alle Werte −{cut} %. Nur einmal pro Bot. Los?',
   'udt.bt.maxed': 'Voll entwickelt: Weitere Punkte haben keine Wirkung mehr.',
+  'udt.bt.banked': '{n} Level-Punkte werden für später (Prestige) aufbewahrt.',
   'udt.bt.done': 'Durchbruch',
   'udt.pot.chip': 'Pot {p}',
   'udt.pot.chipMax': 'Pot max',

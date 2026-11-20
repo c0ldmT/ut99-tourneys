@@ -314,6 +314,27 @@ export const DEVELOP_VALUES = ['accuracy', 'alertness', 'strafing'] as const;
 /** A value at 100 on the 0..100 scale (development ends there; "fully developed"). */
 export const valueAtTop = (v: number | undefined): boolean => pct(v ?? 0) >= 100;
 
+/**
+ * An own bot is fully developed for good (shown from level 5, when the potential is known):
+ * skill at the potential, every value at 100, the breakthrough done (or Godlike). Its level
+ * points have nothing left to buy: they are not "to give" (decision 256) - they wait for the
+ * prestige points (plan P3: 2 left-over points = 1 prestige point).
+ */
+export function fullyDeveloped(b: {
+  level: number;
+  skill: number;
+  potential: number;
+  breakthrough: boolean;
+  values: Partial<Record<(typeof DEVELOP_VALUES)[number], number>>;
+}): boolean {
+  return (
+    b.level >= 5 &&
+    DEVELOP_VALUES.every((k) => valueAtTop(b.values[k])) &&
+    Math.round(b.skill) >= b.potential &&
+    (b.breakthrough || b.potential >= 7)
+  );
+}
+
 /** Why a development step is not possible (null: it is). */
 export function cannotDevelop(
   stat: DevelopStat,

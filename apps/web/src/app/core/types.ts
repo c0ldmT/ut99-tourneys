@@ -1226,6 +1226,8 @@ export interface UdtRosterBot {
     keptFrom?: number | null;
     /** Fully developed for good: points have nothing left to buy (no plaque). */
     maxed?: boolean;
+    /** Level points of a fully developed bot: kept for prestige (decision 256), not to give. */
+    banked?: number;
     /** The mentor it learned from; `here`: in the roster (faster XP). */
     mentor?: { botId: string; name: string; here: boolean } | null;
   } | null;

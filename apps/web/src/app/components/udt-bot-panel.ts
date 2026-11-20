@@ -212,7 +212,12 @@ const SHORT: Readonly<Record<Stat, string>> = {
                     </button>
                   </div>
                 } @else if (own.maxed) {
-                  <p class="udt-bt-maxed small">{{ 'udt.bt.maxed' | t }}</p>
+                  <p class="udt-bt-maxed small">
+                    {{ 'udt.bt.maxed' | t }}
+                    @if (own.banked) {
+                      {{ 'udt.bt.banked' | t: { n: own.banked } }}
+                    }
+                  </p>
                 }
                 @if (own.breakthrough) {
                   <p class="small">

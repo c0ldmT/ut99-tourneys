@@ -185,6 +185,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Dream Team: fully developed bots no longer show development points to give (hub, My team); their level points are kept for prestige.
 - League games: their page no longer offers a sign-up or organizer buttons like "Draw bracket" - it shows the two clubs, the matchday and your lineup link, and you can bet as before.
 - Monster Hunt match page: the "Monsters / deaths" column counts the monsters killed (it stayed at 0), the running time includes the death penalty like everywhere else, and the useless "monsters left" bar is gone (bosses left stay).
 - Monster Hunt map records: Dream Team games are season games and set records too.
