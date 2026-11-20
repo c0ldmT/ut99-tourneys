@@ -19,6 +19,7 @@
  * originals. Only a copy without leftovers is renamed to `out` - otherwise nothing is left.
  */
 import { existsSync, renameSync, rmSync } from 'node:fs';
+import zlib from 'node:zlib';
 import Database from 'better-sqlite3';
 import { newJoinToken, randomId, sha256 } from '../common/ids.js';
 
@@ -29,6 +30,8 @@ export interface AnonymizeReport {
   mapped: Record<string, number>;
   /** Rows removed (sessions, replays, inventories). */
   removed: Record<string, number>;
+  /** Replays kept with neutral names (option `replays`, decision 248). */
+  replays: number;
   /** Originals still found in the copy (then no copy is written). */
   leftovers: { name: string; where: string; sample: string }[];
 }
@@ -284,11 +287,20 @@ export interface NameMapper {
   leftovers(s: string): string[];
 }
 
+export interface AnonymizeOptions {
+  /** Runs with the names of this copy; leftovers it returns stop the copy (nothing written). */
+  extra?: (m: NameMapper) => Promise<AnonymizeReport['leftovers']>;
+  /**
+   * Keep the replays (feed, timeline, players at the end) with neutral names instead of
+   * removing them (decision 248); bot chat lines are emptied.
+   */
+  replays?: boolean;
+}
+
 export async function anonymizeDatabase(
   src: string,
   out: string,
-  /** Runs with the names of this copy; leftovers it returns stop the copy (nothing written). */
-  extra?: (m: NameMapper) => Promise<AnonymizeReport['leftovers']>,
+  o: AnonymizeOptions = {},
 ): Promise<AnonymizeReport> {
   if (!existsSync(src)) throw new Error(`no database at ${src}`);
   if (existsSync(out)) throw new Error(`${out} exists already`);
@@ -306,9 +318,10 @@ export async function anonymizeDatabase(
     try {
       db.pragma('journal_mode = DELETE');
       db.pragma('foreign_keys = OFF');
-      const done = run(db);
+      const done = run(db, { replays: !!o.replays });
       report = done.report;
-      if (!report.leftovers.length && extra) report.leftovers.push(...(await extra(done.mapper)));
+      if (!report.leftovers.length && o.extra)
+        report.leftovers.push(...(await o.extra(done.mapper)));
       if (!report.leftovers.length) db.exec('VACUUM');
     } finally {
       db.close();
@@ -325,7 +338,10 @@ export async function anonymizeDatabase(
   }
 }
 
-function run(db: Database.Database): { report: AnonymizeReport; mapper: NameMapper } {
+function run(
+  db: Database.Database,
+  o: { replays: boolean },
+): { report: AnonymizeReport; mapper: NameMapper } {
   const tables = (
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
   )
@@ -552,11 +568,70 @@ function run(db: Database.Database): { report: AnonymizeReport; mapper: NameMapp
   }
   for (const [k, v] of [...entrantIds]) if (k === v) entrantIds.delete(k);
 
+  // --- Replays (option): names by what the website knows, sides by their ids.
+  let replaysKept = 0;
+  /** A name in a replay: a player by user id, a known name, else (monsters) as it is. */
+  const replayName = (v: unknown, userId?: unknown): unknown =>
+    typeof v !== 'string' || !v
+      ? v
+      : ((typeof userId === 'string' ? userName.get(userId) : undefined) ?? names.peek(v) ?? v);
+  const side = (v: unknown): unknown => {
+    if (typeof v !== 'string') return v;
+    const id = remap(v, 'side_id');
+    // A bot entrant by name the tables never had: by the bot's neutral name.
+    const known = id === v && v.startsWith('bot-') ? names.peek(v.slice(4)) : undefined;
+    return known ? botEntrantId(known) : id;
+  };
+  const neutralReplay = (replay: unknown): unknown => {
+    if (!replay || typeof replay !== 'object') return replay;
+    const r = replay as Record<string, unknown>;
+    const feed = Array.isArray(r.feed) ? (r.feed as Record<string, unknown>[]) : [];
+    const players = Array.isArray(r.players) ? (r.players as Record<string, unknown>[]) : [];
+    return {
+      ...r,
+      ...(Array.isArray(r.sides) ? { sides: (r.sides as unknown[]).map(side) } : {}),
+      feed: feed.map((e) => {
+        const t = e.thought as Record<string, unknown> | undefined;
+        return {
+          ...e,
+          killer: replayName(e.killer),
+          victim: replayName(e.victim),
+          killerSide: side(e.killerSide),
+          victimSide: side(e.victimSide),
+          // Bot lines are free texts (removed elsewhere too).
+          ...(typeof e.chat === 'string' ? { chat: '...' } : {}),
+          ...(t ? { thought: { ...t, target: replayName(t.target) } } : {}),
+        };
+      }),
+      players: players.map((p) => ({
+        ...p,
+        name: replayName(p.name, p.userId),
+        side: side(p.side),
+      })),
+    };
+  };
+
   // --- Rewrite.
   const discordIds: string[] = [];
   const update = db.transaction(() => {
-    for (const t of ['sessions', 'game_replays', 'inventories'])
+    for (const t of ['sessions', 'inventories', ...(o.replays ? [] : ['game_replays'])])
       if (has(t)) removed[t] = db.prepare(`DELETE FROM "${t}"`).run().changes;
+    if (o.replays && has('game_replays'))
+      for (const r of rows<{ rowid: number; data: Buffer }>(
+        'SELECT rowid, data FROM game_replays',
+      )) {
+        let replay: unknown;
+        try {
+          replay = JSON.parse(zlib.inflateSync(r.data).toString('utf8')) as unknown;
+        } catch {
+          // unreadable: it goes
+          db.prepare('DELETE FROM game_replays WHERE rowid = ?').run(r.rowid);
+          continue;
+        }
+        const next = zlib.deflateSync(Buffer.from(JSON.stringify(neutralReplay(replay)), 'utf8'));
+        db.prepare('UPDATE game_replays SET data = ? WHERE rowid = ?').run(next, r.rowid);
+        replaysKept++;
+      }
     users.forEach((u, i) => {
       const neutral = userName.get(u.id)!;
       const keep = u.discord_id !== null && KEEP_DISCORD.test(u.discord_id);
@@ -724,6 +799,8 @@ function run(db: Database.Database): { report: AnonymizeReport; mapper: NameMapp
     ...discordIds,
   ];
   const leftovers = scan(db, tables, columns, oldIds, names.originals());
+  if (o.replays && has('game_replays'))
+    leftovers.push(...scanReplays(db, oldIds, names.originals()));
   const mapper = nameMapper(names, tid, oldIds);
   const report: AnonymizeReport = {
     written: false,
@@ -734,6 +811,7 @@ function run(db: Database.Database): { report: AnonymizeReport; mapper: NameMapp
       servers: agents.length,
     },
     removed,
+    replays: replaysKept,
     leftovers,
   };
   return { report, mapper };
@@ -822,6 +900,42 @@ function finder(ids: string[], list: string[]) {
       : (long?.exec(s)?.[0] ??
         mid?.exec(s)?.[0] ??
         (mode === 'name' && short.has(s.toLowerCase()) ? s : null)));
+}
+
+/** Keys of replay strings that are no names (weapons, items, kinds, trait codes). */
+const REPLAY_ASSETS = new Set(['weapon', 'item', 'kind', 'state', 'code', 'chat']);
+/** Keys of replay strings that are ids. */
+const REPLAY_IDS = /^(sides|side|killerSide|victimSide|userId)$/;
+
+/** Originals still in a kept replay (they are blobs: the table scan does not see them). */
+function scanReplays(
+  db: Database.Database,
+  ids: string[],
+  list: string[],
+): AnonymizeReport['leftovers'] {
+  const find = finder(ids, list);
+  const found: AnonymizeReport['leftovers'] = [];
+  const check = (v: unknown, key: string, where: string): void => {
+    if (found.length >= 200) return;
+    if (typeof v === 'string') {
+      if (REPLAY_ASSETS.has(key)) return;
+      const id = REPLAY_IDS.test(key);
+      const hit =
+        find(v, id ? 'id' : 'name') ??
+        (id && v.startsWith('bot-') ? find(v.slice(4), 'name') : null);
+      if (hit) found.push({ name: hit, where, sample: v.slice(0, 80) });
+    } else if (Array.isArray(v)) v.forEach((x) => check(x, key, where));
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) check(x, k, where);
+  };
+  for (const r of db
+    .prepare('SELECT tournament_id AS t, match_id AS m, game AS g, data FROM game_replays')
+    .all() as { t: string; m: string; g: number; data: Buffer }[])
+    check(
+      JSON.parse(zlib.inflateSync(r.data).toString('utf8')) as unknown,
+      '',
+      `game_replays ${r.t}/${r.m}/${r.g}`,
+    );
+  return found;
 }
 
 /** Every original (name, old id, Discord id) still in a text of the copy. */

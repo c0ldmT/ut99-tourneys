@@ -57,8 +57,85 @@ describe('export for a season analysis (decision 247)', () => {
       area: 'tournaments',
       text: `Siehe /tournaments/${t.id} auf marios-pi`,
     });
+    const marioId = (await mario.get('/me')).body.id as string;
     await api.close();
     api = undefined;
+    // A replay as the live recorder stores it (decision 248).
+    const player = (name: string, side: string, bot: boolean, userId?: string) => ({
+      name,
+      side,
+      bot,
+      ...(userId ? { userId } : {}),
+      alive: true,
+      health: 100,
+      armor: 0,
+      weapon: 'Enforcer',
+      powerups: 0,
+      ampSec: 0,
+      kills: 3,
+      deaths: 1,
+      suicides: 0,
+      damageDealt: 420,
+      damageTaken: 180,
+      items: { amp: 1, belt: 0, armor: 1, keg: 0 },
+    });
+    const kill = (
+      killer: string,
+      killerSide: string | null,
+      victim: string,
+      victimSide: string | null,
+    ) => ({
+      at: 1,
+      sec: 12,
+      kind: 'kill',
+      killer,
+      killerSide,
+      victim,
+      victimSide,
+      weapon: 'Flak Cannon',
+      headshot: false,
+      firstBlood: false,
+      suicide: false,
+      teamKill: false,
+      monster: victimSide === null,
+      spree: 0,
+      multi: 0,
+    });
+    const replay = {
+      v: 1,
+      game: 1,
+      sides: [marioId, 'bot-Nachtwache'],
+      samples: [
+        [0, 0, 0, 0, 0],
+        [5, 1, 0, 120, 0],
+      ],
+      feed: [
+        kill('[MM]Starmario', marioId, 'Nachtwache', 'bot-Nachtwache'),
+        kill('Nachtwache', 'bot-Nachtwache', 'Skaarj Warrior', null),
+        {
+          ...kill('Rotfuchs', 'bot-Nachtwache', '', null),
+          kind: 'chat',
+          chat: 'Rotfuchs grüßt Mariolus',
+        },
+        {
+          ...kill('Rotfuchs', 'bot-Nachtwache', '', null),
+          kind: 'thought',
+          thought: { state: 'item', target: 'Shield Belt' },
+        },
+      ],
+      players: [
+        player('Mariolus', marioId, false, marioId),
+        player('[MM]Starmario', marioId, true),
+        player('Nachtwache', 'bot-Nachtwache', true),
+      ],
+    };
+    const raw = new Database(path.join(dir, 'tourney.db'));
+    raw
+      .prepare(
+        'INSERT INTO game_replays (tournament_id, match_id, game, run, created_at, data) VALUES (?, ?, ?, 0, ?, ?)',
+      )
+      .run(t.id, 'W1-1', 1, new Date().toISOString(), zlib.deflateSync(JSON.stringify(replay)));
+    raw.close();
 
     // Bot logs as the bridge writes them: one day gzipped, today plain.
     const logs = path.join(dir, 'bot-logs');
@@ -119,11 +196,35 @@ describe('export for a season analysis (decision 247)', () => {
       (b) => b.name,
     );
     const tid = (copy.prepare('SELECT id FROM tournaments').get() as { id: string }).id;
+    const replayRow = copy.prepare('SELECT tournament_id, data FROM game_replays').get() as {
+      tournament_id: string;
+      data: Buffer;
+    };
     const snapshots = (
       copy.prepare('SELECT COUNT(*) AS n FROM udt_bot_days').get() as { n: number }
     ).n;
     copy.close();
     expect(snapshots).toBeGreaterThan(0);
+    // The replay stays, with the copy's names and ids; monsters and items as they were.
+    expect(r.db.replays).toBe(1);
+    const kept = JSON.parse(zlib.inflateSync(replayRow.data).toString('utf8'));
+    expect(replayRow.tournament_id).toBe(tid);
+    const [k1, k2, chat, thought] = kept.feed;
+    expect(k1.killer).toMatch(/^(\[T\d+\]|T\d+)?Bot\d+$/);
+    expect(botNames).toContain(k1.victim);
+    expect(k1.killerSide).toBe(marioId);
+    expect(k1.victimSide).toBe(`bot-${k1.victim}`);
+    expect(k2).toMatchObject({
+      killer: k1.victim,
+      victim: 'Skaarj Warrior',
+      weapon: 'Flak Cannon',
+    });
+    expect(chat.chat).toBe('...');
+    expect(botNames).toContain(chat.killer);
+    expect(thought.thought).toEqual({ state: 'item', target: 'Shield Belt' });
+    expect(kept.players.map((p: { name: string }) => p.name)[0]).toMatch(/^Spieler\d+$/);
+    expect(kept.samples).toEqual(replay.samples);
+    expect(kept.sides).toEqual([marioId, k1.victimSide]);
     const read = (f: string) =>
       zlib
         .gunzipSync(readFileSync(path.join(out, 'bot-logs', f)))
@@ -152,6 +253,7 @@ describe('export for a season analysis (decision 247)', () => {
     expect(fb.notes[1].text).toBe(`Siehe /tournaments/${tid} auf id`);
 
     const all = [
+      JSON.stringify(kept),
       readFileSync(path.join(out, 'feedback.json'), 'utf8'),
       readFileSync(path.join(out, 'export.json'), 'utf8'),
       ...day1.map((x) => JSON.stringify(x)),

@@ -1,10 +1,10 @@
 /**
  * Export for a season analysis (decision 247), shipped as `website/dist/export-cli.js`:
  *
- *   node dist/export-cli.js <tourney.db> <out-folder> [--bot-logs <bridge data>/bot-logs]
+ *   node dist/export-cli.js <tourney.db> <out-folder> [--bot-logs <bridge data>/bot-logs] [--no-replays]
  *
- * Writes the anonymised database copy (with snapshots and survey answers), the feedback texts
- * and the bot logs into a new folder (see db/export.ts). The website may keep running (the
+ * Writes the anonymised database copy (with snapshots, survey answers and the replays), the
+ * feedback texts and the bot logs into a new folder (see db/export.ts). The website may keep running (the
  * database is read through SQLite's backup). Exit code 1 when an original name would stay.
  */
 import path from 'node:path';
@@ -13,23 +13,27 @@ import { exportForAnalysis } from './db/export.js';
 const args = process.argv.slice(2);
 const positional: string[] = [];
 let botLogs: string | undefined;
+let replays = true;
 let bad = false;
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--bot-logs') {
+  if (args[i] === '--no-replays') replays = false;
+  else if (args[i] === '--bot-logs') {
     botLogs = args[++i];
     if (!botLogs) bad = true;
   } else positional.push(args[i]!);
 }
 const [src, out] = positional;
 if (bad || !src || !out || positional.length > 2) {
-  console.error('usage: export-cli <tourney.db> <out-folder> [--bot-logs <dir>]');
+  console.error('usage: export-cli <tourney.db> <out-folder> [--bot-logs <dir>] [--no-replays]');
   process.exit(2);
 }
 try {
   const r = await exportForAnalysis(path.resolve(src), path.resolve(out), {
     ...(botLogs ? { botLogs: path.resolve(botLogs) } : {}),
+    replays,
   });
   for (const [k, n] of Object.entries(r.db.mapped)) console.log(`  ${k}: ${n}`);
+  console.log(`  replays: ${r.db.replays}`);
   console.log(`  feedback: ${r.feedback.survey} survey answers, ${r.feedback.notes} messages`);
   if (botLogs)
     console.log(

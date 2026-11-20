@@ -3,7 +3,8 @@
  * neutral names:
  *
  * - `tourney-anon.db`: the anonymised copy of the website database (see anonymize.ts), with the
- *   daily snapshots (244) and the survey answers (245, texts emptied);
+ *   daily snapshots (244), the survey answers (245, texts emptied) and the replays of the games
+ *   (248: feed, timeline, players at the end; names neutral, bot chat lines emptied);
  * - `feedback.json`: survey answers with their free texts and the feedback messages, managers
  *   numbered, known names in the texts replaced by their neutral names;
  * - `bot-logs/`: the bridge's bot logs (what the bots were up to in every game), bot names,
@@ -38,7 +39,7 @@ type Leftovers = AnonymizeReport['leftovers'];
 export async function exportForAnalysis(
   src: string,
   outDir: string,
-  o: { botLogs?: string } = {},
+  o: { botLogs?: string; replays?: boolean } = {},
 ): Promise<ExportReport> {
   if (existsSync(outDir)) throw new Error(`${outDir} exists already`);
   if (o.botLogs && !existsSync(o.botLogs)) throw new Error(`no bot logs at ${o.botLogs}`);
@@ -51,12 +52,15 @@ export async function exportForAnalysis(
   };
   let written = false;
   try {
-    const db = await anonymizeDatabase(src, path.join(part, 'tourney-anon.db'), async (m) => {
-      const left: Leftovers = [];
-      result.feedback = await writeFeedback(src, path.join(part, 'feedback.json'), m, left);
-      if (o.botLogs)
-        result.botLogs = await writeBotLogs(o.botLogs, path.join(part, 'bot-logs'), m, left);
-      return left;
+    const db = await anonymizeDatabase(src, path.join(part, 'tourney-anon.db'), {
+      replays: o.replays ?? true,
+      extra: async (m) => {
+        const left: Leftovers = [];
+        result.feedback = await writeFeedback(src, path.join(part, 'feedback.json'), m, left);
+        if (o.botLogs)
+          result.botLogs = await writeBotLogs(o.botLogs, path.join(part, 'bot-logs'), m, left);
+        return left;
+      },
     });
     if (db.written) {
       await writeFile(
@@ -67,6 +71,7 @@ export async function exportForAnalysis(
             database: 'tourney-anon.db',
             mapped: db.mapped,
             removed: db.removed,
+            replays: db.replays,
             ...result,
           },
           null,

@@ -2,7 +2,7 @@
  * Anonymised copy of the website database (players, bots, clans, teams, tournaments, servers get
  * neutral names; secrets and free texts go), e.g. for `udt:sim` or analyses outside the Pi:
  *
- *   pnpm --filter @tourney/api db:anonymize <tourney.db> [out.db]
+ *   pnpm --filter @tourney/api db:anonymize <tourney.db> [out.db] [--replays]
  *
  * The source stays untouched (read through SQLite's backup, so a running website is fine). The
  * copy defaults to `<name>-anon.db` next to the source. When an original name would stay in the
@@ -11,14 +11,16 @@
 import path from 'node:path';
 import { anonymizeDatabase } from '../src/db/anonymize.js';
 
-const [src, outArg] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const replays = args.includes('--replays');
+const [src, outArg] = args.filter((a) => a !== '--replays');
 if (!src) {
-  console.error('usage: db-anonymize <tourney.db> [out.db]');
+  console.error('usage: db-anonymize <tourney.db> [out.db] [--replays]');
   process.exit(2);
 }
 const out =
   outArg ?? path.join(path.dirname(src), `${path.basename(src, path.extname(src))}-anon.db`);
-const report = await anonymizeDatabase(path.resolve(src), path.resolve(out));
+const report = await anonymizeDatabase(path.resolve(src), path.resolve(out), { replays });
 for (const [k, n] of Object.entries(report.mapped)) console.log(`  ${k}: ${n}`);
 for (const [k, n] of Object.entries(report.removed)) console.log(`  removed ${k}: ${n} rows`);
 if (!report.written) {

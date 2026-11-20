@@ -94,10 +94,11 @@ outbound to the website.
   and forward the `Upgrade` header for `/api/agent`.
 - **Backup:** the whole state is `DATA_DIR/tourney.db` (SQLite in WAL mode; copy it with
   `sqlite3 tourney.db ".backup backup.db"` while the API runs).
-- **Analysis export:** `node dist/export-cli.js DATA_DIR/tourney.db <new folder> [--bot-logs <bridge
-dataDir>/bot-logs]` writes an anonymised copy of the database, the feedback texts and the bot logs with
-  the same neutral names (in the repo: `pnpm --filter @tourney/api db:export …`; only the database:
-  `db:anonymize`).
+- **Analysis export:** `node dist/export-cli.js DATA_DIR/tourney.db <new folder>` writes an anonymised
+  copy of the database (with the replays; `--no-replays` leaves them out) and the feedback texts;
+  `--bot-logs <bridge dataDir>/bot-logs` adds the bot logs. All files share the same neutral names. In the
+  repo: `pnpm --filter @tourney/api db:export …`; only the database: `db:anonymize` (`--replays` keeps
+  the replays).
 
 ## API overview
 

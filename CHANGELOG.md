@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Analysis export: the replays of the games (feed, timeline, players at the end) come along with neutral names (`--no-replays` leaves them out).
 - Analysis export on the server: `node website/dist/export-cli.js <tourney.db> <folder> --bot-logs <bot-logs>` writes the anonymised database, feedback texts and bot logs with the same neutral names into one folder.
 - Bridge: bot logs are kept 90 days by default (`botLogDays` in bridge.json, 0 = for good) instead of 14, earlier days are gzipped, and every line names its tournament.
 - Feedback: a "Feedback" link in the footer sends the admins a message any time; at the end of a season admins open a short survey for the Dream Team managers (fun, money, prices, salaries, bot development, traits, league), which the website asks once per visit; answers and messages download as CSV without names.
