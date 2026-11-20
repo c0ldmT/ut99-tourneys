@@ -60,6 +60,12 @@ export interface EconomyConfig {
    * the net worths and so the index: below 1 that loop is damped (review 23.10., H4).
    */
   rewardIndexExp: number;
+  /**
+   * Basic needs - salaries, standard boxes, creation licences - follow the index only at
+   * index^this (decision 253): the winners drive the index, the others should not pay it on
+   * what every team needs. Premium and elite boxes, the market and scouting stay fully indexed.
+   */
+  basicIndexExp: number;
   /** Reward factor per team size (more bots invested). */
   formatFactor: Readonly<Record<number, number>>;
   stamina: { perGame: number; perDay: number; tiredBelow: number };
@@ -125,6 +131,8 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   // (40 seeds) ran into the cap of 5 in 31-40 of 40 seasons with 2-3 Daily Cups a day; with
   // index^0.2 it ends at 2.4 (1 cup), 3.2-3.4 (2 cups) and 3.7-3.9 (3 cups), the cap almost never.
   rewardIndexExp: 0.2,
+  // √index above 1 (Konzept-Endgame 8, Mario 20.11.): at index 5 basic needs cost ×2.2, not ×5.
+  basicIndexExp: 0.5,
   formatFactor: { 1: 1, 2: 1.5, 3: 2, 5: 3 },
   // 6 per game (was 15): a 4-team double elimination (up to 5 games) leaves a bot at 70.
   stamina: { perGame: 6, perDay: 30, tiredBelow: 40 },
@@ -274,13 +282,25 @@ export function marketValue(base: number, form: number, demand: number, index: n
   return roundNeuro(base * form * demand * index);
 }
 
-/** Weekly salary of a roster bot (the starter bot is free; the caller decides that). */
+/**
+ * The index basic needs are paid at (decision 253): above 1 damped to index^basicIndexExp, up
+ * to 1 the index itself (a root would make them dearer at the start of a season, index 0.3).
+ */
+export const basicIndex = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number =>
+  index > 1 ? index ** cfg.basicIndexExp : index;
+
+/**
+ * Weekly salary of a roster bot (the starter bot is free; the caller decides that): a share of
+ * its market value (`value`, at `index`) by its bracket, the index damped to `basicIndex`.
+ */
 export function weeklySalary(
   value: number,
   skill: number,
+  index: number,
   cfg: EconomyConfig = DEFAULT_ECONOMY,
 ): number {
-  return roundNeuro((value * cfg.salaryRate[bracketOf(skill)]) / 100);
+  const damp = index > 0 ? basicIndex(index, cfg) / index : 1;
+  return roundNeuro((value * damp * cfg.salaryRate[bracketOf(skill)]) / 100);
 }
 
 /** What buying an offer costs: market value plus the bracket's surcharge, in steps of 10. */
@@ -349,9 +369,10 @@ export function staminaRecovered(stamina: number, days: number, cfg = DEFAULT_EC
 export const tiredPenalty = (stamina: number, cfg = DEFAULT_ECONOMY): number =>
   stamina < cfg.stamina.tiredBelow ? 1 : 0;
 
-/** Price of a box or a 10-pull at the index. */
+/** Price of a box or a 10-pull at the index (standard boxes: a basic need, `basicIndex`). */
 export function packPrice(box: PackBox, index: number, ten = false, cfg = DEFAULT_ECONOMY): number {
-  return roundNeuro(cfg.packs[box].price * (ten ? cfg.tenPullBoxes : 1) * index);
+  const f = box === 'standard' ? basicIndex(index, cfg) : index;
+  return roundNeuro(cfg.packs[box].price * (ten ? cfg.tenPullBoxes : 1) * f);
 }
 
 /** Boxes opened since the last epic and since the last legendary (per box kind and season). */

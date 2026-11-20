@@ -280,7 +280,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     // At most one week at a time: weeks without any market day (the Dream Team switched off)
     // were weeks without games, sales or trades.
     const weeks = last ? Math.min(1, mondaysAfter(last.day, day)) : 0;
-    this.paySalaries(s, day, weeks, roster, values, byId, onBots);
+    this.paySalaries(s, day, weeks, roster, values, byId, onBots, index);
     // 6. New offers: free bots of the library (active, not made by a manager, not owned).
     const free = library.filter((b) => b.active && !b.udtOwner && !owned.has(b.id));
     const n = Math.min(this.settings.get().udt.offersPerDay, free.length);
@@ -327,6 +327,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
               values.get(r.botId),
               byId.get(r.botId),
               onBots.get(r.botId) ?? [],
+              index,
             ),
           ]),
       );
@@ -409,6 +410,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     values: Map<string, number>,
     byId: Map<string, LibraryBot>,
     onBots: ReturnType<UdtService['traitsOnBots']>,
+    index: number,
   ) {
     const own = this.udt.ownBots(season);
     for (const r of roster) {
@@ -419,6 +421,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
         values.get(r.botId),
         byId.get(r.botId),
         onBots.get(r.botId) ?? [],
+        index,
       );
       // A strike from before the owed salaries (migration 33) still owes that week.
       const due = r.salaryDue + salary * weeks + (r.striking && !r.salaryDue ? salary : 0);
@@ -698,6 +701,8 @@ export function botSalary(
   value: number | undefined,
   b: LibraryBot | undefined,
   traits: Parameters<typeof withTraits>[2],
+  /** The day's index (salaries follow it damped, decision 253). */
+  index: number,
 ): number {
   const share = salaryShare(r, own);
   if (!share) return 0;
@@ -706,6 +711,7 @@ export function botSalary(
       (weeklySalary(
         value !== undefined && b ? withTraits(value, b, traits) : r.price,
         b?.skill ?? 4,
+        index,
       ) *
         managerEffects(traits).salary *
         share) /

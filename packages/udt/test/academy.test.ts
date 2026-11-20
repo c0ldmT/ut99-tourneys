@@ -45,6 +45,8 @@ describe('academy', () => {
     // As many as a manager pays for, each twice the one before (owner, 25.10.).
     expect(licencePrice(4, 1)).toBe(16000);
     expect(licencePrice(6, 0.5)).toBe(32000);
+    // A basic need (decision 253): √index above 1.
+    expect(licencePrice(2, 4)).toBe(8000);
     expect(madeSalaryShare('blueprint')).toBe(0.75);
     expect(madeSalaryShare('starter')).toBe(0);
     expect(madeSalaryShare('academy')).toBe(0);

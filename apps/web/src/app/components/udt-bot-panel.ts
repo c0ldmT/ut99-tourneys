@@ -459,6 +459,8 @@ export class UdtBotPanel {
   readonly tag = input<string | undefined>(undefined);
   readonly spendable = input<number | null>(null);
   readonly looks = input<UdtLooks | null>(null);
+  /** The season's economy index (salaries follow it damped, decision 253). */
+  readonly index = input(1);
   readonly changed = output<void>();
   readonly closed = output<void>();
 
@@ -471,7 +473,7 @@ export class UdtBotPanel {
   protected readonly blueprintPct = Math.round(DEFAULT_ECONOMY.blueprintSalary * 100);
   /** Weekly salary of the bot (0: none). */
   protected salary(b: UdtRosterBot): number {
-    return rosterSalary(b);
+    return rosterSalary(b, this.index());
   }
   protected readonly xp = computed(() => {
     const b = this.bot();

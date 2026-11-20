@@ -183,6 +183,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           [tag]="v.team.tag"
           [spendable]="spendable() ?? v.wallet?.spendable ?? null"
           [looks]="looks()"
+          [index]="v.index"
           (changed)="load()"
           (closed)="panelId.set(null)"
         />
@@ -319,7 +320,7 @@ export class UdtTeamPage {
   );
   protected readonly salary = computed(() =>
     // Bots a team made draw none, blueprint bots a share (also traded ones).
-    (this.view()?.roster ?? []).reduce((s, b) => s + rosterSalary(b), 0),
+    (this.view()?.roster ?? []).reduce((s, b) => s + rosterSalary(b, this.view()?.index ?? 1), 0),
   );
 
   constructor() {

@@ -7,6 +7,7 @@
 import {
   DEFAULT_ECONOMY,
   baseValue,
+  basicIndex,
   bracketOf,
   buyPrice,
   demandFactor,
@@ -549,7 +550,7 @@ export function simulateSeason(o: SimOptions): SimResult {
   /** Weekly salary of a roster bot: bought ones in full, blueprint bots by the share. */
   function salaryOf(x: Owned): number {
     if (x.starter || x.keeper) return 0;
-    const full = weeklySalary(value(x.bot), x.bot.skill, cfg);
+    const full = weeklySalary(value(x.bot), x.bot.skill, index, cfg);
     return x.own ? Math.round(full * (o.academy?.blueprintSalary ?? 0)) : full;
   }
 
@@ -579,14 +580,16 @@ export function simulateSeason(o: SimOptions): SimResult {
     if (!rarity) return;
     const ref = a.licence(m.made);
     if (ref === null) return;
-    const licence = Math.round(ref * index);
+    // A basic need (decision 253): the licence follows the damped index.
+    const licence = Math.round(ref * basicIndex(index, cfg));
     const rule = BLUEPRINTS[rarity];
     const potential = blueprintPotential(rarity, rng);
     const score = scoreFor(rule.skill, rule.budget);
     const bot: SimBot = { id: `own-${m.name}-${m.made}`, name: 'own', skill: rule.skill, score };
     const future = STRENGTH[potential]! * (0.85 + 0.3 * score);
     const newSalary = Math.round(
-      weeklySalary(baseValue(rule.skill, score, cfg) * index, rule.skill, cfg) * a.blueprintSalary,
+      weeklySalary(baseValue(rule.skill, score, cfg) * index, rule.skill, index, cfg) *
+        a.blueprintSalary,
     );
     if ((m.cash - floor - 2 * (salaries + newSalary)) * m.p.spend < licence) return;
     if (m.roster.length >= 7) {
@@ -657,10 +660,10 @@ export function simulateSeason(o: SimOptions): SimResult {
             ? 5
             : 7;
     const salaries = m.roster.reduce(
-      (s, x) => s + (x.starter ? 0 : weeklySalary(value(x.bot), x.bot.skill, cfg)),
+      (s, x) => s + (x.starter ? 0 : weeklySalary(value(x.bot), x.bot.skill, index, cfg)),
       0,
     );
-    const reserve = floor + 2 * (salaries + weeklySalary(price, b.skill, cfg));
+    const reserve = floor + 2 * (salaries + weeklySalary(price, b.skill, index, cfg));
     const budget = (m.cash - reserve) * m.p.spend;
     const weakest = Math.min(...m.roster.map((x) => strength(x)));
     const fits =

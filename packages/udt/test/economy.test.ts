@@ -11,6 +11,7 @@ import {
   marketValue,
   matchReward,
   packPrice,
+  basicIndex,
   placeReward,
   rollBox,
   rollTen,
@@ -80,9 +81,24 @@ describe('market values', () => {
   });
 
   it('salaries rise with the bracket', () => {
-    expect(weeklySalary(22_000, 7)).toBe(4400);
-    expect(weeklySalary(7000, 5)).toBe(840);
-    expect(weeklySalary(1500, 3)).toBe(120);
+    expect(weeklySalary(22_000, 7, 1)).toBe(4400);
+    expect(weeklySalary(7000, 5, 1)).toBe(840);
+    expect(weeklySalary(1500, 3, 1)).toBe(120);
+  });
+
+  it('basic needs follow the index damped above 1 (decision 253)', () => {
+    expect(basicIndex(0.3)).toBe(0.3);
+    expect(basicIndex(1)).toBe(1);
+    expect(basicIndex(4)).toBe(2);
+    expect(basicIndex(5)).toBeCloseTo(2.236, 3);
+    // A value of 22,000 at index 4 (5,500 at index 1): the salary of index 2, not 4.
+    expect(weeklySalary(22_000, 7, 4)).toBe(2200);
+    expect(weeklySalary(1500, 3, 0.5)).toBe(120);
+    // Standard boxes damped, premium and elite fully indexed.
+    expect(packPrice('standard', 4)).toBe(3000);
+    expect(packPrice('standard', 4, true)).toBe(27_000);
+    expect(packPrice('standard', 0.3)).toBe(450);
+    expect(packPrice('premium', 4)).toBe(16_000);
   });
 });
 

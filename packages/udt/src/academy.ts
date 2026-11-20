@@ -5,6 +5,7 @@
  */
 import {
   baseValue,
+  basicIndex,
   DEFAULT_ECONOMY,
   RARITIES,
   roundNeuro,
@@ -274,7 +275,8 @@ export function inheritedTrait(
 /** Price of the next creation licence of a season (`made` bots so far, the starter is the first). */
 export function licencePrice(made: number, index: number, cfg = DEFAULT_ECONOMY): number {
   if (made <= 0) return 0;
-  return roundNeuro(cfg.licenceBase * cfg.licenceGrowth ** (made - 1) * index);
+  // A basic need (decision 253): at the damped index.
+  return roundNeuro(cfg.licenceBase * cfg.licenceGrowth ** (made - 1) * basicIndex(index, cfg));
 }
 
 /**

@@ -227,6 +227,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Dream Team: salaries, standard packs and creation licences follow the economy index only with its square root above 1 (at index 5 about ×2.2 instead of ×5); premium and elite packs, the market and scouting stay fully indexed.
 - Dream Team league: AI clubs play with traits (as many per bot as the median human of their tier, at most 4/3/2/1 by tier, drawn at random), and the game model counts every bot's traits (rubber band, simulated games, test mode, calibration); the trait report marks the AI's randomly drawn traits (trait lab).
 - Dream Team AI managers: points go into skill until the potential (saved for the next step), a full roster swaps its weakest bought bot for a clearly stronger offer from savings, savings also open packs and build blueprints, trait cards land on a random bot (trait lab).
 - Trait report: each row shows the bot's skill and all its traits in that game, the summary the average skill - so a trait's numbers can be told apart from a strong bot.

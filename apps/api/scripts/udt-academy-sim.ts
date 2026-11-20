@@ -140,7 +140,7 @@ for (const cups of (process.env.CUPS ?? '1,3').split(',').map(Number))
 console.log('\n=== Wochengehalt bei Index 1 (Werte Mitte) ===');
 for (const sk of [3, 4, 5, 6, 7]) {
   const v = baseValue(sk, 0.5);
-  const full = weeklySalary(v, sk);
+  const full = weeklySalary(v, sk, 1);
   console.log(
     `Skill ${sk}: Wert ${Math.round(v)} €, Gehalt gekauft ${full} €/Woche, 75 %: ${Math.round(full * 0.75)}, 50 %: ${Math.round(full * 0.5)}`,
   );

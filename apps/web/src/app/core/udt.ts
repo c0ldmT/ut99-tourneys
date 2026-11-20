@@ -48,28 +48,32 @@ export {
   weeklySalary,
 };
 
-/** Salary of a roster bot with its manager traits (the penny pincher). */
+/** Salary of a roster bot with its manager traits (the penny pincher) at the season's index. */
 export function salaryOf(
   b: { value: number; skill: number; udtTraits?: { code: string }[] },
+  index: number,
   /** Share of the full salary (bots a team made: `madeSalaryShare` of their origin). */
   share = 1,
 ) {
   const f = managerEffects((b.udtTraits ?? []) as Parameters<typeof managerEffects>[0]).salary;
-  return Math.round((weeklySalary(b.value, b.skill) * f * share) / 10) * 10;
+  return Math.round((weeklySalary(b.value, b.skill, index) * f * share) / 10) * 10;
 }
 
 /** A roster bot's weekly salary: bought in full, blueprint bots a share, other own bots none. */
-export function rosterSalary(b: {
-  value: number;
-  skill: number;
-  starter: boolean;
-  udtTraits?: { code: string }[];
-  own?: { origin: string; keptFrom?: number | null } | null;
-}): number {
+export function rosterSalary(
+  b: {
+    value: number;
+    skill: number;
+    starter: boolean;
+    udtTraits?: { code: string }[];
+    own?: { origin: string; keptFrom?: number | null } | null;
+  },
+  index: number,
+): number {
   // The starter and keepers play for free.
   if (b.starter || b.own?.keptFrom) return 0;
   const share = madeSalaryShare(b.own?.origin);
-  return share ? salaryOf(b, share) : 0;
+  return share ? salaryOf(b, index, share) : 0;
 }
 
 /** UT99 skill names 0..7. */

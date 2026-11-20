@@ -4,7 +4,7 @@ import type { RunningApi } from '../src/app.js';
 import { buyPrice, weeklySalary } from '@tourney/udt';
 import { desc, eq } from 'drizzle-orm';
 import { DB, type Db } from '../src/db/database.js';
-import { bots, udtBids, udtBots, udtRoster, udtValues } from '../src/db/schema.js';
+import { bots, udtBids, udtBots, udtDays, udtRoster, udtValues } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtMarketService } from '../src/udt/udt-market.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -207,8 +207,9 @@ describe('Unreal Dream Team: transfer market', () => {
       .from(udtValues)
       .where(eq(udtValues.botId, bp))
       .orderBy(desc(udtValues.day))
-      .get()!.value;
-    expect(paid(bp)).toBe(-Math.round((weeklySalary(value, 5) * 0.75) / 10) * 10);
+      .get()!;
+    const index = db.select().from(udtDays).where(eq(udtDays.day, value.day)).get()!.economyIndex;
+    expect(paid(bp)).toBe(-Math.round((weeklySalary(value.value, 5, index) * 0.75) / 10) * 10);
     expect(paid(bp)).toBeLessThan(0);
     expect(paid(talent)).toBe(0);
   });

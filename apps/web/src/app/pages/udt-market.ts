@@ -358,7 +358,7 @@ export class UdtMarketPage {
   }
 
   protected salaryOf(o: UdtOffer) {
-    return weeklySalary(o.value, o.skill);
+    return weeklySalary(o.value, o.skill, this.market()?.index ?? 1);
   }
 
   protected async buy(o: UdtOffer) {
