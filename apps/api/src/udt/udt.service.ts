@@ -35,6 +35,10 @@ import {
   prestigeStage,
   respecPrice,
   starPrice,
+  CLUB_UPGRADES,
+  clubEffects,
+  clubUpgradePrice,
+  type ClubUpgrade,
   type PrestigeAlloc,
   type PrestigeStage,
   type TraitCode,
@@ -56,6 +60,7 @@ import {
   udtEntries,
   udtHall,
   udtKeepers,
+  udtClub,
   udtOffers,
   udtPity,
   udtRoster,
@@ -338,6 +343,7 @@ export class UdtService {
         udtBlueprints,
         udtHall,
         udtKeepers,
+        udtClub,
         udtAi,
         udtTeams,
       ])
@@ -649,7 +655,11 @@ export class UdtService {
     const n = Math.min(Math.round(points), 100 - r.stamina);
     if (n <= 0) throw conflict('the bot is fully rested');
     // Thrifty (decision 242): this bot rests for less.
-    const price = REST_PRICE * managerEffects(this.botTraits(season, botId)).restPrice;
+    // Thrifty and the physio (decision 264).
+    const price =
+      REST_PRICE *
+      managerEffects(this.botTraits(season, botId)).restPrice *
+      this.clubFx(season, user.id).rest;
     this.ledger.charge({
       userId: user.id,
       kind: 'udt_rest',
@@ -687,7 +697,9 @@ export class UdtService {
     const ref = campRef(season, this.today(), botId);
     if (this.ledger.has(ref)) throw conflict('the bot was in the training camp today');
     const xp = Math.round(
-      DEFAULT_ECONOMY.camp.xp * managerEffects(this.botTraits(season, botId)).xp,
+      DEFAULT_ECONOMY.camp.xp *
+        managerEffects(this.botTraits(season, botId)).xp *
+        this.clubFx(season, user.id).xp,
     );
     this.ledger.charge({
       userId: user.id,
@@ -743,6 +755,7 @@ export class UdtService {
     const onBots = this.traitsOnBots(season);
     const own = this.ownBots(season, userId);
     const index = this.index(season);
+    const club = this.clubFx(season, userId);
     const plainValue = (skill: number, traits: LibraryBot['traits'] = {}) =>
       marketValue(baseValue(skill, valueScore(traits)), 1, 1, index);
     const starterBase = plainValue(STARTER_SKILL);
@@ -795,7 +808,7 @@ export class UdtService {
             salaryDue: r.salaryDue,
             games: r.games,
             mhFocus: r.mhFocus,
-            restPrice: REST_PRICE * managerEffects(cards).restPrice,
+            restPrice: REST_PRICE * managerEffects(cards).restPrice * club.rest,
             own: ownView(
               own.get(b.id),
               level,
@@ -912,10 +925,59 @@ export class UdtService {
           roster.map((r) => r.botId),
         ),
       },
+      /** Club upgrades of this season (decision 264): bought or their price. */
+      club: this.clubView(user.id, season.number),
       wallet: this.ledger.spendable(user.id),
       starterBudget: this.settings.get().udt.starterBudget,
       starterExtra: this.settings.get().udt.starterExtra,
     };
+  }
+
+  /** A manager's club upgrades of a season (decision 264). */
+  clubUpgrades(season: number, userId: string): ClubUpgrade[] {
+    return this.db
+      .select({ kind: udtClub.kind })
+      .from(udtClub)
+      .where(and(eq(udtClub.season, season), eq(udtClub.userId, userId)))
+      .all()
+      .map((r) => r.kind as ClubUpgrade);
+  }
+
+  /** The effects of a manager's club upgrades this season (multipliers). */
+  clubFx(season: number, userId: string) {
+    return clubEffects(this.clubUpgrades(season, userId));
+  }
+
+  private clubView(userId: string, season: number) {
+    const have = new Set(this.clubUpgrades(season, userId));
+    const index = this.index(season);
+    return CLUB_UPGRADES.map((kind) => ({
+      kind,
+      done: have.has(kind),
+      price: clubUpgradePrice(kind, index),
+    }));
+  }
+
+  /** Buys a club upgrade for the rest of the season (once per season). */
+  buyClubUpgrade(user: User, kind: ClubUpgrade) {
+    this.assertOn();
+    const season = this.season().number;
+    if (!this.team(user.id, season)) throw conflict('found your team first');
+    if (this.clubUpgrades(season, user.id).includes(kind))
+      throw conflict('the club has this upgrade this season');
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_club',
+      amount: clubUpgradePrice(kind, this.index(season)),
+      ref: `club:${season}:${user.id}:${kind}`,
+      meta: { kind },
+    });
+    this.db
+      .insert(udtClub)
+      .values({ season, userId: user.id, kind, boughtAt: new Date(this.clock.now()).toISOString() })
+      .onConflictDoNothing()
+      .run();
+    return this.view(user);
   }
 
   /** The manager's bookings of the running season. */

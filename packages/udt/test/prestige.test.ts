@@ -6,6 +6,9 @@ import {
   cannotAllocate,
   cannotAscend,
   cleanAlloc,
+  clubEffects,
+  clubUpgradePrice,
+  talentReport,
   duelSeries,
   maxStars,
   prestigeCap,
@@ -101,6 +104,27 @@ describe('prestige (plan P3)', () => {
     const full = botStrength(6, 0.5, prestigeEffect(11));
     expect(full).toBeGreaterThan(botStrength(6, 0.5));
     expect(full / botStrength(6, 0.5)).toBeLessThan(SKILL_STRENGTH[7]! / SKILL_STRENGTH[6]!);
+  });
+
+  it('club upgrades: prices at the full index, effects for the season (decision 264)', () => {
+    expect(clubUpgradePrice('training', 2.7)).toBe(16200);
+    expect(clubEffects([])).toEqual({ xp: 1, rest: 1, scout: 1, spread: 8 });
+    expect(clubEffects(['training', 'physio', 'scouting'])).toEqual({
+      xp: 1.1,
+      rest: 0.8,
+      scout: 0.75,
+      spread: 4,
+    });
+    // The scouting office's report: value ranges 8 wide instead of 16.
+    const t = {
+      name: 'X',
+      skill: 2,
+      potential: 5,
+      values: { accuracy: 0, alertness: 0, strafing: 0, combatStyle: 0, camping: 0 },
+    };
+    const r = talentReport(t, () => 0.5, 4);
+    expect(r.ranges.accuracy).toEqual([46, 54]);
+    expect(talentReport(t, () => 0.5).ranges.accuracy).toEqual([42, 58]);
   });
 
   it('makes a bot with prestige win more duels', () => {

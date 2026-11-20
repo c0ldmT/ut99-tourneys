@@ -286,6 +286,8 @@ export const ERRORS_DE: Record<string, string> = {
   'the bot cannot ascend now': 'Der Bot kann jetzt nicht aufsteigen.',
   'stars are for ascended bots': 'Sterne gibt es nur für aufgestiegene Bots.',
   'the bot has all its stars': 'Der Bot hat schon alle Sterne.',
+  'the club has this upgrade this season': 'Den Ausbau hat dein Verein in dieser Season schon.',
+  'club upgrade not found': 'Diesen Vereinsausbau gibt es nicht.',
   'the potential is skill {potential}': 'Das Potenzial ist Skill {potential}.',
   'the value is at its maximum': 'Der Wert ist schon am Maximum.',
   '{name} has an apprentice this season': '{name} hat diese Season schon einen Lehrling.',

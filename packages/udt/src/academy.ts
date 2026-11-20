@@ -134,10 +134,11 @@ export function scoutTalents(
 }
 
 /** What the scout report shows: values ±8 on the 0..100 scale, the potential ±1. */
-export function talentReport(t: Talent, rng: () => number): TalentReport {
+export function talentReport(t: Talent, rng: () => number, spread = 8): TalentReport {
+  // `spread`: half the width of a value's range (the scouting office: 4, decision 264).
   const range = (v: number): [number, number] => {
-    const c = pct(v) + Math.round((rng() * 2 - 1) * 4);
-    return [clamp(c - 8, 0, 100), clamp(c + 8, 0, 100)];
+    const c = pct(v) + Math.round(((rng() * 2 - 1) * 4 * spread) / 8);
+    return [clamp(c - spread, 0, 100), clamp(c + spread, 0, 100)];
   };
   return {
     name: t.name,

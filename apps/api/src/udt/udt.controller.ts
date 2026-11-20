@@ -3,7 +3,7 @@ import { StatsService } from '../stats/stats.service.js';
 import { traitReport } from '../stats/trait-report.js';
 import { udtEntrantId } from '@tourney/protocol';
 import { z } from 'zod';
-import { PRESTIGE_STATS, type PrestigeStat } from '@tourney/udt';
+import { CLUB_UPGRADES, PRESTIGE_STATS, type ClubUpgrade, type PrestigeStat } from '@tourney/udt';
 import {
   Body,
   Controller,
@@ -227,6 +227,14 @@ export class UdtController {
     body: { focus: number },
   ) {
     return this.udt.setMhFocus(user, botId, body.focus);
+  }
+
+  /** A club upgrade for the rest of the season (decision 264). */
+  @Post('club/:kind')
+  @HttpCode(200)
+  clubUpgrade(@CurrentUser() user: User, @Param('kind') kind: string) {
+    if (!(CLUB_UPGRADES as readonly string[]).includes(kind)) throw notFound('club upgrade');
+    return this.udt.buyClubUpgrade(user, kind as ClubUpgrade);
   }
 
   /** Training camp (decision 254): experience for a roster bot, once per bot and day. */

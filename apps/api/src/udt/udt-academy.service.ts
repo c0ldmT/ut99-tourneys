@@ -240,11 +240,20 @@ export class UdtAcademyService {
   }
 
   /** Talent scout in the roster (decision 242): reports cheaper, one talent more. */
-  private scoutFx(season: number, userId: string): { price: number; extra: number } {
+  private scoutFx(
+    season: number,
+    userId: string,
+  ): { price: number; extra: number; spread: number } {
     const scout = this.udt
       .roster(userId, season)
       .some((r) => r.udtTraits.some((t) => t.code === 'talent-scout'));
-    return scout ? { price: 0.75, extra: 1 } : { price: 1, extra: 0 };
+    // The scouting office (decision 264): cheaper, narrower value ranges.
+    const club = this.udt.clubFx(season, userId);
+    return {
+      price: (scout ? 0.75 : 1) * club.scout,
+      extra: scout ? 1 : 0,
+      spread: club.spread,
+    };
   }
 
   /** A new scout report: three talents (replaces the last report). */
@@ -262,7 +271,7 @@ export class UdtAcademyService {
     });
     const taken = this.bots.list().map((b) => b.name);
     const talents = scoutTalents(rng, taken, 3 + fx.extra);
-    const report = talents.map((t) => talentReport(t, rng));
+    const report = talents.map((t) => talentReport(t, rng, fx.spread));
     this.db
       .insert(udtScouts)
       .values({

@@ -77,6 +77,7 @@ const MANAGER_ACTIONS = [
   'udt_camp',
   'udt_workshop',
   'udt_prestige',
+  'udt_club',
   'udt_ticket',
 ];
 

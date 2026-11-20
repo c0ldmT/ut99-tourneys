@@ -229,3 +229,46 @@ export function cannotAscend(b: {
   if (!b.fullyDeveloped) return 'values';
   return null;
 }
+
+// ---------- club upgrades (concept section 8: per season, reset at the season change) ----------
+
+export type ClubUpgrade = 'training' | 'physio' | 'scouting';
+
+export const CLUB_UPGRADES: readonly ClubUpgrade[] = ['training', 'physio', 'scouting'];
+
+/**
+ * What a club upgrade costs (× the full index, luxury) and does for the rest of the season:
+ * training ground +10 % experience for every bot of the roster (games and the training camp),
+ * physio rest 20 % cheaper, scouting office scouting 25 % cheaper and value ranges in the report
+ * half as wide (decision 264; the scouting office's effect is a proposal for Mario).
+ */
+export const CLUB_UPGRADE_RULES: Readonly<
+  Record<
+    ClubUpgrade,
+    { price: number; xp?: number; rest?: number; scout?: number; spread?: number }
+  >
+> = {
+  training: { price: 6000, xp: 1.1 },
+  physio: { price: 4000, rest: 0.8 },
+  scouting: { price: 3000, scout: 0.75, spread: 4 },
+};
+
+export const clubUpgradePrice = (kind: ClubUpgrade, index: number): number =>
+  roundNeuro(CLUB_UPGRADE_RULES[kind].price * Math.max(0, index));
+
+/** The effects of a club's upgrades (multipliers; 1 without). */
+export function clubEffects(have: Iterable<string>): {
+  xp: number;
+  rest: number;
+  scout: number;
+  spread: number;
+} {
+  const set = new Set(have);
+  const r = CLUB_UPGRADE_RULES;
+  return {
+    xp: set.has('training') ? r.training.xp! : 1,
+    rest: set.has('physio') ? r.physio.rest! : 1,
+    scout: set.has('scouting') ? r.scouting.scout! : 1,
+    spread: set.has('scouting') ? r.scouting.spread! : 8,
+  };
+}

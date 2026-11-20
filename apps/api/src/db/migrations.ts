@@ -797,4 +797,14 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_bots ADD COLUMN ascended INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE udt_bots ADD COLUMN marks_json TEXT NOT NULL DEFAULT '[]';
   `,
+  // 50: club upgrades of a manager per season (decision 264): training ground, physio, scouting.
+  `
+  CREATE TABLE udt_club (
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    bought_at TEXT NOT NULL,
+    PRIMARY KEY (season, user_id, kind)
+  );
+  `,
 ];

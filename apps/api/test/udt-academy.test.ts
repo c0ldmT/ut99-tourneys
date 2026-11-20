@@ -325,6 +325,33 @@ describe('Unreal Dream Team: academy', () => {
     expect((await post('/star')).body.key).toBe('the bot has all its stars');
   });
 
+  it('club upgrades for the season: training ground, physio, scouting office (decision 264)', async () => {
+    const { mario } = await setup();
+    const view = (await mario.get('/udt')).body;
+    expect(view.club.map((c: { kind: string }) => c.kind)).toEqual([
+      'training',
+      'physio',
+      'scouting',
+    ]);
+    expect(view.club.every((c: { done: boolean; price: number }) => !c.done && c.price > 0)).toBe(
+      true,
+    );
+    const rest = view.roster[0].restPrice as number;
+    const scout = (await mario.get('/udt/academy')).body.scoutPrice as number;
+    for (const kind of ['training', 'physio', 'scouting']) {
+      const r = await mario.post(`/udt/club/${kind}`);
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+    }
+    expect((await mario.post('/udt/club/physio')).body.key).toBe(
+      'the club has this upgrade this season',
+    );
+    expect((await mario.post('/udt/club/nope')).status).toBe(404);
+    const after = (await mario.get('/udt')).body;
+    expect(after.club.every((c: { done: boolean }) => c.done)).toBe(true);
+    expect(after.roster[0].restPrice).toBeCloseTo(rest * 0.8);
+    expect((await mario.get('/udt/academy')).body.scoutPrice).toBe(Math.round(scout * 0.75));
+  });
+
   it('builds an own bot from a blueprint: skill 3, points, potential, model, start trait', async () => {
     const { mario, marioId, db } = await setup();
     for (const [id, rarity] of [

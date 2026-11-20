@@ -15,6 +15,8 @@ import {
   traitSlots,
   valueAtTop,
   valueReady,
+  clubUpgradePrice,
+  type ClubUpgrade,
   type PrestigeStat,
   type Rarity,
 } from '@tourney/udt';
@@ -275,6 +277,7 @@ export class UdtAiService implements OnModuleInit {
       };
       act('trades', () => (out.trades += this.answerTrades(m.user, style.tradeMin)));
       act('develop', () => this.develop(m.user, season.number));
+      act('club', () => this.club(m.user, season.number, style.spend * strength));
       act('prestige', () =>
         this.prestige(m.user, season.number, style.spend * strength, m.personality, rng),
       );
@@ -546,6 +549,25 @@ export class UdtAiService implements OnModuleInit {
           else break;
         }
       }
+    }
+  }
+
+  /**
+   * Club upgrades (decision 264): the training ground first, then the physio, when one fits its
+   * share of the spendable Neuro; the scouting office only a breeder.
+   */
+  private club(user: User, season: number, share: number) {
+    const have = new Set(this.udt.clubUpgrades(season, user.id));
+    const breeder = this.managers().find((m) => m.user.id === user.id)?.personality === 'breeder';
+    const kinds: ClubUpgrade[] = breeder
+      ? ['training', 'physio', 'scouting']
+      : ['training', 'physio'];
+    for (const kind of kinds) {
+      if (have.has(kind)) continue;
+      const price = clubUpgradePrice(kind, this.udt.index(season));
+      if (price > this.spendable(user) * Math.min(0.9, share)) return;
+      this.udt.buyClubUpgrade(user, kind);
+      return; // one a day
     }
   }
 

@@ -566,6 +566,19 @@ export const udtBots = sqliteTable('udt_bots', {
   marksJson: text('marks_json').notNull().default('[]'),
 });
 
+/** Club upgrades of a manager per season (migration 50, decision 264). */
+export const udtClub = sqliteTable(
+  'udt_club',
+  {
+    season: integer('season').notNull(),
+    userId: text('user_id').notNull(),
+    /** "training", "physio" or "scouting" (`ClubUpgrade`). */
+    kind: text('kind').notNull(),
+    boughtAt: text('bought_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.season, t.userId, t.kind] })],
+);
+
 /**
  * Keepers: own bots a manager keeps at the end of `season` for the next one (at most
  * `udt.keepers.max`); `appliedAt` once the bot moved over (the team was founded again).
