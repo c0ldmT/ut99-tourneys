@@ -9,8 +9,8 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { TPipe } from '../core/i18n';
-import type { UdtSettings } from '../core/types';
+import { I18n, TPipe } from '../core/i18n';
+import type { FeedbackAdmin, UdtSettings } from '../core/types';
 import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
 
 /** Settings tab "Dream Team": the module switch, market, starter, trading and AI managers. */
@@ -184,6 +184,40 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
         </button>
       </div>
     </section>
+    <section class="card">
+      <h2>{{ 'fb.admin.title' | t }}</h2>
+      <p class="muted small">{{ 'fb.admin.hint' | t }}</p>
+      @if (fb(); as f) {
+        <p>
+          @if (f.open) {
+            {{ 'fb.admin.open' | t: { n: f.season ?? '', at: i18n.date(f.openedAt) } }}
+          } @else if (f.openedAt) {
+            {{ 'fb.admin.closed' | t: { n: f.season ?? '' } }}
+          } @else {
+            {{ 'fb.admin.none' | t: { n: f.season ?? '–' } }}
+          }
+          <br /><span class="muted small">{{
+            'fb.admin.counts' | t: { a: f.answers, m: f.managers, n: f.notes }
+          }}</span>
+        </p>
+        <div class="row gap">
+          <button
+            type="button"
+            [class.primary]="!f.open"
+            [disabled]="busy() || f.season === null"
+            (click)="survey(!f.open)"
+          >
+            {{ (f.open ? 'fb.admin.closeBtn' : 'fb.admin.openBtn') | t }}
+          </button>
+          <button type="button" [disabled]="busy()" (click)="feedbackCsv('survey')">
+            {{ 'fb.admin.surveyCsv' | t }}
+          </button>
+          <button type="button" [disabled]="busy()" (click)="feedbackCsv('notes')">
+            {{ 'fb.admin.notesCsv' | t }}
+          </button>
+        </div>
+      }
+    </section>
   `,
   styles: [SETTINGS_STYLES],
 })
@@ -205,8 +239,56 @@ export class SettingsUdt {
   /** Trait report (decision 237): empty = the running season. */
   protected reportSeason: number | null = null;
 
+  /** Season survey and feedback (decision 245). */
+  protected readonly fb = signal<FeedbackAdmin | null>(null);
+  protected readonly i18n = inject(I18n);
+
   constructor() {
     void this.load();
+    this.api
+      .feedbackAdmin()
+      .then((f) => this.fb.set(f))
+      .catch(() => {
+        // the toast shows the error
+      });
+  }
+
+  protected async survey(open: boolean) {
+    this.busy.set(true);
+    try {
+      this.fb.set(await this.api.setSurvey(open));
+    } catch {
+      // the toast shows the error
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  /** Survey answers or messages as CSV (no names: managers are numbered). */
+  protected async feedbackCsv(what: 'survey' | 'notes') {
+    this.busy.set(true);
+    try {
+      const x = await this.api.feedbackExport(this.fb()?.season ?? undefined);
+      const rows: Record<string, unknown>[] =
+        what === 'survey'
+          ? x.survey.map((r) => ({
+              manager: r.manager,
+              createdAt: r.createdAt,
+              updatedAt: r.updatedAt,
+              ...Object.fromEntries(x.questions.map((q) => [q, r.answers[q] ?? ''])),
+              ...Object.fromEntries(x.texts.map((k) => [k, r.texts[k] ?? ''])),
+            }))
+          : x.notes.map((n) => ({ ...n, season: n.season ?? '' }));
+      download(
+        csv(rows),
+        what === 'survey' ? `survey-season-${x.season ?? 0}.csv` : 'feedback-messages.csv',
+        'text/csv',
+      );
+    } catch {
+      // the toast shows the error
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   /** Downloads the trait report of a season: rows as CSV (for a review) or everything as JSON. */
@@ -214,29 +296,13 @@ export class SettingsUdt {
     this.busy.set(true);
     try {
       const r = await this.api.udtTraitReport(this.reportSeason ?? undefined);
-      // CSV for spreadsheets: quoted fields, no formulas, a BOM for umlauts in Excel.
-      const cell = (v: unknown) => {
-        const s = String(v).replace(/[\r\n]+/g, ' ');
-        return `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
-      };
-      const body =
+      download(
         format === 'json'
           ? JSON.stringify(r, null, 2)
-          : '\uFEFF' +
-            [
-              Object.keys(r.rows[0] ?? { season: 0 })
-                .map(cell)
-                .join(';'),
-              ...r.rows.map((x) => Object.values(x).map(cell).join(';')),
-            ].join('\r\n');
-      const url = URL.createObjectURL(
-        new Blob([body], { type: format === 'json' ? 'application/json' : 'text/csv' }),
+          : csv(r.rows, r.rows.length ? undefined : ['season']),
+        `trait-report-season-${r.season}.${format}`,
+        format === 'json' ? 'application/json' : 'text/csv',
       );
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `trait-report-season-${r.season}.${format}`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch {
       // the toast shows the error
     } finally {
@@ -314,4 +380,28 @@ function pickAi(u: Partial<UdtSettings>) {
     aiCount: u.aiCount ?? 4,
     aiStrength: u.aiStrength ?? ('normal' as UdtSettings['aiStrength']),
   };
+}
+
+/** CSV for spreadsheets: quoted fields, no formulas, a BOM for umlauts in Excel. */
+function csv(rows: readonly Record<string, unknown>[], columns?: string[]): string {
+  const cell = (v: unknown) => {
+    const s = String(v ?? '').replace(/[\r\n]+/g, ' ');
+    return `"${(/^[=+\-@]/.test(s) ? `'${s}` : s).replace(/"/g, '""')}"`;
+  };
+  const head = columns ?? Object.keys(rows[0] ?? {});
+  return (
+    '\uFEFF' +
+    [head.map(cell).join(';'), ...rows.map((x) => head.map((k) => cell(x[k])).join(';'))].join(
+      '\r\n',
+    )
+  );
+}
+
+function download(body: string, name: string, type: string): void {
+  const url = URL.createObjectURL(new Blob([body], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

@@ -761,4 +761,26 @@ export const MIGRATIONS: string[] = [
   );
   CREATE INDEX udt_bot_days_season ON udt_bot_days(season, day);
   `,
+  // 47: feedback of the players (decision 245): the season survey (one answer per user and
+  // season, open while an admin has it open) and notes at any time.
+  `
+  CREATE TABLE feedback (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    season INTEGER,
+    kind TEXT NOT NULL,
+    area TEXT,
+    answers_json TEXT NOT NULL DEFAULT '{}',
+    texts_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX feedback_survey ON feedback(season, user_id) WHERE kind = 'survey';
+  CREATE INDEX feedback_user ON feedback(user_id, created_at);
+  CREATE TABLE feedback_surveys (
+    season INTEGER PRIMARY KEY,
+    opened_at TEXT NOT NULL,
+    closed_at TEXT
+  );
+  `,
 ];

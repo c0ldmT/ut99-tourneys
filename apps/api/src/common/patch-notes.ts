@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 245,
+    date: '2026-11-20',
+    en: {
+      title: 'Feedback and the season survey',
+      items: [
+        'New in the footer: "Feedback" - tell the admins what you like, what bugs you or what you wish for, any time.',
+        'At the end of a season every Dream Team manager gets a short survey (fun, money, prices, salaries, bot development, league). It takes two minutes and you can change your answers while it is open.',
+      ],
+    },
+    de: {
+      title: 'Feedback und Season-Umfrage',
+      items: [
+        'Neu im Footer: „Feedback“ – sag den Admins jederzeit, was dir gefällt, was dich stört oder was du dir wünschst.',
+        'Am Ende einer Season bekommt jeder Dream-Team-Manager eine kurze Umfrage (Spaß, Geld, Preise, Gehälter, Bot-Entwicklung, Liga). Sie dauert zwei Minuten, und solange sie offen ist, kannst du deine Antworten ändern.',
+      ],
+    },
+  },
+  {
     id: 243,
     date: '2026-10-31',
     en: {

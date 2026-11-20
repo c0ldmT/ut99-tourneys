@@ -61,6 +61,8 @@ import { UdtAiService } from './udt/udt-ai.service.js';
 import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
 import { UdtSnapshotService } from './udt/udt-snapshots.service.js';
+import { FeedbackController } from './feedback/feedback.controller.js';
+import { FeedbackService } from './feedback/feedback.service.js';
 import { UdtService } from './udt/udt.service.js';
 import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
@@ -109,6 +111,7 @@ class AppModule {
         UdtController,
         UdtTestController,
         NeuroController,
+        FeedbackController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -158,6 +161,7 @@ class AppModule {
         UdtService,
         UdtMarketService,
         UdtSnapshotService,
+        FeedbackService,
         UdtEventsService,
         UdtRewardsService,
         UdtPacksService,

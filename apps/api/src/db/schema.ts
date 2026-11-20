@@ -722,3 +722,28 @@ export const leagueFixtures = sqliteTable('league_fixtures', {
   /** Moved to a later evening this often (the server was not free). */
   postponed: integer('postponed').notNull().default(0),
 });
+
+/**
+ * Feedback of the players (decision 245): a season survey (`kind` "survey", one per user and
+ * season, answers by question id) or a note at any time (`kind` "note", an area and a text).
+ */
+export const feedback = sqliteTable('feedback', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  season: integer('season'),
+  kind: text('kind').notNull(),
+  area: text('area'),
+  /** Survey answers: question id -> scale (1-5) or option. */
+  answersJson: text('answers_json').notNull().default('{}'),
+  /** Free texts: survey "best", "worst", "wish"; a note "text". */
+  textsJson: text('texts_json').notNull().default('{}'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+/** Season surveys an admin opened (open while `closedAt` is null). */
+export const feedbackSurveys = sqliteTable('feedback_surveys', {
+  season: integer('season').primaryKey(),
+  openedAt: text('opened_at').notNull(),
+  closedAt: text('closed_at'),
+});

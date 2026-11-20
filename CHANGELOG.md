@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Feedback: a "Feedback" link in the footer sends the admins a message any time; at the end of a season admins open a short survey for the Dream Team managers (fun, money, prices, salaries, bot development, traits, league), which the website asks once per visit; answers and messages download as CSV without names.
 - Dream Team: a daily snapshot of every team (money, roster value, salaries, strikes, strength) and roster bot (skill, level, experience, points, potential, value, stamina, form, traits) after the market day, for season analyses (in the anonymised database copy).
 - Patch notes: after an update the website shows what changed once in a modal (per user, guests per browser); the footer link "Patch notes" opens all of them again.
 - Dream Team: 29 new traits in every rarity (now 62) - e.g. light feet, scavenger, second wind, health hound, talent scout, cold blood, regeneration, captain, juggernaut, overload, weapon master (pick a favourite weapon), warden, deemer dream, rewind, hivemind, monster whisperer and dynasty, Monster Hunt traits among them; the bouncer no longer jumps all the time but dodges more often (mod 0.18.0).

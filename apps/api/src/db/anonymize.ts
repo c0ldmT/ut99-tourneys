@@ -77,6 +77,9 @@ const ASSET_COLUMNS = new Set([
   'users.look_json',
   'udt_traits.weapon',
   'udt_bot_days.trait_codes',
+  // Validated codes and numbers only (question ids, options, areas).
+  'feedback.answers_json',
+  'feedback.area',
 ]);
 /** Keys and columns of ids, refs and tokens: checked against old ids only (random ids would hit names). */
 const ID_KEY = /(^id$|Id$|_id$|^ref$|Ref$|_ref$|^rngSeed$|^token_hash$|^join_token$|^invite_code$)/;
@@ -581,6 +584,8 @@ function run(db: Database.Database): AnonymizeReport {
     named('udt_hall', (r) => ({ name: names.get(r.name!)! }));
     named('league_clubs', (r) => ({ name: names.get(r.name!)!, tag: names.tag(r.tag!) }));
     named('udt_trades', () => ({ message: null }));
+    // Free texts of the players' feedback (the export CLI writes them apart, for reading).
+    named('feedback', () => ({ texts_json: '{}' }));
 
     const done = new Set([
       'users.display_name',
@@ -613,6 +618,7 @@ function run(db: Database.Database): AnonymizeReport {
       'teams.tag',
       'udt_hall.name',
       'udt_trades.message',
+      'feedback.texts_json',
       'league_clubs.name',
       'league_clubs.tag',
     ]);

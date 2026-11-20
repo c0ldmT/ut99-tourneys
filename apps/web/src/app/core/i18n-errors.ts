@@ -76,6 +76,13 @@ export const ERRORS_DE: Record<string, string> = {
   'unknown rival player {id}': 'Unbekannter Rivalen-Spieler {id}.',
   'names must differ': 'Die Namen müssen sich unterscheiden.',
 
+  // --- feedback (decision 245)
+  'the survey is closed': 'Die Umfrage ist geschlossen.',
+  'only managers of season {season} take part in its survey':
+    'An der Umfrage nehmen nur die Manager der Season {season} teil.',
+  'an answer is out of range': 'Eine Antwort passt nicht zur Frage.',
+  'answer at least one question': 'Beantworte mindestens eine Frage.',
+  'at most {n} feedback notes a day': 'Höchstens {n} Feedback-Nachrichten pro Tag.',
   // --- seasons
   'a season cannot start in the past': 'Eine Season kann nicht in der Vergangenheit beginnen.',
   'dates: YYYY-MM-DD': 'Datum im Format JJJJ-MM-TT.',

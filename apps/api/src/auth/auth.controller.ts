@@ -17,6 +17,7 @@ import { CONFIG, type ApiConfig } from '../config.js';
 import { cookie, forbidden, parseCookies, ZodPipe } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { LATEST_PATCH, PATCH_NOTES } from '../common/patch-notes.js';
+import { FeedbackService } from '../feedback/feedback.service.js';
 import type { ApiLogger } from '../common/logger.js';
 import { LOGGER } from '../common/logger.js';
 import { DISCORD, type DiscordApi } from './discord.js';
@@ -51,6 +52,7 @@ export class AuthController {
     @Inject(LOGGER) private readonly log: ApiLogger,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
+    @Inject(FeedbackService) private readonly feedback: FeedbackService,
   ) {}
 
   /** What the frontend needs before login. */
@@ -175,6 +177,8 @@ export class AuthController {
       notices: this.users.notices(user.id),
       /** The last patch note the user saw (decision 243). */
       patchSeen: user.patchSeen,
+      /** A season survey waiting for the user (decision 245). */
+      survey: this.feedback.pending(user.id),
     };
   }
 

@@ -57,6 +57,9 @@ import type {
   MatchDetailView,
   Me,
   PatchNote,
+  FeedbackAdmin,
+  FeedbackExport,
+  SurveyView,
   MapRecord,
   PlayerRatings,
   PublicUser,
@@ -316,6 +319,24 @@ export class Api {
     this.call<UdtPacks>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}`, undefined, {
       ok: 'ok.udt.scrapped',
     });
+  feedbackSurvey = () =>
+    this.call<SurveyView>('GET', '/feedback/survey', undefined, { quiet: true });
+  answerSurvey = (body: {
+    answers: Record<string, number | string>;
+    texts: Record<string, string>;
+  }) => this.call<SurveyView>('POST', '/feedback/survey', body, { ok: 'ok.survey' });
+  sendFeedback = (body: { area: string; text: string }) =>
+    this.call<{ ok: true }>('POST', '/feedback/notes', body, { ok: 'ok.feedback' });
+  feedbackAdmin = () => this.call<FeedbackAdmin>('GET', '/feedback/admin');
+  setSurvey = (open: boolean) =>
+    this.call<FeedbackAdmin>(
+      'PUT',
+      '/feedback/survey',
+      { open },
+      { ok: open ? 'ok.surveyOpen' : 'ok.surveyClosed' },
+    );
+  feedbackExport = (season?: number) =>
+    this.call<FeedbackExport>('GET', `/feedback/export${season ? `?season=${season}` : ''}`);
   udtTraitReport = (season?: number) =>
     this.call<TraitReport>('GET', `/udt/traits/report${season ? `?season=${season}` : ''}`);
   udtScrapBlueprint = (id: string) =>

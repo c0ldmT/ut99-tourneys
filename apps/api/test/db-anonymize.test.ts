@@ -197,6 +197,14 @@ describe('anonymised database copy', () => {
     ).body as { id: string };
     for (const c of [mario, tim, plain]) await c.post(`/tournaments/${open.id}/registration`, {});
     expect((await admin.post(`/tournaments/${open.id}/seed`, { mode: 'auto' })).status).toBe(200);
+    // Feedback (decision 245): free texts name people, the answers stay.
+    await admin.req('PUT', '/feedback/survey', { open: true });
+    const said = await mario.post('/feedback/survey', {
+      answers: { fun: 5, money: 'ok' },
+      texts: { best: 'Sabine und Nachtwache' },
+    });
+    expect(said.status, JSON.stringify(said.body)).toBe(200);
+    await tim.post('/feedback/notes', { area: 'league', text: 'Mariolus spielt zu gut' });
     await api.close();
     api = undefined;
 
@@ -209,6 +217,15 @@ describe('anonymised database copy', () => {
     expect(report.written).toBe(true);
     expect(report.removed.sessions).toBe(4);
     expect(readdirSync(out)).toEqual(['tourney.db']);
+    const copy = new Database(path.join(out, 'tourney.db'), { readonly: true });
+    const fb = copy
+      .prepare('SELECT kind, area, answers_json, texts_json FROM feedback ORDER BY kind')
+      .all();
+    copy.close();
+    expect(fb).toEqual([
+      { kind: 'note', area: 'league', answers_json: '{}', texts_json: '{}' },
+      { kind: 'survey', area: null, answers_json: '{"fun":5,"money":"ok"}', texts_json: '{}' },
+    ]);
     const text = allText(path.join(out, 'tourney.db'));
     for (const name of [
       'Adminrich',

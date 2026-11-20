@@ -98,6 +98,61 @@ export interface Me {
   notices?: UserNotice[];
   /** The last patch note the user saw: newer ones show once (decision 243). */
   patchSeen?: number;
+  /** A season survey waiting for the user (decision 245). */
+  survey?: { season: number } | null;
+}
+
+/** A question of the season survey (decision 245): texts `fb.q.<id>`, `fb.o.<id>.<option>`. */
+export interface SurveyQuestion {
+  id: string;
+  kind: 'scale' | 'choice';
+  options?: string[];
+}
+
+/** The season survey for the user (`GET /feedback/survey`). */
+export interface SurveyView {
+  season: number | null;
+  open: boolean;
+  eligible: boolean;
+  questions: SurveyQuestion[];
+  texts: string[];
+  answer: {
+    answers: Record<string, number | string>;
+    texts: Record<string, string>;
+    updatedAt: string;
+  } | null;
+}
+
+/** Survey state for admins (`GET /feedback/admin`). */
+export interface FeedbackAdmin {
+  season: number | null;
+  open: boolean;
+  openedAt: string | null;
+  closedAt: string | null;
+  answers: number;
+  managers: number;
+  notes: number;
+}
+
+/** Answers and notes without names (`GET /feedback/export`). */
+export interface FeedbackExport {
+  season: number | null;
+  questions: string[];
+  texts: string[];
+  survey: {
+    manager: number;
+    createdAt: string;
+    updatedAt: string;
+    answers: Record<string, number | string>;
+    texts: Record<string, string>;
+  }[];
+  notes: {
+    manager: number;
+    season: number | null;
+    createdAt: string;
+    area: string;
+    text: string;
+  }[];
 }
 
 export interface UserNotice {

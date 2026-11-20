@@ -23,6 +23,7 @@ import { ActivityBar } from './components/activity-bar';
 import { Loader } from './components/loader';
 import { NoticeModal } from './components/notice-modal';
 import { PatchNotes } from './components/patch-notes';
+import { Feedback } from './components/feedback';
 
 @Component({
   selector: 'app-root',
@@ -44,6 +45,7 @@ import { PatchNotes } from './components/patch-notes';
     ActivityBar,
     NoticeModal,
     PatchNotes,
+    Feedback,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -182,8 +184,14 @@ import { PatchNotes } from './components/patch-notes';
           >{{ 'footer.line' | t }} · v{{ version }} ·
           <button type="button" class="link fpatch" (click)="patchNotes.openAll()">
             {{ 'patch.footer' | t }}
-          </button></span
-        >
+          </button>
+          @if (auth.me()) {
+            ·
+            <button type="button" class="link fpatch" (click)="feedback.openNote()">
+              {{ 'fb.footer' | t }}
+            </button>
+          }
+        </span>
       </div>
     </footer>
     <app-toasts />
@@ -191,6 +199,7 @@ import { PatchNotes } from './components/patch-notes';
       <na-notice-modal />
     }
     <na-patch-notes #patchNotes />
+    <na-feedback #feedback />
   `,
   styles: `
     :host {
