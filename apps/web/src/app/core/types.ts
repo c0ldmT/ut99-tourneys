@@ -897,6 +897,11 @@ export interface TraitReport {
   baseline: { games: number; won: number; kills: number; deaths: number };
   summary: Record<string, string | number>[];
   rows: Record<string, string | number | boolean>[];
+  /** Mod 0.19.0 (decision 257): the bots' measures per skill, suicides per map. */
+  measures?: {
+    bySkill: Record<string, string | number | null>[];
+    byMap: Record<string, string | number>[];
+  };
 }
 
 /** A trait in one game of a bot (mod code; see `traitByMod`, decision 237). */

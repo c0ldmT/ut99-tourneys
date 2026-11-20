@@ -221,6 +221,50 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     v: int.nonnegative(),
     w: int.nonnegative(),
   }),
+  /**
+   * Mod 0.19.0 (decision 257): measures of a bot in the game (run), before `pse`: weapon
+   * switches (`ws`, in a fight `wf`), fight switches followed by a shot within 10 s (`wn`) and
+   * the time to it (`wq`, tenths of a second), seconds with an enemy (`ef`) and of them with the
+   * enforcer (`ee`), retreat episodes by the health at their start (`r0` 90+, `r1` 40-89, `r2`
+   * below 40) and their end (`k` a kill meanwhile, `d` died, `n` nothing), power items and kegs
+   * taken (`it`), the seconds they had waited (`iw`, at most 60 each) and taken within 3 s of
+   * their respawn (`iq`).
+   */
+  z.object({
+    t: z.literal('pm'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    ws: int.nonnegative(),
+    wf: int.nonnegative(),
+    wn: int.nonnegative(),
+    wq: int.nonnegative(),
+    ef: int.nonnegative(),
+    ee: int.nonnegative(),
+    r0k: int.nonnegative(),
+    r0d: int.nonnegative(),
+    r0n: int.nonnegative(),
+    r1k: int.nonnegative(),
+    r1d: int.nonnegative(),
+    r1n: int.nonnegative(),
+    r2k: int.nonnegative(),
+    r2d: int.nonnegative(),
+    r2n: int.nonnegative(),
+    it: int.nonnegative(),
+    iw: int.nonnegative(),
+    iq: int.nonnegative(),
+  }),
+  /** Mod 0.19.0: a bot's suicides by damage type (falls, kill zones, own weapons). */
+  z.object({
+    t: z.literal('pu'),
+    mid: str(16),
+    g: int.positive(),
+    n: int.min(0).max(2),
+    i: int.nonnegative().max(63),
+    u: str(32), // the damage type (Fell, Burned, RocketDeath ...)
+    c: int.positive(),
+  }),
   /** Mod 0.17.0, trait log: an episode of a trait ended (live): start, length, kills, died. */
   z.object({
     t: z.literal('tv'),

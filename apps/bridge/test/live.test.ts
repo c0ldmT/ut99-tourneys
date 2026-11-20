@@ -130,6 +130,21 @@ describe('live data (mod 0.16.0)', () => {
       { code: 'wd', uses: 0, sec: expect.any(Number), kills: 0, deaths: 0, value: 0, value2: 0 },
     ]);
     expect(stats.filter((p) => !p.bot).every((p) => p.traits === undefined)).toBe(true);
+    // Mod 0.19.0 (decision 257): measures and suicides by damage type of every bot.
+    expect(bot.measures).toMatchObject({
+      fightSwitches: 8,
+      shotAfter: 7,
+      shotAfterDs: 42,
+      enforcerSec: 5,
+      retreats: {
+        high: { kill: 1, death: 1, none: 2 },
+        mid: { kill: 0, death: 1, none: 1 },
+        low: { kill: 0, death: 2, none: 0 },
+      },
+      items: { taken: 3, waitSec: 25, quick: 1 },
+    });
+    expect(bot.selfKills).toEqual({ Fell: 1 });
+    expect(stats.filter((p) => !p.bot).every((p) => p.measures === undefined)).toBe(true);
     const ep = feed.find((f) => f.kind === 'trait');
     expect(ep).toMatchObject({ killer: bot.name, trait: { code: 'aa', dur: 6, kills: 1 } });
   });

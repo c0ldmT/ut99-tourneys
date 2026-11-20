@@ -47,6 +47,27 @@ export const TraitGameStatsSchema = z.object({
 });
 export type TraitGameStats = z.infer<typeof TraitGameStatsSchema>;
 
+const retreats = z.object({ kill: count, death: count, none: count });
+
+/**
+ * Mod 0.19.0 (decision 257): what every bot did in a game (run) beyond the score - weapon
+ * switches (in a fight; those followed by a shot within 10 s and the tenths of a second to it),
+ * seconds with an enemy and of them with the enforcer, retreat episodes by the health at their
+ * start (high 90+, mid 40-89, low below 40) and how they ended, power items and kegs taken, the
+ * seconds they had waited (at most 60 each) and those taken within 3 s of their respawn.
+ */
+export const BotMeasuresSchema = z.object({
+  switches: count,
+  fightSwitches: count,
+  shotAfter: count,
+  shotAfterDs: count,
+  fightSec: count,
+  enforcerSec: count,
+  retreats: z.object({ high: retreats, mid: retreats, low: retreats }),
+  items: z.object({ taken: count, waitSec: count, quick: count }),
+});
+export type BotMeasures = z.infer<typeof BotMeasuresSchema>;
+
 /**
  * One player's (or bot's) statistics of a game (Monster Hunt: of a run), counted by the mod.
  * Players are identified by their website user id, bots by their name.
@@ -86,6 +107,10 @@ export const PlayerGameStatsSchema = z.object({
   items: z.object({ amp: count, belt: count, armor: count, keg: count }).optional(),
   /** Mod 0.17.0: what the bot's Dream Team traits did (trait log). */
   traits: z.array(TraitGameStatsSchema).max(16).optional(),
+  /** Mod 0.19.0: measures of a bot (decision 257). */
+  measures: BotMeasuresSchema.optional(),
+  /** Mod 0.19.0: a bot's suicides by damage type. */
+  selfKills: z.record(z.string().min(1).max(32), z.number().int().positive()).optional(),
 });
 export type PlayerGameStats = z.infer<typeof PlayerGameStatsSchema>;
 

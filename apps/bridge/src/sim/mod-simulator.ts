@@ -648,6 +648,30 @@ export class ModSimulator {
           { t: 'tv', ...id, c: 'aa', s: 10, d: 6, k: 1, x: 0 },
           { t: 'pt', ...id, c: 'aa', a: 1, s: 6, k: 1, d: 0, v: 0, w: 0 },
           { t: 'pt', ...id, c: 'wd', a: 0, s: sec, k: 0, d: 0, v: 0, w: 0 },
+          // Mod 0.19.0: measures and suicides by damage type.
+          {
+            t: 'pm',
+            ...id,
+            ws: 12 + i,
+            wf: 8,
+            wn: 7,
+            wq: 42,
+            ef: Math.floor(sec / 2),
+            ee: 5,
+            r0k: 1,
+            r0d: 1,
+            r0n: 2,
+            r1k: 0,
+            r1d: 1,
+            r1n: 1,
+            r2k: 0,
+            r2d: 2,
+            r2n: 0,
+            it: 3,
+            iw: 25,
+            iq: 1,
+          },
+          { t: 'pu', ...id, u: 'Fell', c: 1 },
         );
       }
       for (const l of lines) {

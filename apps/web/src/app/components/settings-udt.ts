@@ -182,6 +182,12 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
         <button type="button" [disabled]="busy()" (click)="report('json')">
           {{ 'trait.report.json' | t }}
         </button>
+        <button type="button" [disabled]="busy()" (click)="report('skill')">
+          {{ 'trait.report.skill' | t }}
+        </button>
+        <button type="button" [disabled]="busy()" (click)="report('maps')">
+          {{ 'trait.report.maps' | t }}
+        </button>
       </div>
     </section>
     <section class="card">
@@ -291,16 +297,31 @@ export class SettingsUdt {
     }
   }
 
-  /** Downloads the trait report of a season: rows as CSV (for a review) or everything as JSON. */
-  protected async report(format: 'csv' | 'json') {
+  /**
+   * Downloads the trait report of a season: rows as CSV (for a review) or everything as JSON;
+   * mod 0.19.0 (decision 257): the bots' measures per skill and the suicides per map as CSV.
+   */
+  protected async report(format: 'csv' | 'json' | 'skill' | 'maps') {
     this.busy.set(true);
     try {
       const r = await this.api.udtTraitReport(this.reportSeason ?? undefined);
+      const rows =
+        format === 'skill'
+          ? (r.measures?.bySkill ?? [])
+          : format === 'maps'
+            ? (r.measures?.byMap ?? [])
+            : r.rows;
+      const name =
+        format === 'skill'
+          ? 'measures-skill'
+          : format === 'maps'
+            ? 'suicides-maps'
+            : 'trait-report';
       download(
         format === 'json'
           ? JSON.stringify(r, null, 2)
-          : csv(r.rows, r.rows.length ? undefined : ['season']),
-        `trait-report-season-${r.season}.${format}`,
+          : csv(rows, rows.length ? undefined : ['season']),
+        `${name}-season-${r.season}.${format === 'json' ? 'json' : 'csv'}`,
         format === 'json' ? 'application/json' : 'text/csv',
       );
     } catch {

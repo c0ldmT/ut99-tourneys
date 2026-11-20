@@ -21,6 +21,7 @@ import {
   type ModToBridge,
   type NewTournamentEvent,
   type PlayerGameStats,
+  type BotMeasures,
   type TraitGameStats,
   type TeamEntrant,
   type TournamentEvent,
@@ -216,6 +217,9 @@ interface StatLine {
   /** Mod 0.17.0, trait log: counters per trait (pt) and its episodes (tv). */
   traits?: Extract<ModToBridge, { t: 'pt' }>[];
   episodes?: Extract<ModToBridge, { t: 'tv' }>[];
+  /** Mod 0.19.0: measures (pm) and suicides by damage type (pu). */
+  pm?: Extract<ModToBridge, { t: 'pm' }>;
+  selfKills?: Record<string, number>;
 }
 
 interface ReadyState {
@@ -2057,6 +2061,8 @@ export class MatchDirector extends EventEmitter {
       case 'px':
       case 'pw':
       case 'pt':
+      case 'pm':
+      case 'pu':
         this.collectStat(msg);
         return;
       case 'pse':
@@ -2070,11 +2076,16 @@ export class MatchDirector extends EventEmitter {
     }
   }
 
-  private collectStat(msg: Extract<ModToBridge, { t: 'ps' | 'px' | 'pw' | 'pt' | 'tv' }>): void {
+  private collectStat(
+    msg: Extract<ModToBridge, { t: 'ps' | 'px' | 'pw' | 'pt' | 'tv' | 'pm' | 'pu' }>,
+  ): void {
     const key = `${msg.mid}/${msg.g}/${msg.n}/${msg.i}`;
     const line = this.statLines.get(key) ?? { weapons: {} };
     if (msg.t === 'ps') line.ps = msg;
     else if (msg.t === 'px') line.px = msg;
+    else if (msg.t === 'pm') line.pm = msg;
+    // Sent again after a reconnect (pending end): the last count of a damage type counts.
+    else if (msg.t === 'pu') line.selfKills = { ...line.selfKills, [msg.u]: msg.c };
     else if (msg.t === 'pt') {
       // Sent again after a reconnect (pending end): the last line of a trait counts.
       line.traits = [...(line.traits ?? []).filter((x) => x.c !== msg.c), msg];
@@ -2157,6 +2168,8 @@ export class MatchDirector extends EventEmitter {
           ? { items: { amp: x.ua, belt: x.ub ?? 0, armor: x.ur ?? 0, keg: x.uk ?? 0 } }
           : {}),
         ...(l.traits?.length ? { traits: traitStats(l) } : {}),
+        ...(l.pm ? { measures: measuresOf(l.pm) } : {}),
+        ...(l.selfKills ? { selfKills: l.selfKills } : {}),
       });
     }
     await this.append({
@@ -2665,6 +2678,24 @@ function clampAi(level: number | undefined): number {
 }
 
 /** The trait log of a player's game (mod 0.17.0): counters with up to 40 episodes per trait. */
+/** Mod 0.19.0: the measures of a bot from its pm line (decision 257). */
+function measuresOf(m: Extract<ModToBridge, { t: 'pm' }>): BotMeasures {
+  return {
+    switches: m.ws,
+    fightSwitches: m.wf,
+    shotAfter: m.wn,
+    shotAfterDs: m.wq,
+    fightSec: m.ef,
+    enforcerSec: m.ee,
+    retreats: {
+      high: { kill: m.r0k, death: m.r0d, none: m.r0n },
+      mid: { kill: m.r1k, death: m.r1d, none: m.r1n },
+      low: { kill: m.r2k, death: m.r2d, none: m.r2n },
+    },
+    items: { taken: m.it, waitSec: m.iw, quick: m.iq },
+  };
+}
+
 function traitStats(l: StatLine): TraitGameStats[] {
   return (l.traits ?? []).slice(0, 16).map((t) => {
     const eps = (l.episodes ?? []).filter((e) => e.c === t.c).slice(0, 40);

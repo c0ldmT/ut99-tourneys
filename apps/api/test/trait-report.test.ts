@@ -113,10 +113,75 @@ describe('trait report (decision 237)', () => {
       labGames: 0,
     });
     expect(r.rows.every((x) => !x.lab)).toBe(true);
+    // Mod 0.19.0: no measures in these games.
+    expect(r.measures).toEqual({ bySkill: [], byMap: [] });
     // Trait lab (decision 251): rows of AI entrants are marked.
     const lab = traitReport([t], (e) => e === 'eb');
     expect(lab.rows.find((x) => x.trait === 'vampire')?.lab).toBe(true);
     expect(lab.rows.find((x) => x.trait === 'vulture')?.lab).toBe(false);
     expect(lab.summary.find((s) => s.trait === 'vampire')?.labGames).toBe(1);
+  });
+
+  it('measures of every bot per skill, suicides per map (mod 0.19.0, decision 257)', () => {
+    const measures = (ws: number) => ({
+      switches: ws,
+      fightSwitches: 4,
+      shotAfter: 2,
+      shotAfterDs: 15,
+      fightSec: 100,
+      enforcerSec: 20,
+      retreats: {
+        high: { kill: 1, death: 0, none: 2 },
+        mid: { kill: 0, death: 1, none: 0 },
+        low: { kill: 0, death: 1, none: 0 },
+      },
+      items: { taken: 2, waitSec: 10, quick: 1 },
+    });
+    const t: TournamentFacts = {
+      tournamentId: 't2',
+      name: 'Cup',
+      mode: 'dm',
+      at: '2026-11-21T18:00:00.000Z',
+      finished: true,
+      entrantNames: {},
+      games: [],
+      runs: [],
+      matches: [],
+      participants: [],
+      players: [
+        player('Mira', true, {
+          deaths: 3,
+          suicides: 1,
+          timeSec: 300,
+          measures: measures(10),
+          selfKills: { Fell: 1 },
+        }),
+        player('Rex', false, { deaths: 5, timeSec: 300, measures: measures(6) }),
+        player('Old', true, { deaths: 2 }),
+      ],
+    };
+    const r = traitReport([t]);
+    expect(r.measures.bySkill).toEqual([
+      expect.objectContaining({
+        skill: 4,
+        games: 2,
+        minutes: 10,
+        deaths: 8,
+        suicides: 1,
+        switches: 16,
+        fightSwitches: 8,
+        shotAfter: 4,
+        shotAfterSec: 0.8,
+        enforcerSec: 40,
+        retreatHighKill: 2,
+        retreatHighNone: 4,
+        retreatLowDeath: 2,
+        itemsTaken: 4,
+        itemsQuick: 2,
+      }),
+    ]);
+    expect(r.measures.byMap).toEqual([
+      { map: 'DM-Deck16][', damageType: 'Fell', count: 1, deaths: 8 },
+    ]);
   });
 });

@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.18.0";
+const MOD_VERSION = "0.19.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -25,6 +25,7 @@ const MAXACL = 64;
 const MAXTRACK = 64;
 const MAXST = 32;   // players and bots with statistics per game
 const MAXW = 8;     // weapons per player
+const MAXU = 6;     // damage types of suicides per player (mod 0.19.0)
 const MAXCFG = 16;  // website bots with a configuration
 const MAXSAY = 192; // their chat lines
 const MAXRIV = 96;  // their rivals
@@ -98,7 +99,7 @@ var string SavedKey[16];           // 1v1: the side (a/b), team games: the playe
 var float SavedScore[16], SavedDeaths[16];
 var string PendingAddr;
 var string PendingEnd;
-var string PendingStat[260];       // statistics lines of the end, sent again with PendingEnd
+var string PendingStat[400];       // statistics lines of the end, sent again with PendingEnd
 var int PendingStatCount;
 var bool bTokenFromAddress;
 var float ReleaseAt; // see ReleaseScoreboards
@@ -134,6 +135,26 @@ var int PkHealth[8];
 var float PkAt[8];
 var int PkCount;
 var int CounterTicks;              // sx lines every 5 s
+// Mod 0.19.0 (decision 257): measures for every bot, per statistics slot (pm/pu lines).
+var Weapon MsW[32];                // the weapon in hand at the last frame
+var float MsSwAt[32];              // a switch in a fight began then (0: none waits for a shot)
+var float MsPendAt[32];            // the bot decided on another weapon then (0: none pending)
+var byte MsMv[32];                 // 1: the weapon in hand came with a move (translocator, impact jump)
+var int MsSw[32], MsSwF[32];       // weapon switches, of them in a fight (an enemy)
+var int MsGapN[32], MsGapDs[32];   // fight switches with a shot within 10 s, time to it (1/10 s)
+var int MsFight[32], MsEnf[32];    // seconds with an enemy, of them with the enforcer in hand
+var byte MsRet[32];                // 1: in a retreat episode
+var byte MsRetBand[32];            // health at its start: 0 = 90 or more, 1 = 40-89, 2 = below 40
+var int MsRetKills[32];            // the bot's kills when it began
+var int MsRetOut[288];             // MAXST * 9: retreats by band and end (kill, death, nothing)
+var string StUName[192];           // MAXST * MAXU: suicides per damage type (sent for bots)
+var int StUCount[192];
+var Inventory MsItem[24];          // armour, shield belts, damage amplifiers and kegs of the map
+var float MsUp[24];                // available since then (-1: it sleeps)
+var float MsBack[24];              // while it sleeps: back then
+var int MsItemN;
+var bool bMsItems;
+var int MsTake[32], MsWait[32], MsQuick[32]; // power items taken, seconds they waited, within 3 s
 
 // Website bots (bridge lines bcfg/btr/bpers/bsay/brv, sent before their "bot" line): look, play
 // style, chat lines and rivals by name in the game. Bots without these lines use the ini.
@@ -1727,12 +1748,17 @@ function CountKill(Pawn Killer, Pawn Other, name DamageType)
 		StSpree[v] = 0;
 		StMulti[v] = 0;
 		StLastKill[v] = -1000; // a multi kill ends with the death, as in UT
+		if (MsRet[v] != 0)
+			EndRetreat(v, 1);
 	}
 	if (Killer == None || Killer == Other)
 	{
 		FeedFlags = FeedFlags | 4;
 		if (v >= 0)
+		{
 			StSuicides[v]++;
+			AddSelfKill(v, string(DamageType));
+		}
 		return;
 	}
 	if (Other.IsA('ScriptedPawn'))
@@ -1901,6 +1927,9 @@ function SendStats(int N, int Sec)
 
 	PendingStatCount = 0;
 	for (i = 0; i < StCount; i++)
+		if (MsRet[i] != 0)
+			EndRetreat(i, 0);
+	for (i = 0; i < StCount; i++)
 	{
 		OutMsg.Begin("ps");
 		OutMsg.AddStr("mid", MatchId);
@@ -1951,6 +1980,8 @@ function SendStats(int N, int Sec)
 			OutMsg.AddInt("c", StWCount[i * MAXW + j]);
 			SendStat();
 		}
+		if (StBot[i] != "")
+			SendMeasures(N, i);
 	}
 	SendTraitStats(N);
 	OutMsg.Begin("pse");
@@ -1968,7 +1999,7 @@ function SendStat()
 	local string Line;
 
 	Line = OutMsg.Finish();
-	if (PendingStatCount < 260)
+	if (PendingStatCount < 400)
 	{
 		PendingStat[PendingStatCount] = Line;
 		PendingStatCount++;
@@ -2014,9 +2045,13 @@ function LiveDataTick()
 			SendRoster(i, P);
 		SendLiveState(i, P);
 		if (Bot(P) != None)
+		{
 			SendThought(i, Bot(P));
+			MeasureSecond(i, Bot(P));
+		}
 	}
 	CheckPickups(); // after the roster: a pk line never comes before its lr line
+	MeasureItemTick(); // after the pickups: an item taken now counts its wait from before
 	if (bCounters)
 		for (i = 0; i < StCount; i++)
 			if (StListed[i] != 0 && StPawn[i] != None && !StPawn[i].bDeleteMe)
@@ -2253,6 +2288,7 @@ function CheckPickups()
 		if (i < 0)
 			continue;
 		CountPickup(i, PkCode[j]);
+		MeasureTake(i, Itm, PkAt[j]);
 		TrItemTaken(P, PkCode[j]);
 		LiveHead("pk", i);
 		OutMsg.AddStr("it", PkCode[j]);
@@ -2931,6 +2967,8 @@ event Tick(float DeltaTime)
 	local int t;
 	local PlayerPawn P;
 
+	if (bGameLive && !bEndReported && !bTourneyPaused && Game != None && !Game.bGameEnded)
+		MeasureFrame();
 	if (ReleaseAt <= 0 || Level.TimeSeconds < ReleaseAt)
 		return;
 	ReleaseAt = 0;
@@ -6181,6 +6219,285 @@ function TrSampleLate(int c, int t, bool bOn, Pawn P)
 		TrStart(c, t, P);
 	else if (TrOn[x] != 0 && Level.TimeSeconds - TrLast[x] >= 3)
 		TrEndAt(c, t, 0, TrLast[x]);
+}
+
+// ---------------------------------------------------------------------------------------
+// Mod 0.19.0 (decision 257): measures for every bot - weapon switches and the time to the next
+// shot, seconds in a fight and with the enforcer, retreat episodes by health and how they ended,
+// suicides by damage type, power items taken and how long they waited for it.
+// ---------------------------------------------------------------------------------------
+
+// The weapon is shooting (server side: the firing states of UT's weapons; the rocket launcher
+// from its loading on, the impact hammer's primary in Firing / FireBlast).
+function bool MsFiring(Weapon W)
+{
+	if (W.IsInState('NormalFire') || W.IsInState('AltFiring') || W.IsInState('FireRockets'))
+		return true;
+	return W.IsInState('Firing') || W.IsInState('FireBlast');
+}
+
+// Every frame of a live game: switches, and from a switch in a fight to the next shot. Bot's
+// SwitchToBestWeapon leaves PendingWeapon on the weapon in hand: only another one is a switch.
+// The translocator and the impact jump's hammer are moves, not a choice of weapon.
+function MeasureFrame()
+{
+	local int i;
+	local Bot B;
+	local Weapon W, PW;
+	local float Gap;
+	local bool bPending, bMove;
+
+	for (i = 0; i < StCount; i++)
+	{
+		B = Bot(StPawn[i]);
+		if (B == None || B.bDeleteMe || B.Health <= 0)
+		{
+			MsW[i] = None; // the weapon of the next life is no switch
+			MsSwAt[i] = 0;
+			MsPendAt[i] = 0;
+			MsMv[i] = 0;
+			continue;
+		}
+		W = B.Weapon;
+		PW = B.PendingWeapon;
+		bPending = PW != None && PW != W;
+		bMove = Translocator(W) != None || Translocator(PW) != None || B.GetStateName() == 'ImpactJumping';
+		if (bPending && !bMove && B.Enemy != None && MsPendAt[i] == 0)
+			MsPendAt[i] = Level.TimeSeconds;
+		if (!bPending && W == MsW[i])
+			MsPendAt[i] = 0; // the switch was dropped
+		if (W != MsW[i])
+		{
+			if (MsW[i] != None && W != None && !bMove && MsMv[i] == 0)
+			{
+				MsSw[i]++;
+				if (B.Enemy != None || MsPendAt[i] > 0)
+				{
+					MsSwF[i]++;
+					if (MsPendAt[i] > 0)
+						MsSwAt[i] = MsPendAt[i];
+					else
+						MsSwAt[i] = Level.TimeSeconds;
+				}
+			}
+			MsPendAt[i] = 0;
+			MsW[i] = W;
+			if (bMove)
+				MsMv[i] = 1;
+			else
+				MsMv[i] = 0;
+		}
+		if (MsSwAt[i] > 0 && W != None && !bPending && !bMove)
+		{
+			Gap = Level.TimeSeconds - MsSwAt[i];
+			if (Gap > 10)
+				MsSwAt[i] = 0;
+			else if (MsFiring(W))
+			{
+				MsGapN[i]++;
+				MsGapDs[i] += int(Gap * 10 + 0.5);
+				MsSwAt[i] = 0;
+			}
+		}
+	}
+}
+
+// Once a second for a living bot: seconds in a fight (and with the enforcer), retreats.
+function MeasureSecond(int i, Bot B)
+{
+	local name St;
+	local bool bRet;
+
+	if (B.Health <= 0)
+		return;
+	if (B.Enemy != None)
+	{
+		MsFight[i]++;
+		if (enforcer(B.Weapon) != None)
+			MsEnf[i]++;
+	}
+	St = B.GetStateName();
+	// Short states inside a retreat (a fall, a hit, a jump) keep the episode open; Fallback
+	// is going back to its orders (team games), no retreat.
+	if (St == 'FallingState' || St == 'TakeHit' || St == 'ImpactJumping')
+		return;
+	bRet = St == 'Retreating';
+	if (bRet && MsRet[i] == 0)
+	{
+		MsRet[i] = 1;
+		MsRetKills[i] = StKills[i];
+		if (B.Health >= 90)
+			MsRetBand[i] = 0;
+		else if (B.Health >= 40)
+			MsRetBand[i] = 1;
+		else
+			MsRetBand[i] = 2;
+	}
+	else if (!bRet && MsRet[i] != 0)
+		EndRetreat(i, 0);
+}
+
+// A retreat episode ends: with a kill (it scored meanwhile), its death or nothing.
+function EndRetreat(int i, int Died)
+{
+	local int o;
+
+	MsRet[i] = 0;
+	if (Died != 0)
+		o = 1;
+	else if (StKills[i] > MsRetKills[i])
+		o = 0;
+	else
+		o = 2;
+	MsRetOut[i * 9 + MsRetBand[i] * 3 + o]++;
+}
+
+// A suicide (falls, kill zones and own weapons) by its damage type.
+function AddSelfKill(int i, string D)
+{
+	local int j, Bs;
+
+	D = Left(D, 32);
+	if (D == "")
+		return;
+	Bs = i * MAXU;
+	for (j = 0; j < MAXU; j++)
+	{
+		if (StUName[Bs + j] == D)
+		{
+			StUCount[Bs + j]++;
+			return;
+		}
+		if (StUName[Bs + j] == "")
+		{
+			StUName[Bs + j] = D;
+			StUCount[Bs + j] = 1;
+			return;
+		}
+	}
+}
+
+// The armour, shield belts, damage amplifiers and kegs of the map (once).
+function FindMeasureItems()
+{
+	local Inventory Itm;
+
+	bMsItems = true;
+	foreach AllActors(class'Inventory', Itm)
+	{
+		if (MsItemN >= 24)
+			break;
+		if (Itm.Owner != None || Itm.bHeldItem || Itm.RespawnTime <= 0)
+			continue;
+		if (UDamage(Itm) == None && UT_ShieldBelt(Itm) == None && Armor2(Itm) == None && HealthPack(Itm) == None)
+			continue;
+		MsItem[MsItemN] = Itm;
+		MsUp[MsItemN] = Level.TimeSeconds;
+		MsBack[MsItemN] = 0;
+		if (Itm.IsInState('Sleeping'))
+		{
+			MsUp[MsItemN] = -1;
+			MsBack[MsItemN] = Level.TimeSeconds + FMax(Itm.LatentFloat, 0.1);
+		}
+		MsItemN++;
+	}
+}
+
+// Once a second after the pickups: since when each item waits (or when it is back).
+function MeasureItemTick()
+{
+	local int j;
+
+	if (!bMsItems)
+		FindMeasureItems();
+	for (j = 0; j < MsItemN; j++)
+	{
+		if (MsItem[j] == None || MsItem[j].bDeleteMe)
+			continue;
+		if (MsItem[j].IsInState('Sleeping'))
+		{
+			MsUp[j] = -1;
+			MsBack[j] = Level.TimeSeconds + FMax(MsItem[j].LatentFloat, 0.1);
+		}
+		else if (MsUp[j] < 0)
+		{
+			// back since the last second: from its respawn time
+			if (MsBack[j] > 0 && MsBack[j] <= Level.TimeSeconds)
+				MsUp[j] = MsBack[j];
+			else
+				MsUp[j] = Level.TimeSeconds;
+		}
+	}
+}
+
+// A power item or keg was taken (at At): how long it had been waiting.
+function MeasureTake(int i, Inventory Itm, float At)
+{
+	local int j;
+	local float Wait;
+
+	if (Itm == None)
+		return;
+	for (j = 0; j < MsItemN; j++)
+		if (MsItem[j] == Itm)
+			break;
+	if (j >= MsItemN)
+		return;
+	if (MsUp[j] >= 0)
+		Wait = At - MsUp[j];
+	else if (MsBack[j] > 0 && MsBack[j] <= At + 1)
+		Wait = At - MsBack[j]; // back and taken within the same second
+	else
+		return;
+	Wait = FMax(Wait, 0);
+	MsTake[i]++;
+	MsWait[i] += Min(60, int(Wait + 0.5));
+	if (Wait <= 3)
+		MsQuick[i]++;
+	// Taken: a second pawn on the same item in this tick does not count it again.
+	MsUp[j] = -1;
+	MsBack[j] = 0;
+}
+
+// The pm line of a bot and its pu lines (before pse, kept for a resend like the others).
+function SendMeasures(int N, int i)
+{
+	local int j, b;
+
+	OutMsg.Begin("pm");
+	OutMsg.AddStr("mid", MatchId);
+	OutMsg.AddInt("g", GameNo);
+	OutMsg.AddInt("n", N);
+	OutMsg.AddInt("i", i);
+	OutMsg.AddInt("ws", MsSw[i]);
+	OutMsg.AddInt("wf", MsSwF[i]);
+	OutMsg.AddInt("wn", MsGapN[i]);
+	OutMsg.AddInt("wq", MsGapDs[i]);
+	OutMsg.AddInt("ef", MsFight[i]);
+	OutMsg.AddInt("ee", MsEnf[i]);
+	for (b = 0; b < 3; b++)
+	{
+		OutMsg.AddInt("r" $ b $ "k", MsRetOut[i * 9 + b * 3]);
+		OutMsg.AddInt("r" $ b $ "d", MsRetOut[i * 9 + b * 3 + 1]);
+		OutMsg.AddInt("r" $ b $ "n", MsRetOut[i * 9 + b * 3 + 2]);
+	}
+	OutMsg.AddInt("it", MsTake[i]);
+	OutMsg.AddInt("iw", MsWait[i]);
+	OutMsg.AddInt("iq", MsQuick[i]);
+	SendStat();
+	for (j = 0; j < MAXU; j++)
+	{
+		if (StUName[i * MAXU + j] == "")
+			break;
+		OutMsg.Begin("pu");
+		OutMsg.AddStr("mid", MatchId);
+		OutMsg.AddInt("g", GameNo);
+		OutMsg.AddInt("n", N);
+		OutMsg.AddInt("i", i);
+		OutMsg.AddStr("u", StUName[i * MAXU + j]);
+		OutMsg.AddInt("c", StUCount[i * MAXU + j]);
+		SendStat();
+	}
 }
 
 // Before "pse": open episodes end with the game, then one "pt" line per trait of every bot

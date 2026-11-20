@@ -73,6 +73,53 @@ export interface TraitSummary {
   labGames: number;
 }
 
+/**
+ * Measures of every bot (mod 0.19.0, decision 257) summed per skill: weapon switches, the time
+ * from a switch in a fight to the next shot, the enforcer in fights, retreats by the health at
+ * their start and their end, power items and how long they had waited, suicides.
+ */
+export interface MeasureSkillRow {
+  skill: number | null;
+  /** Bot games (runs) with measures, their minutes, deaths and suicides. */
+  games: number;
+  minutes: number;
+  deaths: number;
+  suicides: number;
+  switches: number;
+  fightSwitches: number;
+  shotAfter: number;
+  /** Mean seconds from a switch in a fight to the next shot (null: none). */
+  shotAfterSec: number | null;
+  fightSec: number;
+  enforcerSec: number;
+  retreatHighKill: number;
+  retreatHighDeath: number;
+  retreatHighNone: number;
+  retreatMidKill: number;
+  retreatMidDeath: number;
+  retreatMidNone: number;
+  retreatLowKill: number;
+  retreatLowDeath: number;
+  retreatLowNone: number;
+  itemsTaken: number;
+  itemsWaitSec: number;
+  itemsQuick: number;
+}
+
+/** Suicides by map and damage type (falls, kill zones, own weapons), with the bots' deaths. */
+export interface MeasureMapRow {
+  map: string;
+  damageType: string;
+  count: number;
+  /** All deaths of the bots with measures on that map. */
+  deaths: number;
+}
+
+export interface MeasureReport {
+  bySkill: MeasureSkillRow[];
+  byMap: MeasureMapRow[];
+}
+
 export interface TraitReport {
   /** Bot games (runs) with a trait log. */
   games: number;
@@ -80,6 +127,8 @@ export interface TraitReport {
   baseline: { games: number; won: number; kills: number; deaths: number };
   summary: TraitSummary[];
   rows: TraitReportRow[];
+  /** Mod 0.19.0: measures of every bot (decision 257). */
+  measures: MeasureReport;
 }
 
 export function traitReport(
@@ -193,5 +242,87 @@ export function traitReport(
         : null,
     }))
     .sort((a, b) => b.games - a.games || a.trait.localeCompare(b.trait));
-  return { games: baseline.games, baseline, summary, rows };
+  return { games: baseline.games, baseline, summary, rows, measures: measureReport(all) };
+}
+
+/** The measures of every bot (mod 0.19.0) per skill, and suicides per map and damage type. */
+export function measureReport(all: readonly TournamentFacts[]): MeasureReport {
+  const skills = new Map<number | null, MeasureSkillRow & { ds: number }>();
+  const deathsOn = new Map<string, number>();
+  const selfKills = new Map<string, number>();
+  for (const t of all)
+    for (const p of t.players) {
+      const m = p.stats?.measures;
+      if (!p.bot || !m || !p.stats) continue;
+      const key = p.skill ?? null;
+      let r = skills.get(key);
+      if (!r) {
+        r = {
+          skill: key,
+          games: 0,
+          minutes: 0,
+          deaths: 0,
+          suicides: 0,
+          switches: 0,
+          fightSwitches: 0,
+          shotAfter: 0,
+          shotAfterSec: null,
+          fightSec: 0,
+          enforcerSec: 0,
+          retreatHighKill: 0,
+          retreatHighDeath: 0,
+          retreatHighNone: 0,
+          retreatMidKill: 0,
+          retreatMidDeath: 0,
+          retreatMidNone: 0,
+          retreatLowKill: 0,
+          retreatLowDeath: 0,
+          retreatLowNone: 0,
+          itemsTaken: 0,
+          itemsWaitSec: 0,
+          itemsQuick: 0,
+          ds: 0,
+        };
+        skills.set(key, r);
+      }
+      r.games++;
+      r.minutes += p.stats.timeSec / 60;
+      r.deaths += p.stats.deaths;
+      r.suicides += p.stats.suicides;
+      r.switches += m.switches;
+      r.fightSwitches += m.fightSwitches;
+      r.shotAfter += m.shotAfter;
+      r.ds += m.shotAfterDs;
+      r.fightSec += m.fightSec;
+      r.enforcerSec += m.enforcerSec;
+      r.retreatHighKill += m.retreats.high.kill;
+      r.retreatHighDeath += m.retreats.high.death;
+      r.retreatHighNone += m.retreats.high.none;
+      r.retreatMidKill += m.retreats.mid.kill;
+      r.retreatMidDeath += m.retreats.mid.death;
+      r.retreatMidNone += m.retreats.mid.none;
+      r.retreatLowKill += m.retreats.low.kill;
+      r.retreatLowDeath += m.retreats.low.death;
+      r.retreatLowNone += m.retreats.low.none;
+      r.itemsTaken += m.items.taken;
+      r.itemsWaitSec += m.items.waitSec;
+      r.itemsQuick += m.items.quick;
+      deathsOn.set(p.map, (deathsOn.get(p.map) ?? 0) + p.stats.deaths);
+      for (const [d, n] of Object.entries(p.stats.selfKills ?? {}))
+        selfKills.set(`${p.map}\n${d}`, (selfKills.get(`${p.map}\n${d}`) ?? 0) + n);
+    }
+  const bySkill = [...skills.values()]
+    .map(({ ds, ...r }) => ({
+      ...r,
+      minutes: Math.round(r.minutes * 10) / 10,
+      shotAfterSec: r.shotAfter ? Math.round(ds / r.shotAfter) / 10 : null,
+    }))
+    .sort((a, b) => (a.skill ?? -1) - (b.skill ?? -1));
+  const byMap = [...selfKills.entries()]
+    .map(([k, count]) => {
+      const [map, damageType] = k.split('\n') as [string, string];
+      return { map, damageType, count, deaths: deathsOn.get(map) ?? 0 };
+    })
+    .sort((a, b) => a.map.localeCompare(b.map) || b.count - a.count);
+  return { bySkill, byMap };
 }

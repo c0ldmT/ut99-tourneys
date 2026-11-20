@@ -134,6 +134,14 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > juggernaut, adrenaline, pathfinder multiply). Every new trait reports to the trait log of 0.17.0 (`pt`, cold blood and
 > second wind as episodes `tv`).
 
+> Mod 0.19.0: measures of every bot (decision 257, plan Season 3 P2.1), sent with the statistics before `pse`: `pm`
+> (weapon switches, in a fight, the time from a fight switch to the next shot, seconds in a fight and with the enforcer,
+> retreat episodes by the health at their start and how they ended, power items and kegs taken and how long they had
+> waited since their respawn) and `pu` (suicides by damage type: falls, kill zones, own weapons). Counted every frame
+> (switches - not the translocator or an impact jump; shots: the weapon in a firing state, the rocket launcher from its
+> loading on) and once a second (fights, retreats: state `Retreating`, kept over falls and hits; items). No change to how
+> bots play.
+
 ## Classes
 
 | Class | Role |
@@ -331,6 +339,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 67 | **Monster Hunt focus** (mod 0.17.0) | Website updated. My team → bot details → Monster Hunt focus (per bot, decision 239): in one team set one bot to Sprinter and one to Hunter (the Monster Hunt lineup shows the focus under the card), then a Dream Team Monster Hunt cup 2on2 (MH-NaliVillage or MH-Egypt), bot help (waypoint fix) on. Server log: `bot [..] <name>: focus 2` / `focus -2` once per bot, the sprinter `focus 2 - breaks off from … and moves on` and passes monsters further away; the hunter `focus -2 - attacks …` and stays to fight titans/big monsters instead of fleeing. Standard (0) plays as before |
 | 68 | **Trait catalogue v2** (mod 0.18.0) | Website updated. Dream Team cup with roster bots carrying new traits (craft them on the packs page): weapon master (pick the weapon like the gun nut), juggernaut, second wind, rewind, deemer dream, overload, scavenger/health hound in DM, warden/monster whisperer/titan slayer in a Monster Hunt 2on2. Server log: `game trait deemer dream: <bot> gets a redeemer` once per game, `game trait rewind: <bot> back at …` once (not after a fall or lava), `game trait overload: <bot> amplified` on every 5th kill of a life, `health hound heads for …`; the match page → "Traits in this game" shows the new counters (bonus damage, prevented damage, health from second wind/regeneration, seconds with the favourite weapon). A bouncer bot no longer hops around all the time. No `Accessed None` in the log |
 | 69 | **Patch notes** (website only) | Website updated (migration 45 runs by itself). Log in: the modal "What's new" shows the notes 243 and 242 once ("All patch notes" shows the older ones too); "Got it" or Escape, reload: it does not come again. Footer → "Patch notes" opens all notes any time, in German with the language switch. A new user (first login) and a guest on the first visit get no modal. |
+| 70 | **Bot measures** (mod 0.19.0) | Bridge and website updated, mod 0.19.0 built. A Dream Team or bot-only game with 4+ bots on a map with power items and a pit (DM-Deck16][ or DM-Morpheus), 5 minutes. Bridge: no `bad line` for `pm`/`pu`. Settings → Dream Team → Trait report: "Bot measures per skill (CSV)" has a row per skill with switches, fight switches, seconds to the shot (about 0.3-2 s), fight and enforcer seconds, retreats (most with health 90+ in the first column group if the old pattern holds), items taken and quick ones; "Suicides per map (CSV)" lists e.g. `Fell` or `RocketDeath` with the map. Server log: no `Accessed None` in `MeasureFrame`/`MeasureItemTick`. |
 
 ## SmartStockBots (optional)
 
