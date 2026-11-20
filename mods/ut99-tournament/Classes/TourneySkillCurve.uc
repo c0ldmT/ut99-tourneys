@@ -23,6 +23,10 @@
 //   (TDodgeLate) and sometimes the wrong side (TDodgeErr), also in fighting moves; leading
 //   switched off now and then (TLeadOff); UT's advanced tactics kept by level (TAdvTactics);
 //   the strafing value scales the dodge chances (TStrafeDodge). Decision 174.
+// - 0.19.1: base AI by level (decision 258): safety distances of splash weapons (TSafe), fewer
+//   switches in a fight (TSwitchGap), a switch before the last shot (TAmmoCare), less push next
+//   to a drop (TPitPush), power items planned a few seconds ahead (TItemAhead, TItemPlan; the
+//   core's item timing).
 // - SmartStockBots: its MoveWithDodge (it sets bCanDuck every 0.1 s) and
 //   FixMinigun (doubles the minigun's aim error) are switched off at run time;
 //   the ini stays untouched, everything else of it keeps working.
@@ -71,6 +75,11 @@ var Projectile CSeen[128];        // 4 per bot: projectiles already rolled for
 var byte CSeenNext[32];
 var float CLeadAt[32];            // next roll of leading
 var byte CAdvSeen[32];            // 1: the game's advanced tactics already rolled for
+// Mod 0.19.1 (decision 258): base AI rolls, every 2 s per bot.
+var float CSafeAt[32];            // next roll of the safety distances
+var byte CSafeOn[32];             // 1: it keeps the safety distances of splash weapons now
+var float CCareAt[32];            // next roll of the ammo care
+var byte CCareOn[32];             // 1: it takes another weapon before its last shot now
 
 // The curve, index = level 0..7 (Novice, Average, Experienced, Skilled, Adept, Masterful,
 // Inhuman, Godlike). See docs/decisions.md 149.
@@ -97,6 +106,12 @@ var float TDodgeErr[8];           // chance a dodge goes to the wrong side (0.15
 var float TLeadOff[8];            // chance it does not lead its target, rolled every 2 s (0.15.0)
 var float TStrafeDodge[8];        // dodge chances x (1 + this x strafing) (0.15.0)
 var float TAdvTactics[8];         // share of the game's advanced tactics it keeps (0.15.0)
+var float TSafe[8];               // chance it keeps the safety distances of splash weapons (0.19.1)
+var float TSwitchGap[8];          // in a fight another weapon must rate this much better (0.19.1)
+var float TAmmoCare[8];           // chance it takes another weapon before its last shot (0.19.1)
+var float TPitPush[8];            // share of a hit's push it takes next to a drop (0.19.1)
+var float TItemAhead[8];          // seconds before a power item is back it heads there (0.19.1)
+var float TItemPlan[8];           // chance per look (every 3 s) that it does (0.19.1)
 
 function Init(TourneyCore C)
 {
@@ -180,6 +195,10 @@ function int Slot(Bot B, bool bCreate)
 	CPickAt[Free] = 0;
 	CAimAt[Free] = 0;
 	CBlindLog[Free] = 0;
+	CSafeAt[Free] = 0;
+	CSafeOn[Free] = 0;
+	CCareAt[Free] = 0;
+	CCareOn[Free] = 0;
 	return Free;
 }
 
@@ -350,6 +369,200 @@ function bool HoldFire(Bot B)
 	// The enemy may be new since the last tick (SeePlayer fires at once).
 	SightReact(B, s);
 	return Level.TimeSeconds < CHoldUntil[s];
+}
+
+//-----------------------------------------------------------------------------
+// Mod 0.19.1 (decision 258): base AI by level. G1: now and then (TSafe, rolled every 2 s) a
+// splash weapon is not fired within its safety distance (the table of the trait Trigger
+// discipline): flak, shock and ripper fire their primary, rocket launcher, bio rifle and
+// redeemer give way to the best safe weapon. G4: in a fight it keeps the weapon in hand unless
+// another one rates TSwitchGap better (UT adds 0.21 already), and now and then (TAmmoCare)
+// it takes another weapon before its last shot. The tournament's bot classes call BotSwitch
+// instead of Bot.SwitchToBestWeapon (Bot.FireWeapon calls it before every shot).
+//-----------------------------------------------------------------------------
+
+// A weapon in a mode would hurt the bot itself at this distance to its enemy.
+function bool Unsafe(Weapon W, int Alt, float Dist)
+{
+	if (W == None)
+		return false;
+	if (UT_Eightball(W) != None)
+		return Dist < 400;
+	if (UT_FlakCannon(W) != None)
+		return Alt > 0 && Dist < 450;
+	if (SuperShockRifle(W) != None)
+		return false;
+	if (ShockRifle(W) != None)
+		return Alt > 0 && Dist < 400;
+	if (Ripper(W) != None)
+		return Alt > 0 && Dist < 300;
+	if (UT_BioRifle(W) != None)
+		return Dist < 300;
+	if (WarHeadLauncher(W) != None)
+		return Dist < 1500;
+	return false;
+}
+
+// Only the secondary mode splashes: the primary is safe.
+function bool AltOnly(Weapon W)
+{
+	return UT_FlakCannon(W) != None || ShockRifle(W) != None || Ripper(W) != None;
+}
+
+// The best other weapon with ammo that is safe at Dist (None: there is none), its mode in Alt.
+function Weapon SafeOther(Bot B, Weapon NotW, float Dist, out int Alt)
+{
+	local Inventory Inv;
+	local Weapon W, Best;
+	local float R, BestR;
+	local int A, n;
+
+	Best = None;
+	BestR = 0;
+	for (Inv = B.Inventory; Inv != None && n < 64; Inv = Inv.Inventory)
+	{
+		n++;
+		W = Weapon(Inv);
+		if (W == None || W == NotW || Translocator(W) != None)
+			continue;
+		R = W.RateSelf(A);
+		if (R <= 0 || (W.bMeleeWeapon && Dist > 400))
+			continue;
+		if (Unsafe(W, A, Dist))
+		{
+			if (!AltOnly(W))
+				continue;
+			A = 0;
+		}
+		if (Best == None || R > BestR)
+		{
+			Best = W;
+			BestR = R;
+			Alt = A;
+		}
+	}
+	return Best;
+}
+
+// Bot.SwitchToBestWeapon with the base AI of the level (returns: use the secondary mode).
+function bool BotSwitch(Bot B)
+{
+	local float Rating, Cur, Dist, R;
+	local int UseAlt, CurAlt, FavAlt, OtherAlt, s;
+	local Inventory MyFav;
+	local Weapon Rec, W, Other;
+
+	if (B.Inventory == None)
+		return false;
+	Rec = B.Inventory.RecommendWeapon(Rating, UseAlt);
+	B.PendingWeapon = Rec;
+	if (Rec == None)
+		return false;
+	// The favourite weapon as in UT.
+	if (B.FavoriteWeapon != None && Rec.Class != B.FavoriteWeapon)
+	{
+		MyFav = B.FindInventoryType(B.FavoriteWeapon);
+		if (MyFav != None)
+		{
+			R = Weapon(MyFav).RateSelf(FavAlt) + 0.22;
+			if (R > Rec.RateSelf(UseAlt))
+			{
+				UseAlt = FavAlt;
+				Rec = Weapon(MyFav);
+				Rating = R;
+			}
+		}
+	}
+	W = B.Weapon;
+	s = Slot(B, false);
+	if (bOn && s >= 0 && B.Enemy != None && W != None && Translocator(W) == None)
+	{
+		Dist = VSize(B.Enemy.Location - B.Location);
+		if (Level.TimeSeconds >= CSafeAt[s])
+		{
+			CSafeAt[s] = Level.TimeSeconds + 2;
+			CSafeOn[s] = 0;
+			if (FRand() < TSafe[CLv[s]])
+				CSafeOn[s] = 1;
+		}
+		if (Level.TimeSeconds >= CCareAt[s])
+		{
+			CCareAt[s] = Level.TimeSeconds + 2;
+			CCareOn[s] = 0;
+			if (FRand() < TAmmoCare[CLv[s]])
+				CCareOn[s] = 1;
+		}
+		// G4: the weapon in hand stays unless another one is clearly better.
+		if (TSwitchGap[CLv[s]] > 0 && Rec != W && !W.bMeleeWeapon && (W.AmmoType == None || W.AmmoType.AmmoAmount > 0))
+		{
+			Cur = W.RateSelf(CurAlt) + 0.21;
+			if (Cur > 0 && Rating < Cur + TSwitchGap[CLv[s]])
+			{
+				Rec = W;
+				UseAlt = CurAlt;
+			}
+		}
+		// G4: before the last shot another weapon (melee weapons have no ammo).
+		if (CCareOn[s] != 0 && Rec == W && W.AmmoType != None && W.AmmoType.AmmoAmount == 1 && !W.IsInState('ComboMove'))
+		{
+			Other = SafeOther(B, W, Dist, OtherAlt);
+			if (Other != None)
+			{
+				Rec = Other;
+				UseAlt = OtherAlt;
+			}
+		}
+		// G1: no splash within the safety distance.
+		if (CSafeOn[s] != 0 && Unsafe(Rec, UseAlt, Dist))
+		{
+			if (AltOnly(Rec))
+				UseAlt = 0;
+			else
+			{
+				Other = SafeOther(B, Rec, Dist, OtherAlt);
+				if (Other != None)
+				{
+					Rec = Other;
+					UseAlt = OtherAlt;
+				}
+			}
+		}
+	}
+	B.PendingWeapon = Rec;
+	if (B.Weapon == None)
+		B.ChangedWeapon();
+	else if (B.Weapon != B.PendingWeapon)
+		B.Weapon.PutDown();
+	return UseAlt > 0;
+}
+
+// G2: a hit next to a drop pushes the bot less (it keeps TPitPush of the push sideways), so a
+// rocket does not throw it into a pit or space as easily. A drop: no floor within 900
+// below a point 160 ahead in the push's direction (no wall in between). Maps stay in the pool.
+function PitPush(Pawn Victim, Pawn By, out vector Momentum)
+{
+	local Bot B;
+	local int s;
+	local vector Dir, Ahead, HitLoc, HitNorm;
+
+	B = Bot(Victim);
+	// Its own hits (impact jumps, rocket jumps) keep their push.
+	if (!bOn || B == None || B.bDeleteMe || By == Victim || B.IsInState('ImpactJumping'))
+		return;
+	s = Slot(B, false);
+	if (s < 0 || TPitPush[CLv[s]] >= 1)
+		return;
+	Dir = Momentum;
+	Dir.Z = 0;
+	if (VSize(Dir) < 50)
+		return;
+	Ahead = B.Location + Normal(Dir) * 160;
+	if (!B.FastTrace(Ahead, B.Location))
+		return;
+	if (B.Trace(HitLoc, HitNorm, Ahead - vect(0,0,900), Ahead, false) != None)
+		return;
+	Momentum.X = Momentum.X * TPitPush[CLv[s]];
+	Momentum.Y = Momentum.Y * TPitPush[CLv[s]];
 }
 
 // The game's peripheral vision for the full AI at skill S (Bot.SetPeripheralVision).
@@ -1244,4 +1457,52 @@ defaultproperties
 	TAdvTactics(5)=0.85
 	TAdvTactics(6)=1
 	TAdvTactics(7)=1
+	TSafe(0)=0.05
+	TSafe(1)=0.07
+	TSafe(2)=0.1
+	TSafe(3)=0.13
+	TSafe(4)=0.17
+	TSafe(5)=0.21
+	TSafe(6)=0.25
+	TSafe(7)=0.3
+	TSwitchGap(0)=0
+	TSwitchGap(1)=0
+	TSwitchGap(2)=0.02
+	TSwitchGap(3)=0.04
+	TSwitchGap(4)=0.06
+	TSwitchGap(5)=0.08
+	TSwitchGap(6)=0.1
+	TSwitchGap(7)=0.12
+	TAmmoCare(0)=0
+	TAmmoCare(1)=0.05
+	TAmmoCare(2)=0.1
+	TAmmoCare(3)=0.15
+	TAmmoCare(4)=0.2
+	TAmmoCare(5)=0.3
+	TAmmoCare(6)=0.4
+	TAmmoCare(7)=0.5
+	TPitPush(0)=0.85
+	TPitPush(1)=0.8
+	TPitPush(2)=0.75
+	TPitPush(3)=0.7
+	TPitPush(4)=0.65
+	TPitPush(5)=0.6
+	TPitPush(6)=0.55
+	TPitPush(7)=0.5
+	TItemAhead(0)=0
+	TItemAhead(1)=0
+	TItemAhead(2)=0
+	TItemAhead(3)=2
+	TItemAhead(4)=3
+	TItemAhead(5)=4
+	TItemAhead(6)=6
+	TItemAhead(7)=8
+	TItemPlan(0)=0
+	TItemPlan(1)=0
+	TItemPlan(2)=0
+	TItemPlan(3)=0.1
+	TItemPlan(4)=0.15
+	TItemPlan(5)=0.2
+	TItemPlan(6)=0.3
+	TItemPlan(7)=0.4
 }

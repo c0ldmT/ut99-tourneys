@@ -92,6 +92,8 @@ export interface MeasureSkillRow {
   shotAfterSec: number | null;
   fightSec: number;
   enforcerSec: number;
+  /** Mod 0.19.1: switches from a living enemy to another one. */
+  enemySwitches: number;
   retreatHighKill: number;
   retreatHighDeath: number;
   retreatHighNone: number;
@@ -269,6 +271,7 @@ export function measureReport(all: readonly TournamentFacts[]): MeasureReport {
           shotAfterSec: null,
           fightSec: 0,
           enforcerSec: 0,
+          enemySwitches: 0,
           retreatHighKill: 0,
           retreatHighDeath: 0,
           retreatHighNone: 0,
@@ -295,6 +298,7 @@ export function measureReport(all: readonly TournamentFacts[]): MeasureReport {
       r.ds += m.shotAfterDs;
       r.fightSec += m.fightSec;
       r.enforcerSec += m.enforcerSec;
+      r.enemySwitches += m.enemySwitches ?? 0;
       r.retreatHighKill += m.retreats.high.kill;
       r.retreatHighDeath += m.retreats.high.death;
       r.retreatHighNone += m.retreats.high.none;

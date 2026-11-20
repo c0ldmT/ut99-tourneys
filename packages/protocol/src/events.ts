@@ -63,6 +63,8 @@ export const BotMeasuresSchema = z.object({
   shotAfterDs: count,
   fightSec: count,
   enforcerSec: count,
+  /** Mod 0.19.1: switches from a living enemy straight to another one. */
+  enemySwitches: count.optional(),
   retreats: z.object({ high: retreats, mid: retreats, low: retreats }),
   items: z.object({ taken: count, waitSec: count, quick: count }),
 });

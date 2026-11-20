@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.19.1: base AI by level on the skill curve - safety distances of splash weapons now and then, fewer weapon switches in fights, a switch before the last shot, less push towards drops, higher levels head for power items shortly before they are back; the measures count switches between enemies.
 - Mod 0.19.0: measures of every bot in the game statistics - weapon switches and the time to the next shot, enforcer time in fights, retreats by health and how they ended, power items and how long they waited, suicides by damage type; the trait report downloads them per skill and per map (CSV).
 - Dream Team: trait workshop on the packs page - reroll an inventory trait into another of its rarity or upgrade it one rarity (random), for Neuro and scrap.
 - Dream Team: training camp in the bot details - +60 XP for a bot once a day for 300 × √index Neuro.

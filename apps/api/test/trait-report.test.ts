@@ -130,6 +130,7 @@ describe('trait report (decision 237)', () => {
       shotAfterDs: 15,
       fightSec: 100,
       enforcerSec: 20,
+      enemySwitches: 3,
       retreats: {
         high: { kill: 1, death: 0, none: 2 },
         mid: { kill: 0, death: 1, none: 0 },
@@ -173,6 +174,7 @@ describe('trait report (decision 237)', () => {
         shotAfter: 4,
         shotAfterSec: 0.8,
         enforcerSec: 40,
+        enemySwitches: 6,
         retreatHighKill: 2,
         retreatHighNone: 4,
         retreatLowDeath: 2,

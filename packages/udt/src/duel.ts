@@ -73,6 +73,19 @@ export interface SkillCurve {
   strafeDodge: CurveRow;
   /** Mod 0.15.0: share of UT's advanced tactics it keeps (map moves; not in a duel). */
   advTactics: CurveRow;
+  /**
+   * Mod 0.19.1 (decision 258), base AI on the map (not in a duel, kept for the file): chance it
+   * keeps the safety distances of splash weapons (rolled every 2 s), how much better another
+   * weapon must rate before it switches in a fight, chance it switches before its last shot,
+   * share of a hit's push it takes next to a drop, seconds before a power item is back it heads
+   * there and the chance per look that it does.
+   */
+  safe: CurveRow;
+  switchGap: CurveRow;
+  ammoCare: CurveRow;
+  pitPush: CurveRow;
+  itemAhead: CurveRow;
+  itemPlan: CurveRow;
 }
 
 export type CurveKey = keyof SkillCurve;
@@ -102,6 +115,12 @@ export const CURVE_PROPS: Readonly<Partial<Record<CurveKey, string>>> = {
   leadOff: 'TLeadOff',
   strafeDodge: 'TStrafeDodge',
   advTactics: 'TAdvTactics',
+  safe: 'TSafe',
+  switchGap: 'TSwitchGap',
+  ammoCare: 'TAmmoCare',
+  pitPush: 'TPitPush',
+  itemAhead: 'TItemAhead',
+  itemPlan: 'TItemPlan',
 };
 
 /** Mod 0.14.0, curve v1 (TourneySkillCurve defaultproperties; a test compares them with the .uc file). */
@@ -129,6 +148,12 @@ export const CURRENT_CURVE: SkillCurve = {
   leadOff: [0.5, 0.42, 0.35, 0.28, 0.2, 0.12, 0.06, 0],
   strafeDodge: [0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6, 0.6],
   advTactics: [0.2, 0.3, 0.4, 0.5, 0.7, 0.85, 1, 1],
+  safe: [0.05, 0.07, 0.1, 0.13, 0.17, 0.21, 0.25, 0.3],
+  switchGap: [0, 0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.12],
+  ammoCare: [0, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5],
+  pitPush: [0.85, 0.8, 0.75, 0.7, 0.65, 0.6, 0.55, 0.5],
+  itemAhead: [0, 0, 0, 2, 3, 4, 6, 8],
+  itemPlan: [0, 0, 0, 0.1, 0.15, 0.2, 0.3, 0.4],
 };
 
 export const LEVEL_NAMES = [

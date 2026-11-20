@@ -136,6 +136,7 @@ describe('live data (mod 0.16.0)', () => {
       shotAfter: 7,
       shotAfterDs: 42,
       enforcerSec: 5,
+      enemySwitches: 4,
       retreats: {
         high: { kill: 1, death: 1, none: 2 },
         mid: { kill: 0, death: 1, none: 1 },

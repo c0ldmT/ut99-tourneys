@@ -33,6 +33,15 @@ function FireWeapon()
 	Super.FireWeapon();
 }
 
+// Mod 0.19.1: the base AI of the level picks the weapon (safety distances, fewer switches in a
+// fight, a switch before the last shot; TourneySkillCurve.BotSwitch).
+function bool SwitchToBestWeapon()
+{
+	if (Curve != None && !Curve.bDeleteMe && Curve.bOn)
+		return Curve.BotSwitch(self);
+	return Super.SwitchToBestWeapon();
+}
+
 defaultproperties
 {
 }

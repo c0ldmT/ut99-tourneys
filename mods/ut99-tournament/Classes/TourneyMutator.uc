@@ -25,6 +25,9 @@ function MutatorTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy,
 {
 	if (Game != None)
 		Game.OnTakeDamage(ActualDamage, Victim, InstigatedBy, DamageType);
+	// mod 0.19.1: less push for bots next to a drop (skill curve)
+	if (Game != None && Game.Curve != None)
+		Game.Curve.PitPush(Victim, InstigatedBy, Momentum);
 	if (NextDamageMutator != None)
 		NextDamageMutator.MutatorTakeDamage(ActualDamage, Victim, InstigatedBy, HitLocation, Momentum, DamageType);
 	// mod 0.16.0: damage counters with the damage after all damage mutators

@@ -2687,6 +2687,7 @@ function measuresOf(m: Extract<ModToBridge, { t: 'pm' }>): BotMeasures {
     shotAfterDs: m.wq,
     fightSec: m.ef,
     enforcerSec: m.ee,
+    ...(m.es !== undefined ? { enemySwitches: m.es } : {}),
     retreats: {
       high: { kill: m.r0k, death: m.r0d, none: m.r0n },
       mid: { kill: m.r1k, death: m.r1d, none: m.r1n },

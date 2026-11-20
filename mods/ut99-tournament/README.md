@@ -142,6 +142,17 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > loading on) and once a second (fights, retreats: state `Retreating`, kept over falls and hits; items). No change to how
 > bots play.
 
+> Mod 0.19.1: base AI by level on the skill curve (decision 258, plan Season 3 P2.2). New rows in `TourneySkillCurve`:
+> `TSafe` (chance, rolled every 2 s, that a bot keeps the safety distances of splash weapons: rocket 400, flak secondary
+> 450, shock secondary/combo 400, ripper secondary 300, bio 300, redeemer 1500 - flak, shock, ripper fire their primary,
+> the others give way to the best safe weapon), `TSwitchGap` (in a fight another weapon must rate this much better than
+> the one in hand; UT adds 0.21 already), `TAmmoCare` (chance it takes another weapon before its last shot), `TPitPush`
+> (share of a hit's push sideways it takes when there is no floor within 900 below a point 160 ahead - less falls into
+> pits and space), `TItemAhead`/`TItemPlan` (seconds before a power item is back it heads there, chance per look; a weak
+> item controller for bots without the trait). The tournament's bot classes pick their weapon through
+> `TourneySkillCurve.BotSwitch` (Bot.SwitchToBestWeapon with these rules). `pm` gets `es` (switches from a living enemy
+> to another one). Only with the skill curve on.
+
 ## Classes
 
 | Class | Role |
@@ -340,6 +351,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 68 | **Trait catalogue v2** (mod 0.18.0) | Website updated. Dream Team cup with roster bots carrying new traits (craft them on the packs page): weapon master (pick the weapon like the gun nut), juggernaut, second wind, rewind, deemer dream, overload, scavenger/health hound in DM, warden/monster whisperer/titan slayer in a Monster Hunt 2on2. Server log: `game trait deemer dream: <bot> gets a redeemer` once per game, `game trait rewind: <bot> back at …` once (not after a fall or lava), `game trait overload: <bot> amplified` on every 5th kill of a life, `health hound heads for …`; the match page → "Traits in this game" shows the new counters (bonus damage, prevented damage, health from second wind/regeneration, seconds with the favourite weapon). A bouncer bot no longer hops around all the time. No `Accessed None` in the log |
 | 69 | **Patch notes** (website only) | Website updated (migration 45 runs by itself). Log in: the modal "What's new" shows the notes 243 and 242 once ("All patch notes" shows the older ones too); "Got it" or Escape, reload: it does not come again. Footer → "Patch notes" opens all notes any time, in German with the language switch. A new user (first login) and a guest on the first visit get no modal. |
 | 70 | **Bot measures** (mod 0.19.0) | Bridge and website updated, mod 0.19.0 built. A Dream Team or bot-only game with 4+ bots on a map with power items and a pit (DM-Deck16][ or DM-Morpheus), 5 minutes. Bridge: no `bad line` for `pm`/`pu`. Settings → Dream Team → Trait report: "Bot measures per skill (CSV)" has a row per skill with switches, fight switches, seconds to the shot (about 0.3-2 s), fight and enforcer seconds, retreats (most with health 90+ in the first column group if the old pattern holds), items taken and quick ones; "Suicides per map (CSV)" lists e.g. `Fell` or `RocketDeath` with the map. Server log: no `Accessed None` in `MeasureFrame`/`MeasureItemTick`. |
+| 71 | **Base AI by level** (mod 0.19.1) | Skill curve on, mod 0.19.1 built. 1) Bot-only 1v1s Godlike vs Godlike with rocket launcher and flak on DM-Deck16][ (10 min): fewer suicides than before (Settings → Dream Team → Trait report → "Suicides per map", `RocketDeath`/`FlakDeath`); in close fights a bot now and then fires flak primary or takes another weapon instead of the rocket. 2) Same on DM-Morpheus or DM-SpaceNoxx: fewer `Fell` deaths after rocket hits at the edge. 3) Inhuman/Godlike bots in a 2on2 on a map with a belt/amp: server log `item timing heads for … back in n s` (n ≤ 8) for bots without the item controller. 4) "Bot measures per skill": fewer fight switches per minute at Masterful+ than at Novice, `enemySwitches` filled. No `Accessed None` in `BotSwitch`/`PitPush`. |
 
 ## SmartStockBots (optional)
 

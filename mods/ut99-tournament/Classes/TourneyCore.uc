@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.19.0";
+const MOD_VERSION = "0.19.1";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -143,6 +143,8 @@ var byte MsMv[32];                 // 1: the weapon in hand came with a move (tr
 var int MsSw[32], MsSwF[32];       // weapon switches, of them in a fight (an enemy)
 var int MsGapN[32], MsGapDs[32];   // fight switches with a shot within 10 s, time to it (1/10 s)
 var int MsFight[32], MsEnf[32];    // seconds with an enemy, of them with the enforcer in hand
+var Pawn MsEnemy[32];              // mod 0.19.1: the enemy at the last second, changes of it
+var int MsEnemySw[32];
 var byte MsRet[32];                // 1: in a retreat episode
 var byte MsRetBand[32];            // health at its start: 0 = 90 or more, 1 = 40-89, 2 = below 40
 var int MsRetKills[32];            // the bot's kills when it began
@@ -4231,11 +4233,19 @@ function FreeRespawn(Bot B, int s, string Why, bool bNeedPath)
 // back and is there in time (waits next to them), when it has no enemy in sight.
 //-----------------------------------------------------------------------------
 
+// The configuration of a bot for its errands: also without traits (mod 0.19.1: item timing).
+function int ErrandCfg(Pawn P)
+{
+	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
+		return -1;
+	return FindCfg(P.PlayerReplicationInfo.PlayerName, false);
+}
+
 // The bot heads for a nest or an item for its trait (no AI help hunt meanwhile).
 function bool OnTraitErrand(Bot B)
 {
 	local int c;
-	c = GameTraitCfg(B);
+	c = ErrandCfg(B);
 	if (c < 0)
 		return false;
 	return CfgNest[c] != None || CfgItem[c] != None || CfgGoal[c] != None;
@@ -4245,15 +4255,37 @@ function bool OnTraitErrand(Bot B)
 function bool OnCampErrand(Bot B)
 {
 	local int c;
-	c = GameTraitCfg(B);
-	return c >= 0 && (CfgBeh[c] & (32 | 256)) != 0;
+	c = ErrandCfg(B);
+	return c >= 0 && ((CfgBeh[c] & (32 | 256)) != 0 || CfgItem[c] != None);
+}
+
+// Mod 0.19.1 (decision 258, G3): higher levels know when power items come back and head there
+// a few seconds before (the curve's TItemAhead, TItemPlan; a weak item controller).
+function BaseItemTiming(Bot B, int c)
+{
+	local int L;
+	if (Curve == None || !Curve.bOn || !AntiIdleAllowed())
+		return;
+	// Orders (team games) or a trait's errand (nest, team play, goals): no item timing, a
+	// pending item errand ends.
+	if ((B.Orders != '' && B.Orders != 'FreeLance' && B.Orders != 'Attack')
+		|| (CfgBeh[c] & (32 | 64 | 512 | 1024)) != 0 || CfgNest[c] != None || CfgGoal[c] != None)
+	{
+		if (CfgItem[c] != None && CfgNest[c] == None && CfgGoal[c] == None)
+			DropTraitErrand(B, 0);
+		return;
+	}
+	L = BotLevel(CfgName[c]);
+	if (L < 0 || Curve.TItemAhead[L] <= 0)
+		return;
+	ItemControl(B, c, Curve.TItemAhead[L], Curve.TItemPlan[L]);
 }
 
 // Ends a nest or item errand (stuck, orders); no new one for Secs.
 function DropTraitErrand(Bot B, float Secs)
 {
 	local int c;
-	c = GameTraitCfg(B);
+	c = ErrandCfg(B);
 	if (c < 0)
 		return;
 	if (CfgNest[c] != None)
@@ -4620,7 +4652,9 @@ function float PowValue(Bot B, Inventory Itm)
 }
 
 // Item controller. True: the bot heads for an item or waits next to it.
-function bool ItemControl(Bot B, int c)
+// Ahead: seconds before an item is back it heads there (the trait 20, the base AI by level);
+// Chance: per look (every 3 s) that it looks at all (the trait 1).
+function bool ItemControl(Bot B, int c, float Ahead, float Chance)
 {
 	local int i, Best;
 	local float Now, D, Eta, Rest, Value, BestValue;
@@ -4647,7 +4681,7 @@ function bool ItemControl(Bot B, int c)
 		{
 			if (!B.bCamping)
 			{
-				BotLog(BName(B) $ ": item controller waits" @ int(PowBack[i] - Now + 1) @ "s at" @ Itm.Name);
+				BotLog(BName(B) $ ": item timing waits" @ int(PowBack[i] - Now + 1) @ "s at" @ Itm.Name);
 				CampHere(B, FClamp(PowBack[i] - Now + 0.6, 1, 8));
 			}
 			return true;
@@ -4670,6 +4704,11 @@ function bool ItemControl(Bot B, int c)
 	}
 	if (Now < CfgItemNext[c] || B.bCamping || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
 		return false;
+	if (Chance < 1 && FRand() >= Chance)
+	{
+		CfgItemNext[c] = Now + 3;
+		return false;
+	}
 	Best = -1;
 	for (i = 0; i < PowCount; i++)
 	{
@@ -4686,7 +4725,9 @@ function bool ItemControl(Bot B, int c)
 		Rest = 0;
 		if (PowBack[i] > 0)
 			Rest = PowBack[i] - Now;
-		if (Rest > Eta + 4 || Rest > 20)
+		else if (Ahead < 20)
+			continue; // the base AI: only the timing (the game's own AI takes what is there)
+		if (Rest > Eta + 4 || Rest > Ahead)
 			continue;
 		Value -= D / 2000;
 		if (Best >= 0 && Value <= BestValue)
@@ -4705,7 +4746,7 @@ function bool ItemControl(Bot B, int c)
 	if (PowBack[Best] > 0)
 		Rest = PowBack[Best] - Now;
 	CfgItemUntil[c] = Now + VSize(Itm.Location - B.Location) / FMax(B.GroundSpeed, 200) + Rest + 10;
-	BotLog(BName(B) $ ": item controller heads for" @ Itm.Name $ ", back in" @ int(Rest) @ "s");
+	BotLog(BName(B) $ ": item timing heads for" @ Itm.Name $ ", back in" @ int(Rest) @ "s");
 	return true;
 }
 
@@ -5402,10 +5443,13 @@ function BehaviourTick()
 		PowerItemTick();
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0)
-			continue;
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
+			continue;
+		// Mod 0.19.1 (G3): without the item controller the level knows a little of the timing.
+		if ((CfgBeh[c] & 256) == 0)
+			BaseItemTiming(B, c);
+		if (CfgBeh[c] == 0)
 			continue;
 		A = B.BaseAggressiveness;
 		if ((CfgBeh[c] & 1) != 0 && B.Health < 50)
@@ -5432,7 +5476,7 @@ function BehaviourTick()
 				continue;
 			if ((CfgBeh[c] & 32) != 0 && SniperNest(B, c))
 				continue;
-			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c))
+			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c, 20, 1))
 				continue;
 			if ((CfgBeh[c] & (512 | 1024)) != 0 && GoalErrand(B, c))
 				continue;
@@ -6309,13 +6353,20 @@ function MeasureSecond(int i, Bot B)
 	local bool bRet;
 
 	if (B.Health <= 0)
+	{
+		MsEnemy[i] = None;
 		return;
+	}
 	if (B.Enemy != None)
 	{
 		MsFight[i]++;
 		if (enforcer(B.Weapon) != None)
 			MsEnf[i]++;
+		// Mod 0.19.1: from a living enemy straight to another one (not after a kill)
+		if (MsEnemy[i] != None && MsEnemy[i] != B.Enemy && !MsEnemy[i].bDeleteMe && MsEnemy[i].Health > 0)
+			MsEnemySw[i]++;
 	}
+	MsEnemy[i] = B.Enemy;
 	St = B.GetStateName();
 	// Short states inside a retreat (a fall, a hit, a jump) keep the episode open; Fallback
 	// is going back to its orders (team games), no retreat.
@@ -6475,6 +6526,7 @@ function SendMeasures(int N, int i)
 	OutMsg.AddInt("wq", MsGapDs[i]);
 	OutMsg.AddInt("ef", MsFight[i]);
 	OutMsg.AddInt("ee", MsEnf[i]);
+	OutMsg.AddInt("es", MsEnemySw[i]);
 	for (b = 0; b < 3; b++)
 	{
 		OutMsg.AddInt("r" $ b $ "k", MsRetOut[i * 9 + b * 3]);

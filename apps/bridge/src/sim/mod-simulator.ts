@@ -658,6 +658,7 @@ export class ModSimulator {
             wq: 42,
             ef: Math.floor(sec / 2),
             ee: 5,
+            es: 4,
             r0k: 1,
             r0d: 1,
             r0n: 2,

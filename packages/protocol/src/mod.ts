@@ -242,6 +242,7 @@ export const ModToBridgeSchema = z.discriminatedUnion('t', [
     wq: int.nonnegative(),
     ef: int.nonnegative(),
     ee: int.nonnegative(),
+    es: int.nonnegative().optional(), // mod 0.19.1: switches from a living enemy to another one
     r0k: int.nonnegative(),
     r0d: int.nonnegative(),
     r0n: int.nonnegative(),
