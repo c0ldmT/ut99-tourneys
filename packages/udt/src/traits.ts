@@ -4,7 +4,14 @@
  * mod 0.9.0), C (behaviour: the mod steers the bot's AI, groups in mod 0.10.0 and 0.11.0) and D (manager:
  * economy and career on the website). Traits only work in Dream Team games and last one season.
  */
-import { baseValue, DEFAULT_ECONOMY, RARITIES, valueScore, type Rarity } from './economy.js';
+import {
+  baseValue,
+  DEFAULT_ECONOMY,
+  RARITIES,
+  roundNeuro,
+  valueScore,
+  type Rarity,
+} from './economy.js';
 
 export type TraitCategory = 'values' | 'body' | 'behaviour' | 'manager';
 
@@ -341,6 +348,63 @@ export const SCRAP: Readonly<Record<Rarity, number>> = {
 export const CRAFT_FACTOR = 4;
 export const craftCost = (code: TraitCode): number =>
   SCRAP[traitDef(code)?.rarity ?? 'common'] * CRAFT_FACTOR;
+
+// ---------- trait workshop (decision 255) ----------
+
+export type WorkshopKind = 'reroll' | 'upgrade';
+
+/**
+ * Neuro of the trait workshop at index 1 (a luxury: fully indexed): rerolling a card of a
+ * rarity, upgrading a card of a rarity to the next one (about a third of what packs cost per
+ * card of the target rarity; scrap on top).
+ */
+export const WORKSHOP_NEURO: Readonly<{
+  reroll: Readonly<Record<Rarity, number>>;
+  upgrade: Readonly<Partial<Record<Rarity, number>>>;
+}> = {
+  reroll: { common: 400, uncommon: 800, rare: 2000, epic: 5000, legendary: 12_000 },
+  upgrade: { common: 1500, uncommon: 4000, rare: 10_000, epic: 25_000 },
+};
+
+/**
+ * What the workshop takes for a card of `rarity`: rerolling its scrap value (as if scrapped)
+ * and Neuro, upgrading twice the scrap value of the next rarity (crafting it costs four times)
+ * and Neuro; null: a legendary cannot be upgraded.
+ */
+export function workshopCost(
+  kind: WorkshopKind,
+  rarity: Rarity,
+  index: number,
+): { scrap: number; neuro: number } | null {
+  if (kind === 'reroll')
+    return { scrap: SCRAP[rarity], neuro: roundNeuro(WORKSHOP_NEURO.reroll[rarity] * index) };
+  const next = RARITIES[RARITIES.indexOf(rarity) + 1];
+  const neuro = WORKSHOP_NEURO.upgrade[rarity];
+  if (!next || neuro === undefined) return null;
+  return { scrap: 2 * SCRAP[next], neuro: roundNeuro(neuro * index) };
+}
+
+/**
+ * The trait a workshop step draws (uniformly, like a pack): rerolling another trait of the
+ * card's rarity, upgrading one of the next rarity - never one in `held` (the inventory keeps one
+ * of each). Null: nothing left to draw.
+ */
+export function workshopDraw(
+  kind: WorkshopKind,
+  code: TraitCode,
+  held: readonly string[],
+  rng: () => number,
+): TraitCode | null {
+  const rarity = traitDef(code)?.rarity;
+  if (!rarity) return null;
+  const target = kind === 'reroll' ? rarity : RARITIES[RARITIES.indexOf(rarity) + 1];
+  if (!target) return null;
+  const pool = TRAITS.filter(
+    (t) => t.rarity === target && t.code !== code && !held.includes(t.code),
+  );
+  if (!pool.length) return null;
+  return pool[Math.min(pool.length - 1, Math.floor(rng() * pool.length))]!.code;
+}
 
 // ---------- category A: effective values ----------
 

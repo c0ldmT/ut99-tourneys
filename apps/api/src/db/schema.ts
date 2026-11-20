@@ -470,7 +470,7 @@ export const udtTraits = sqliteTable('udt_traits', {
   botId: text('bot_id'),
   /** Gun nut: the favourite weapon chosen when it was put on the bot. */
   weapon: text('weapon'),
-  /** "pack" or "craft". */
+  /** "pack", "craft", "blueprint" (a start trait) or "workshop" (decision 255). */
   source: text('source').notNull(),
   createdAt: text('created_at').notNull(),
   assignedAt: text('assigned_at'),

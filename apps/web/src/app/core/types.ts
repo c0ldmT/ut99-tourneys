@@ -1257,6 +1257,19 @@ export interface UdtInventoryCard {
   rarity: UdtRarity;
   category: 'values' | 'body' | 'behaviour' | 'manager';
   needsWeapon: boolean;
+  /** Trait workshop (decision 255): what rerolling / upgrading costs (null: not possible). */
+  workshop?: { reroll: UdtWorkshopCost | null; upgrade: UdtWorkshopCost | null };
+}
+
+export interface UdtWorkshopCost {
+  scrap: number;
+  neuro: number;
+}
+
+/** A workshop step: the card's new trait and the packs page. */
+export interface UdtWorkshopResult {
+  card: { id: string; from: string; code: string; rarity: UdtRarity };
+  view: UdtPacks;
 }
 
 export interface UdtCatalogTrait {

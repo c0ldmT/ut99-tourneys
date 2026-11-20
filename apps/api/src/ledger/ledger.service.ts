@@ -28,6 +28,7 @@ export type LedgerKind =
   | 'udt_sponsor'
   | 'udt_rest'
   | 'udt_camp'
+  | 'udt_workshop'
   | 'udt_league'
   | 'udt_cup_bonus';
 

@@ -46,6 +46,7 @@ import {
   CraftBody,
   OpenBody,
   UdtPacksService,
+  WorkshopBody,
   type AssignInput,
   type OpenInput,
 } from './udt-packs.service.js';
@@ -329,6 +330,17 @@ export class UdtController {
   @Delete('traits/:id/assign')
   unassign(@CurrentUser() user: User, @Param('id') id: string) {
     return this.packs.remove(user, id);
+  }
+
+  /** Trait workshop (decision 255): reroll an inventory card or upgrade it one rarity. */
+  @Post('traits/:id/workshop')
+  @HttpCode(200)
+  workshop(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(WorkshopBody)) body: { kind: 'reroll' | 'upgrade' },
+  ) {
+    return this.packs.workshop(user, id, body.kind);
   }
 
   /** Turns an inventory card into scrap. */

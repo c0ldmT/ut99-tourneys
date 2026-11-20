@@ -17,6 +17,8 @@ import {
   TRAITS,
   traitDef,
   traitOfRarity,
+  workshopCost,
+  workshopDraw,
   type PackBox,
   type Pity,
   type Rarity,
@@ -49,6 +51,9 @@ export const AssignBody = z.object({
 export type AssignInput = z.infer<typeof AssignBody>;
 
 export const CraftBody = z.object({ code: z.string().min(1).max(40) });
+
+/** Trait workshop (decision 255): reroll a card in its rarity or upgrade it one rarity. */
+export const WorkshopBody = z.object({ kind: z.enum(['reroll', 'upgrade']) });
 
 export interface PullCard {
   id: string | null;
@@ -177,13 +182,21 @@ export class UdtPacksService {
       scrap: this.scrapOf(season, user.id),
       spendable: this.ledger.spendable(user.id).spendable,
       boxes,
-      inventory: inv.map((t) => ({
-        id: t.id,
-        code: t.code,
-        rarity: traitDef(t.code)?.rarity ?? 'common',
-        category: traitDef(t.code)?.category ?? 'values',
-        needsWeapon: !!traitDef(t.code)?.needsWeapon,
-      })),
+      inventory: inv.map((t) => {
+        const rarity = traitDef(t.code)?.rarity ?? 'common';
+        return {
+          id: t.id,
+          code: t.code,
+          rarity,
+          category: traitDef(t.code)?.category ?? 'values',
+          needsWeapon: !!traitDef(t.code)?.needsWeapon,
+          /** Trait workshop (decision 255): what rerolling / upgrading costs (null: not possible). */
+          workshop: {
+            reroll: workshopCost('reroll', rarity, index),
+            upgrade: workshopCost('upgrade', rarity, index),
+          },
+        };
+      }),
       blueprints: this.blueprints(season, user.id).map((b) => ({
         id: b.id,
         rarity: b.rarity,
@@ -390,6 +403,45 @@ export class UdtPacksService {
   private destroy(season: number, userId: string, id: string, code: string) {
     this.db.delete(udtTraits).where(eq(udtTraits.id, id)).run();
     this.udt.addScrap(season, userId, SCRAP[traitDef(code)?.rarity ?? 'common']);
+  }
+
+  /**
+   * Trait workshop (decision 255): an inventory card becomes another trait of its rarity
+   * (reroll) or a trait one rarity up (upgrade), drawn like a pack and never one the inventory
+   * holds; costs scrap and Neuro at the full index (`workshopCost`).
+   */
+  workshop(user: User, cardId: string, kind: 'reroll' | 'upgrade') {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const card = this.card(season, user.id, cardId);
+    if (card.botId) throw conflict('take the trait off the bot first');
+    const def = traitDef(card.code);
+    if (!def) throw badRequest('unknown trait');
+    const cost = workshopCost(kind, def.rarity, this.udt.index(season));
+    if (!cost) throw conflict('a legendary trait cannot be upgraded');
+    const held = this.inventory(season, user.id).map((t) => t.code);
+    const code = workshopDraw(kind, def.code, held, rng);
+    if (!code) throw conflict('no other trait of that rarity is left to draw');
+    if (this.scrapOf(season, user.id) < cost.scrap)
+      throw conflict('the workshop needs {scrap} scrap', { scrap: cost.scrap });
+    // Neuro first (throws when they do not reach), then the scrap.
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_workshop',
+      amount: cost.neuro,
+      ref: `workshop:${card.id}:${randomId(6)}`,
+      meta: { kind, from: card.code, to: code, scrap: cost.scrap },
+    });
+    this.udt.addScrap(season, user.id, -cost.scrap);
+    this.db
+      .update(udtTraits)
+      .set({ code, source: 'workshop', createdAt: this.now() })
+      .where(eq(udtTraits.id, card.id))
+      .run();
+    return {
+      card: { id: card.id, from: card.code, code, rarity: traitDef(code)!.rarity },
+      view: this.view(user),
+    };
   }
 
   /** Crafts a trait with scrap (four times its scrap value), one of each in the inventory. */

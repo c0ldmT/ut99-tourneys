@@ -75,6 +75,7 @@ const MANAGER_ACTIONS = [
   'udt_trade_fee',
   'udt_rest',
   'udt_camp',
+  'udt_workshop',
   'udt_ticket',
 ];
 

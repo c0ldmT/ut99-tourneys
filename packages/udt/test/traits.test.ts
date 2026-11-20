@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  workshopCost,
+  workshopDraw,
   cannotAssign,
   craftCost,
   edgeScore,
@@ -186,5 +188,30 @@ describe('packs', () => {
       ]),
     ).toEqual(['px', 'wd', 'rg', 'bo']);
     expect(traitValueFactor(4, {}, [{ code: 'phoenix' }])).toBeCloseTo(1.2);
+  });
+});
+
+describe('trait workshop (decision 255)', () => {
+  it('costs scrap and fully indexed Neuro; a legendary is not upgraded', () => {
+    expect(workshopCost('reroll', 'rare', 1)).toEqual({ scrap: 25, neuro: 2000 });
+    expect(workshopCost('reroll', 'rare', 2.5)).toEqual({ scrap: 25, neuro: 5000 });
+    expect(workshopCost('upgrade', 'common', 1)).toEqual({ scrap: 20, neuro: 1500 });
+    expect(workshopCost('upgrade', 'epic', 2)).toEqual({ scrap: 300, neuro: 50_000 });
+    expect(workshopCost('upgrade', 'legendary', 1)).toBeNull();
+  });
+
+  it('draws another trait of the rarity or one rarity up, never one held', () => {
+    let i = 0;
+    const rng = () => (i++ % 10) / 10;
+    for (let k = 0; k < 20; k++) {
+      const r = workshopDraw('reroll', 'steady-hand', ['bouncer'], rng)!;
+      expect(traitDef(r)!.rarity).toBe('common');
+      expect(['steady-hand', 'bouncer']).not.toContain(r);
+      const u = workshopDraw('upgrade', 'steady-hand', [], rng)!;
+      expect(traitDef(u)!.rarity).toBe('uncommon');
+    }
+    expect(workshopDraw('upgrade', 'phoenix', [], rng)).toBeNull();
+    const commons = TRAITS.filter((t) => t.rarity === 'common').map((t) => t.code);
+    expect(workshopDraw('reroll', 'steady-hand', commons, rng)).toBeNull();
   });
 });

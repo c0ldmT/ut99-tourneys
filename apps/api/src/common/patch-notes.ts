@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 255,
+    date: '2026-11-20',
+    en: {
+      title: 'Cheaper basics, new ways to spend Neuro',
+      items: [
+        'Salaries, standard packs and creation licences now follow the economy index only with its square root (at index 5 about ×2.2 instead of ×5). Premium and elite packs and the market stay as they are.',
+        'Training camp: in the bot details a bot gains +60 XP once a day for a little Neuro - good for bots that play little.',
+        'Trait workshop on the packs page: reroll a trait card into another trait of its rarity, or upgrade it into a random trait one rarity higher - for Neuro and scrap.',
+      ],
+    },
+    de: {
+      title: 'Günstigere Grundkosten, neue Wege, Neuro auszugeben',
+      items: [
+        'Gehälter, Standard-Packs und Lizenzen folgen dem Wirtschaftsindex jetzt nur noch mit seiner Wurzel (bei Index 5 etwa ×2,2 statt ×5). Premium- und Elite-Packs und der Markt bleiben, wie sie sind.',
+        'Trainingslager: In den Bot-Details bekommt ein Bot einmal am Tag +60 XP für ein paar Neuro – gut für Bots, die wenig spielen.',
+        'Trait-Werkstatt auf der Packs-Seite: Würfle eine Trait-Karte zu einem anderen Trait ihrer Seltenheit neu oder werte sie zu einem zufälligen Trait eine Seltenheit höher auf – gegen Neuro und Schrott.',
+      ],
+    },
+  },
+  {
     id: 252,
     date: '2026-11-20',
     en: {

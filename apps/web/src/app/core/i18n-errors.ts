@@ -227,6 +227,10 @@ export const ERRORS_DE: Record<string, string> = {
     'Nur deine eigenen Bots (Starter, Akademie, Bauplan) kannst du ändern.',
   'the bot is fully rested': 'Der Bot ist voll erholt.',
   'the bot was in the training camp today': 'Der Bot war heute schon im Trainingslager.',
+  'a legendary trait cannot be upgraded': 'Ein legendärer Trait lässt sich nicht aufwerten.',
+  'no other trait of that rarity is left to draw':
+    'Es gibt keinen anderen Trait dieser Seltenheit mehr, der gezogen werden kann.',
+  'the workshop needs {scrap} scrap': 'Die Werkstatt braucht {scrap} Schrott.',
   'the model {value} is not known': 'Das Modell {value} kennt der Server nicht',
   'the skin {value} does not fit the model': 'Der Skin {value} passt nicht zum Modell',
   'the face {value} does not fit the skin': 'Das Gesicht {value} passt nicht zum Skin',

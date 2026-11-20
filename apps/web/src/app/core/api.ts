@@ -44,6 +44,7 @@ import type {
   UdtTrades,
   UdtTestState,
   UdtView,
+  UdtWorkshopResult,
   AgentView,
   BetBoard,
   BetRecordView,
@@ -314,6 +315,10 @@ export class Api {
   udtUnassign = (cardId: string) =>
     this.call<UdtView>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}/assign`, undefined, {
       ok: 'ok.udt.traitOff',
+    });
+  udtWorkshop = (cardId: string, kind: 'reroll' | 'upgrade') =>
+    this.call<UdtWorkshopResult>('POST', `/udt/traits/${encodeURIComponent(cardId)}/workshop`, {
+      kind,
     });
   udtScrap = (cardId: string) =>
     this.call<UdtPacks>('DELETE', `/udt/traits/${encodeURIComponent(cardId)}`, undefined, {

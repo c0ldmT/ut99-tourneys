@@ -10,8 +10,16 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
+import { Toasts } from '../core/toast';
 import { NeuroPipe, NeuroStore } from '../core/neuro';
-import type { UdtBox, UdtCatalogTrait, UdtInventoryCard, UdtPacks, UdtRarity } from '../core/types';
+import type {
+  UdtBox,
+  UdtCatalogTrait,
+  UdtInventoryCard,
+  UdtPacks,
+  UdtRarity,
+  UdtWorkshopCost,
+} from '../core/types';
 import { RARITIES, SCRAP, UdtNav } from '../core/udt';
 import { BOX_STROKE, UdtPackStage } from './udt-pack-stage';
 
@@ -165,39 +173,75 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       />
 
       <div class="lower">
-        <section class="card" id="inventory">
-          <h2>{{ 'udt.packs.inventory' | t }} ({{ v.inventory.length }})</h2>
-          @for (c of inventory(); track c.id) {
-            <div class="irow">
-              <span class="udt-trait r-{{ c.rarity }}">{{ 'udt.trait.' + c.code | t }}</span>
-              <span class="grow muted small">{{ 'udt.traitE.' + c.code | t }}</span>
-              <button type="button" [disabled]="busy()" (click)="scrap(c)">
-                {{ 'udt.packs.scrapIt' | t }} +{{ scrapOf(c.rarity) }}
-              </button>
-            </div>
-          } @empty {
-            <p class="muted small">{{ 'udt.traits.none' | t }}</p>
-          }
-          @if (v.blueprints.length) {
-            <h3>{{ 'udt.packs.blueprints' | t }}</h3>
-            @for (b of v.blueprints; track b.id) {
+        <div class="stack">
+          <section class="card" id="inventory">
+            <h2>{{ 'udt.packs.inventory' | t }} ({{ v.inventory.length }})</h2>
+            @for (c of inventory(); track c.id) {
               <div class="irow">
-                <span class="udt-trait r-{{ b.rarity }}">{{ 'udt.bp.' + b.rarity | t }}</span>
-                <span class="grow muted small">
-                  @if (b.gift) {
-                    {{ 'udt.packs.bpGift' | t }} ·
-                  }
-                  {{ 'udt.bpE.' + b.rarity | t }}
-                </span>
-                <a routerLink="/udt/academy">{{ 'udt.nav.academy' | t }}</a>
-                <button type="button" [disabled]="busy()" (click)="scrapBlueprint(b.id)">
-                  {{ 'udt.packs.scrapIt' | t }} +{{ b.scrap }}
+                <span class="udt-trait r-{{ c.rarity }}">{{ 'udt.trait.' + c.code | t }}</span>
+                <span class="grow muted small">{{ 'udt.traitE.' + c.code | t }}</span>
+                <button type="button" [disabled]="busy()" (click)="scrap(c)">
+                  {{ 'udt.packs.scrapIt' | t }} +{{ scrapOf(c.rarity) }}
                 </button>
               </div>
+            } @empty {
+              <p class="muted small">{{ 'udt.traits.none' | t }}</p>
             }
-          }
-          <p class="muted small">{{ 'udt.packs.mod' | t }}</p>
-        </section>
+            @if (v.blueprints.length) {
+              <h3>{{ 'udt.packs.blueprints' | t }}</h3>
+              @for (b of v.blueprints; track b.id) {
+                <div class="irow">
+                  <span class="udt-trait r-{{ b.rarity }}">{{ 'udt.bp.' + b.rarity | t }}</span>
+                  <span class="grow muted small">
+                    @if (b.gift) {
+                      {{ 'udt.packs.bpGift' | t }} ·
+                    }
+                    {{ 'udt.bpE.' + b.rarity | t }}
+                  </span>
+                  <a routerLink="/udt/academy">{{ 'udt.nav.academy' | t }}</a>
+                  <button type="button" [disabled]="busy()" (click)="scrapBlueprint(b.id)">
+                    {{ 'udt.packs.scrapIt' | t }} +{{ b.scrap }}
+                  </button>
+                </div>
+              }
+            }
+            <p class="muted small">{{ 'udt.packs.mod' | t }}</p>
+          </section>
+          <section class="card" id="workshop">
+            <h2>{{ 'udt.workshop.title' | t }}</h2>
+            <p class="muted small">{{ 'udt.workshop.text' | t: { i: v.index.toFixed(2) } }}</p>
+            @for (c of inventory(); track c.id) {
+              <div class="irow">
+                <span class="udt-trait r-{{ c.rarity }}">{{ 'udt.trait.' + c.code | t }}</span>
+                <span class="grow"></span>
+                @if (c.workshop?.reroll; as w) {
+                  <button
+                    type="button"
+                    [disabled]="!canWork(v, w)"
+                    [title]="'udt.workshop.rerollHint' | t"
+                    (click)="workshop(c, 'reroll')"
+                  >
+                    {{ 'udt.workshop.reroll' | t }} · {{ w.neuro | neuro }} +
+                    <span class="mono">{{ w.scrap }}</span> {{ 'udt.packs.scrap' | t }}
+                  </button>
+                }
+                @if (c.workshop?.upgrade; as w) {
+                  <button
+                    type="button"
+                    [disabled]="!canWork(v, w)"
+                    [title]="'udt.workshop.upgradeHint' | t"
+                    (click)="workshop(c, 'upgrade')"
+                  >
+                    {{ 'udt.workshop.upgrade' | t }} · {{ w.neuro | neuro }} +
+                    <span class="mono">{{ w.scrap }}</span> {{ 'udt.packs.scrap' | t }}
+                  </button>
+                }
+              </div>
+            } @empty {
+              <p class="muted small">{{ 'udt.traits.none' | t }}</p>
+            }
+          </section>
+        </div>
         <section class="card" id="craft">
           <h2>{{ 'udt.packs.craftTitle' | t }}</h2>
           <p class="muted small">{{ 'udt.packs.craftText' | t }}</p>
@@ -340,6 +384,11 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     .lower .card {
       margin: 0;
     }
+    .stack {
+      display: grid;
+      gap: 18px;
+      align-content: start;
+    }
     .irow {
       display: flex;
       align-items: center;
@@ -387,6 +436,7 @@ export class UdtPacksPage {
   protected readonly busy = signal(false);
   protected readonly rarities = RARITIES;
   private readonly i18n = inject(I18n);
+  private readonly toasts = inject(Toasts);
   /** Category, then rarity (common first), then the name in the viewer's language. */
   private readonly order = <T extends { code: string; rarity: UdtRarity; category: string }>(
     a: T,
@@ -470,6 +520,27 @@ export class UdtPacksPage {
 
   protected async scrapBlueprint(id: string) {
     await this.act(async () => this.view.set(await this.api.udtScrapBlueprint(id)));
+  }
+
+  /** A workshop step the manager can pay (scrap and Neuro). */
+  protected canWork(v: UdtPacks, w: UdtWorkshopCost): boolean {
+    return (
+      v.hasTeam &&
+      !this.busy() &&
+      v.scrap >= w.scrap &&
+      (this.spendable() ?? v.spendable) >= w.neuro
+    );
+  }
+
+  protected async workshop(c: UdtInventoryCard, kind: 'reroll' | 'upgrade') {
+    const from = this.i18n.t(`udt.trait.${c.code}`);
+    await this.act(async () => {
+      const r = await this.api.udtWorkshop(c.id, kind);
+      this.view.set(r.view);
+      this.toasts.success(
+        this.i18n.t('ok.udt.workshop', { from, to: this.i18n.t(`udt.trait.${r.card.code}`) }),
+      );
+    });
   }
 
   protected async craft(c: UdtCatalogTrait) {

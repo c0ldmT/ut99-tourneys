@@ -1359,6 +1359,15 @@ const en = {
   'udt.camp.done': 'Trained today',
   'ok.udt.camp': 'Training done: the bot gained experience.',
   'udt.kind.udt_camp': 'Training camp',
+  'udt.workshop.title': 'Trait workshop',
+  'udt.workshop.text':
+    'Reroll a card into another trait of its rarity, or upgrade it into a random trait one rarity higher - never one you already hold. Costs Neuro (at index {i}) and scrap.',
+  'udt.workshop.reroll': 'Reroll',
+  'udt.workshop.upgrade': 'Upgrade',
+  'udt.workshop.rerollHint': 'Another trait of the same rarity, drawn at random',
+  'udt.workshop.upgradeHint': 'A random trait one rarity higher',
+  'ok.udt.workshop': '{from} became {to}.',
+  'udt.kind.udt_workshop': 'Trait workshop',
   'udt.rest.buy': 'Buy',
   'udt.kind.udt_rest': 'Rest with Neuro',
   'udt.events.auto': 'Enter automatically when possible',
@@ -2097,7 +2106,7 @@ const en = {
     'Scout three talents and sign one with a licence, or build a bot from a blueprint; an experienced bot (from level 3) can teach one of them as its apprentice. Starter, talents and apprentices draw no salary, blueprint bots 75 % of the normal one; bots you made develop with points and can be renamed once for free. Licences: as many as you like, each twice the price of the one before.',
   'udt.help.way.packs.title': 'Packs: traits and blueprints',
   'udt.help.way.packs.text':
-    'Packs bring traits that make your bots stronger, and now and then a blueprint for the academy.',
+    'Packs bring traits that make your bots stronger, and now and then a blueprint for the academy. In the trait workshop you reroll a card or upgrade it one rarity for Neuro and scrap.',
   'udt.help.way.trades.title': 'Trades: swap with managers',
   'udt.help.way.trades.text':
     'Swap bots and Neuro with other managers – bought ones and the ones you made, the starter too (one bot always stays). Bots you made keep their perks at the new team, and you stay their breeder.',
@@ -4047,6 +4056,15 @@ const de: Record<TKey, string> = {
   'udt.camp.done': 'Heute trainiert',
   'ok.udt.camp': 'Training erledigt: Der Bot hat Erfahrung gesammelt.',
   'udt.kind.udt_camp': 'Trainingslager',
+  'udt.workshop.title': 'Trait-Werkstatt',
+  'udt.workshop.text':
+    'Würfle eine Karte zu einem anderen Trait ihrer Seltenheit neu oder werte sie zu einem zufälligen Trait eine Seltenheit höher auf – nie zu einem, den du schon hast. Kostet Neuro (mit Index {i}) und Schrott.',
+  'udt.workshop.reroll': 'Neu würfeln',
+  'udt.workshop.upgrade': 'Aufwerten',
+  'udt.workshop.rerollHint': 'Ein anderer Trait derselben Seltenheit, zufällig gezogen',
+  'udt.workshop.upgradeHint': 'Ein zufälliger Trait eine Seltenheit höher',
+  'ok.udt.workshop': 'Aus {from} wurde {to}.',
+  'udt.kind.udt_workshop': 'Trait-Werkstatt',
   'udt.rest.buy': 'Kaufen',
   'udt.kind.udt_rest': 'Erholung mit Neuro',
   'udt.events.auto': 'Automatisch anmelden, wenn möglich',
@@ -4793,7 +4811,7 @@ const de: Record<TKey, string> = {
     'Scoute drei Talente und verpflichte eins mit einer Lizenz oder bau einen Bot aus einem Bauplan; ein erfahrener Bot (ab Level 3) kann einen davon als Lehrling ausbilden. Starter, Talente und Lehrlinge bekommen kein Gehalt, Bauplan-Bots 75 % des normalen; selbst gemachte Bots entwickeln sich mit Punkten und lassen sich einmal kostenlos umbenennen. Lizenzen: so viele du willst, jede kostet das Doppelte der vorigen.',
   'udt.help.way.packs.title': 'Packs: Traits und Baupläne',
   'udt.help.way.packs.text':
-    'Packs bringen Traits, die deine Bots stärker machen, und ab und zu einen Bauplan für die Akademie.',
+    'Packs bringen Traits, die deine Bots stärker machen, und ab und zu einen Bauplan für die Akademie. In der Trait-Werkstatt würfelst du eine Karte gegen Neuro und Schrott neu oder wertest sie eine Seltenheit auf.',
   'udt.help.way.trades.title': 'Handel: mit Managern tauschen',
   'udt.help.way.trades.text':
     'Tausche Bots und Neuro mit anderen Managern – gekaufte und selbst gemachte, auch den Starter (ein Bot bleibt immer). Selbst gemachte Bots behalten beim neuen Team ihre Vorteile, du bleibst ihr Züchter.',

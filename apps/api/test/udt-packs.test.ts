@@ -136,6 +136,47 @@ describe('Unreal Dream Team: packs and traits', () => {
     expect(packs.inventory).toHaveLength(0);
   });
 
+  it('the trait workshop rerolls or upgrades an inventory card for scrap and Neuro (decision 255)', async () => {
+    const { mario, marioId, ledger } = await setup();
+    const db = api!.app.get<Db>(DB);
+    db.insert(udtTraits)
+      .values({
+        id: 'tw1',
+        season: 1,
+        userId: marioId,
+        code: 'steady-hand',
+        source: 'craft',
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+    api!.app.get(UdtService).addScrap(1, marioId, 100);
+    let v = (await mario.get('/udt/packs')).body;
+    // At index 0.3: reroll 400 × 0.3, upgrade 1,500 × 0.3.
+    expect(v.inventory[0].workshop).toEqual({
+      reroll: { scrap: 5, neuro: 120 },
+      upgrade: { scrap: 20, neuro: 450 },
+    });
+    const before = ledger.spendable(marioId).spendable;
+    const r = await mario.post('/udt/traits/tw1/workshop', { kind: 'reroll' });
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.card).toMatchObject({ id: 'tw1', from: 'steady-hand', rarity: 'common' });
+    expect(r.body.card.code).not.toBe('steady-hand');
+    expect(r.body.view.scrap).toBe(95);
+    expect(ledger.spendable(marioId).spendable).toBe(before - 120);
+    const up = await mario.post('/udt/traits/tw1/workshop', { kind: 'upgrade' });
+    expect(up.status).toBe(200);
+    expect(up.body.card.rarity).toBe('uncommon');
+    v = up.body.view;
+    expect(v.scrap).toBe(75);
+    expect(v.inventory[0]).toMatchObject({ id: 'tw1', code: up.body.card.code });
+    expect(ledger.entries(marioId, 1).filter((e) => e.kind === 'udt_workshop')).toHaveLength(2);
+    // Not on a bot, not without the scrap, not a stranger's card.
+    expect((await mario.post('/udt/traits/tw1/workshop', { kind: 'nope' })).status).toBe(400);
+    api!.app.get(UdtService).addScrap(1, marioId, -75);
+    expect((await mario.post('/udt/traits/tw1/workshop', { kind: 'reroll' })).status).toBe(409);
+    expect((await mario.post('/udt/traits/nope/workshop', { kind: 'reroll' })).status).toBe(404);
+  });
+
   it('never scraps a blueprint by itself: over the limit the manager chooses', async () => {
     const { mario, marioId } = await setup();
     const db = api!.app.get<Db>(DB);
