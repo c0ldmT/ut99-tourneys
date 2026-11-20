@@ -24,8 +24,8 @@ const LEAGUE = {
   mapPool: ['DM-Deck16][', 'DM-Morpheus'],
 };
 
-async function setup() {
-  ({ api } = await startApi({ TEST_MODE: 'true' }));
+async function setup(clock?: FakeClock) {
+  ({ api } = await startApi({ TEST_MODE: 'true' }, clock ? { clock } : {}));
   const admin = await Client.login(api, 'Boss', true);
   const mario = await Client.login(api, 'Mario');
   const tim = await Client.login(api, 'Tim');
@@ -223,7 +223,9 @@ describe('Dream Team league', () => {
   });
 
   it('status for the settings tab: waiting, running, called off only before the first game (decision 230)', async () => {
-    const { admin } = await setup();
+    // Monday 19.10.2026, 17:30 in Berlin: three days later the first evening (18:00) is half an
+    // hour ahead (with the real clock the test depended on the time of day).
+    const { admin } = await setup(new FakeClock(Date.parse('2026-10-19T15:30:00Z')));
     let st = (await admin.get('/udt/league/admin')).body.status;
     expect(st).toMatchObject({ state: 'waiting', test: false, now: null, progress: null });
     expect(st.start).toMatchObject({ season: 1 });
