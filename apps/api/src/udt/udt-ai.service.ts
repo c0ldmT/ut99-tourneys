@@ -2,8 +2,10 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { asc } from 'drizzle-orm';
 import { createRng } from '@tourney/bracket';
 import {
+  BLUEPRINTS,
   buildCost,
   cannotBreakthrough,
+  DEVELOP_COST,
   DEVELOP_VALUES,
   levelOf,
   RARITIES,
@@ -47,8 +49,17 @@ const STYLE: Readonly<
   breeder: { spend: 0.3, packs: 0.1, tradeMin: 1, scout: true },
 };
 const STRENGTH = { calm: 0.6, normal: 1, ambitious: 1.4 } as const;
-/** Bots an AI manager buys per market day at most (humans have room). */
+/** Bots an AI manager buys per market day at most, swaps included (humans have room). */
 const MAX_BUYS = 2;
+/**
+ * A full roster swaps its weakest bought bot for an offer at least this many skill steps better
+ * (decision 249: AI rosters stayed at skill 2-5 while skill 6-7 bots were for sale).
+ */
+const SWAP_GAIN = 1;
+/** A swap may use savings: this many times the style's share of the spendable Neuro (≤ 0.9). */
+const SWAP_SAVINGS = 2;
+/** Packs an AI manager opens per market day at most when it has savings (decision 249). */
+const MAX_PACKS = 3;
 /**
  * AI managers do not bet: a sponsor pays them this much per market day (× index × style) so
  * that they can keep up with managers who win bets.
@@ -251,8 +262,9 @@ export class UdtAiService implements OnModuleInit {
       act('trades', () => (out.trades += this.answerTrades(m.user, style.tradeMin)));
       act('develop', () => this.develop(m.user, season.number));
       if (style.scout || rng() < 0.05) act('academy', () => this.scoutAndSign(m.user, rng));
-      if (rng() < style.packs * strength) act('packs', () => (out.packs += this.openPack(m.user)));
-      act('traits', () => this.assignTraits(m.user, season.number, rng));
+      act('packs', () => (out.packs += this.openPacks(m.user, style.packs * strength, rng)));
+      act('blueprints', () => this.buildBlueprint(m.user, season.number, style.spend * strength));
+      act('traits', () => this.assignTraits(m.user, season.number, rng, m.n));
       act('lineup', () => this.lineup(m.user, season.number, m.personality === 'tactician'));
       act(
         'events',
@@ -302,6 +314,11 @@ export class UdtAiService implements OnModuleInit {
     return n;
   }
 
+  /**
+   * Buys the strongest offers it can afford while the roster has room; a full roster swaps its
+   * weakest bought bot for an offer at least `SWAP_GAIN` skill steps better, paid from savings
+   * (`SWAP_SAVINGS` × its share; decision 249). Bots the team made are never sold.
+   */
   private buy(
     user: User,
     season: number,
@@ -309,21 +326,42 @@ export class UdtAiService implements OnModuleInit {
     strength: number,
   ): number {
     const m = this.market.view(user);
-    let room = Math.min(MAX_BUYS, ROSTER_MAX - this.udt.roster(user.id, season).length);
-    let budget = this.spendable(user) * style.spend * strength;
+    let room = ROSTER_MAX - this.udt.roster(user.id, season).length;
+    const spendable = this.spendable(user);
+    const budget = spendable * style.spend * strength;
+    const savings = spendable * Math.min(0.9, SWAP_SAVINGS * style.spend * strength);
+    let spent = 0;
     let n = 0;
     const offers = m.offers
       .filter((o) => !o.sold)
       .sort((a, b) => b.skill - a.skill || a.price - b.price);
     for (const o of offers) {
-      if (room <= 0) break;
-      if (o.price > budget) continue;
+      if (n >= MAX_BUYS) break;
+      if (o.price > (room > 0 ? budget : savings) - spent) continue;
+      if (room <= 0) {
+        const weakest = this.weakestBought(user, season);
+        if (!weakest || Math.round(o.skill) < Math.round(weakest.skill) + SWAP_GAIN) continue;
+        try {
+          this.market.sell(user, weakest.botId);
+        } catch {
+          continue; // it plays in a running tournament
+        }
+        room++;
+      }
       this.market.buy(user, { botId: o.botId });
-      budget -= o.price;
+      spent += o.price;
       room--;
       n++;
     }
     return n;
+  }
+
+  /** The weakest bot it bought (never one it made): lowest skill, then the lowest value. */
+  private weakestBought(user: User, season: number): RosterBot | undefined {
+    return this.udt
+      .roster(user.id, season)
+      .filter((r) => !r.own && !r.starter)
+      .sort((a, b) => a.skill - b.skill || a.value - b.value)[0];
   }
 
   /** Lineups: the strongest fit bots play, tired ones to the bench (the tactician rests them). */
@@ -357,6 +395,23 @@ export class UdtAiService implements OnModuleInit {
     return n;
   }
 
+  /**
+   * Packs: one now and then by its style, more from savings (decision 249) - as many as the
+   * style's share of the spendable Neuro pays for, at most `MAX_PACKS` a day.
+   */
+  private openPacks(user: User, share: number, rng: () => number): number {
+    const price = this.packs.view(user).boxes.find((b) => b.box === 'standard')!.price;
+    const savings = Math.floor((this.spendable(user) * share) / Math.max(1, price));
+    const want = Math.min(MAX_PACKS, Math.max(rng() < share ? 1 : 0, savings));
+    let n = 0;
+    for (let i = 0; i < want; i++) {
+      const opened = this.openPack(user);
+      if (!opened) break;
+      n += opened;
+    }
+    return n;
+  }
+
   private openPack(user: User): number {
     let v = this.packs.view(user);
     // Over the blueprint limit: the AI scraps its lowest pack blueprints (a human chooses).
@@ -375,14 +430,20 @@ export class UdtAiService implements OnModuleInit {
     return 1;
   }
 
-  /** Trait cards from the inventory onto the best bots with a free slot. */
-  private assignTraits(user: User, season: number, rng: () => number) {
+  /**
+   * Trait cards from the inventory onto a random bot with a free slot (trait lab, decision 249:
+   * the pack draws the trait, chance the bot - so the trait report compares traits without a
+   * manager's choice; logged).
+   */
+  private assignTraits(user: User, season: number, rng: () => number, n: number) {
     const v = this.packs.view(user);
     for (const card of v.inventory) {
       const def = traitDef(card.code);
       const roster = this.udt
         .roster(user.id, season)
-        .sort((a, b) => b.effective.skill - a.effective.skill);
+        .map((r) => ({ r, k: rng() }))
+        .sort((a, b) => a.k - b.k)
+        .map((x) => x.r);
       for (const r of roster) {
         const codes: string[] = r.udtTraits.map((t) => t.code);
         if (codes.includes(card.code) || codes.length >= traitSlots(levelOf(r.xp))) continue;
@@ -398,6 +459,9 @@ export class UdtAiService implements OnModuleInit {
           : undefined;
         try {
           this.packs.assign(user, card.id, { botId: r.botId, ...(weapon ? { weapon } : {}) });
+          this.log.info(
+            `udt AI ${n} trait lab: ${card.code}${weapon ? ` (${weapon})` : ''} on ${r.name} (skill ${r.skill})`,
+          );
           break;
         } catch {
           // try the next bot
@@ -407,16 +471,21 @@ export class UdtAiService implements OnModuleInit {
   }
 
   /**
-   * Development points: the breakthrough when possible, else skill when possible, else accuracy,
-   * alertness, strafing in turn.
+   * Development points: the breakthrough when possible, else skill up to the potential - the
+   * points wait until a skill step (3) is paid (decision 249: spending every point at once put
+   * them into the values and left the bots below their potential) - then accuracy, alertness,
+   * strafing in turn.
    */
   private develop(user: User, season: number) {
+    // The AI knows its bots' potential (a human sees it from level 5).
+    let exact = this.udt.ownBots(season, user.id);
     for (const r of this.udt.roster(user.id, season)) {
       if (!r.own) continue;
+      const potential = exact.get(r.botId)?.potential ?? r.own.potential[1];
       const bt = cannotBreakthrough(
         {
           skill: r.skill,
-          potential: r.own.potential[1],
+          potential,
           level: r.level,
           done: r.own.breakthrough,
           values: r.traits,
@@ -426,6 +495,7 @@ export class UdtAiService implements OnModuleInit {
       if (bt === null)
         try {
           this.academy.breakthrough(user, r.botId);
+          exact = this.udt.ownBots(season, user.id); // potential + 1
         } catch {
           // checked above; the next round tries again
         }
@@ -440,12 +510,13 @@ export class UdtAiService implements OnModuleInit {
         guard++
       ) {
         const now = this.udt.roster(user.id, season).find((x) => x.botId === r.botId)!;
-        const skill =
-          !skillClosed && now.own!.points >= 3 && Math.round(now.skill) < now.own!.potential[1];
+        const top = exact.get(r.botId)?.potential ?? now.own!.potential[1];
+        const below = !skillClosed && Math.round(now.skill) < top;
+        // Below the potential: save for the next skill step.
+        if (below && now.own!.points < DEVELOP_COST.skill) break;
+        const skill = below;
         const ahead =
-          !now.own!.breakthrough &&
-          Math.round(now.skill) < 7 &&
-          Math.round(now.skill) >= now.own!.potential[1];
+          !now.own!.breakthrough && Math.round(now.skill) < 7 && Math.round(now.skill) >= top;
         const value = DEVELOP_VALUES.filter((k) =>
           ahead ? !valueReady(now.traits[k]) : !valueAtTop(now.traits[k]),
         ).sort((a, b) => (now.traits[a] ?? 0) - (now.traits[b] ?? 0))[0];
@@ -459,6 +530,41 @@ export class UdtAiService implements OnModuleInit {
         }
       }
     }
+  }
+
+  /**
+   * Blueprints from packs (decision 249: they stayed unused): builds the best one when a licence
+   * fits its budget share and the roster has room - a full roster first sells its weakest bought
+   * bot when that is below the blueprint's skill or its potential range. The values lean on
+   * accuracy (the strongest value in the season 2 games), the others stay average.
+   */
+  private buildBlueprint(user: User, season: number, share: number): number {
+    const v = this.academy.view(user);
+    const rank = (r: string) => RARITIES.indexOf(r as Rarity);
+    const bp = [...v.blueprints].sort((a, b) => rank(b.rarity) - rank(a.rarity))[0];
+    if (!bp) return 0;
+    if (v.licence.nextPrice > this.spendable(user) * share) return 0;
+    const rule = BLUEPRINTS[bp.rarity as Rarity];
+    if (v.rosterFull) {
+      const weakest = this.weakestBought(user, season);
+      if (!weakest || Math.round(weakest.skill) >= rule.potential[0]) return 0;
+      try {
+        this.market.sell(user, weakest.botId);
+      } catch {
+        return 0;
+      }
+    }
+    const traits = { accuracy: 0, alertness: 0, strafing: 0 };
+    for (let a = 1; a >= -1; a -= 0.05) {
+      traits.accuracy = Math.round(a * 100) / 100;
+      if (buildCost(rule.skill, traits) <= rule.budget) break;
+    }
+    const library = new Set(this.bots.list().map((b) => b.name.toLowerCase()));
+    const base = [...TALENT_NAMES].find((x) => !library.has(x.toLowerCase())) ?? 'Unit';
+    let name = base;
+    for (let i = 2; library.has(name.toLowerCase()); i++) name = `${base}${i}`;
+    this.academy.build(user, { blueprintId: bp.id, name, traits });
+    return 1;
   }
 
   /** Breeders (and now and then others) scout and sign the talent with the best potential. */
