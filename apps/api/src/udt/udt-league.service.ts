@@ -473,10 +473,18 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  /** The human clubs' user ids by club id. */
-  private humanClubs(): Map<string, string> {
+  /** The managers' clubs (humans and AI managers, decision 250): user id by club id. */
+  private managerClubs(): Map<string, string> {
     return new Map(
       [...this.clubs().values()].filter((c) => c.userId).map((c) => [c.id, c.userId!]),
+    );
+  }
+
+  /** The clubs of human managers: their games are played, the rubber band follows them. */
+  private humanClubs(): Set<string> {
+    const ai = this.udt.aiIds();
+    return new Set(
+      [...this.managerClubs()].filter(([, userId]) => !ai.has(userId)).map(([id]) => id),
     );
   }
 
@@ -802,9 +810,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Starts the league of a season: the managers with a team (not the AI managers) in their tier
-   * (last season's league, newcomers at the bottom; a first league by the cup ranking), AI clubs
-   * fill every tier, the fixture list on the league evenings.
+   * Starts the league of a season: the managers with a team (AI managers too, decision 250) in
+   * their tier (last season's league, newcomers at the bottom; a first league by the cup ranking),
+   * AI clubs fill every tier, the fixture list on the league evenings.
    */
   start(
     season: Season,
@@ -874,7 +882,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         .all()
         .map((a) => a.id),
     );
-    const teams = this.udt.teams(season.number).filter((t) => !ai.has(t.userId));
+    // Every manager gets a club; the AI managers' only while they act (setting).
+    const aiOn = this.settings.get().udt.aiEnabled;
+    const teams = this.udt.teams(season.number).filter((t) => aiOn || !ai.has(t.userId));
     // A manager's club for good (its name and tag follow the team of the season).
     const clubs = this.clubs();
     const byUser = new Map([...clubs.values()].filter((c) => c.userId).map((c) => [c.userId!, c]));
@@ -912,7 +922,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     );
     const tierOf = new Map<string, number>();
     const fresh: string[] = [];
-    for (const t of teams) {
+    // The humans first; the AI managers take the places left (below).
+    const humanTeams = teams.filter((t) => !ai.has(t.userId));
+    for (const t of humanTeams) {
       const id = humanClub.get(t.userId)!;
       const k = lastTier.get(id);
       if (k !== undefined) tierOf.set(id, k);
@@ -922,7 +934,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     else if (placement === 'one') for (const id of fresh) tierOf.set(id, 0);
     else {
       const points = new Map(
-        teams.map((t) => [humanClub.get(t.userId)!, this.cupPoints(season.number, t.userId)]),
+        humanTeams.map((t) => [humanClub.get(t.userId)!, this.cupPoints(season.number, t.userId)]),
       );
       const ranked =
         placement === 'random'
@@ -941,6 +953,17 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         n: tierOf.size,
         places: tiers * size,
       });
+    // AI managers (decision 250): last season's next tier, else the lowest one (all into one:
+    // the top), each in the first tier from there down with a free place; none left: no club.
+    for (const t of teams.filter((x) => ai.has(x.userId))) {
+      const id = humanClub.get(t.userId)!;
+      const want = lastTier.get(id) ?? (!carry && placement === 'one' ? 0 : tiers - 1);
+      const count = (k: number) => [...tierOf.values()].filter((x) => x === k).length;
+      let k = want;
+      while (k < tiers && count(k) >= size) k++;
+      if (k < tiers) tierOf.set(id, k);
+      else this.log.warn(`league: no place for the AI manager team ${t.name}`);
+    }
     const members: { clubId: string; tier: number }[] = [...tierOf].map(([clubId, tier]) => ({
       clubId,
       tier,
@@ -988,7 +1011,10 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         }
       }
     }
-    const humans = new Set(humanClub.values());
+    // Games with a human are played; AI managers play each other and AI clubs in the simulation.
+    const humans = new Set(
+      teams.filter((t) => !ai.has(t.userId)).map((t) => humanClub.get(t.userId)!),
+    );
     this.db.transaction((tx) => {
       tx.insert(leagueRuns)
         .values({
@@ -1285,16 +1311,20 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       this.finish(run, false);
   }
 
-  /** The AI clubs' strength for the evening: the rubber band of their tier × the club's factor. */
+  /**
+   * The AI clubs' strength for the evening: the rubber band of their tier (the human managers'
+   * lineups; AI managers do not count) × the club's factor.
+   */
   private renewBand(run: RunRow): void {
     const settings = this.leagueSettings('league');
+    const managers = this.managerClubs();
     const humans = this.humanClubs();
     const members = this.members(run.season);
     const sides = members
       .filter((m) => humans.has(m.clubId))
       .map((m) => ({
         tier: m.tier,
-        strength: this.lineupStrength(humans.get(m.clubId)!, settings),
+        strength: this.lineupStrength(managers.get(m.clubId)!, settings),
       }));
     const cfg = this.cfg();
     const bands = rubberBands(sides, run.tiers, {
@@ -1305,7 +1335,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const clubs = this.clubs();
     this.db.transaction((tx) => {
       for (const m of members)
-        if (!humans.has(m.clubId))
+        if (!managers.has(m.clubId))
           tx.update(leagueSeasons)
             .set({
               strength:
@@ -1343,7 +1373,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
 
   /** The club's strength now (AI: the band; a manager: the lineup). */
   private strengthOf(season: number, clubId: string): number {
-    const userId = this.humanClubs().get(clubId);
+    const userId = this.managerClubs().get(clubId);
     if (userId) return this.lineupStrength(userId, this.leagueSettings('league'));
     const m = this.db
       .select()
@@ -1358,7 +1388,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
    * a manager: the lineup), when the day's last result shows, the frag limit.
    */
   private simContext(run: RunRow, all: FixtureRow[]): SimContext {
-    const humans = this.humanClubs();
+    const managers = this.managerClubs();
     const members = new Map(this.members(run.season).map((m) => [m.clubId, m]));
     const cfg = this.cfg();
     const settings = this.leagueSettings('league');
@@ -1372,7 +1402,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       strength: (clubId) => {
         let v = strengths.get(clubId);
         if (v === undefined) {
-          const userId = humans.get(clubId);
+          const userId = managers.get(clubId);
           const m = members.get(clubId);
           v = userId
             ? this.lineupStrength(userId, settings)
@@ -1687,6 +1717,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     o: { tier: number; kind: FixtureKind; home: string; away: string; day: string; order: number },
   ) {
     const humans = this.humanClubs();
+    const all = this.cfg().aiGames === 'all';
     this.db
       .insert(leagueFixtures)
       .values({
@@ -1699,7 +1730,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         away: o.away,
         day: o.day,
         scheduledAt: this.kickOff(o.day, this.plan(run).slotTime, 0, o.order),
-        real: humans.has(o.home) || humans.has(o.away),
+        real: all || humans.has(o.home) || humans.has(o.away),
       })
       .run();
   }
@@ -1817,7 +1848,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     // A test league and a season without a league: the cups decide as before.
     if (!run || run.test || run.status === 'aborted') return undefined;
     if (!run.champion) return null;
-    return this.clubs().get(run.champion)?.userId ?? null;
+    // An AI manager can win the league (decision 250), the season's awards stay with humans.
+    const userId = this.clubs().get(run.champion)?.userId ?? null;
+    return userId && !this.udt.aiIds().has(userId) ? userId : null;
   }
 
   // ------------------------------------------------------------------------------------------
@@ -1831,12 +1864,14 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     if (!run || run.status !== 'running') return;
     const f = rewardIndex(this.udt.index(season.number));
     const cfg = this.cfg();
-    const humans = this.humanClubs();
+    // Table money for every manager's club (AI managers need it for their economy, decision
+    // 250); the cup bonus stays with the humans.
+    const managers = this.managerClubs();
     const played = this.fixtures(season.number).some((x) => x.kind === 'league' && this.result(x));
     if (run.tableMoney && played)
       this.tables(season.number).forEach((tb, t) =>
         tb.forEach((r) => {
-          const userId = humans.get(r.club);
+          const userId = managers.get(r.club);
           if (!userId) return;
           this.ledger.book({
             season: season.number,
@@ -1872,11 +1907,14 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * A team founded while the league runs (L-E18): until the `joinUntil` matchday it takes over
-   * the weakest AI club of the lowest tier, with its points and fixture list.
+   * the weakest AI club of the lowest tier, with its points and fixture list (an AI manager's
+   * too while the AI managers act, decision 250; its games stay simulated unless a human plays).
    */
   private newcomer(userId: string, season: number): void {
     const run = this.run(season);
-    if (!run || run.status !== 'running' || this.udt.aiIds().has(userId)) return;
+    if (!run || run.status !== 'running') return;
+    const isAi = this.udt.aiIds().has(userId);
+    if (isAi && !this.settings.get().udt.aiEnabled) return;
     const clubs = this.clubs();
     const mine = [...clubs.values()].find((c) => c.userId === userId);
     const members = this.members(season);
@@ -1924,6 +1962,11 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           .where(and(eq(leagueFixtures.season, season), eq(leagueFixtures[col], ai)))
           .run();
     });
+    // An AI manager's games stay as they were (against humans played, else simulated).
+    if (isAi) {
+      this.log.info(`league: ${team.name} (AI manager) takes over a club of tier ${bottom + 1}`);
+      return;
+    }
     // Its coming games are played from now on.
     this.db
       .update(leagueFixtures)
@@ -1955,7 +1998,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     this.udt.assertOn();
     const f = this.db.select().from(leagueFixtures).where(eq(leagueFixtures.id, fixtureId)).get();
     if (!f) throw notFound('league game {id}', { id: fixtureId });
-    if (this.humanClubs().get(f.home) !== user.id)
+    if (this.managerClubs().get(f.home) !== user.id)
       throw forbidden('only the home club picks the map');
     if (f.status !== 'scheduled' || f.kind !== 'league')
       throw conflict('the game is not open any more');
@@ -2289,6 +2332,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const plan = this.plan(run);
     const fixtures = this.fixtures(season);
     const mine = [...clubs.values()].find((c) => c.userId === user.id && members.has(c.id));
+    const ai = this.udt.aiIds();
     const club = (id: string) => {
       const c = clubs.get(id);
       return {
@@ -2296,6 +2340,8 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         name: c?.name ?? '?',
         tag: c?.tag ?? '',
         manager: !!c?.userId,
+        /** An AI manager's club (decision 250). */
+        ai: !!c?.userId && ai.has(c.userId),
         me: c?.userId === user.id,
       };
     };
@@ -2429,6 +2475,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   history() {
     this.udt.assertOn();
     const clubs = this.clubs();
+    const ai = this.udt.aiIds();
     return this.db
       .select()
       .from(leagueRuns)
@@ -2443,6 +2490,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
               name: clubs.get(r.champion)?.name ?? '?',
               tag: clubs.get(r.champion)?.tag ?? '',
               manager: !!clubs.get(r.champion)?.userId,
+              ai: ai.has(clubs.get(r.champion)?.userId ?? ''),
             }
           : null,
         tiers: Array.from({ length: r.tiers }, (_, t) =>
@@ -2453,6 +2501,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
               name: clubs.get(m.clubId)?.name ?? '?',
               tag: clubs.get(m.clubId)?.tag ?? '',
               manager: !!clubs.get(m.clubId)?.userId,
+              ai: ai.has(clubs.get(m.clubId)?.userId ?? ''),
               place: m.place,
               points: m.points,
               nextTier: m.nextTier,

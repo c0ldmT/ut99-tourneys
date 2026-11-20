@@ -610,7 +610,9 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                             <span class="nm"
                               >{{ r.name }}
                               @if (r.manager) {
-                                <span class="lg-chip mgr">{{ 'league.manager' | t }}</span>
+                                <span class="lg-chip mgr">{{
+                                  (r.ai ? 'league.aiManager' : 'league.manager') | t
+                                }}</span>
                               }
                             </span>
                             <b>{{ r.points }}</b>
@@ -900,8 +902,14 @@ export class UdtLeaguePage implements OnDestroy {
   );
   protected readonly queue = computed(() => this.realGames().filter((g) => !this.isRunning(g)));
 
-  protected chip(c: { me: boolean; manager: boolean }): string {
-    return c.me ? 'league.you' : c.manager ? 'league.manager' : 'league.ai';
+  protected chip(c: { me: boolean; manager: boolean; ai?: boolean }): string {
+    return c.me
+      ? 'league.you'
+      : c.ai
+        ? 'league.aiManager'
+        : c.manager
+          ? 'league.manager'
+          : 'league.ai';
   }
 
   protected isRunning(g: LeagueGame): boolean {

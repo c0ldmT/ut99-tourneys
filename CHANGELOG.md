@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team league: AI managers get their own clubs (games against humans played, against AI clubs simulated, table money yes, cup bonus no) and are marked on the league page.
 - Analysis export: the replays of the games (feed, timeline, players at the end) come along with neutral names (`--no-replays` leaves them out).
 - Analysis export on the server: `node website/dist/export-cli.js <tourney.db> <folder> --bot-logs <bot-logs>` writes the anonymised database, feedback texts and bot logs with the same neutral names into one folder.
 - Bridge: bot logs are kept 90 days by default (`botLogDays` in bridge.json, 0 = for good) instead of 14, earlier days are gzipped, and every line names its tournament.

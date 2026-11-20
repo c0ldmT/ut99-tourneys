@@ -296,6 +296,70 @@ describe('Dream Team league', () => {
     expect((ab.body as { status: { state: string } }).status.state).toBe('nextSeason');
   });
 
+  it('AI managers get clubs: played against humans, simulated otherwise, table money but no cup bonus (decision 250)', async () => {
+    const { admin, mario, db } = await setup();
+    // One tier: humans and AI managers meet.
+    await admin.req('PUT', '/settings/udt', { league: { ...LEAGUE, tiers: 1 } });
+    await admin.req('PUT', '/settings/udt', { aiEnabled: true, aiCount: 2 });
+    await admin.post('/udt/ai/ensure');
+    await admin.post('/udt/test/advance', { hours: 3 * 24 });
+    const v = (await mario.get('/udt/league')).body;
+    expect(v.run).toMatchObject({ status: 'running' });
+    const rows = v.tables.flatMap(
+      (t: { rows: { club: string; manager: boolean; ai?: boolean }[] }) => t.rows,
+    ) as { club: string; manager: boolean; ai?: boolean }[];
+    // Two humans and two AI managers have clubs; the AI managers' clubs are marked.
+    expect(rows.filter((r) => r.manager)).toHaveLength(4);
+    const aiClubs = new Set(rows.filter((r) => r.ai).map((r) => r.club));
+    expect(aiClubs.size).toBe(2);
+    const humans = new Set(rows.filter((r) => r.manager && !r.ai).map((r) => r.club));
+    const fixtures = db.select().from(leagueFixtures).all();
+    for (const f of fixtures.filter((x) => x.kind === 'league')) {
+      const human = humans.has(f.home) || humans.has(f.away);
+      expect(f.real, `${f.home}-${f.away}`).toBe(human);
+    }
+    // Some games of an AI manager against a human are played, against the rest simulated.
+    const vsHuman = (f: { home: string; away: string }) =>
+      (aiClubs.has(f.home) && humans.has(f.away)) || (aiClubs.has(f.away) && humans.has(f.home));
+    expect(fixtures.some((f) => f.real && vsHuman(f))).toBe(true);
+    expect(fixtures.some((f) => !f.real && (aiClubs.has(f.home) || aiClubs.has(f.away)))).toBe(
+      true,
+    );
+    // Play into the next Monday: the AI managers get table money, never the cup bonus.
+    for (let d = 0; d < 8; d++) {
+      await admin.post('/udt/test/advance', { hours: 12 });
+      await playDue(admin, db);
+      await admin.post('/udt/test/advance', { hours: 12 });
+      await playDue(admin, db);
+    }
+    const aiIds = ((await admin.get('/udt/ai')).body as { userId: string }[]).map((a) => a.userId);
+    const ledger = api!.app.get(LedgerService);
+    const kinds = aiIds.flatMap((id) => ledger.entries(id, 1, 500).map((e) => e.kind));
+    expect(kinds).toContain('udt_league');
+    expect(kinds).not.toContain('udt_cup_bonus');
+    // Their simulated games have results.
+    const sim = db
+      .select()
+      .from(leagueFixtures)
+      .all()
+      .filter((f) => !f.real && (aiClubs.has(f.home) || aiClubs.has(f.away)) && f.winner);
+    expect(sim.length).toBeGreaterThan(0);
+  });
+
+  it('AI managers only take the places the humans leave (decision 250)', async () => {
+    const { admin, mario } = await setup();
+    await admin.req('PUT', '/settings/udt', { league: { ...LEAGUE, tiers: 1 } });
+    await admin.req('PUT', '/settings/udt', { aiEnabled: true, aiCount: 8 });
+    await admin.post('/udt/ai/ensure');
+    await admin.post('/udt/test/advance', { hours: 3 * 24 });
+    const v = (await mario.get('/udt/league')).body;
+    expect(v.run).toMatchObject({ status: 'running' });
+    const rows = v.tables[0].rows as { manager: boolean; ai?: boolean; me: boolean }[];
+    expect(rows).toHaveLength(8);
+    expect(rows.filter((r) => r.manager && !r.ai)).toHaveLength(2);
+    expect(rows.filter((r) => r.ai)).toHaveLength(6);
+  });
+
   it('a manager who founds a team later takes over an AI club of the lowest tier', async () => {
     const { admin } = await setup();
     await admin.post('/udt/test/advance', { hours: 3 * 24 + 1 });

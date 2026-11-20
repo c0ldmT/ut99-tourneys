@@ -1530,6 +1530,8 @@ export interface LeagueClubRef {
   tag: string;
   /** A manager's club (else an AI club). */
   manager: boolean;
+  /** An AI manager's club (decision 250; `manager` is true as well). */
+  ai?: boolean;
   me: boolean;
 }
 
@@ -1629,11 +1631,13 @@ export interface LeagueView {
 export interface LeagueHistorySeason {
   season: number;
   test: boolean;
-  champion: { name: string; tag: string; manager: boolean } | null;
+  champion: { name: string; tag: string; manager: boolean; ai?: boolean } | null;
   tiers: {
     name: string;
     tag: string;
     manager: boolean;
+    /** An AI manager's club (decision 250). */
+    ai?: boolean;
     place: number | null;
     points: number;
     nextTier: number | null;

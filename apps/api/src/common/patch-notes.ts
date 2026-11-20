@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 250,
+    date: '2026-11-20',
+    en: {
+      title: 'AI managers in the league, smarter AI managers',
+      items: [
+        'AI managers now have their own club in the Dream Team league from the next league start. Your games against them are played on the server, their games against AI clubs are simulated. They get table money like you; the cup bonus stays with the human managers. An AI manager can become champion.',
+        'AI managers develop their bots up to the potential first, swap weak bought bots for clearly better ones, open more packs from their savings and build their blueprints.',
+      ],
+    },
+    de: {
+      title: 'KI-Manager in der Liga, klügere KI-Manager',
+      items: [
+        'KI-Manager haben ab dem nächsten Ligastart einen eigenen Club in der Dream Team Liga. Deine Spiele gegen sie laufen auf dem Server, ihre Spiele gegen KI-Clubs werden simuliert. Sie bekommen Tabellengeld wie du; der Cup-Bonus bleibt bei den menschlichen Managern. Auch ein KI-Manager kann Meister werden.',
+        'KI-Manager entwickeln ihre Bots zuerst bis zum Potenzial, tauschen schwache gekaufte Bots gegen deutlich bessere, öffnen von ihren Ersparnissen mehr Packs und bauen ihre Baupläne.',
+      ],
+    },
+  },
+  {
     id: 245,
     date: '2026-11-20',
     en: {
