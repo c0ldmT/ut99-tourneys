@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.19.1";
+const MOD_VERSION = "0.19.2";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -190,6 +190,8 @@ var NavigationPoint CfgNest[16];   // sniper's nest: the nest it heads for
 var NavigationPoint CfgLastNest[16];
 var float CfgNestUntil[16];        // gives up the way there then
 var float CfgNestNext[16];         // no new nest before then
+var float CfgNestHit[16];          // mod 0.19.2: hit on the way to or in its nest (then)
+var float CfgNestCamp[16];         // mod 0.19.2: camps in the nest it reached until then
 var float CfgDanceNext[16];        // shuffle dancer: next dodge not before then
 var byte CfgDanceSide[16];
 var Inventory CfgItem[16];         // item controller: the item it heads for or waits at
@@ -4226,8 +4228,9 @@ function FreeRespawn(Bot B, int s, string Why, bool bNeedPath)
 //-----------------------------------------------------------------------------
 // Mod 0.11.0: behaviour traits, second group. Sniper's nest: with the sniper rifle (its
 // favourite weapon) it heads for a high point with a view when it has no enemy in sight and
-// camps there 8-14 s. Team player (team games): attacks what its team mates attack (target
-// threat), and without an enemy in sight joins a team mate's fight within 2500 units. Shuffle
+// camps there 8-14 s (mod 0.19.2: only with a hitscan weapon in hand, 5-9 s, a hit ends it). Team player (team games): attacks what its team mates attack (target
+// threat), and without an enemy in sight joins a team mate's fight within 2500 units (3500 since
+// 0.19.2). Shuffle
 // dancer: in a fight it dodges left and right about once a second (the game's own dodge),
 // strafes more. Item controller: knows when armour, shield belts and damage amplifiers come
 // back and is there in time (waits next to them), when it has no enemy in sight.
@@ -4452,13 +4455,58 @@ function NavigationPoint PickNest(Bot B, int c)
 	return Best;
 }
 
-// Sniper's nest. True: the bot is on its way to a nest or camps in it.
+// Mod 0.19.2: a hitscan weapon in hand (sniper rifle, shock rifle, minigun).
+function bool HitscanInHand(Bot B)
+{
+	if (B.Weapon == None)
+		return false;
+	return B.Weapon.IsA('SniperRifle') || B.Weapon.IsA('ShockRifle') || B.Weapon.IsA('Minigun2');
+}
+
+// Mod 0.19.2: camping in the nest it has reached (not another camp near it).
+function bool InNest(Bot B, int c)
+{
+	return B.bCamping && B.IsInState('Roaming') && Level.TimeSeconds < CfgNestCamp[c] && CfgLastNest[c] != None
+		&& VSize(CfgLastNest[c].Location - B.Location) < 250;
+}
+
+// Sniper's nest. True: the bot is on its way to a nest or camps in it. Mod 0.19.2 (decision
+// 259): only with a hitscan weapon in hand, shorter (5 s + 1 s per 300 units to get there, 5-9 s
+// in the nest with the sniper rifle in hand), a hit on the way or in the nest ends it (no new nest
+// for 30 s).
 function bool SniperNest(Bot B, int c)
 {
 	local float Now;
 	local NavigationPoint N;
+	local Weapon W;
 
 	Now = Level.TimeSeconds;
+	if (CfgNestHit[c] > 0 && Now - CfgNestHit[c] > 3)
+		CfgNestHit[c] = 0; // an old hit (the errand was not looked at then)
+	if (CfgNestHit[c] > 0 || (InNest(B, c) && !HitscanInHand(B) && B.PendingWeapon == None))
+	{
+		if (CfgNest[c] != None)
+		{
+			BotLog(BName(B) $ ": sniper's nest" @ CfgNest[c].Name @ "given up after a hit");
+			CfgLastNest[c] = CfgNest[c];
+			CfgNest[c] = None;
+		}
+		else if (InNest(B, c))
+		{
+			if (CfgNestHit[c] > 0)
+				BotLog(BName(B) $ ": leaves the sniper's nest" @ CfgLastNest[c].Name @ "after a hit");
+			else
+				BotLog(BName(B) $ ": leaves the sniper's nest" @ CfgLastNest[c].Name @ "without a hitscan weapon");
+			CfgNestCamp[c] = 0;
+			B.bCampOnlyOnce = false;
+			B.GotoState('Roaming', 'PreBegin');
+		}
+		if (CfgNestHit[c] > 0)
+			CfgNestNext[c] = FMax(CfgNestNext[c], Now + 30);
+		CfgNestHit[c] = 0;
+		CfgNestCamp[c] = 0;
+		return false;
+	}
 	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
 		return false;
 	if (!HasSniper(B))
@@ -4474,9 +4522,21 @@ function bool SniperNest(Bot B, int c)
 			BotLog(BName(B) $ ": sniper's nest" @ CfgNest[c].Name @ "reached, camps");
 			CfgLastNest[c] = CfgNest[c];
 			CfgNest[c] = None;
-			CfgNestNext[c] = Now + 25;
-			B.SwitchToBestWeapon();
-			CampHere(B, 8 + 6 * FRand());
+			CfgNestNext[c] = Now + 30;
+			// Mod 0.19.2: the sniper rifle in hand (the best weapon is often another one up there).
+			W = Weapon(B.FindInventoryType(class'Botpack.SniperRifle'));
+			if (W != None && B.Weapon != W)
+			{
+				B.PendingWeapon = W;
+				if (B.Weapon == None)
+					B.ChangedWeapon();
+				else
+					B.Weapon.PutDown();
+			}
+			else if (W != None)
+				B.PendingWeapon = None; // keeps the rifle in hand
+			CfgNestCamp[c] = Now + 10;
+			CampHere(B, 5 + 4 * FRand());
 			return true;
 		}
 		if (Now > CfgNestUntil[c] || !SteerTo(B, CfgNest[c]))
@@ -4489,7 +4549,7 @@ function bool SniperNest(Bot B, int c)
 		}
 		return true;
 	}
-	if (B.bCamping || Now < CfgNestNext[c] || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
+	if (B.bCamping || Now < CfgNestNext[c] || (!B.IsInState('Roaming') && !B.IsInState('Wandering')) || !HitscanInHand(B))
 		return false;
 	N = PickNest(B, c);
 	if (N == None)
@@ -4498,7 +4558,7 @@ function bool SniperNest(Bot B, int c)
 		return false;
 	}
 	CfgNest[c] = N;
-	CfgNestUntil[c] = Now + 25;
+	CfgNestUntil[c] = Now + 5 + VSize(N.Location - B.Location) / 300;
 	BotLog(BName(B) $ ": heads for the sniper's nest" @ N.Name @ Where(N.Location));
 	return SteerTo(B, N);
 }
@@ -4515,7 +4575,8 @@ function bool MateTarget(Bot B, Pawn Other)
 	return false;
 }
 
-// Team player without an enemy in sight: joins a team mate's fight within 2500 units.
+// Team player without an enemy in sight: joins a team mate's fight within 3500 units (mod
+// 0.19.2; 2500 before).
 // True: it goes for that enemy now.
 function bool TeamPlay(Bot B)
 {
@@ -4525,7 +4586,7 @@ function bool TeamPlay(Bot B)
 		return false;
 	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
 		return false;
-	// The enemy of the nearest team mate in a fight, within 2500 units.
+	// The enemy of the nearest team mate in a fight, within 3500 units.
 	for (Q = Level.PawnList; Q != None; Q = Q.NextPawn)
 	{
 		if (Q == B || Bot(Q) == None || Q.Health <= 0 || !SameTeam(Q, B))
@@ -4534,7 +4595,7 @@ function bool TeamPlay(Bot B)
 		if (T == None || T.Health <= 0 || T.bDeleteMe || SameTeam(T, B))
 			continue;
 		D = VSize(T.Location - B.Location);
-		if (D > 2500 || (Mate != None && D >= BestD))
+		if (D > 3500 || (Mate != None && D >= BestD))
 			continue;
 		Mate = Q;
 		BestD = D;
@@ -5154,6 +5215,8 @@ function ResetGameTraits()
 		CfgNest[c] = None;
 		CfgLastNest[c] = None;
 		CfgNestNext[c] = 0;
+		CfgNestHit[c] = 0;
+		CfgNestCamp[c] = 0;
 		CfgItem[c] = None;
 		CfgItemNext[c] = 0;
 		CfgPhxAt[c] = 0;
@@ -5192,8 +5255,8 @@ function ResetGameTraits()
 }
 
 // From the damage mutator, after armour: glass cannon (+20 % dealt and taken), thick skin
-// (-10 % taken), vampire (15 % of the damage dealt as health, up to 100), phoenix (one lethal hit
-// per game leaves 50 health).
+// (-15 % taken, mod 0.19.2), vampire (11 % of the damage dealt as health, up to 100; mod 0.19.2),
+// phoenix (one lethal hit per game leaves 50 health).
 function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name DamageType)
 {
 	local int cv, ci, Heal, ms, Before;
@@ -5230,12 +5293,12 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 	if (cv >= 0 && (CfgBody[cv] & 2) != 0)
 	{
 		Before = ActualDamage;
-		ActualDamage = Max(1, int(ActualDamage * 0.9 + 0.5));
+		ActualDamage = Max(1, int(ActualDamage * 0.85 + 0.5));
 		TrCount(cv, 10, Before - ActualDamage, 0);
 	}
 	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
 	{
-		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.15 + 0.5);
+		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.11 + 0.5);
 		Heal = Min(Heal, 100 - InstigatedBy.Health);
 		if (Heal > 0)
 		{
@@ -5518,8 +5581,6 @@ function float BehaviourThreat(Bot B, Pawn Other)
 		F += 0.5;
 	if ((CfgBeh[c] & 64) != 0 && MateTarget(B, Other))
 		F += 0.5;
-	if ((CfgBeh[c] & 8192) != 0 && Other.Health > 0 && Other.Health < 50)
-		F += 0.4; // assassin: the hurt first
 	return F;
 }
 
@@ -5531,7 +5592,8 @@ function float BehaviourThreat(Bot B, Pawn Other)
 // 1 kamikaze, 2 berserker, 3 revenant, 4 bounty hunter, 5 sniper's nest, 6 team player,
 // 7 shuffle dancer, 8 item controller, 9 starter armour, 10 thick skin, 11 adrenaline,
 // 12 glass cannon, 13 vampire, 14 phoenix, 15-22 values traits on the curve (passive), 23 light
-// feet (passive), 24-43 the catalogue v2 (decision 242).
+// feet (passive until 0.19.1, since 0.19.2 a counter: seconds of sprint), 24-43 the catalogue v2
+// (decision 242).
 //=============================================================================
 
 function string TrCode(int t)
@@ -5596,10 +5658,10 @@ function int TrIdOf(string Code)
 	return -1;
 }
 
-// Values traits on the curve and light feet: nothing to count, the seconds in the game.
+// Values traits on the curve (light feet until 0.19.1): nothing to count, the seconds in the game.
 function bool TrPassive(int t)
 {
-	return t >= 15 && t <= 23;
+	return t >= 15 && t <= 22;
 }
 
 // From the btrt line: the bot's game traits in its slots (up to 8; unknown codes left out).
@@ -5847,7 +5909,7 @@ function TraitTelemetryTick()
 		}
 		if ((CfgBeh[c] & 32) != 0)
 		{
-			bOn = CfgNest[c] != None || (B.bCamping && HasSniper(B));
+			bOn = CfgNest[c] != None || InNest(B, c);
 			TrSampleLate(c, 5, bOn, B);
 		}
 		if ((CfgBeh[c] & 64) != 0)
@@ -5900,8 +5962,8 @@ function TraitBodyTick(Bot B, int c)
 		else
 			TrEnd(c, 27, 0);
 	}
-	// Regeneration: +2 health a second after 4 s without a hit.
-	if ((CfgBody[c] & 2048) != 0 && B.Health < 100 && Level.TimeSeconds - CfgHitAt[c] >= 4)
+	// Regeneration: +2 health a second after 3 s without a hit (mod 0.19.2; 4 s before).
+	if ((CfgBody[c] & 2048) != 0 && B.Health < 100 && Level.TimeSeconds - CfgHitAt[c] >= 3)
 	{
 		Heal = Min(2, 100 - B.Health);
 		B.Health += Heal;
@@ -5920,20 +5982,21 @@ function TraitBodyTick(Bot B, int c)
 		bFav = B.Weapon != None && B.FavoriteWeapon != None && B.Weapon.Class == B.FavoriteWeapon;
 		if (bFav)
 		{
-			F *= 0.7;
+			F *= 0.8; // mod 0.19.2 (0.7 before)
 			TrCount(c, 35, 1, 0); // seconds with it
 		}
 	}
 	CfgRunAim[c] = F;
 	if (Curve != None)
 		Curve.SetRunAim(B, F);
-	// Pathfinder: faster without an enemy (seconds boosted as its value).
-	if ((CfgBeh[c] & 2048) != 0)
-	{
+	// Pathfinder: faster without an enemy (seconds boosted as its value). Light feet (mod
+	// 0.19.2): faster on the way to items and on the retreat (seconds of sprint as its uses).
+	if ((CfgBeh[c] & 2048) != 0 || (CfgBody[c] & 64) != 0)
 		ApplySpeed(B, c);
-		if (B.Enemy == None)
-			TrCount(c, 30, 1, 0);
-	}
+	if ((CfgBeh[c] & 2048) != 0 && B.Enemy == None)
+		TrCount(c, 30, 1, 0);
+	if ((CfgBody[c] & 64) != 0 && LightSprint(B))
+		TrCount(c, 23, 1, 0);
 	// Ammo hoarder: ammo the held weapon gained since the last tick (a pickup) +25 %.
 	if ((CfgBody[c] & 128) != 0 && B.Weapon != None && B.Weapon.AmmoType != None)
 	{
@@ -5960,16 +6023,28 @@ function TraitBodyTick(Bot B, int c)
 	}
 }
 
-// Speed of a bot with speed traits: light feet x1.1, juggernaut x0.92, adrenaline boost x1.3,
-// pathfinder without an enemy x1.1 (on the class's ground speed).
+// Mod 0.19.2: light feet sprints on the way to items (roaming without an enemy, not camping)
+// and on the retreat; in a fight it runs as fast as the others.
+function bool LightSprint(Pawn P)
+{
+	if (Bot(P) == None || P.Health <= 0)
+		return false;
+	if (P.IsInState('Retreating'))
+		return true;
+	return P.Enemy == None && P.IsInState('Roaming') && !Bot(P).bCamping;
+}
+
+// Speed of a bot with speed traits: light feet x1.12 while it sprints (mod 0.19.2; always x1.1
+// before), juggernaut x0.92, adrenaline boost x1.3, pathfinder without an enemy x1.1 (on the
+// class's ground speed).
 function ApplySpeed(Pawn P, int c)
 {
 	local float F;
 	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & 2048) == 0))
 		return;
 	F = 1.0;
-	if ((CfgBody[c] & 64) != 0)
-		F *= 1.1;
+	if ((CfgBody[c] & 64) != 0 && LightSprint(P))
+		F *= 1.12;
 	if ((CfgBody[c] & 8192) != 0)
 		F *= 0.92;
 	if (CfgAdrUntil[c] > 0)
@@ -6022,7 +6097,7 @@ function TraitKill(Pawn Killer, Pawn Other, int c)
 	if ((CfgBody[c] & 16384) != 0)
 	{
 		CfgOlKills[c]++;
-		if (CfgOlKills[c] - (CfgOlKills[c] / 5) * 5 == 0 && Killer.FindInventoryType(class'Botpack.UDamage') == None)
+		if (CfgOlKills[c] - (CfgOlKills[c] / 6) * 6 == 0 && Killer.FindInventoryType(class'Botpack.UDamage') == None)
 		{
 			Amp = Spawn(class'Botpack.UDamage', Killer,, Killer.Location);
 			if (Amp != None)
@@ -6061,7 +6136,7 @@ function TraitDeath(Pawn Other)
 
 // Mod 0.18.0, from OnTakeDamage before the other body traits. True: no damage at all (monster
 // whisperer). Monster bane, titan slayer, splash expert, assassin (from behind), juggernaut,
-// counter-attacker, regeneration (last hit).
+// counter-attacker, regeneration (last hit), sniper's nest (mod 0.19.2: a hit ends the nest).
 function bool TraitDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name DamageType, int cv, int ci)
 {
 	local int Before;
@@ -6110,6 +6185,9 @@ function bool TraitDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, 
 		return true;
 	}
 	CfgHitAt[cv] = Level.TimeSeconds;
+	if ((CfgBeh[cv] & 32) != 0 && Bot(Victim) != None && InstigatedBy != None && InstigatedBy != Victim && !SameTeam(InstigatedBy, Victim)
+		&& (CfgNest[cv] != None || (Bot(Victim).bCamping && Level.TimeSeconds < CfgNestCamp[cv])))
+		CfgNestHit[cv] = Level.TimeSeconds;
 	if ((CfgBody[cv] & 8192) != 0)
 	{
 		Before = ActualDamage;
@@ -6122,7 +6200,7 @@ function bool TraitDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, 
 		Dir = Normal(InstigatedBy.Location - Victim.Location);
 		if ((vector(Victim.Rotation) Dot Dir) < 0.3)
 		{
-			CfgCaUntil[cv] = Level.TimeSeconds + 3;
+			CfgCaUntil[cv] = Level.TimeSeconds + 5; // mod 0.19.2 (3 s before)
 			Bot(Victim).SetEnemy(InstigatedBy);
 			TrStart(cv, 34, Victim);
 		}
@@ -6130,7 +6208,8 @@ function bool TraitDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, 
 	return false;
 }
 
-// Scavenger (the weapon its victim dropped) and health hound (health below 70) when no enemy is
+// Scavenger (the weapon its victim dropped) and health hound (health below 85 since 0.19.2, 70
+// before) when no enemy is
 // in sight. True: the bot heads for the item.
 function bool GoalErrand(Bot B, int c)
 {
@@ -6174,7 +6253,7 @@ function bool GoalErrand(Bot B, int c)
 			return true;
 		}
 	}
-	if ((CfgBeh[c] & 1024) != 0 && B.Health < 70)
+	if ((CfgBeh[c] & 1024) != 0 && B.Health < 85)
 	{
 		BestD = 2500;
 		foreach AllActors(class'TournamentHealth', H)
@@ -6553,7 +6632,7 @@ function SendMeasures(int N, int i)
 }
 
 // Before "pse": open episodes end with the game, then one "pt" line per trait of every bot
-// (values traits on the curve and light feet as passive lines with the seconds in the game).
+// (values traits on the curve as passive lines with the seconds in the game).
 function SendTraitStats(int N)
 {
 	local int c, s, x, i, t;

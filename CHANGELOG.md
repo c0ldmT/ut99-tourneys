@@ -232,6 +232,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Changed
 
+- Mod 0.19.2: trait rework - light feet sprints only to items and on the retreat, sniper's nest only with a hitscan weapon and shorter (a hit ends it), assassin without the hunt; thick skin, regeneration, counter-attacker, health hound and team player stronger; overload, vampire and weapon master a little weaker.
 - Dream Team: salaries, standard packs and creation licences follow the economy index only with its square root above 1 (at index 5 about ×2.2 instead of ×5); premium and elite packs, the market and scouting stay fully indexed.
 - Dream Team league: AI clubs play with traits (as many per bot as the median human of their tier, at most 4/3/2/1 by tier, drawn at random), and the game model counts every bot's traits (rubber band, simulated games, test mode, calibration); the trait report marks the AI's randomly drawn traits (trait lab).
 - Dream Team AI managers: points go into skill until the potential (saved for the next step), a full roster swaps its weakest bought bot for a clearly stronger offer from savings, savings also open packs and build blueprints, trait cards land on a random bot (trait lab).

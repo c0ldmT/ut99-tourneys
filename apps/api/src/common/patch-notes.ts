@@ -22,6 +22,31 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 259,
+    date: '2026-11-21',
+    mod: '0.19.2',
+    en: {
+      title: 'Smarter bots and reworked traits (mod 0.19.2)',
+      items: [
+        'Base AI by level: higher levels now and then keep safe distances with splash weapons, switch weapons less in fights, change weapon before their last shot, are pushed into pits less often and head for power items shortly before they are back.',
+        'Light feet: +12 % speed only on the way to items and on the retreat, normal speed in a fight.',
+        "Sniper's nest: only with the sniper rifle and a hitscan weapon in hand, shorter stays, a hit ends it. Assassin: only +25 % damage from behind, no more hunting of hurt enemies.",
+        'Stronger: thick skin −15 %, regeneration after 3 s, counter-attacker 5 s, health hound below 85 health, team player joins fights from further away.',
+        'A little weaker: overload every 6th kill, vampire 11 %, weapon master aim error −20 %.',
+      ],
+    },
+    de: {
+      title: 'Klügere Bots und überarbeitete Traits (Mod 0.19.2)',
+      items: [
+        'Grund-KI nach Stufe: Höhere Stufen halten mit Splash-Waffen öfter Abstand, wechseln im Kampf seltener die Waffe, wechseln vor dem letzten Schuss, werden seltener in Abgründe gestoßen und laufen kurz vor dem Respawn zu Power-Items.',
+        'Light feet: +12 % Tempo nur auf dem Weg zu Items und auf dem Rückzug, im Kampf normales Tempo.',
+        "Sniper's nest: nur mit Scharfschützengewehr und Hitscan-Waffe in der Hand, kürzer, ein Treffer beendet es. Assassin: nur noch +25 % Schaden von hinten, keine Jagd auf angeschlagene Gegner mehr.",
+        'Stärker: Thick skin −15 %, Regeneration nach 3 s, Counter-attacker 5 s, Health hound unter 85 Leben, Team player hilft aus größerer Entfernung.',
+        'Etwas schwächer: Overload jeder 6. Kill, Vampire 11 %, Weapon master Zielfehler −20 %.',
+      ],
+    },
+  },
+  {
     id: 256,
     date: '2026-11-21',
     en: {

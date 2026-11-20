@@ -153,6 +153,16 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > `TourneySkillCurve.BotSwitch` (Bot.SwitchToBestWeapon with these rules). `pm` gets `es` (switches from a living enemy
 > to another one). Only with the skill curve on.
 
+> Mod 0.19.2: trait rework (decision 259, plan Season 3 P2.3, by the season 2 data). Light feet sprints (+12 %) only on
+> the way to items (roaming without an enemy, not camping) and in `Retreating`, in a fight normal speed (trait log: a
+> counter, seconds of sprint). Sniper's nest only with the sniper rifle and a hitscan weapon in hand (sniper, shock
+> rifle, minigun), 5 s + 1 s per 300 units to get there, 5-9 s in the nest with the sniper rifle in hand, a hit (not by
+> a team mate) on the way or in the nest ends it (no nest for 30 s), it leaves the nest when the weapon in hand is no
+> hitscan weapon any more. Assassin no longer prefers hurt enemies (only +25 % from
+> behind). Stronger: thick skin -15 % (was -10 %), regeneration after 3 s (was 4 s), counter-attacker 5 s (was 3 s),
+> health hound below 85 health (was 70), team player joins fights within 3500 (was 2500). Weaker: overload every 6th
+> kill (was 5th), vampire 11 % (was 15 %), weapon master aim x0.8 (was x0.7).
+
 ## Classes
 
 | Class | Role |
@@ -352,6 +362,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 69 | **Patch notes** (website only) | Website updated (migration 45 runs by itself). Log in: the modal "What's new" shows the notes 243 and 242 once ("All patch notes" shows the older ones too); "Got it" or Escape, reload: it does not come again. Footer → "Patch notes" opens all notes any time, in German with the language switch. A new user (first login) and a guest on the first visit get no modal. |
 | 70 | **Bot measures** (mod 0.19.0) | Bridge and website updated, mod 0.19.0 built. A Dream Team or bot-only game with 4+ bots on a map with power items and a pit (DM-Deck16][ or DM-Morpheus), 5 minutes. Bridge: no `bad line` for `pm`/`pu`. Settings → Dream Team → Trait report: "Bot measures per skill (CSV)" has a row per skill with switches, fight switches, seconds to the shot (about 0.3-2 s), fight and enforcer seconds, retreats (most with health 90+ in the first column group if the old pattern holds), items taken and quick ones; "Suicides per map (CSV)" lists e.g. `Fell` or `RocketDeath` with the map. Server log: no `Accessed None` in `MeasureFrame`/`MeasureItemTick`. |
 | 71 | **Base AI by level** (mod 0.19.1) | Skill curve on, mod 0.19.1 built. 1) Bot-only 1v1s Godlike vs Godlike with rocket launcher and flak on DM-Deck16][ (10 min): fewer suicides than before (Settings → Dream Team → Trait report → "Suicides per map", `RocketDeath`/`FlakDeath`); in close fights a bot now and then fires flak primary or takes another weapon instead of the rocket. 2) Same on DM-Morpheus or DM-SpaceNoxx: fewer `Fell` deaths after rocket hits at the edge. 3) Inhuman/Godlike bots in a 2on2 on a map with a belt/amp: server log `item timing heads for … back in n s` (n ≤ 8) for bots without the item controller. 4) "Bot measures per skill": fewer fight switches per minute at Masterful+ than at Novice, `enemySwitches` filled. No `Accessed None` in `BotSwitch`/`PitPush`. |
+| 72 | **Trait rework** (mod 0.19.2) | Mod 0.19.2 built, website updated. Dream Team DM with roster bots carrying the reworked traits. 1) Light feet: spectate - faster only while it runs to items or flees, normal speed in a fight; match page → "Traits in this game": light feet with a count (seconds of sprint). 2) Sniper's nest on DM-Deck16][ or DM-Morpheus: server log `heads for the sniper's nest …` only while it holds the sniper rifle, shock rifle or minigun, it camps 5-9 s; shoot it on the way or in the nest → `given up after a hit` / `leaves the sniper's nest …`, no new nest for 30 s. 3) Overload: `game trait overload: <bot> amplified` on every 6th kill of a life. 4) Thick skin/vampire/weapon master/regeneration: counters on the match page in line with the new numbers. Trait texts on the website (packs, bot details) show the new numbers. No `Accessed None` |
 
 ## SmartStockBots (optional)
 

@@ -104,7 +104,8 @@ describe('values traits', () => {
     expect(new Set(TRAITS.flatMap((t) => (t.mod ? [t.mod] : []))).size).toBe(
       TRAITS.filter((t) => t.mod).length,
     );
-    expect(traitLogKind('light-feet')).toBe('passive');
+    expect(traitLogKind('light-feet')).toBe('counter');
+    expect(traitLogKind('steady-hand')).toBe('passive');
     expect(traitLogKind('cold-blood')).toBe('episode');
     expect(traitLogKind('juggernaut')).toBe('counter');
     expect(traitLogKind('second-wind')).toBe('episode');

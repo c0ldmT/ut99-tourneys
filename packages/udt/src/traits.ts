@@ -206,15 +206,13 @@ const LOG_COUNTERS = new Set<TraitCode>([
   'hivemind',
   'monster-whisperer',
   'weapon-master',
+  // mod 0.19.2: seconds of sprint (passive before)
+  'light-feet',
 ]);
 
 /** Values traits that act only at times (mod 0.18.0): logged like body traits. */
 const LOG_EPISODE_VALUES = new Set<TraitCode>(['cold-blood']);
-/** Body traits with nothing to count (the seconds in the game, like values traits). */
-const LOG_PASSIVE = new Set<TraitCode>(['light-feet']);
-
 export function traitLogKind(code: TraitCode): TraitLogKind {
-  if (LOG_PASSIVE.has(code)) return 'passive';
   if (LOG_EPISODE_VALUES.has(code)) return 'episode';
   if (LOG_COUNTERS.has(code)) return 'counter';
   if (traitDef(code)?.category === 'values') return 'passive';
@@ -241,11 +239,12 @@ export function traitOfRarity(rarity: Rarity, rng: () => number): TraitDef {
  * games, `claude/Analyse-Scratch.md`), each pulled towards the mean trait (+0.48, empirical
  * Bayes, spread 0.4) by its standard error - few games, little weight. A skill step is about
  * +1.7. Traits without data count as the mean trait when the mod plays them, else (manager
- * traits, claudius - its +1 skill counts already - and gun nut) as nothing.
+ * traits, claudius - its +1 skill counts already - and gun nut) as nothing. Mod 0.19.2 (decision
+ * 259) changed what light feet, sniper's nest and assassin do: they count as without data until
+ * season 3 has measured them; the traits with a stronger or weaker knob keep their numbers.
  */
 export const TRAIT_EFFECT: Readonly<Partial<Record<TraitCode, number>>> = {
   'all-rounder': 0.17,
-  assassin: 0.07,
   berserker: 0.36,
   bouncer: 0.37,
   'cold-blood': 1.07,
@@ -257,7 +256,6 @@ export const TRAIT_EFFECT: Readonly<Partial<Record<TraitCode, number>>> = {
   'health-hound': 0.01,
   'item-controller': 0.53,
   kamikaze: 0.7,
-  'light-feet': -0.65,
   // Only in Monster Hunt: nothing in a deathmatch.
   'monster-bane': 0,
   'monster-whisperer': 0,
@@ -268,7 +266,6 @@ export const TRAIT_EFFECT: Readonly<Partial<Record<TraitCode, number>>> = {
   revenant: 0.01,
   'shuffle-dancer': 0.42,
   'side-stepper': 0.71,
-  'snipers-nest': -0.41,
   'splash-expert': 0.27,
   'starter-armour': 0.98,
   'steady-hand': 0.63,
@@ -515,7 +512,8 @@ export const RUNTIME_EDGES: Readonly<
   Partial<Record<TraitCode, { aim: number; rate?: number; score: number }>>
 > = {
   'cold-blood': { aim: 0.7, score: 0.04 },
-  'weapon-master': { aim: 0.7, score: 0.06 },
+  // Mod 0.19.2 (decision 259): ×0.8 with its favourite weapon (×0.7 before).
+  'weapon-master': { aim: 0.8, score: 0.06 },
 };
 
 /** The bot's edges in the game: multipliers multiply, degrees add. */

@@ -344,7 +344,7 @@ export interface ResolvedBot {
     phoenix: boolean;
     /** Rewind: back where it died with 35 health (a duel goes on like with the phoenix). */
     rewind: boolean;
-    /** Mod 0.18.0 (decision 242): speed × (light feet, juggernaut), damage taken ×. */
+    /** Mod 0.18.0 (decision 242): speed × (juggernaut; light feet since 0.19.2 only off fights), damage taken ×. */
     speed: number;
     taken: number;
     /** Splash expert: rocket damage ×. */
@@ -409,7 +409,8 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
       // Rewind comes back where it died with 50 health: in a duel like the phoenix.
       phoenix: codes.has('px'),
       rewind: codes.has('rw'),
-      speed: (codes.has('lf') ? 1.1 : 1) * (codes.has('jg') ? 0.92 : 1),
+      // Mod 0.19.2: light feet sprints only to items and on the retreat - not in a duel's fight.
+      speed: codes.has('jg') ? 0.92 : 1,
       taken: codes.has('jg') ? 0.8 : 1,
       splash: codes.has('se') ? 1.25 : 1,
       secondWind: codes.has('sw'),
@@ -725,14 +726,14 @@ function play(
     const x = f[i]!;
     const e = f[1 - i]!;
     if (x.hp <= 0 || e.hp <= 0) return;
-    // Mod 0.18.0: second wind (once below 25: +2/s for 10 s), regeneration (+1/s after 5 s
-    // without a hit), both up to 100.
+    // Mod 0.18.0: second wind (once below 35: +3/s for 10 s), regeneration (+2/s after 3 s
+    // without a hit since mod 0.19.2, 4 s before), both up to 100.
     if (x.r.body.secondWind && !x.windUsed && x.hp < 35) {
       x.windUsed = true;
       x.windUntil = t + 10;
     }
     if (t < x.windUntil) x.hp = Math.min(100, x.hp + 3 * STEP);
-    if (x.r.body.regen && t - x.hurtAt >= 4) x.hp = Math.min(100, x.hp + 2 * STEP);
+    if (x.r.body.regen && t - x.hurtAt >= 3) x.hp = Math.min(100, x.hp + 2 * STEP);
     // Awareness: sight (polled), hearing the enemy's shots of the last step.
     if (!x.aware) {
       if (sees(x, c)) becomeAware(x, t, rng() * 0.1 + c.sightReact[x.lv.react]! * x.r.edge.react);
@@ -970,7 +971,7 @@ function play(
     if (!v.aware && x.r.body.backstab !== 1) dmg = Math.round(dmg * x.r.body.backstab);
     if (x.r.body.glass) dmg = Math.round(dmg * 1.2);
     if (v.r.body.glass) dmg = Math.round(dmg * 1.2);
-    if (v.r.body.thick) dmg = Math.max(1, Math.round(dmg * 0.9));
+    if (v.r.body.thick) dmg = Math.max(1, Math.round(dmg * 0.85));
     if (v.r.body.taken !== 1) dmg = Math.max(1, Math.round(dmg * v.r.body.taken));
     v.hurtAt = t;
     if (v.armour > 0) {
@@ -979,7 +980,7 @@ function play(
       dmg -= a;
     }
     if (x.r.body.vampire && x.hp > 0 && x.hp < 100)
-      x.hp = Math.min(100, x.hp + Math.round(Math.min(dmg, Math.max(0, v.hp)) * 0.15));
+      x.hp = Math.min(100, x.hp + Math.round(Math.min(dmg, Math.max(0, v.hp)) * 0.11));
     if (v.r.body.phoenix && !v.phoenixUsed && dmg >= v.hp) {
       v.phoenixUsed = true;
       dmg = Math.max(0, v.hp - 50);

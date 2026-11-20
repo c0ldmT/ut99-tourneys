@@ -495,7 +495,7 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
    * values traits as edges on the skill curve: sh steady hand, wd watchdog, ss side-stepper, ph
    * patient hunter, ee eagle eye, ar all-rounder; mod 0.15.0: dd daredevil, bo bouncer. Unknown
    * codes are ignored. Mod 0.17.0: `mf` the Monster Hunt focus (-2 … 2, missing: 0); `c` may
-   * then be empty.
+   * then be empty. Mod 0.19.2 changed effects, not codes (decision 259: tf -15 %, vp 11 %, …).
    */
   z.object({
     t: z.literal('btrt'),
