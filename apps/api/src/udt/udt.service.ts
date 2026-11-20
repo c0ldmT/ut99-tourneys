@@ -25,6 +25,18 @@ import {
   traitSlots,
   traitValueFactor,
   valueScore,
+  ascendPrice,
+  cannotAscend,
+  cleanAlloc,
+  maxStars,
+  prestigePointPrice,
+  prestigePoints,
+  prestigeSpent,
+  prestigeStage,
+  respecPrice,
+  starPrice,
+  type PrestigeAlloc,
+  type PrestigeStage,
   type TraitCode,
   type TraitOnBot,
 } from '@tourney/udt';
@@ -178,7 +190,66 @@ export interface RosterBot {
     maxed: boolean;
     /** A keeper: the season it came from (no salary, no graduation in its first keeper season). */
     keptFrom: number | null;
+    /** Prestige (plan P3, decision 262): null while still developing. */
+    prestige: OwnPrestige | null;
   } | null;
+}
+
+/** An own bot's prestige as the roster shows it (decision 262). */
+export interface OwnPrestige {
+  stage: PrestigeStage;
+  /** Points it can hold (stage cap + stars), points it has (levels + bought), from levels. */
+  cap: number;
+  points: number;
+  fromLevels: number;
+  bought: number;
+  alloc: PrestigeAlloc;
+  spent: number;
+  free: number;
+  stars: number;
+  maxStars: number;
+  ascended: boolean;
+  /** Why it cannot ascend now (null: it can). */
+  ascend: ReturnType<typeof cannotAscend>;
+  /** Neuro: the next bought point, resetting its menu, the ascension, the next star (null: not now). */
+  prices: {
+    point: number | null;
+    respec: number | null;
+    ascend: number | null;
+    star: number | null;
+  };
+}
+
+/** The prestige points a team holds, its stars and its ascended bots (progressive prices). */
+export interface TeamPrestige {
+  points: number;
+  stars: number;
+  ascended: number;
+}
+
+/** A bot's stages of past seasons (yearbook marks). */
+export interface PrestigeMark {
+  season: number;
+  stage: PrestigeStage;
+  stars: number;
+}
+
+export function marksOf(json: string | null | undefined): PrestigeMark[] {
+  try {
+    const v: unknown = JSON.parse(json ?? '[]');
+    return Array.isArray(v) ? (v as PrestigeMark[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** A stored menu (JSON) as an allocation; anything broken is no point. */
+export function parseAlloc(json: string | null | undefined): PrestigeAlloc {
+  try {
+    return cleanAlloc(JSON.parse(json ?? '{}'), 99);
+  } catch {
+    return {};
+  }
 }
 
 /** An own bot at a season's end: can it be kept, and its skill in the next season. */
@@ -684,7 +755,7 @@ export class UdtService {
     /** An apprentice's mentor: its name and whether it is in this roster (faster XP). */
     const mentorOf = (id: string | null | undefined) =>
       id ? { botId: id, name: lib.get(id)?.name ?? '?', here: here.has(id) } : null;
-    return rows
+    const list: RosterBot[] = rows
       .flatMap((r) => {
         const b = lib.get(r.botId);
         if (!b) return [];
@@ -725,11 +796,23 @@ export class UdtService {
             games: r.games,
             mhFocus: r.mhFocus,
             restPrice: REST_PRICE * managerEffects(cards).restPrice,
-            own: ownView(own.get(b.id), level, b.skill, b.traits ?? {}, mentorOf),
+            own: ownView(
+              own.get(b.id),
+              level,
+              b.skill,
+              b.traits ?? {},
+              mentorOf,
+              cards.some((c) => c.code === 'claudius'),
+            ),
           },
         ];
       })
       .sort((a, b) => (a.dmSlot ?? 9) - (b.dmSlot ?? 9) || b.skill - a.skill);
+    // Prices of prestige follow what the whole team holds.
+    const tp = teamPrestige(list.map((x) => x.own?.prestige));
+    for (const x of list)
+      if (x.own?.prestige) x.own.prestige = withPrestigePrices(x.own.prestige, tp, index);
+    return list;
   }
 
   /** The Dream Team page of a manager. */
@@ -1031,12 +1114,31 @@ export class UdtService {
         // A potential the roster showed exactly (level 5) stays known.
         const known = c.level >= 5;
         tx.update(bots).set({ skill: c.nextSkill }).where(eq(bots.id, c.botId)).run();
+        // Prestige ends with the season (decision 262); its stage stays as a mark.
+        const stage = prestigeStage({
+          skill: c.skill,
+          potential: b.potential,
+          ascended: b.ascended,
+          level: c.level,
+        });
         tx.update(udtBots)
           .set({
             season,
             keptFrom: from,
             pointsSpent: 0,
             ...(known ? windowOf([b.potential, b.potential]) : {}),
+            prestigeJson: '{}',
+            prestigeBought: 0,
+            stars: 0,
+            ascended: false,
+            ...(stage
+              ? {
+                  marksJson: JSON.stringify([
+                    ...marksOf(b.marksJson),
+                    { season: from, stage, stars: b.stars },
+                  ]),
+                }
+              : {}),
           })
           .where(eq(udtBots.botId, c.botId))
           .run();
@@ -1132,6 +1234,7 @@ function ownView(
   values: LibraryBot['traits'],
   mentorOf: (id: string | null) => { botId: string; name: string; here: boolean } | null = () =>
     null,
+  claudius = false,
 ) {
   if (!b) return null;
   const p = b.potential;
@@ -1161,5 +1264,73 @@ function ownView(
     breakthrough: b.breakthrough,
     keptFrom: b.keptFrom,
     maxed,
+    prestige: ownPrestige(b, level, skill, maxed, points, claudius),
+  };
+}
+
+/**
+ * An own bot's prestige without prices (those need the team, `withPrestigePrices`): its stage
+ * (from level 5), points from left-over level points (a fully developed bot's) and bought ones.
+ */
+export function ownPrestige(
+  b: typeof udtBots.$inferSelect,
+  level: number,
+  skill: number,
+  maxed: boolean,
+  levelPoints: number,
+  claudius = false,
+): OwnPrestige | null {
+  const stage = prestigeStage({ skill, potential: b.potential, ascended: b.ascended, level });
+  if (!stage) return null;
+  const p = prestigePoints({
+    stage,
+    stars: b.stars,
+    banked: maxed ? levelPoints : 0,
+    bought: b.prestigeBought,
+  });
+  const alloc = cleanAlloc(parseAlloc(b.prestigeJson), p.points);
+  const spent = prestigeSpent(alloc);
+  return {
+    stage,
+    cap: p.cap,
+    points: p.points,
+    fromLevels: p.fromLevels,
+    bought: p.points - p.fromLevels,
+    alloc,
+    spent,
+    free: p.points - spent,
+    stars: b.stars,
+    maxStars: maxStars(claudius),
+    ascended: b.ascended,
+    ascend: cannotAscend({ stage, level, fullyDeveloped: maxed }),
+    prices: { point: null, respec: null, ascend: null, star: null },
+  };
+}
+
+/** The team's prestige from its roster bots' (bots it holds, also bought points of traded ones). */
+export function teamPrestige(list: readonly (OwnPrestige | null | undefined)[]): TeamPrestige {
+  return list.reduce<TeamPrestige>(
+    (t, p) =>
+      p
+        ? {
+            points: t.points + p.points,
+            stars: t.stars + p.stars,
+            ascended: t.ascended + (p.ascended ? 1 : 0),
+          }
+        : t,
+    { points: 0, stars: 0, ascended: 0 },
+  );
+}
+
+/** The prices of what a bot can buy now (progressive by the team, at the full index). */
+export function withPrestigePrices(p: OwnPrestige, team: TeamPrestige, index: number): OwnPrestige {
+  return {
+    ...p,
+    prices: {
+      point: p.fromLevels + p.bought < p.cap ? prestigePointPrice(team.points, index) : null,
+      respec: p.spent > 0 ? respecPrice(p.spent, index) : null,
+      ascend: p.ascend === null ? ascendPrice(team.ascended, index) : null,
+      star: p.stage === 'ascended' && p.stars < p.maxStars ? starPrice(team.stars, index) : null,
+    },
   };
 }

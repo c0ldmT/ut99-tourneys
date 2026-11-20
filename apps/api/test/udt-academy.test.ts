@@ -223,20 +223,20 @@ describe('Unreal Dream Team: academy', () => {
     ]);
   });
 
-  it('breakthrough: once, for a fully developed bot from level 10', async () => {
+  it('breakthrough: once, for a fully developed bot from level 15', async () => {
     const { mario, db } = await setup();
     const starter = (await mario.get('/udt')).body.roster[0];
     const id = starter.botId as string;
     const bt = () => mario.post(`/udt/roster/${id}/breakthrough`);
-    // Level 9, skill 3 below the potential 5, values 50: refused for the level first; a hidden
+    // Level 14, skill 3 below the potential 5, values 50: refused for the level first; a hidden
     // potential 7 at level 3 gets the same answer (it does not tell the potential).
-    db.update(udtRoster).set({ xp: 585 }).where(eq(udtRoster.botId, id)).run();
+    db.update(udtRoster).set({ xp: 1200 }).where(eq(udtRoster.botId, id)).run();
     expect((await bt()).body.key).toBe('a breakthrough needs level {level}');
     db.update(udtRoster).set({ xp: 60 }).where(eq(udtRoster.botId, id)).run();
     db.update(udtBots).set({ potential: 7 }).where(eq(udtBots.botId, id)).run();
     expect((await bt()).body.key).toBe('a breakthrough needs level {level}');
-    // Level 12 (11 points): skill at the potential, but the values (50) are below 60.
-    db.update(udtRoster).set({ xp: 880 }).where(eq(udtRoster.botId, id)).run();
+    // Level 17 (16 points): skill at the potential, but the values (50) are below 60.
+    db.update(udtRoster).set({ xp: 1700 }).where(eq(udtRoster.botId, id)).run();
     db.update(udtBots).set({ potential: 3 }).where(eq(udtBots.botId, id)).run();
     expect((await bt()).body.key).toBe('a breakthrough needs every value at {value} or more');
     api!.app
@@ -245,12 +245,12 @@ describe('Unreal Dream Team: academy', () => {
     let r = (await mario.get('/udt')).body.roster[0];
     expect(r.own).toMatchObject({
       potential: [3, 3],
-      points: 11,
+      points: 16,
       breakthrough: false,
       maxed: false,
     });
-    // Not enough points (11 - 8 spent = 3 of 4).
-    db.update(udtBots).set({ pointsSpent: 8 }).where(eq(udtBots.botId, id)).run();
+    // Not enough points (16 - 13 spent = 3 of 4).
+    db.update(udtBots).set({ pointsSpent: 13 }).where(eq(udtBots.botId, id)).run();
     expect((await bt()).body.key).toBe('the breakthrough costs {cost} points');
     db.update(udtBots).set({ pointsSpent: 0 }).where(eq(udtBots.botId, id)).run();
     const ok = await bt();
@@ -259,11 +259,70 @@ describe('Unreal Dream Team: academy', () => {
     // Skill and potential 4, values 100 -> 65, 4 points spent.
     expect(r).toMatchObject({
       skill: 4,
-      own: { potential: [4, 4], points: 7, breakthrough: true },
+      own: { potential: [4, 4], points: 12, breakthrough: true },
     });
     expect(r.traits).toMatchObject({ accuracy: 0.3, alertness: 0.3, strafing: 0.3 });
     // Once per bot.
     expect((await bt()).body.key).toBe('a bot has one breakthrough');
+  });
+
+  it('prestige: stage, menu, bought points, reset, ascension and stars (decision 262)', async () => {
+    const { mario, db, ledger, marioId } = await setup();
+    const starter = (await mario.get('/udt')).body.roster[0];
+    const id = starter.botId as string;
+    const post = (path: string, body?: unknown) => mario.post(`/udt/roster/${id}${path}`, body);
+    const own = async () => (await mario.get('/udt')).body.roster[0].own;
+    // Below level 5 nothing (the stage would tell the potential).
+    db.update(udtBots).set({ potential: 3 }).where(eq(udtBots.botId, id)).run();
+    expect((await own()).prestige).toBeNull();
+    expect((await post('/prestige', { stat: 'aim' })).body.key).toBe(
+      'prestige starts when the bot reached its potential (level 5)',
+    );
+    // Level 6 at its potential: mature, four points of room, none yet.
+    db.update(udtRoster).set({ xp: 260 }).where(eq(udtRoster.botId, id)).run();
+    let p = (await own()).prestige;
+    expect(p).toMatchObject({ stage: 'mature', cap: 4, points: 0, free: 0, ascend: 'godlike' });
+    expect(p.prices.point).toBeGreaterThan(0);
+    expect(p.prices.respec).toBeNull();
+    expect((await post('/prestige', { stat: 'aim' })).body.key).toBe('no free prestige point');
+    const before = ledger.spendable(marioId).balance;
+    for (let i = 0; i < 4; i++) expect((await post('/prestige/buy')).status).toBe(200);
+    expect(ledger.spendable(marioId).balance).toBeLessThan(before);
+    expect((await post('/prestige/buy')).body.key).toBe(
+      'the bot holds all the prestige points it can',
+    );
+    for (let i = 0; i < 3; i++) expect((await post('/prestige', { stat: 'aim' })).status).toBe(200);
+    expect((await post('/prestige', { stat: 'aim' })).body.key).toBe(
+      'a prestige stat takes at most {n} points',
+    );
+    expect((await post('/prestige', { stat: 'nope' })).status).toBe(400);
+    const set = await post('/prestige', { stat: 'armour' });
+    p = set.body.roster[0].own.prestige;
+    expect(p).toMatchObject({ points: 4, spent: 4, free: 0, alloc: { aim: 3, armour: 1 } });
+    const reset = await post('/prestige/reset');
+    expect(reset.status).toBe(200);
+    expect(reset.body.roster[0].own.prestige).toMatchObject({ spent: 0, free: 4, alloc: {} });
+    // Godlike: no ascension below level 30 and with values below 100.
+    api!.app.get(BotsService).update(id, { skill: 7 });
+    db.update(udtBots).set({ potential: 7 }).where(eq(udtBots.botId, id)).run();
+    expect((await own()).prestige).toMatchObject({ stage: 'godlike', cap: 6, points: 4 });
+    expect((await post('/ascend')).body.key).toBe('an ascension needs level {level}');
+    expect((await post('/star')).body.key).toBe('stars are for ascended bots');
+    db.update(udtRoster).set({ xp: 5000 }).where(eq(udtRoster.botId, id)).run();
+    expect((await post('/ascend')).body.key).toBe('an ascension needs every value at 100');
+    api!.app
+      .get(BotsService)
+      .update(id, { traits: { ...starter.traits, accuracy: 1, alertness: 1, strafing: 1 } });
+    // Fully developed at level 30: 29 left-over level points fill the cap.
+    expect((await own()).prestige).toMatchObject({ stage: 'godlike', points: 6, ascend: null });
+    const up = await post('/ascend');
+    expect(up.status, JSON.stringify(up.body)).toBe(200);
+    expect(up.body.roster[0].own.prestige).toMatchObject({ stage: 'ascended', cap: 6, stars: 0 });
+    expect((await post('/ascend')).body.key).toBe('the bot ascended already');
+    const star = await post('/star');
+    expect(star.body.roster[0].own.prestige).toMatchObject({ cap: 7, stars: 1, points: 7 });
+    db.update(udtBots).set({ stars: 5 }).where(eq(udtBots.botId, id)).run();
+    expect((await post('/star')).body.key).toBe('the bot has all its stars');
   });
 
   it('builds an own bot from a blueprint: skill 3, points, potential, model, start trait', async () => {

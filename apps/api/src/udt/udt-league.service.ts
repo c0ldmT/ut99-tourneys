@@ -34,6 +34,7 @@ import {
   winsNeeded,
   type LeagueResult,
   type TableRow,
+  prestigeEffect,
 } from '@tourney/udt';
 import { z } from 'zod';
 import { UsersService, type User } from '../auth/users.service.js';
@@ -1479,7 +1480,8 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           botStrength(
             r.effective.skill,
             valueScore(r.effective.traits),
-            traitsEffect(r.udtTraits.map((t) => t.code)),
+            traitsEffect(r.udtTraits.map((t) => t.code)) +
+              prestigeEffect(r.own?.prestige?.spent ?? 0),
           ),
         0,
       );

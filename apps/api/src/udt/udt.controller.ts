@@ -3,6 +3,7 @@ import { StatsService } from '../stats/stats.service.js';
 import { traitReport } from '../stats/trait-report.js';
 import { udtEntrantId } from '@tourney/protocol';
 import { z } from 'zod';
+import { PRESTIGE_STATS, type PrestigeStat } from '@tourney/udt';
 import {
   Body,
   Controller,
@@ -450,6 +451,48 @@ export class UdtController {
   @HttpCode(200)
   breakthrough(@CurrentUser() user: User, @Param('botId') botId: string) {
     return this.academy.breakthrough(user, botId);
+  }
+
+  /** Prestige (decision 262): a free point on a stat of the menu. */
+  @Post('roster/:botId/prestige')
+  @HttpCode(200)
+  prestige(
+    @CurrentUser() user: User,
+    @Param('botId') botId: string,
+    @Body(
+      new ZodPipe(z.object({ stat: z.enum(PRESTIGE_STATS as [PrestigeStat, ...PrestigeStat[]]) })),
+    )
+    body: { stat: PrestigeStat },
+  ) {
+    return this.academy.prestigeAllocate(user, botId, body.stat);
+  }
+
+  /** Prestige: a point for Neuro. */
+  @Post('roster/:botId/prestige/buy')
+  @HttpCode(200)
+  prestigeBuy(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.academy.prestigeBuy(user, botId);
+  }
+
+  /** Prestige: every point of the bot free again (for Neuro). */
+  @Post('roster/:botId/prestige/reset')
+  @HttpCode(200)
+  prestigeReset(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.academy.prestigeReset(user, botId);
+  }
+
+  /** The ascension of a Godlike (stars afterwards). */
+  @Post('roster/:botId/ascend')
+  @HttpCode(200)
+  ascend(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.academy.ascend(user, botId);
+  }
+
+  /** A star for an ascended bot. */
+  @Post('roster/:botId/star')
+  @HttpCode(200)
+  star(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.academy.buyStar(user, botId);
   }
 
   /** The manager's own bots of the season and what their graduation needs. */

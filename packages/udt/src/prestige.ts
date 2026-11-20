@@ -72,13 +72,16 @@ export const BANKED_PER_PRESTIGE = 2;
 
 /**
  * The stage of an own bot (null: still developing): ascended once ascended, Godlike at skill 7,
- * mature at its potential below Godlike (a breakthrough may still come; the stage stays).
+ * mature at its potential below Godlike (a breakthrough may still come; the stage stays). Not
+ * before level 5, when the potential shows exactly (`level` given).
  */
 export function prestigeStage(b: {
   skill: number;
   potential: number;
   ascended?: boolean;
+  level?: number;
 }): PrestigeStage | null {
+  if (b.level !== undefined && b.level < 5) return null;
   const s = Math.round(b.skill);
   if (s >= 7) return b.ascended ? 'ascended' : 'godlike';
   return s >= b.potential ? 'mature' : null;
@@ -165,6 +168,10 @@ export function prestigeFromCode(code: string | null | undefined): PrestigeAlloc
 export const PRESTIGE_FRAGS = 0.1;
 
 export const prestigeEffect = (points: number): number => Math.max(0, points) * PRESTIGE_FRAGS;
+
+/** The same from a game's bot (`BotSpec.prestige`, the mod code). */
+export const prestigeCodeEffect = (code: string | null | undefined): number =>
+  prestigeEffect(prestigeSpent(prestigeFromCode(code)));
 
 // ---------- prices (Neuro, luxury: the full index, progressive by what the team holds) ----------
 

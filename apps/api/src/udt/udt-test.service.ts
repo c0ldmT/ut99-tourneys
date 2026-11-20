@@ -1,7 +1,13 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import type { Entrant, NewTournamentEvent } from '@tourney/protocol';
-import { botStrength, gameChance, modTraitsEffect, valueScore } from '@tourney/udt';
+import {
+  botStrength,
+  gameChance,
+  modTraitsEffect,
+  valueScore,
+  prestigeCodeEffect,
+} from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
@@ -198,7 +204,14 @@ export class UdtTestService {
       return specs.reduce((sum, b) => {
         const score = valueScore(b.traits ?? (b.id ? lib.get(b.id)?.traits : undefined));
         // With the traits the mod plays (their effect in season 2, decision 251).
-        return sum + botStrength(b.skill, score, modTraitsEffect(b.gameTraits));
+        return (
+          sum +
+          botStrength(
+            b.skill,
+            score,
+            modTraitsEffect(b.gameTraits) + prestigeCodeEffect(b.prestige),
+          )
+        );
       }, 0.5);
     };
     let last: string | undefined;

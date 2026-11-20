@@ -87,11 +87,11 @@ describe('academy', () => {
 });
 
 describe('breakthrough', () => {
-  it('needs a fully developed bot of level 10, once, below Godlike; dearer higher up', async () => {
+  it('needs a fully developed bot of level 15, once, below Godlike; dearer higher up', async () => {
     const { cannotBreakthrough, breakthroughStep, breakthroughValues } =
       await import('../src/index.js');
     const top = { accuracy: 1, alertness: 1, strafing: 1 };
-    const bot = { skill: 5, potential: 5, level: 10, done: false, values: top };
+    const bot = { skill: 5, potential: 5, level: 15, done: false, values: top };
     expect(cannotBreakthrough(bot, 6)).toBeNull();
     expect(cannotBreakthrough(bot, 5)).toBe('points');
     expect(cannotBreakthrough({ ...bot, done: true }, 99)).toBe('done');
@@ -100,7 +100,7 @@ describe('breakthrough', () => {
     // potential 7 is not told).
     expect(cannotBreakthrough({ ...bot, skill: 4, potential: 7, level: 3 }, 99)).toBe('potential');
     expect(cannotBreakthrough({ ...bot, skill: 4 }, 99)).toBe('potential');
-    expect(cannotBreakthrough({ ...bot, level: 9 }, 99)).toBe('level');
+    expect(cannotBreakthrough({ ...bot, level: 14 }, 99)).toBe('level');
     // Every value at 60 or more (not 100): 55 is too low, 60 is enough.
     expect(cannotBreakthrough({ ...bot, values: { ...top, strafing: 0.1 } }, 99)).toBe('values');
     expect(cannotBreakthrough({ ...bot, values: { ...top, strafing: 0.2 } }, 99)).toBeNull();

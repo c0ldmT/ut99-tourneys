@@ -351,8 +351,11 @@ export const developValue = (v: number | undefined): number => r3(clamp((v ?? 0)
 
 // ---------- breakthrough ----------
 
-/** A breakthrough needs this level (the potential shows exactly from level 5). */
-export const BREAKTHROUGH_LEVEL = 10;
+/**
+ * A breakthrough needs this level (the potential shows exactly from level 5). 15 since the
+ * prestige (decision 262, concept section 2: a gentle stretch; 10 before).
+ */
+export const BREAKTHROUGH_LEVEL = 15;
 
 /**
  * A breakthrough needs every value at least this (0..100; owner, 23.10.: not 100). With the cut

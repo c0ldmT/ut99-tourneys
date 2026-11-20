@@ -27,7 +27,9 @@ import {
   scoutTalents,
   talentReport,
   traitOfRarity,
+  cannotAllocate,
   type DevelopStat,
+  type PrestigeStat,
   type Rarity,
   type Talent,
   type TalentReport,
@@ -620,6 +622,107 @@ export class UdtAcademyService {
         .where(eq(udtBots.botId, botId))
         .run();
     });
+    return this.udt.view(user);
+  }
+
+  // ---------- prestige (plan Season 3 P3, decision 262) ----------
+
+  /** An own bot of the manager's roster with its prestige (refused while it is still developing). */
+  private prestigeBot(user: User, botId: string) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const own = this.udt.ownBots(season, user.id).get(botId);
+    const r = this.udt.roster(user.id, season).find((x) => x.botId === botId);
+    if (!own || !r) throw notFound('own bot in your roster');
+    const p = r.own?.prestige;
+    if (!p) throw conflict('prestige starts when the bot reached its potential (level 5)');
+    return { season, own, r, p };
+  }
+
+  /** A free prestige point on a stat of the menu (at most 3 each). */
+  prestigeAllocate(user: User, botId: string, stat: PrestigeStat) {
+    const { own, p } = this.prestigeBot(user, botId);
+    const why = cannotAllocate(stat, p.alloc, p.points);
+    if (why === 'max') throw conflict('a prestige stat takes at most {n} points', { n: 3 });
+    if (why === 'free') throw conflict('no free prestige point');
+    this.db
+      .update(udtBots)
+      .set({ prestigeJson: JSON.stringify({ ...p.alloc, [stat]: (p.alloc[stat] ?? 0) + 1 }) })
+      .where(eq(udtBots.botId, own.botId))
+      .run();
+    return this.udt.view(user);
+  }
+
+  /** A prestige point for Neuro (progressive by the team's points), never above the cap. */
+  prestigeBuy(user: User, botId: string) {
+    const { season, own, p } = this.prestigeBot(user, botId);
+    if (p.prices.point === null) throw conflict('the bot holds all the prestige points it can');
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_prestige',
+      amount: p.prices.point,
+      ref: `prestige:${season}:${botId}:${own.prestigeBought + 1}`,
+      meta: { botId, what: 'point' },
+    });
+    this.db
+      .update(udtBots)
+      .set({ prestigeBought: own.prestigeBought + 1 })
+      .where(eq(udtBots.botId, own.botId))
+      .run();
+    return this.udt.view(user);
+  }
+
+  /** All prestige points of the bot free again, for Neuro per point set. */
+  prestigeReset(user: User, botId: string) {
+    const { season, own, p } = this.prestigeBot(user, botId);
+    if (p.prices.respec === null) throw conflict('no prestige points are set');
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_prestige',
+      amount: p.prices.respec,
+      ref: `prestige-reset:${season}:${botId}:${this.clock.now()}`,
+      meta: { botId, what: 'reset', points: p.spent },
+    });
+    this.db.update(udtBots).set({ prestigeJson: '{}' }).where(eq(udtBots.botId, own.botId)).run();
+    return this.udt.view(user);
+  }
+
+  /** The ascension of a fully developed Godlike of level 30 (once per bot and season). */
+  ascend(user: User, botId: string) {
+    const { season, own, p } = this.prestigeBot(user, botId);
+    if (p.ascend === 'done') throw conflict('the bot ascended already');
+    if (p.ascend === 'godlike') throw conflict('only a Godlike bot can ascend');
+    if (p.ascend === 'level') throw conflict('an ascension needs level {level}', { level: 30 });
+    if (p.ascend === 'values') throw conflict('an ascension needs every value at 100');
+    if (p.prices.ascend === null) throw conflict('the bot cannot ascend now');
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_prestige',
+      amount: p.prices.ascend,
+      ref: `ascend:${season}:${botId}`,
+      meta: { botId, what: 'ascend' },
+    });
+    this.db.update(udtBots).set({ ascended: true }).where(eq(udtBots.botId, own.botId)).run();
+    return this.udt.view(user);
+  }
+
+  /** A star of an ascended bot (one prestige point more room), for Neuro. */
+  buyStar(user: User, botId: string) {
+    const { season, own, p } = this.prestigeBot(user, botId);
+    if (p.stage !== 'ascended') throw conflict('stars are for ascended bots');
+    if (p.prices.star === null) throw conflict('the bot has all its stars');
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_prestige',
+      amount: p.prices.star,
+      ref: `star:${season}:${botId}:${own.stars + 1}`,
+      meta: { botId, what: 'star' },
+    });
+    this.db
+      .update(udtBots)
+      .set({ stars: own.stars + 1 })
+      .where(eq(udtBots.botId, own.botId))
+      .run();
     return this.udt.view(user);
   }
 }

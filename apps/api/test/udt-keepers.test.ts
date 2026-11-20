@@ -58,6 +58,10 @@ describe('Dream Team keepers', () => {
           pointsSpent: 9,
           status,
           createdAt: OLD,
+          // Prestige of the old season (decision 262): gone with it.
+          prestigeJson: '{"aim":2}',
+          prestigeBought: 2,
+          stars: 1,
         })
         .run();
       db.update(bots).set({ udtOwner: marioId }).where(eq(bots.id, id)).run();
@@ -147,7 +151,16 @@ describe('Dream Team keepers', () => {
     expect(after.find((b) => b.botId === starter)).toMatchObject({ skill: 3, starter: false });
     expect(new Set(after.map((b) => b.dmSlot))).toEqual(new Set([1, 2, 3]));
     const row = db.select().from(udtBots).where(eq(udtBots.botId, lib.Blue!)).get()!;
-    expect(row).toMatchObject({ season: 2, keptFrom: 1, pointsSpent: 0, status: 'own' });
+    expect(row).toMatchObject({
+      season: 2,
+      keptFrom: 1,
+      pointsSpent: 0,
+      status: 'own',
+      prestigeJson: '{}',
+      prestigeBought: 0,
+      stars: 0,
+      ascended: false,
+    });
     // The new starter is the only bot made this season (licences).
     expect(api.app.get(UdtService).madeCount(2, marioId)).toBe(1);
     // A keeper cannot graduate in its first season as a keeper.

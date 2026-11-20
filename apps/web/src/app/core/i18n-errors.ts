@@ -272,6 +272,20 @@ export const ERRORS_DE: Record<string, string> = {
   'a breakthrough needs every value at {value} or more':
     'Für einen Durchbruch müssen alle drei Werte mindestens {value} sein.',
   'the breakthrough costs {cost} points': 'Der Durchbruch kostet {cost} Punkte.',
+  'prestige starts when the bot reached its potential (level 5)':
+    'Prestige gibt es, sobald der Bot sein Potenzial erreicht hat (ab Level 5).',
+  'a prestige stat takes at most {n} points': 'Ein Prestige-Wert nimmt höchstens {n} Punkte.',
+  'no free prestige point': 'Kein freier Prestige-Punkt.',
+  'the bot holds all the prestige points it can':
+    'Der Bot hat schon so viele Prestige-Punkte, wie seine Endstufe erlaubt.',
+  'no prestige points are set': 'Es sind keine Prestige-Punkte verteilt.',
+  'the bot ascended already': 'Der Bot ist schon aufgestiegen.',
+  'only a Godlike bot can ascend': 'Nur ein Godlike-Bot kann aufsteigen.',
+  'an ascension needs level {level}': 'Ein Aufstieg geht ab Level {level}.',
+  'an ascension needs every value at 100': 'Ein Aufstieg braucht alle drei Werte bei 100.',
+  'the bot cannot ascend now': 'Der Bot kann jetzt nicht aufsteigen.',
+  'stars are for ascended bots': 'Sterne gibt es nur für aufgestiegene Bots.',
+  'the bot has all its stars': 'Der Bot hat schon alle Sterne.',
   'the potential is skill {potential}': 'Das Potenzial ist Skill {potential}.',
   'the value is at its maximum': 'Der Wert ist schon am Maximum.',
   '{name} has an apprentice this season': '{name} hat diese Season schon einen Lehrling.',

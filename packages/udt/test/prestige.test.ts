@@ -10,6 +10,7 @@ import {
   maxStars,
   prestigeCap,
   prestigeCode,
+  prestigeCodeEffect,
   prestigeEdge,
   prestigeEffect,
   prestigeFromCode,
@@ -25,6 +26,9 @@ import {
 describe('prestige (plan P3)', () => {
   it('knows the stage at the end of the development', () => {
     expect(prestigeStage({ skill: 4, potential: 5 })).toBeNull();
+    // Not before level 5: the stage would tell the hidden potential.
+    expect(prestigeStage({ skill: 5, potential: 5, level: 4 })).toBeNull();
+    expect(prestigeStage({ skill: 5, potential: 5, level: 5 })).toBe('mature');
     expect(prestigeStage({ skill: 5, potential: 5 })).toBe('mature');
     // A breakthrough above the potential stays mature below Godlike.
     expect(prestigeStage({ skill: 6, potential: 5 })).toBe('mature');
@@ -64,6 +68,8 @@ describe('prestige (plan P3)', () => {
     expect(prestigeCode({ aim: 2, ammo: 1 })).toBe('200000001');
     expect(prestigeFromCode('200000001')).toEqual({ aim: 2, ammo: 1 });
     expect(prestigeFromCode('9x0')).toEqual({});
+    expect(prestigeCodeEffect('200000001')).toBeCloseTo(0.3);
+    expect(prestigeCodeEffect(undefined)).toBe(0);
   });
 
   it('prices progressively by what the team holds, at the full index', () => {

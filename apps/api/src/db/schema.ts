@@ -555,6 +555,15 @@ export const udtBots = sqliteTable('udt_bots', {
   breakthrough: integer('breakthrough', { mode: 'boolean' }).notNull().default(false),
   /** The season the bot came from as a keeper (its newest keep); null: made this season. */
   keptFrom: integer('kept_from'),
+  /** Prestige (migration 49, decision 262): points per stat this season (`PrestigeAlloc`). */
+  prestigeJson: text('prestige_json').notNull().default('{}'),
+  /** Prestige points bought with Neuro this season. */
+  prestigeBought: integer('prestige_bought').notNull().default(0),
+  stars: integer('stars').notNull().default(0),
+  /** Ascended (Godlike+) this season. */
+  ascended: integer('ascended', { mode: 'boolean' }).notNull().default(false),
+  /** Stages of past seasons as marks: `{ season, stage, stars }[]` (yearbook, hall of fame). */
+  marksJson: text('marks_json').notNull().default('[]'),
 });
 
 /**

@@ -22,6 +22,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 262,
+    date: '2026-11-21',
+    en: {
+      title: 'Breakthrough from level 15',
+      items: [
+        'A breakthrough now needs level 15 (was 10): development lasts a little longer. Next comes prestige - bots at the end of their development get small strength boosts.',
+      ],
+    },
+    de: {
+      title: 'Durchbruch ab Level 15',
+      items: [
+        'Ein Durchbruch braucht jetzt Level 15 (statt 10): Die Entwicklung dauert etwas länger. Als Nächstes kommt Prestige – Bots am Ende ihrer Entwicklung bekommen kleine Stärke-Boni.',
+      ],
+    },
+  },
+  {
     id: 259,
     date: '2026-11-21',
     mod: '0.19.2',

@@ -29,6 +29,7 @@ export type LedgerKind =
   | 'udt_rest'
   | 'udt_camp'
   | 'udt_workshop'
+  | 'udt_prestige'
   | 'udt_league'
   | 'udt_cup_bonus';
 

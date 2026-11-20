@@ -18,6 +18,7 @@ import {
   roundNeuro,
   tiredPenalty,
   type Career,
+  prestigeCode,
 } from '@tourney/udt';
 import { UsersService, type User } from '../auth/users.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
@@ -496,12 +497,15 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     withCareer(traits, careers.get(r.botId));
     // Body traits (category B) are played by the mod.
     const codes = modCodes(r.udtTraits);
+    // Prestige (mod 0.20.0, decision 262): the points set on the menu.
+    const prestige = prestigeCode(r.own?.prestige?.alloc);
     return {
       ...base,
       skill: eff.skill,
       name: gameName(tag, r.name),
       traits,
       ...(codes.length ? { gameTraits: codes } : {}),
+      ...(prestige ? { prestige } : {}),
     };
   }
 

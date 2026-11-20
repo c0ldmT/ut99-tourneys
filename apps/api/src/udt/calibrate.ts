@@ -1,5 +1,12 @@
 import type Database from 'better-sqlite3';
-import { botStrength, gameChance, GAME_MODEL_K, modTraitsEffect, valueScore } from '@tourney/udt';
+import {
+  botStrength,
+  gameChance,
+  GAME_MODEL_K,
+  modTraitsEffect,
+  valueScore,
+  prestigeCodeEffect,
+} from '@tourney/udt';
 
 /**
  * Calibration of the game model on real games (`pnpm --filter @tourney/api udt:calibrate`):
@@ -14,6 +21,8 @@ interface BotSpec {
   traits?: Record<string, unknown>;
   /** The traits the mod played (their effect counts, decision 251). */
   gameTraits?: string[];
+  /** Prestige points the mod played (mod code, decision 262). */
+  prestige?: string;
 }
 
 /** One finished game between two sides of bots. */
@@ -99,7 +108,12 @@ export function readCalibrationGames(db: Database.Database): CalibrationGame[] {
 const sideStrength = (s: BotSpec[]) =>
   s.reduce(
     (x, b) =>
-      x + botStrength(b.skill, valueScore(b.traits as never), modTraitsEffect(b.gameTraits)),
+      x +
+      botStrength(
+        b.skill,
+        valueScore(b.traits as never),
+        modTraitsEffect(b.gameTraits) + prestigeCodeEffect(b.prestige),
+      ),
     0,
   ) / s.length;
 const meanSkill = (s: BotSpec[]) => s.reduce((x, b) => x + b.skill, 0) / s.length;

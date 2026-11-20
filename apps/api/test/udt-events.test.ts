@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
-import { bots, udtRoster, udtTraits } from '../src/db/schema.js';
+import { bots, udtBots, udtRoster, udtTraits } from '../src/db/schema.js';
 import { StatsService } from '../src/stats/stats.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
@@ -379,6 +379,13 @@ describe('Unreal Dream Team: events', () => {
     expect((await mario.req('PUT', `/udt/roster/${lib.id}/mh-focus`, { focus: -2 })).status).toBe(
       200,
     );
+    // Prestige (decision 262): Mira at her potential with a point on aim plays it (mod code).
+    const db = api!.app.get<Db>(DB);
+    db.update(udtBots)
+      .set({ potential: 3, prestigeBought: 1, prestigeJson: '{"aim":1}' })
+      .where(eq(udtBots.botId, mira))
+      .run();
+    db.update(udtRoster).set({ xp: 260 }).where(eq(udtRoster.botId, mira)).run();
     const body = udtCup(2) as any;
     body.settings.game = {
       adapter: 'ut99-mh',
@@ -394,6 +401,7 @@ describe('Unreal Dream Team: events', () => {
     const entrants = Object.values(seeded.body.projection.entrants) as any[];
     const nexus = entrants.find((e) => e.displayName === 'Nexus');
     expect(nexus.bots.map((b: any) => b.mhFocus).sort()).toEqual([-2, 2]);
+    expect(nexus.bots.map((b: any) => b.prestige ?? null).sort()).toEqual(['100000000', null]);
     // Bots of other teams play as Monster Hunt sets them.
     for (const e of entrants.filter((x) => x !== nexus))
       expect(e.bots.every((b: any) => b.mhFocus === undefined)).toBe(true);

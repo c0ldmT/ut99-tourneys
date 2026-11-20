@@ -788,4 +788,13 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE league_runs ADD COLUMN band_json TEXT NOT NULL DEFAULT '[]';
   `,
+  // 49: prestige of own bots (decision 262, plan Season 3 P3): the menu, bought points, stars,
+  // the ascension, and the stages of past seasons (the yearbook's marks).
+  `
+  ALTER TABLE udt_bots ADD COLUMN prestige_json TEXT NOT NULL DEFAULT '{}';
+  ALTER TABLE udt_bots ADD COLUMN prestige_bought INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE udt_bots ADD COLUMN stars INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE udt_bots ADD COLUMN ascended INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE udt_bots ADD COLUMN marks_json TEXT NOT NULL DEFAULT '[]';
+  `,
 ];
