@@ -421,6 +421,52 @@ describe('Dream Team league', () => {
     for (const b of aiClub.bots) expect(b.gameTraits?.length).toBe(3);
   });
 
+  it("the self-regulating band moves by the humans' played games against AI clubs (decision 252)", async () => {
+    const { admin, db } = await setup();
+    await admin.post('/udt/test/advance', { hours: 3 * 24 + 1 });
+    let band = (await admin.get('/udt/league/admin')).body.band as {
+      tier: number;
+      factor: number;
+      rate: number | null;
+      games: number;
+      settings: number;
+    }[];
+    expect(band).toHaveLength(2);
+    expect(band[0]).toMatchObject({ factor: 0.85, rate: null, games: 0, settings: 1 });
+    // The humans won their first 20 games against AI clubs of their tier (as if played).
+    const run = db.select().from(leagueRuns).get()!;
+    const clubs = (await admin.get('/udt/league')).body.tables.flatMap(
+      (t: { rows: { club: string; manager: boolean }[] }) => t.rows,
+    ) as { club: string; manager: boolean }[];
+    const humans = new Set(clubs.filter((c) => c.manager).map((c) => c.club));
+    const vsAi = db
+      .select()
+      .from(leagueFixtures)
+      .all()
+      .filter((f) => f.kind === 'league' && humans.has(f.home) !== humans.has(f.away));
+    const tier = vsAi[0]!.tier;
+    let n = 0;
+    for (const f of vsAi.filter((x) => x.tier === tier).slice(0, 20)) {
+      n++;
+      db.update(leagueFixtures)
+        .set({
+          status: 'played',
+          winner: humans.has(f.home) ? f.home : f.away,
+          homeFrags: 50,
+          awayFrags: 30,
+          day: '2000-01-01',
+        })
+        .where(eq(leagueFixtures.id, f.id))
+        .run();
+    }
+    expect(n).toBeGreaterThanOrEqual(10);
+    // The next evening: +0.02 in that tier.
+    await admin.post('/udt/test/advance', { hours: 24 });
+    band = (await admin.get('/udt/league/admin')).body.band;
+    expect(band[tier]).toMatchObject({ factor: 0.87, rate: 1, games: n });
+    expect(run.season).toBe(1);
+  });
+
   it('a manager who founds a team later takes over an AI club of the lowest tier', async () => {
     const { admin } = await setup();
     await admin.post('/udt/test/advance', { hours: 3 * 24 + 1 });

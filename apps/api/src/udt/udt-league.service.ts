@@ -7,6 +7,8 @@ import {
   type TournamentSettings,
 } from '@tourney/protocol';
 import {
+  AUTO_BAND,
+  autoBandStep,
   botStrength,
   CLUB_TRAITS_MAX,
   clubFactor,
@@ -80,9 +82,25 @@ const CLUB_POOL = new Set<string>(clubTraitPool(true));
 export interface LeagueBand {
   /** Traits per bot of the tier's AI clubs: the humans' median, at most `CLUB_TRAITS_MAX`. */
   traits: number;
+  /** The self-regulating factor (× the tier's factor of the settings, `AUTO_BAND`). */
+  factor: number;
+  /** The humans' wins against AI clubs in their last played games of the tier (null: none). */
+  rate: number | null;
+  games: number;
+  /** The league evening the factor moved last (once per evening, also after a restart). */
+  day: string;
+  /** The humans' played games against AI clubs counted then (it moves only with new ones). */
+  seen: number;
 }
 
-const NO_BAND: LeagueBand = { traits: 0 };
+const NO_BAND: LeagueBand = {
+  traits: 0,
+  factor: AUTO_BAND.start,
+  rate: null,
+  games: 0,
+  day: '',
+  seen: 0,
+};
 type ClubRow = typeof leagueClubs.$inferSelect;
 export type FixtureKind = 'league' | 'relegation' | 'semi' | 'final' | 'third';
 
@@ -1056,6 +1074,16 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           tableMoney: o.tableMoney ?? true,
           placement: o.placement ?? 'cup',
           startedAt: now,
+          // The self-regulating factor goes on from last season's league (decision 252).
+          bandJson: JSON.stringify(
+            Array.from({ length: tiers }, (_, t) => ({
+              ...NO_BAND,
+              factor:
+                last?.status === 'done' && !last.test
+                  ? (this.bands(last)[Math.min(t, last.tiers - 1)]?.factor ?? NO_BAND.factor)
+                  : NO_BAND.factor,
+            })),
+          ),
         })
         .run();
       // In batches (one insert per row took a Raspberry Pi seconds for a whole season).
@@ -1270,7 +1298,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     // Regular games left over on the relegation day: simulated (R2, the season must end).
     const lastCall = today >= plan.relegation;
     if (open.length && this.banded.get(run.season) !== today) {
-      this.renewBand(run);
+      this.renewBand(run, today);
       this.banded.set(run.season, today);
     }
     const ctx = this.simContext(run, all);
@@ -1341,9 +1369,11 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
 
   /**
    * The AI clubs' strength for the evening: the rubber band of their tier (the human managers'
-   * lineups; AI managers do not count) × the club's factor.
+   * lineups; AI managers do not count) × the club's factor. The tier's factor of the settings is
+   * multiplied by the self-regulating one (decision 252), which first moves by the humans' last
+   * played games against AI clubs (once per evening).
    */
-  private renewBand(run: RunRow): void {
+  private renewBand(run: RunRow, today: string): void {
     const settings = this.leagueSettings('league');
     const managers = this.managerClubs();
     const humans = this.humanClubs();
@@ -1360,14 +1390,42 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       return x.length % 2 ? x[mid]! : (x[mid - 1]! + x[mid]!) / 2;
     };
     const all = sides.flatMap((x) => x.traits);
+    // The humans' played games against AI clubs per tier, oldest first (simulated games and
+    // forfeits say nothing about the strength).
+    const wins: boolean[][] = Array.from({ length: run.tiers }, () => []);
+    const played = [...this.fixtures(run.season)].sort(
+      (a, b) => a.day.localeCompare(b.day) || a.scheduledAt.localeCompare(b.scheduledAt),
+    );
+    for (const f of played) {
+      if (f.kind !== 'league' || f.status !== 'played' || !f.winner) continue;
+      const h = humans.has(f.home);
+      const a = humans.has(f.away);
+      if (h === a) continue;
+      if (!(h ? !managers.has(f.away) : !managers.has(f.home))) continue; // an AI manager
+      wins[f.tier]?.push(f.winner === (h ? f.home : f.away));
+    }
     const band = this.bands(run).map((b, t) => {
       const mine = sides.filter((x) => x.tier === t).flatMap((x) => x.traits);
       const max = CLUB_TRAITS_MAX[Math.min(t, CLUB_TRAITS_MAX.length - 1)]!;
-      return { ...b, traits: Math.min(max, Math.round(median(mine.length ? mine : all))) };
+      const traits = Math.min(max, Math.round(median(mine.length ? mine : all)));
+      const step = autoBandStep(b.factor, wins[t] ?? []);
+      // Once per evening and only with new games (not on the relegation or final days).
+      const total = wins[t]?.length ?? 0;
+      const moves = b.day !== today && total > b.seen;
+      return {
+        traits,
+        factor: moves ? step.factor : b.factor,
+        rate: step.rate,
+        games: step.games,
+        day: moves ? today : b.day,
+        seen: moves ? total : b.seen,
+      };
     });
     const cfg = this.cfg();
     const bands = rubberBands(sides, run.tiers, {
-      factors: cfg.factors,
+      factors: band.map(
+        (b, t) => (cfg.factors[Math.min(t, cfg.factors.length - 1)] ?? 1) * b.factor,
+      ),
       floors: cfg.aiFloor,
       emptyTier: 0.75,
     });
@@ -2230,6 +2288,14 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           )
         : null,
       run: run ? { ...runView(run), plan: this.plan(run) } : null,
+      /** The AI clubs' band per tier of the running league (decisions 251, 252). */
+      band: run
+        ? this.bands(run).map((b, t) => ({
+            tier: t,
+            ...b,
+            settings: cfg.factors[Math.min(t, cfg.factors.length - 1)] ?? 1,
+          }))
+        : [],
       fits: season ? !!this.planFor(season, cfg) : null,
       status: this.status(),
       managers,

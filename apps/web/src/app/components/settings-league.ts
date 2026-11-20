@@ -481,6 +481,24 @@ interface StatusView {
                   /><b class="mono">× {{ dec(factors[t]!) }}</b></label
                 >
               }
+              @if (admin()?.band?.length) {
+                <div class="lgs-band">
+                  <span class="lgs-lbl">{{ 'lgs.band' | t }}</span>
+                  <span class="muted small">{{ 'lgs.bandHint' | t }}</span>
+                  @for (b of admin()!.band!; track b.tier) {
+                    <div class="lgs-band-row small">
+                      <span [style.color]="tierColor(b.tier)">{{ tierName(b.tier) }}</span>
+                      <b class="mono">× {{ dec(b.factor) }}</b>
+                      <span class="muted">{{
+                        b.rate === null
+                          ? ('lgs.bandNone' | t)
+                          : ('lgs.bandRate' | t: { p: pct(b.rate), n: b.games })
+                      }}</span>
+                      <span class="muted">{{ 'lgs.bandTraits' | t: { n: b.traits } }}</span>
+                    </div>
+                  }
+                </div>
+              }
               <div class="lgs-bar">
                 <span>{{ 'lgs.joinShort' | t }}</span>
                 <span class="lgs-step">
@@ -1040,6 +1058,10 @@ export class SettingsLeague {
   protected duration(min: number): string {
     const h = Math.floor(min / 60);
     return h ? `~${h} h ${min % 60} min` : `~${min} min`;
+  }
+
+  protected pct(n: number): string {
+    return `${Math.round(n * 100)} %`;
   }
 
   protected dec(n: number): string {

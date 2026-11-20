@@ -355,6 +355,53 @@ export function rubberBands(
 }
 
 /**
+ * The self-regulating rubber band (decision 252): after every league evening each tier's factor
+ * moves by `step` when the humans won more than `high` or less than `low` of their last
+ * `window` played games against AI clubs (at least half a window), within `min`..`max`. It
+ * multiplies the tier's factor of the settings. Target: humans win 60-70 % against AI clubs.
+ */
+export interface AutoBand {
+  start: number;
+  min: number;
+  max: number;
+  step: number;
+  window: number;
+  low: number;
+  high: number;
+}
+
+export const AUTO_BAND: AutoBand = {
+  start: 0.85,
+  min: 0.8,
+  max: 1.3,
+  step: 0.02,
+  window: 20,
+  low: 0.55,
+  high: 0.7,
+};
+
+/**
+ * One step of the self-regulating band: the new factor and the humans' win rate over the last
+ * `window` games (`wins`: true = the human won, oldest first; null with no games).
+ */
+export function autoBandStep(
+  factor: number,
+  wins: readonly boolean[],
+  cfg: AutoBand = AUTO_BAND,
+): { factor: number; rate: number | null; games: number } {
+  const last = wins.slice(-cfg.window);
+  const games = last.length;
+  const rate = games ? last.filter(Boolean).length / games : null;
+  let f = factor;
+  if (rate !== null && games >= cfg.window / 2) {
+    if (rate > cfg.high) f += cfg.step;
+    else if (rate < cfg.low) f -= cfg.step;
+  }
+  f = Math.round(Math.min(cfg.max, Math.max(cfg.min, f)) * 1000) / 1000;
+  return { factor: f, rate: rate === null ? null : Math.round(rate * 1000) / 1000, games };
+}
+
+/**
  * Spread of the AI clubs around the tier's strength: each club gets a fixed factor from its seed
  * (0.8-1.2), so the table has favourites and outsiders.
  */

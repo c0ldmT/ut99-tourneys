@@ -3733,6 +3733,23 @@ tr[class*='lg-z-'] .pl {
   text-align: right;
   font-size: 0.85rem;
 }
+.lgs-band {
+  margin-top: 14px;
+  display: grid;
+  gap: 4px;
+}
+.lgs-band-row {
+  display: grid;
+  grid-template-columns: 96px 58px minmax(0, 1fr);
+  gap: 4px 10px;
+  align-items: baseline;
+}
+.lgs-band-row > span:first-child {
+  font-weight: 600;
+}
+.lgs-band-row > span:last-child {
+  grid-column: 3;
+}
 .lgs-actions {
   display: flex;
   gap: 10px;

@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 252,
+    date: '2026-11-20',
+    en: {
+      title: 'League: stronger AI clubs that keep pace',
+      items: [
+        'AI clubs now play with traits - as many per bot as a typical human manager of their tier has (at most 4 in the Pro Series down to 1 in the lowest tier).',
+        "Your bots' traits now count when the league works out how strong the AI clubs should be. Last season the AI clubs ignored them and lost almost every game.",
+        "The AI clubs' strength regulates itself: after every league evening it rises a little when the humans win more than 70 % of their games against AI clubs and falls when they win less than 55 %. Good teams should win about two of three games against AI clubs.",
+      ],
+    },
+    de: {
+      title: 'Liga: stärkere KI-Clubs, die mithalten',
+      items: [
+        'KI-Clubs spielen jetzt mit Traits – so vielen pro Bot, wie ein typischer menschlicher Manager ihrer Liga hat (höchstens 4 in der Pro Series bis 1 in der untersten Liga).',
+        'Die Traits deiner Bots zählen jetzt mit, wenn die Liga berechnet, wie stark die KI-Clubs sein sollen. In der letzten Season haben die KI-Clubs sie ignoriert und fast jedes Spiel verloren.',
+        'Die Stärke der KI-Clubs regelt sich selbst: Nach jedem Ligaabend steigt sie etwas, wenn die Menschen mehr als 70 % ihrer Spiele gegen KI-Clubs gewinnen, und sinkt, wenn sie weniger als 55 % gewinnen. Gute Teams sollen etwa zwei von drei Spielen gegen KI-Clubs gewinnen.',
+      ],
+    },
+  },
+  {
     id: 250,
     date: '2026-11-20',
     en: {

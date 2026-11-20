@@ -1683,12 +1683,26 @@ export interface LeagueAdmin {
   today: string;
   daysLeft: number | null;
   run: LeagueRunInfo | null;
+  /** The AI clubs' band per tier of the running league (decisions 251, 252). */
+  band?: LeagueBandView[];
   fits: boolean | null;
   managers: number;
   estimate: { minutes: number; realPerMatchday: number };
   evenings: number;
   server: { agentId: string; profileId: string } | null;
   mapPool: string[];
+}
+
+/** A tier's band: AI clubs' traits per bot, the self-regulating factor, the humans' wins. */
+export interface LeagueBandView {
+  tier: number;
+  traits: number;
+  /** The self-regulating factor (× `settings`, the tier's factor of the settings). */
+  factor: number;
+  settings: number;
+  /** Humans' wins in their last played games against AI clubs (null: none yet). */
+  rate: number | null;
+  games: number;
 }
 
 export interface LeagueEstimate {

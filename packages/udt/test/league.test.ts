@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AUTO_BAND,
+  autoBandStep,
   botStrength,
   clubTraitPool,
   clubTraits,
@@ -273,6 +275,24 @@ describe('AI clubs', () => {
     }
     // Four average traits: about one skill step (strength ×1.6, skill 5 → 6 is ×1.57).
     expect(botStrength(5, 0.5, 4 * 0.48) / botStrength(5, 0.5)).toBeCloseTo(1.62, 1);
+  });
+
+  it('the self-regulating band (decision 252): up above 70 %, down below 55 %, within 0.8-1.3', () => {
+    const games = (won: number, n: number) => Array.from({ length: n }, (_, i) => i < won);
+    expect(AUTO_BAND).toMatchObject({ min: 0.8, max: 1.3, step: 0.02, window: 20 });
+    expect(autoBandStep(1, games(15, 20))).toEqual({ factor: 1.02, rate: 0.75, games: 20 });
+    expect(autoBandStep(1, games(10, 20))).toEqual({ factor: 0.98, rate: 0.5, games: 20 });
+    expect(autoBandStep(1, games(13, 20)).factor).toBe(1);
+    // Only the last 20 games count: 20 old losses, then 20 wins.
+    expect(autoBandStep(1, [...games(0, 20), ...games(20, 20)])).toMatchObject({
+      factor: 1.02,
+      rate: 1,
+    });
+    // Fewer than half a window: no move yet.
+    expect(autoBandStep(1, games(9, 9))).toEqual({ factor: 1, rate: 1, games: 9 });
+    expect(autoBandStep(1, [])).toEqual({ factor: 1, rate: null, games: 0 });
+    expect(autoBandStep(1.3, games(20, 20)).factor).toBe(1.3);
+    expect(autoBandStep(0.8, games(0, 20)).factor).toBe(0.8);
   });
 
   it('simulated games: the stronger club wins more, frags fit the result', () => {

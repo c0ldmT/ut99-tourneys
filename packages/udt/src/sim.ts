@@ -36,6 +36,7 @@ import {
 import { levelOf } from './traits.js';
 import { SKILL_STRENGTH as STRENGTH, botStrength, gameChance } from './model.js';
 import {
+  autoBandStep,
   CUP_BONUS,
   CUP_FORMAT_POINTS,
   CUP_POINTS,
@@ -53,6 +54,7 @@ import {
   standings,
   tableMoney,
   winsNeeded,
+  type AutoBand,
   type LeagueResult,
   type RubberBand,
   type TableRow,
@@ -139,6 +141,17 @@ export interface SimLeague {
   perEvening?: number;
   teamSize?: number;
   band?: RubberBand;
+  /**
+   * The self-regulating band (decision 252): the factor of every tier follows the managers'
+   * wins against AI clubs (missing: off, the band's factors as they are).
+   */
+  autoBand?: AutoBand;
+  /**
+   * What the managers have over AI clubs that the model does not see (× their strength in their
+   * games against AI clubs; 1 = the model is right). Season 2 without traits in the model was
+   * about 1.6 in the Pro Series (89 % wins) and 1.25 in division 1 (73 %).
+   */
+  edge?: number;
   /** Weekly table money per band of four places (index 1) and the factor per tier. */
   tableMoney?: readonly number[] | null;
   tierMult?: readonly number[];
@@ -243,6 +256,8 @@ export interface SimResult {
     /** Per manager: wins and games against AI clubs in the first and second half. */
     halves: { tier: number; first: [number, number]; second: [number, number] }[];
     overtimes: number;
+    /** The self-regulating factor per tier at the end (1 without it). */
+    autoFactors: number[];
   };
 }
 
@@ -825,6 +840,9 @@ export function simulateSeason(o: SimOptions): SimResult {
     halves: Map<Manager, { first: [number, number]; second: [number, number] }>;
     /** The rubber band per tier (renewed every league evening). */
     band: number[] | null;
+    /** The self-regulating factor per tier and the managers' results against AI clubs. */
+    auto: number[];
+    recent: boolean[][];
   }
 
   function setupLeague(L: SimLeague): LeagueState {
@@ -862,6 +880,8 @@ export function simulateSeason(o: SimOptions): SimResult {
       overtimes: 0,
       halves: new Map(managers.map((m) => [m, { first: [0, 0], second: [0, 0] }])),
       band: null,
+      auto: fixtures.map(() => L.autoBand?.start ?? 1),
+      recent: fixtures.map(() => []),
     };
   }
 
@@ -886,7 +906,19 @@ export function simulateSeason(o: SimOptions): SimResult {
       tier: s.L.tierOf[i] ?? 0,
       strength: leagueSide(s, m, false),
     }));
-    s.band = rubberBands(sides, s.fixtures.length, s.L.band ?? DEFAULT_RUBBER_BAND);
+    const b = s.L.band ?? DEFAULT_RUBBER_BAND;
+    s.band = rubberBands(sides, s.fixtures.length, {
+      ...b,
+      factors: s.fixtures.map(
+        (_, t) => (b.factors[Math.min(t, b.factors.length - 1)] ?? 1) * s.auto[t]!,
+      ),
+    });
+  }
+
+  /** After a league evening: the self-regulating factor of every tier (when on). */
+  function regulate(s: LeagueState) {
+    if (!s.L.autoBand) return;
+    s.auto = s.auto.map((f, t) => autoBandStep(f, s.recent[t]!, s.L.autoBand).factor);
   }
 
   function aiSide(s: LeagueState, c: Club): number {
@@ -935,13 +967,17 @@ export function simulateSeason(o: SimOptions): SimResult {
         for (const p of tier[s.next]!) {
           const home = s.byName.get(p.home)!;
           const away = s.byName.get(p.away)!;
+          // The managers' edge the model does not see (only against AI clubs).
+          const vsAi = !home.manager !== !away.manager;
+          const edge = (c: Club) => (vsAi && c.manager ? (s.L.edge ?? 1) : 1);
           const r = simulateGame(
-            { club: home.name, strength: sideOf(s, home, true) },
-            { club: away.name, strength: sideOf(s, away, true) },
+            { club: home.name, strength: sideOf(s, home, true) * edge(home) },
+            { club: away.name, strength: sideOf(s, away, true) * edge(away) },
             rng,
             s.teamSize,
           );
           s.results[t]!.push(r);
+          if (vsAi) s.recent[t]!.push(r.winner === (home.manager ? home.name : away.name));
           if (r.overtime) s.overtimes++;
           if (home.manager || away.manager) s.realGames++;
           else s.simulatedGames++;
@@ -962,6 +998,7 @@ export function simulateSeason(o: SimOptions): SimResult {
         }
       });
     }
+    regulate(s);
   }
 
   /** Monday: table money by the places (from the first played matchday) and the cup bonus. */
@@ -1061,6 +1098,7 @@ export function simulateSeason(o: SimOptions): SimResult {
       simulatedGames: s.simulatedGames,
       halves: managers.map((m, i) => ({ tier: s.L.tierOf[i] ?? 0, ...s.halves.get(m)! })),
       overtimes: s.overtimes,
+      autoFactors: [...s.auto],
     };
   }
 

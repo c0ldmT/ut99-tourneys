@@ -20,6 +20,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parseArgs } from 'node:util';
 import {
+  AUTO_BAND,
   keeperSkill,
   pickKeepers,
   simulateSeason,
@@ -263,3 +264,53 @@ for (const v of VARIANTS) {
     ].join(' | '),
   );
 }
+
+// --- The self-regulating rubber band (decision 252) ------------------------------------------
+// One season per seed with the league (2 tiers, two managers per tier like above): the managers'
+// wins against AI clubs per half when they have an edge the model does not see (season 2 without
+// traits in the model: about 1.6 in the Pro Series, 1.25 in division 1), with the band's factors
+// as they are (1) and with the self-regulating factor (start AUTO_BAND.start, target 60-70 %).
+console.log(
+  '\nrubber band (decision 252): edge | regulated | wins vs AI 1st / 2nd half | factor at the end (tier 1 / 2)',
+);
+for (const edge of [1.6, 1.25, 1, 0.9, 0.85])
+  for (const auto of [false, true]) {
+    const first: [number, number] = [0, 0];
+    const second: [number, number] = [0, 0];
+    const factors: number[][] = [];
+    for (let s = 1; s <= seeds; s++) {
+      const r = simulateSeason({
+        managers: SIX,
+        library: data.library,
+        betMultiples: data.multiples,
+        topMultiples: data.topMultiples,
+        winCaps: data.winCaps,
+        seed: s * 100,
+        dailyCups: cups,
+        academy: { licence: (n) => 2000 * 2 ** (n - 1), blueprintSalary: 0.75 },
+        rosterTarget: (d: number) => (d < 17 ? 5 : 7),
+        league: {
+          tierOf: SIX.map((_, i) => (i % 2 ? 0 : 1)),
+          tiers: 2,
+          size: 16,
+          edge,
+          ...(auto ? { autoBand: AUTO_BAND } : {}),
+        },
+      });
+      for (const h of r.league!.halves) {
+        first[0] += h.first[0];
+        first[1] += h.first[1];
+        second[0] += h.second[0];
+        second[1] += h.second[1];
+      }
+      factors.push(r.league!.autoFactors);
+    }
+    console.log(
+      [
+        edge,
+        auto ? 'yes' : 'no',
+        `${pct(first[0] / Math.max(1, first[1]))} / ${pct(second[0] / Math.max(1, second[1]))}`,
+        [0, 1].map((t) => avg(factors.map((f) => f[t] ?? 1)).toFixed(2)).join(' / '),
+      ].join(' | '),
+    );
+  }
