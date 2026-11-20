@@ -709,4 +709,56 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE users ADD COLUMN patch_seen INTEGER NOT NULL DEFAULT 0;
   UPDATE users SET patch_seen = 241;
   `,
+  // 46: a snapshot of every Dream Team team and roster bot per market day (decision 244), for
+  // analyses of the economy and the bots' development over a season (no history before).
+  `
+  CREATE TABLE udt_team_days (
+    day TEXT NOT NULL,
+    season INTEGER NOT NULL,
+    user_id TEXT NOT NULL,
+    ai INTEGER NOT NULL,
+    active INTEGER NOT NULL,
+    cash INTEGER NOT NULL,
+    staked INTEGER NOT NULL,
+    book INTEGER NOT NULL,
+    roster_value INTEGER NOT NULL,
+    salary_week INTEGER NOT NULL,
+    salary_due INTEGER NOT NULL,
+    roster INTEGER NOT NULL,
+    striking INTEGER NOT NULL,
+    top5_skill REAL NOT NULL,
+    traits INTEGER NOT NULL,
+    blueprints INTEGER NOT NULL,
+    PRIMARY KEY (day, user_id)
+  );
+  CREATE INDEX udt_team_days_season ON udt_team_days(season, day);
+  CREATE TABLE udt_bot_days (
+    day TEXT NOT NULL,
+    season INTEGER NOT NULL,
+    bot_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    origin TEXT NOT NULL,
+    skill REAL NOT NULL,
+    eff_skill REAL NOT NULL,
+    value_score REAL NOT NULL,
+    level INTEGER NOT NULL,
+    xp INTEGER NOT NULL,
+    points_spent INTEGER NOT NULL,
+    potential INTEGER,
+    value INTEGER NOT NULL,
+    cap_value INTEGER NOT NULL,
+    price INTEGER NOT NULL,
+    salary INTEGER NOT NULL,
+    stamina INTEGER NOT NULL,
+    form TEXT NOT NULL,
+    phase TEXT,
+    games INTEGER NOT NULL,
+    dm_slot INTEGER,
+    bench INTEGER,
+    striking INTEGER NOT NULL,
+    trait_codes TEXT NOT NULL,
+    PRIMARY KEY (day, bot_id)
+  );
+  CREATE INDEX udt_bot_days_season ON udt_bot_days(season, day);
+  `,
 ];

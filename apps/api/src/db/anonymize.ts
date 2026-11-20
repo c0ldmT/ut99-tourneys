@@ -76,6 +76,7 @@ const ASSET_COLUMNS = new Set([
   'bots.face',
   'users.look_json',
   'udt_traits.weapon',
+  'udt_bot_days.trait_codes',
 ]);
 /** Keys and columns of ids, refs and tokens: checked against old ids only (random ids would hit names). */
 const ID_KEY = /(^id$|Id$|_id$|^ref$|Ref$|_ref$|^rngSeed$|^token_hash$|^join_token$|^invite_code$)/;

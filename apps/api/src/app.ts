@@ -60,6 +60,7 @@ import { UdtLeagueService } from './udt/udt-league.service.js';
 import { UdtAiService } from './udt/udt-ai.service.js';
 import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
+import { UdtSnapshotService } from './udt/udt-snapshots.service.js';
 import { UdtService } from './udt/udt.service.js';
 import { ShopService } from './shop/shop.service.js';
 import { SeriesService } from './series/series.service.js';
@@ -156,6 +157,7 @@ class AppModule {
         LedgerService,
         UdtService,
         UdtMarketService,
+        UdtSnapshotService,
         UdtEventsService,
         UdtRewardsService,
         UdtPacksService,

@@ -43,6 +43,7 @@ import { botKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { UdtCareerService } from './udt-career.service.js';
+import { UdtSnapshotService } from './udt-snapshots.service.js';
 import { playingBots } from './udt-playing.js';
 import { UdtService, withTraits } from './udt.service.js';
 import { ServerActivity } from '../common/activity.js';
@@ -94,6 +95,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
     @Inject(EventLogService) private readonly events: EventLogService,
+    @Inject(UdtSnapshotService) private readonly snapshots: UdtSnapshotService,
   ) {}
 
   onModuleInit(): void {
@@ -148,7 +150,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Managers with a bet, a Dream Team action of their own or a new team since `since`. */
-  private activeManagers(season: number, since: string): Set<string> {
+  activeManagers(season: number, since: string): Set<string> {
     const out = new Set<string>();
     for (const b of this.db
       .select({ userId: bets.userId })
@@ -308,6 +310,30 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       })
       .run();
     this.log.info(`udt market day ${day}: index ${index}, ${n} offers`);
+    // The day's snapshot of teams and bots (decision 244): never in the way of the market day.
+    try {
+      const own = this.udt.ownBots(s);
+      const salary = new Map(
+        this.db
+          .select()
+          .from(udtRoster)
+          .where(eq(udtRoster.season, s))
+          .all()
+          .map((r) => [
+            r.botId,
+            botSalary(
+              r,
+              own.get(r.botId),
+              values.get(r.botId),
+              byId.get(r.botId),
+              onBots.get(r.botId) ?? [],
+            ),
+          ]),
+      );
+      this.snapshots.take(season, day, { active, salary });
+    } catch (e) {
+      this.log.error(`udt snapshot: ${e instanceof Error ? e.message : String(e)}`);
+    }
     for (const fn of this.dayHooks)
       try {
         fn(season, day);
@@ -386,25 +412,14 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
   ) {
     const own = this.udt.ownBots(season);
     for (const r of roster) {
-      // Bots the managers made play for free (starter, talents, apprentices) or for a share of
-      // the salary (blueprint bots, owner 25.10.).
-      // Keepers play for free (league plan L-E7).
-      const o = own.get(r.botId);
-      const share = r.starter || (o?.keptFrom ?? null) !== null ? 0 : madeSalaryShare(o?.origin);
-      if (!share) continue;
-      const b = byId.get(r.botId);
-      const traits = onBots.get(r.botId) ?? [];
-      const value = values.get(r.botId);
-      const salary =
-        Math.round(
-          (weeklySalary(
-            value !== undefined && b ? withTraits(value, b, traits) : r.price,
-            b?.skill ?? 4,
-          ) *
-            managerEffects(traits).salary *
-            share) /
-            10,
-        ) * 10;
+      if (!salaryShare(r, own.get(r.botId))) continue;
+      const salary = botSalary(
+        r,
+        own.get(r.botId),
+        values.get(r.botId),
+        byId.get(r.botId),
+        onBots.get(r.botId) ?? [],
+      );
       // A strike from before the owed salaries (migration 33) still owes that week.
       const due = r.salaryDue + salary * weeks + (r.striking && !r.salaryDue ? salary : 0);
       if (!due && !r.striking) continue;
@@ -659,6 +674,44 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       });
     return this.udt.view(user);
   }
+}
+
+/**
+ * Bots the managers made play for free (starter, talents, apprentices) or for a share of the
+ * salary (blueprint bots, owner 25.10.); keepers play for free (league plan L-E7).
+ */
+export function salaryShare(
+  r: Pick<typeof udtRoster.$inferSelect, 'starter'>,
+  own: { origin: string; keptFrom: number | null } | undefined,
+): number {
+  return r.starter || (own?.keptFrom ?? null) !== null ? 0 : madeSalaryShare(own?.origin);
+}
+
+/**
+ * A roster bot's weekly salary: bought bots in full, blueprint bots a share, the starter, talents,
+ * apprentices and keepers nothing (decisions 212, L-E7); `value` is the bot's market value of
+ * the day (missing: its price).
+ */
+export function botSalary(
+  r: Pick<typeof udtRoster.$inferSelect, 'starter' | 'price'>,
+  own: { origin: string; keptFrom: number | null } | undefined,
+  value: number | undefined,
+  b: LibraryBot | undefined,
+  traits: Parameters<typeof withTraits>[2],
+): number {
+  const share = salaryShare(r, own);
+  if (!share) return 0;
+  return (
+    Math.round(
+      (weeklySalary(
+        value !== undefined && b ? withTraits(value, b, traits) : r.price,
+        b?.skill ?? 4,
+      ) *
+        managerEffects(traits).salary *
+        share) /
+        10,
+    ) * 10
+  );
 }
 
 /** Mondays after `from` up to and including `to` (days as YYYY-MM-DD). */

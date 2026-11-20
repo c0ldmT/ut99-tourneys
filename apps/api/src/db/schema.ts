@@ -352,6 +352,74 @@ export const udtValues = sqliteTable(
   (t) => [primaryKey({ columns: [t.botId, t.day] })],
 );
 
+/**
+ * A team per market day (decision 244): money, roster and strength after the market day, for
+ * analyses of the economy over a season.
+ */
+export const udtTeamDays = sqliteTable(
+  'udt_team_days',
+  {
+    day: text('day').notNull(),
+    season: integer('season').notNull(),
+    userId: text('user_id').notNull(),
+    ai: integer('ai', { mode: 'boolean' }).notNull(),
+    /** Counted for the economy index (a bet or a Dream Team action in the last 7 days). */
+    active: integer('active', { mode: 'boolean' }).notNull(),
+    /** Wallet balance (open stakes included) and the open stakes. */
+    cash: integer('cash').notNull(),
+    staked: integer('staked').notNull(),
+    /** What the roster cost (book value) and its market value. */
+    book: integer('book').notNull(),
+    rosterValue: integer('roster_value').notNull(),
+    salaryWeek: integer('salary_week').notNull(),
+    salaryDue: integer('salary_due').notNull(),
+    roster: integer('roster').notNull(),
+    striking: integer('striking').notNull(),
+    /** Mean effective skill of the five best bots (the team's strength). */
+    top5Skill: real('top5_skill').notNull(),
+    traits: integer('traits').notNull(),
+    /** Unused blueprints. */
+    blueprints: integer('blueprints').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.userId] })],
+);
+
+/** A roster bot per market day (decision 244): its development, value and stamina. */
+export const udtBotDays = sqliteTable(
+  'udt_bot_days',
+  {
+    day: text('day').notNull(),
+    season: integer('season').notNull(),
+    botId: text('bot_id').notNull(),
+    userId: text('user_id').notNull(),
+    /** "bought" or the origin of a bot the team made (starter, blueprint, talent, apprentice). */
+    origin: text('origin').notNull(),
+    skill: real('skill').notNull(),
+    /** Skill and value score with the traits (what the game gets). */
+    effSkill: real('eff_skill').notNull(),
+    valueScore: real('value_score').notNull(),
+    level: integer('level').notNull(),
+    xp: integer('xp').notNull(),
+    pointsSpent: integer('points_spent').notNull(),
+    /** Exact potential of a bot the team made (null: bought). */
+    potential: integer('potential'),
+    value: integer('value').notNull(),
+    capValue: integer('cap_value').notNull(),
+    price: integer('price').notNull(),
+    salary: integer('salary').notNull(),
+    stamina: integer('stamina').notNull(),
+    form: text('form').notNull(),
+    phase: text('phase'),
+    games: integer('games').notNull(),
+    dmSlot: integer('dm_slot'),
+    bench: integer('bench'),
+    striking: integer('striking', { mode: 'boolean' }).notNull(),
+    /** Trait codes on the bot, space separated. */
+    traitCodes: text('trait_codes').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.day, t.botId] })],
+);
+
 /** Bots on offer from a market day until the next one. */
 export const udtOffers = sqliteTable(
   'udt_offers',
