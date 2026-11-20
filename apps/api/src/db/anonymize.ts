@@ -222,6 +222,29 @@ class Names {
     return this.of(value, kind);
   }
 
+  /** A name's neutral name when it is known (also with a tag in front); never makes one. */
+  peek(value: string): string | undefined {
+    const done = this.fields.get(value) ?? this.fixedMap.get(value) ?? this.known(value);
+    if (done) return done;
+    const tags = [...this.tagMap.keys()].sort((a, b) => b.length - a.length);
+    for (const t of tags) {
+      if (!value.startsWith(t) || value.length === t.length) continue;
+      const rest = this.known(value.slice(t.length));
+      if (rest) return this.tagMap.get(t)! + rest;
+    }
+    const m = /^\[([^\]]{1,8})\](.+)$/s.exec(value);
+    const rest = m ? this.known(m[2]!) : undefined;
+    return m && rest ? `[${this.tag(m[1]!)}]${rest}` : undefined;
+  }
+
+  /** Every original with its neutral name (for free texts). */
+  pairs(): [string, string][] {
+    const out: [string, string][] = [];
+    for (const m of [this.map, this.aliases, this.fixedMap, this.tagMap, this.fields])
+      for (const [k, v] of m) out.push([k, v]);
+    return out;
+  }
+
   counts(): Record<string, number> {
     return { ...this.count };
   }
@@ -244,7 +267,29 @@ interface Column {
   notnull: number;
 }
 
-export async function anonymizeDatabase(src: string, out: string): Promise<AnonymizeReport> {
+/**
+ * Maps the originals of the database to its neutral names, for files written next to the copy
+ * (the export CLI: bot logs, feedback texts). Lives only while the copy is made.
+ */
+export interface NameMapper {
+  /** A player's or bot's in-game name: its neutral name (a new one when unknown). */
+  player(name: string): string;
+  /** A known name's neutral name; anything else (items, monsters) stays. */
+  known(name: string): string;
+  /** A tournament id's neutral id (unknown ids get new ones). */
+  tournament(id: string): string;
+  /** A free text with every known name in it replaced. */
+  text(s: string): string;
+  /** Originals (names, old ids) still in a string. */
+  leftovers(s: string): string[];
+}
+
+export async function anonymizeDatabase(
+  src: string,
+  out: string,
+  /** Runs with the names of this copy; leftovers it returns stop the copy (nothing written). */
+  extra?: (m: NameMapper) => Promise<AnonymizeReport['leftovers']>,
+): Promise<AnonymizeReport> {
   if (!existsSync(src)) throw new Error(`no database at ${src}`);
   if (existsSync(out)) throw new Error(`${out} exists already`);
   const part = `${out}.part`;
@@ -261,7 +306,9 @@ export async function anonymizeDatabase(src: string, out: string): Promise<Anony
     try {
       db.pragma('journal_mode = DELETE');
       db.pragma('foreign_keys = OFF');
-      report = run(db);
+      const done = run(db);
+      report = done.report;
+      if (!report.leftovers.length && extra) report.leftovers.push(...(await extra(done.mapper)));
       if (!report.leftovers.length) db.exec('VACUUM');
     } finally {
       db.close();
@@ -278,7 +325,7 @@ export async function anonymizeDatabase(src: string, out: string): Promise<Anony
   }
 }
 
-function run(db: Database.Database): AnonymizeReport {
+function run(db: Database.Database): { report: AnonymizeReport; mapper: NameMapper } {
   const tables = (
     db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
   )
@@ -669,20 +716,16 @@ function run(db: Database.Database): AnonymizeReport {
   });
   update();
 
-  const leftovers = scan(
-    db,
-    tables,
-    columns,
-    [
-      ...entrantIds.keys(),
-      ...tids,
-      ...agents,
-      ...[...profiles].filter((p) => p !== 'local'),
-      ...discordIds,
-    ],
-    names.originals(),
-  );
-  return {
+  const oldIds = [
+    ...entrantIds.keys(),
+    ...tids,
+    ...agents,
+    ...[...profiles].filter((p) => p !== 'local'),
+    ...discordIds,
+  ];
+  const leftovers = scan(db, tables, columns, oldIds, names.originals());
+  const mapper = nameMapper(names, tid, oldIds);
+  const report: AnonymizeReport = {
     written: false,
     mapped: {
       ...names.counts(),
@@ -693,16 +736,62 @@ function run(db: Database.Database): AnonymizeReport {
     removed,
     leftovers,
   };
+  return { report, mapper };
 }
 
-/** Every original (name, old id, Discord id) still in a text of the copy. */
-function scan(
-  db: Database.Database,
-  tables: string[],
-  columns: Map<string, Column[]>,
-  ids: string[],
-  list: string[],
-): AnonymizeReport['leftovers'] {
+function nameMapper(names: Names, tid: Map<string, string>, oldIds: string[]): NameMapper {
+  const find = finder(oldIds, names.originals());
+  const extraTid = new Map<string, string>();
+  // Free texts: longest originals first, the scan's rules (4+ anywhere, 3 as a word).
+  const pairs = names
+    .pairs()
+    .filter(([k]) => k.length >= 3 && !NEUTRAL.test(k) && !NEUTRAL_WORDS.has(k.toLowerCase()))
+    .sort((a, b) => b[0].length - a[0].length);
+  const neutral = new Map(pairs.map(([k, v]) => [k.toLowerCase(), v]));
+  const longIds = [...new Set(oldIds)].filter((id) => id.length >= 4);
+  const idRe = longIds.length
+    ? new RegExp(`(?<![A-Za-z0-9_-])(${longIds.map(escape).join('|')})(?![A-Za-z0-9_-])`, 'g')
+    : null;
+  const textRe = pairs.length
+    ? new RegExp(
+        pairs
+          .map(([k]) => (k.length >= 4 ? escape(k) : `(?<![A-Za-z0-9])${escape(k)}(?![A-Za-z])`))
+          .join('|'),
+        'gi',
+      )
+    : null;
+  return {
+    player: (name) => names.peek(name) ?? names.field(name, 'name'),
+    known: (name) => names.peek(name) ?? name,
+    tournament: (id) => {
+      const known = tid.get(id) ?? extraTid.get(id);
+      if (known) return known;
+      const made = `tx${String(extraTid.size + 1).padStart(3, '0')}`;
+      extraTid.set(id, made);
+      return made;
+    },
+    text: (s) => {
+      // Old ids first (a pasted tournament link), then the names.
+      const ids = idRe ? s.replace(idRe, (m) => tid.get(m) ?? 'id') : s;
+      return textRe ? ids.replace(textRe, (m) => neutral.get(m.toLowerCase()) ?? 'Name') : ids;
+    },
+    leftovers: (s) => {
+      const hit = find(s, 'text');
+      return hit ? [hit] : [];
+    },
+  };
+}
+
+/** Originals that look like neutral names ("Server", "T") would hit every neutral name. */
+const NEUTRAL =
+  /^(Spieler|Bot|Team|Clan|Name|Turnier|Serie|Server|Dream Team Cup|T|t|server|profile)[\s_\d]*$/;
+/** Also originals inside the neutral words ("Spiel" in "Spieler01"). */
+const NEUTRAL_WORDS = new Set(
+  'spieler bot team clan name turnier serie server dream cup profile anon anonymized'.split(' '),
+);
+
+/** Finds an original (old id or name) in a string; ids only as whole ids. */
+function finder(ids: string[], list: string[]) {
   // Old ids (entrants "bot-Bo", tournament slugs, servers, Discord ids) as whole ids only:
   // "bot-Bot17" is a neutral one.
   // Very short ids ("pi", Discord test ids) would hit any number or word.
@@ -710,15 +799,8 @@ function scan(
   const idRe = ids.length
     ? new RegExp(`(?<![A-Za-z0-9_-])(${ids.map(escape).join('|')})(?![A-Za-z0-9_-])`)
     : null;
-  // Originals that look like neutral names ("Server", "T") would hit every neutral name.
-  const neutral =
-    /^(Spieler|Bot|Team|Clan|Name|Turnier|Serie|Server|Dream Team Cup|T|t|server|profile)[\s_\d]*$/;
-  // Also originals inside the neutral words ("Spiel" in "Spieler01").
-  const words = new Set(
-    'spieler bot team clan name turnier serie server dream cup profile anon anonymized'.split(' '),
-  );
   const originals = [...new Set(list)].filter(
-    (k) => k && !neutral.test(k) && !words.has(k.toLowerCase()),
+    (k) => k && !NEUTRAL.test(k) && !NEUTRAL_WORDS.has(k.toLowerCase()),
   );
   const re = (l: string[], f: (x: string) => string) =>
     l.length ? new RegExp(l.map(f).join('|'), 'i') : null;
@@ -733,16 +815,28 @@ function scan(
     (k) => `(?<![A-Za-z0-9])${escape(k)}(?![A-Za-z])`,
   );
   const short = new Set(originals.filter((k) => k.length < 3).map((k) => k.toLowerCase()));
+  return (s: string, mode: 'id' | 'name' | 'text'): string | null =>
+    idRe?.exec(s)?.[0] ??
+    (mode === 'id'
+      ? null
+      : (long?.exec(s)?.[0] ??
+        mid?.exec(s)?.[0] ??
+        (mode === 'name' && short.has(s.toLowerCase()) ? s : null)));
+}
+
+/** Every original (name, old id, Discord id) still in a text of the copy. */
+function scan(
+  db: Database.Database,
+  tables: string[],
+  columns: Map<string, Column[]>,
+  ids: string[],
+  list: string[],
+): AnonymizeReport['leftovers'] {
+  const find = finder(ids, list);
   const found: AnonymizeReport['leftovers'] = [];
   // Ids, refs and tokens only against old ids: a random id may contain a name ("l03hAwKzi").
   const check = (s: string, where: string, mode: 'id' | 'name' | 'text') => {
-    const hit =
-      idRe?.exec(s)?.[0] ??
-      (mode === 'id'
-        ? null
-        : (long?.exec(s)?.[0] ??
-          mid?.exec(s)?.[0] ??
-          (mode === 'name' && short.has(s.toLowerCase()) ? s : null)));
+    const hit = find(s, mode);
     if (hit && found.length < 200) found.push({ name: hit, where, sample: s.slice(0, 80) });
   };
   const values = (v: unknown, key: string, where: string) => {

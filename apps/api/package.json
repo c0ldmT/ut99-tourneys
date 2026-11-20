@@ -16,7 +16,8 @@
     "udt:calibrate": "node --conditions=@tourney/source --import tsx scripts/udt-calibrate.ts",
     "udt:league-sim": "node --conditions=@tourney/source --import tsx scripts/udt-league-sim.ts",
     "bot:sim": "node --conditions=@tourney/source --import tsx scripts/bot-sim.ts",
-    "db:anonymize": "node --conditions=@tourney/source --import tsx scripts/db-anonymize.ts"
+    "db:anonymize": "node --conditions=@tourney/source --import tsx scripts/db-anonymize.ts",
+    "db:export": "node --conditions=@tourney/source --import tsx src/export-cli.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.1.2",

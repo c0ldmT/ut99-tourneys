@@ -167,14 +167,15 @@ The website now shows the server as online. Click **Scan** there, so maps and bo
 
 ## Operation
 
-| Task        | Command                                                                                                   |
-| ----------- | --------------------------------------------------------------------------------------------------------- |
-| Status      | `systemctl status tourney-website tourney-bridge --no-pager`                                              |
-| Logs        | `journalctl -u tourney-website -f`, `journalctl -u tourney-bridge -f`, UT: `/opt/ut99/System/Tourney.log` |
-| Restart     | `sudo systemctl restart tourney-website` (or `tourney-bridge`)                                            |
-| Update      | unpack the new bundle, `sudo bash deploy/linux/install.sh --ut /opt/ut99` (settings and data are kept)    |
-| Backup      | `/etc/tourney` (settings) and `/var/lib/tourney` (database, bridge logs)                                  |
-| Free memory | `free -h`; the UT server only runs while a tournament runs                                                |
+| Task            | Command                                                                                                                                                                                                                           |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status          | `systemctl status tourney-website tourney-bridge --no-pager`                                                                                                                                                                      |
+| Logs            | `journalctl -u tourney-website -f`, `journalctl -u tourney-bridge -f`, UT: `/opt/ut99/System/Tourney.log`                                                                                                                         |
+| Restart         | `sudo systemctl restart tourney-website` (or `tourney-bridge`)                                                                                                                                                                    |
+| Update          | unpack the new bundle, `sudo bash deploy/linux/install.sh --ut /opt/ut99` (settings and data are kept)                                                                                                                            |
+| Backup          | `/etc/tourney` (settings) and `/var/lib/tourney` (database, bridge logs)                                                                                                                                                          |
+| Free memory     | `free -h`; the UT server only runs while a tournament runs                                                                                                                                                                        |
+| Analysis export | `sudo -u tourney node /opt/tourney/website/dist/export-cli.js /var/lib/tourney/website/tourney.db /tmp/tourney-export --bot-logs /var/lib/tourney/bridge/bot-logs` (anonymised database, feedback, bot logs; the website may run) |
 
 ## Troubleshooting
 
