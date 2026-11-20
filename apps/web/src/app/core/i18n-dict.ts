@@ -1353,6 +1353,12 @@ const en = {
   'udt.lineupHint': 'Strikers never play; tired bots (below 40) after the bench.',
   'udt.rest.button': 'Rest',
   'udt.rest.points': 'Stamina points',
+  'udt.camp.title': 'Training camp',
+  'udt.camp.hint': '+{xp} XP, once a day per bot',
+  'udt.camp.go': 'Train (+{xp} XP)',
+  'udt.camp.done': 'Trained today',
+  'ok.udt.camp': 'Training done: the bot gained experience.',
+  'udt.kind.udt_camp': 'Training camp',
   'udt.rest.buy': 'Buy',
   'udt.kind.udt_rest': 'Rest with Neuro',
   'udt.events.auto': 'Enter automatically when possible',
@@ -2135,7 +2141,7 @@ const en = {
     'Form of the day: out of form, −10 accuracy in Dream Team games. Random every day; it counts for the tournaments drawn today.',
   'udt.form.title.normal': 'Form of the day: normal (random every day).',
   'udt.help.lineup.text':
-    'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro. Each bot also has a form of the day (Form ▲ / ▼ on the card).',
+    'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro. Each bot also has a form of the day (Form ▲ / ▼ on the card). In the bot details the training camp gives a bot experience for Neuro, once a day - handy for bots that play little.',
   'udt.market.legend':
     "Line and % on the right: how the bot's market value moved over the last market days, without the economy index – so form and demand of this bot, not the whole economy.",
   'udt.market.trendTitle':
@@ -4035,6 +4041,12 @@ const de: Record<TKey, string> = {
   'udt.lineupHint': 'Streiker spielen nie; müde Bots (unter 40) erst nach der Bank.',
   'udt.rest.button': 'Erholen',
   'udt.rest.points': 'Ausdauerpunkte',
+  'udt.camp.title': 'Trainingslager',
+  'udt.camp.hint': '+{xp} XP, einmal pro Tag und Bot',
+  'udt.camp.go': 'Trainieren (+{xp} XP)',
+  'udt.camp.done': 'Heute trainiert',
+  'ok.udt.camp': 'Training erledigt: Der Bot hat Erfahrung gesammelt.',
+  'udt.kind.udt_camp': 'Trainingslager',
   'udt.rest.buy': 'Kaufen',
   'udt.kind.udt_rest': 'Erholung mit Neuro',
   'udt.events.auto': 'Automatisch anmelden, wenn möglich',
@@ -4827,7 +4839,7 @@ const de: Record<TKey, string> = {
     'Tagesform: Formtief, −10 Treffsicherheit in Dream-Team-Spielen. Jeden Tag neu ausgewürfelt; gilt für die Turniere, die heute ausgelost werden.',
   'udt.form.title.normal': 'Tagesform: normal (jeden Tag neu ausgewürfelt).',
   'udt.help.lineup.text':
-    'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro. Jeder Bot hat außerdem eine Tagesform (Form ▲ / ▼ auf der Karte).',
+    'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro. Jeder Bot hat außerdem eine Tagesform (Form ▲ / ▼ auf der Karte). In den Bot-Details gibt das Trainingslager einem Bot einmal am Tag Erfahrung gegen Neuro – praktisch für Bots, die wenig spielen.',
   'udt.market.legend':
     'Linie und % rechts: wie sich der Marktwert des Bots über die letzten Markttage entwickelt hat, ohne den Wirtschaftsindex – also Form und Nachfrage dieses Bots, nicht die ganze Wirtschaft.',
   'udt.market.trendTitle':

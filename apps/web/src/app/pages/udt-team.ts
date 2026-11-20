@@ -184,6 +184,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           [spendable]="spendable() ?? v.wallet?.spendable ?? null"
           [looks]="looks()"
           [index]="v.index"
+          [camp]="v.camp ?? null"
           (changed)="load()"
           (closed)="panelId.set(null)"
         />

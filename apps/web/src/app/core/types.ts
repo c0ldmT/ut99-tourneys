@@ -1337,6 +1337,16 @@ export interface UdtView {
   lastTeam?: UdtTeam | null;
   /** Without a team: the keepers that come along when it is founded. */
   keepers?: { botId: string; name: string; skill: number; nextSkill: number }[];
+  /** Training camp (decision 254): price, experience, the bots trained today. */
+  camp?: UdtCamp;
+}
+
+/** Training camp (decision 254): experience for Neuro, once per bot and day. */
+export interface UdtCamp {
+  price: number;
+  xp: number;
+  /** Bots of the roster that were in the camp today. */
+  done: string[];
 }
 
 /** An own bot at the season's end: can it be kept, its skill next season. */

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { BotsService } from '../src/bots/bots.service.js';
+import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -143,6 +144,35 @@ describe('Unreal Dream Team: teams and rosters', () => {
     expect((put.body as unknown[])[0]).toMatchObject({ dmSlot: 2, mhSlot: 1, bench: null });
     expect((await mario.req('PUT', '/udt/lineup', { dm: [mira, mira] })).status).toBe(400);
     expect((await mario.req('PUT', '/udt/lineup', { dm: ['bNope'] })).status).toBe(400);
+  });
+});
+
+describe('Unreal Dream Team: training camp (decision 254)', () => {
+  it('gives a roster bot experience for Neuro, once a day per bot', async () => {
+    ({ api } = await startApi({ TEST_MODE: 'true' }));
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    await mario.post('/udt/team', team());
+    const v = (await mario.get('/udt')).body;
+    const bot = v.roster[0];
+    // At index 0.3 (a season's start) the index itself: 300 × 0.3.
+    expect(v.camp).toEqual({ price: 90, xp: 60, done: [] });
+    const before = (await mario.get('/me')).body.id as string;
+    const spend = api.app.get(LedgerService).spendable(before).spendable;
+    const r = await mario.post(`/udt/roster/${bot.botId}/camp`);
+    expect(r.status, JSON.stringify(r.body)).toBe(200);
+    expect(r.body.roster[0].xp).toBe(bot.xp + 60);
+    expect(r.body.camp.done).toEqual([bot.botId]);
+    expect(api.app.get(LedgerService).spendable(before).spendable).toBe(spend - 90);
+    // Once a day per bot; the next day again.
+    expect((await mario.post(`/udt/roster/${bot.botId}/camp`)).status).toBe(409);
+    await admin.post('/udt/test/advance', { hours: 24 });
+    expect((await mario.post(`/udt/roster/${bot.botId}/camp`)).status).toBe(200);
+    // Only own roster bots.
+    const tim = await Client.login(api, 'Tim');
+    expect((await tim.post(`/udt/roster/${bot.botId}/camp`)).status).toBe(404);
   });
 });
 

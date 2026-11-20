@@ -227,6 +227,13 @@ export class UdtController {
     return this.udt.setMhFocus(user, botId, body.focus);
   }
 
+  /** Training camp (decision 254): experience for a roster bot, once per bot and day. */
+  @Post('roster/:botId/camp')
+  @HttpCode(200)
+  camp(@CurrentUser() user: User, @Param('botId') botId: string) {
+    return this.udt.camp(user, botId);
+  }
+
   /** Rest with Neuro: stamina points for a roster bot (REST_PRICE Neuro each). */
   @Post('roster/:botId/rest')
   rest(

@@ -27,6 +27,7 @@ export type LedgerKind =
   | 'udt_licence'
   | 'udt_sponsor'
   | 'udt_rest'
+  | 'udt_camp'
   | 'udt_league'
   | 'udt_cup_bonus';
 

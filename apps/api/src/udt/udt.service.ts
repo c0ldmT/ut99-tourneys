@@ -6,6 +6,7 @@ import {
   botRarity,
   botStrength,
   keeperSkill,
+  campPrice,
   DEFAULT_ECONOMY,
   economyIndex,
   effectiveValues,
@@ -210,6 +211,9 @@ export interface UdtTeam {
 
 /** Neuro per stamina point bought (rest with Neuro, not indexed). */
 export const REST_PRICE = DEFAULT_ECONOMY.restPrice;
+
+/** The booking of a bot's training camp session of a day (once per bot and day). */
+const campRef = (season: number, day: string, botId: string) => `camp:${season}:${day}:${botId}`;
 
 /**
  * Unreal Dream Team (add-on, settings "udt.enabled"): managers' teams and rosters of a season.
@@ -575,6 +579,51 @@ export class UdtService {
     return this.view(user);
   }
 
+  /**
+   * Training camp (decision 254): experience for a roster bot (a training champion learns
+   * more) for Neuro at the damped index, once per bot and day.
+   */
+  camp(user: User, botId: string) {
+    this.assertOn();
+    const season = this.season().number;
+    const r = this.db
+      .select()
+      .from(udtRoster)
+      .where(
+        and(
+          eq(udtRoster.season, season),
+          eq(udtRoster.botId, botId),
+          eq(udtRoster.userId, user.id),
+        ),
+      )
+      .get();
+    if (!r) throw notFound('bot in your roster');
+    const ref = campRef(season, this.today(), botId);
+    if (this.ledger.has(ref)) throw conflict('the bot was in the training camp today');
+    const xp = Math.round(
+      DEFAULT_ECONOMY.camp.xp * managerEffects(this.botTraits(season, botId)).xp,
+    );
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_camp',
+      amount: campPrice(this.index(season)),
+      ref,
+      meta: { botId, xp },
+    });
+    this.db
+      .update(udtRoster)
+      .set({ xp: r.xp + xp })
+      .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, botId)))
+      .run();
+    return this.view(user);
+  }
+
+  /** The roster bots that were in the training camp today. */
+  private campedToday(season: number, botIds: readonly string[]): string[] {
+    const day = this.today();
+    return botIds.filter((id) => this.ledger.has(campRef(season, day, id)));
+  }
+
   teams(season: number): UdtTeam[] {
     return this.db
       .select()
@@ -738,6 +787,7 @@ export class UdtService {
     if (!enabled || !season)
       return { enabled, season: season?.number ?? null, team: null, roster: [], index: 0.3 };
     const team = this.team(user.id, season.number);
+    const roster = team ? this.roster(user.id, season.number) : [];
     return {
       enabled,
       // Founding again: last season's name and tag, and the keepers that come along.
@@ -754,7 +804,16 @@ export class UdtService {
       today: this.today(),
       index: this.index(season.number),
       team,
-      roster: team ? this.roster(user.id, season.number) : [],
+      roster,
+      /** Training camp (decision 254): price, experience and the bots trained today. */
+      camp: {
+        price: campPrice(this.index(season.number)),
+        xp: DEFAULT_ECONOMY.camp.xp,
+        done: this.campedToday(
+          season.number,
+          roster.map((r) => r.botId),
+        ),
+      },
       wallet: this.ledger.spendable(user.id),
       starterBudget: this.settings.get().udt.starterBudget,
       starterExtra: this.settings.get().udt.starterExtra,

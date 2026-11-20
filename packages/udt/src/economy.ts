@@ -71,6 +71,11 @@ export interface EconomyConfig {
   stamina: { perGame: number; perDay: number; tiredBelow: number };
   /** Rest with Neuro: Neuro per stamina point (not indexed). */
   restPrice: number;
+  /**
+   * Training camp (decision 254): experience for a roster bot, once per bot and day, for `price`
+   * Neuro × the damped index (`basicIndex`).
+   */
+  camp: { xp: number; price: number };
   packs: Readonly<Record<PackBox, PackConfig>>;
   /** A 10-pull costs this many boxes. */
   tenPullBoxes: number;
@@ -139,6 +144,10 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   // 7 since 21.10. (owner; was 2): in the simulator a sink of about 500 Neuro per manager and
   // season with three Daily Cups a day, nothing with one; the index does not move.
   restPrice: 7,
+  // Plan P1.4 (Mario 20.11.): +60 XP (about a won match of three games) for 300 × √index - a
+  // flat price per session, so it helps most where a level needs little XP (bots that play
+  // little or lose).
+  camp: { xp: 60, price: 300 },
   packs: {
     // Pity as a safety net about 1.5-2 times the expected wait (review F7, owner 23.10.): with
     // 10/7/4 and 50/30/15 every 10-pull held an epic anyway and the real rates were 13/20/41 %
@@ -368,6 +377,10 @@ export function staminaRecovered(stamina: number, days: number, cfg = DEFAULT_EC
 /** A tired bot plays one step worse in accuracy (0 = fit). */
 export const tiredPenalty = (stamina: number, cfg = DEFAULT_ECONOMY): number =>
   stamina < cfg.stamina.tiredBelow ? 1 : 0;
+
+/** Price of a training camp session at the index (decision 254). */
+export const campPrice = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number =>
+  roundNeuro(cfg.camp.price * basicIndex(index, cfg));
 
 /** Price of a box or a 10-pull at the index (standard boxes: a basic need, `basicIndex`). */
 export function packPrice(box: PackBox, index: number, ten = false, cfg = DEFAULT_ECONOMY): number {

@@ -226,6 +226,7 @@ export const ERRORS_DE: Record<string, string> = {
   'only your own bots (starter, academy, blueprint) can be changed':
     'Nur deine eigenen Bots (Starter, Akademie, Bauplan) kannst du ändern.',
   'the bot is fully rested': 'Der Bot ist voll erholt.',
+  'the bot was in the training camp today': 'Der Bot war heute schon im Trainingslager.',
   'the model {value} is not known': 'Das Modell {value} kennt der Server nicht',
   'the skin {value} does not fit the model': 'Der Skin {value} passt nicht zum Modell',
   'the face {value} does not fit the skin': 'Das Gesicht {value} passt nicht zum Skin',

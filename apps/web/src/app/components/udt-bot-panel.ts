@@ -26,7 +26,7 @@ import {
 import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
-import type { UdtRosterBot, UdtTraitOnBot } from '../core/types';
+import type { UdtCamp, UdtRosterBot, UdtTraitOnBot } from '../core/types';
 import {
   rosterCard,
   rosterSalary,
@@ -125,6 +125,25 @@ const SHORT: Readonly<Record<Stat, string>> = {
                       | t: { xp: x.in, need: x.need, left: x.need - x.in, lv: b.level + 1 }
                   }}
                 </p>
+              }
+              @if (camp(); as c) {
+                <div class="camp">
+                  <span class="small"
+                    ><b>{{ 'udt.camp.title' | t }}</b> ·
+                    <span class="muted">{{ 'udt.camp.hint' | t: { xp: c.xp } }}</span></span
+                  >
+                  @if (c.done.includes(b.botId)) {
+                    <span class="muted small">{{ 'udt.camp.done' | t }}</span>
+                  } @else {
+                    <button
+                      type="button"
+                      [disabled]="busy() || (spendable() !== null && c.price > spendable()!)"
+                      (click)="train(b)"
+                    >
+                      {{ 'udt.camp.go' | t: { xp: c.xp } }} · {{ c.price | neuro }}
+                    </button>
+                  }
+                </div>
               }
             </section>
 
@@ -440,6 +459,14 @@ const SHORT: Readonly<Record<Stat, string>> = {
       color: inherit;
       line-height: 1;
     }
+    .camp {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 8px;
+    }
     .restslider {
       display: flex;
       align-items: center;
@@ -461,6 +488,8 @@ export class UdtBotPanel {
   readonly looks = input<UdtLooks | null>(null);
   /** The season's economy index (salaries follow it damped, decision 253). */
   readonly index = input(1);
+  /** Training camp (decision 254): price, experience, the bots trained today. */
+  readonly camp = input<UdtCamp | null>(null);
   readonly changed = output<void>();
   readonly closed = output<void>();
 
@@ -594,6 +623,10 @@ export class UdtBotPanel {
   protected async setFocus(b: UdtRosterBot, focus: number) {
     if ((b.mhFocus ?? 0) === focus) return;
     await this.act(() => this.api.udtMhFocus(b.botId, focus));
+  }
+
+  protected async train(b: UdtRosterBot) {
+    await this.act(() => this.api.udtCamp(b.botId));
   }
 
   protected async rest(b: UdtRosterBot) {

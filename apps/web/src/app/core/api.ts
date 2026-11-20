@@ -396,6 +396,13 @@ export class Api {
       { on },
       { ok: on ? 'ok.udt.autoOn' : 'ok.udt.autoOff', okParams: (r) => ({ n: r.entered }) },
     );
+  udtCamp = (botId: string) =>
+    this.call<UdtView>(
+      'POST',
+      `/udt/roster/${encodeURIComponent(botId)}/camp`,
+      {},
+      { ok: 'ok.udt.camp' },
+    );
   udtRest = (botId: string, points: number) =>
     this.call<UdtView>(
       'POST',

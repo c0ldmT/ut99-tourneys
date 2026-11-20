@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team: training camp in the bot details - +60 XP for a bot once a day for 300 × √index Neuro.
 - Dream Team league: the AI clubs' strength regulates itself per tier - after every league evening it moves by 0.02 when the humans won more than 70 % or less than 55 % of their last 20 played games against AI clubs (0.8-1.3, carried into the next season); Settings → UDT Liga shows factor, rate and AI traits per tier.
 - Dream Team league: AI managers get their own clubs (games against humans played, against AI clubs simulated, table money yes, cup bonus no) and are marked on the league page.
 - Analysis export: the replays of the games (feed, timeline, players at the end) come along with neutral names (`--no-replays` leaves them out).
