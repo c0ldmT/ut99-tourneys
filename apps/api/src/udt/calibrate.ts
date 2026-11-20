@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { botStrength, gameChance, GAME_MODEL_K, valueScore } from '@tourney/udt';
+import { botStrength, gameChance, GAME_MODEL_K, modTraitsEffect, valueScore } from '@tourney/udt';
 
 /**
  * Calibration of the game model on real games (`pnpm --filter @tourney/api udt:calibrate`):
@@ -12,6 +12,8 @@ import { botStrength, gameChance, GAME_MODEL_K, valueScore } from '@tourney/udt'
 interface BotSpec {
   skill: number;
   traits?: Record<string, unknown>;
+  /** The traits the mod played (their effect counts, decision 251). */
+  gameTraits?: string[];
 }
 
 /** One finished game between two sides of bots. */
@@ -93,9 +95,13 @@ export function readCalibrationGames(db: Database.Database): CalibrationGame[] {
   return out;
 }
 
-/** Mean model strength of a side (as the simulator, without the small body-trait bonus). */
+/** Mean model strength of a side (with the traits the mod played, decision 251). */
 const sideStrength = (s: BotSpec[]) =>
-  s.reduce((x, b) => x + botStrength(b.skill, valueScore(b.traits as never)), 0) / s.length;
+  s.reduce(
+    (x, b) =>
+      x + botStrength(b.skill, valueScore(b.traits as never), modTraitsEffect(b.gameTraits)),
+    0,
+  ) / s.length;
 const meanSkill = (s: BotSpec[]) => s.reduce((x, b) => x + b.skill, 0) / s.length;
 const clampP = (p: number) => Math.min(0.999, Math.max(0.001, p));
 const powChance = (sa: number, sb: number, k: number) => {

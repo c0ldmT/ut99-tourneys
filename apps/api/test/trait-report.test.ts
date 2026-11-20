@@ -110,6 +110,13 @@ describe('trait report (decision 237)', () => {
       value: 63,
       won: 0,
       avgSkill: 4,
+      labGames: 0,
     });
+    expect(r.rows.every((x) => !x.lab)).toBe(true);
+    // Trait lab (decision 251): rows of AI entrants are marked.
+    const lab = traitReport([t], (e) => e === 'eb');
+    expect(lab.rows.find((x) => x.trait === 'vampire')?.lab).toBe(true);
+    expect(lab.rows.find((x) => x.trait === 'vulture')?.lab).toBe(false);
+    expect(lab.summary.find((s) => s.trait === 'vampire')?.labGames).toBe(1);
   });
 });

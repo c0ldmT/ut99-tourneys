@@ -783,4 +783,9 @@ export const MIGRATIONS: string[] = [
     closed_at TEXT
   );
   `,
+  // 48: the league's band per tier (decisions 251, 252): AI clubs' traits per bot and the
+  // self-regulating factor with the humans' recent win rate against AI clubs.
+  `
+  ALTER TABLE league_runs ADD COLUMN band_json TEXT NOT NULL DEFAULT '[]';
+  `,
 ];

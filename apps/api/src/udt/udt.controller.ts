@@ -1,6 +1,7 @@
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { StatsService } from '../stats/stats.service.js';
 import { traitReport } from '../stats/trait-report.js';
+import { udtEntrantId } from '@tourney/protocol';
 import { z } from 'zod';
 import {
   Body,
@@ -22,6 +23,7 @@ import { UdtRewardsService } from './udt-rewards.service.js';
 import { ApproveBody, UdtCareerService } from './udt-career.service.js';
 import { KeepersBody, UdtKeepersService } from './udt-keepers.service.js';
 import {
+  aiClubEntrantId,
   EstimateQuery,
   FitQuery,
   TestLeagueBody,
@@ -458,7 +460,11 @@ export class UdtController {
   traitReport(@Query('season') season?: string) {
     const n =
       Number(season) || this.udt.seasonNumber() || this.seasons.latestStarted()?.number || 0;
-    return { season: n, ...traitReport(n ? this.stats.udtFacts(n) : []) };
+    // Trait lab (decision 251): AI clubs and AI managers drew their traits at random.
+    const ai = new Set([...this.udt.aiIds()].map((id) => udtEntrantId(id)));
+    const lab = (entrantId: string) =>
+      entrantId.startsWith(aiClubEntrantId('')) || ai.has(entrantId);
+    return { season: n, ...traitReport(n ? this.stats.udtFacts(n) : [], lab) };
   }
 
   /** The league: tables, the matchday as a conference, fixtures, the viewer's next game. */

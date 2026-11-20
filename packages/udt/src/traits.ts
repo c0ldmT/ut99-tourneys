@@ -226,6 +226,73 @@ export function traitOfRarity(rarity: Rarity, rng: () => number): TraitDef {
   return TRAITS[0]!;
 }
 
+// ---------- strength in the game model ----------
+
+/**
+ * What a trait did in the games of season 2 (decision 251): frag difference per minute against
+ * the other bots of the same game, skill and values controlled (export of 20.11., 7,608 bot
+ * games, `claude/Analyse-Scratch.md`), each pulled towards the mean trait (+0.48, empirical
+ * Bayes, spread 0.4) by its standard error - few games, little weight. A skill step is about
+ * +1.7. Traits without data count as the mean trait when the mod plays them, else (manager
+ * traits, claudius - its +1 skill counts already - and gun nut) as nothing.
+ */
+export const TRAIT_EFFECT: Readonly<Partial<Record<TraitCode, number>>> = {
+  'all-rounder': 0.17,
+  assassin: 0.07,
+  berserker: 0.36,
+  bouncer: 0.37,
+  'cold-blood': 1.07,
+  'counter-attacker': 0.18,
+  daredevil: 0.79,
+  'deemer-dream': 0.81,
+  'eagle-eye': 0.75,
+  'glass-cannon': 0.65,
+  'health-hound': 0.01,
+  'item-controller': 0.53,
+  kamikaze: 0.7,
+  'light-feet': -0.65,
+  // Only in Monster Hunt: nothing in a deathmatch.
+  'monster-bane': 0,
+  'monster-whisperer': 0,
+  overload: 1.09,
+  pathfinder: 0.59,
+  phoenix: 0.48,
+  regeneration: 0.23,
+  revenant: 0.01,
+  'shuffle-dancer': 0.42,
+  'side-stepper': 0.71,
+  'snipers-nest': -0.41,
+  'splash-expert': 0.27,
+  'starter-armour': 0.98,
+  'steady-hand': 0.63,
+  'team-player': 0.18,
+  'thick-skin': -0.01,
+  'titan-slayer': 0,
+  vampire: 1.24,
+  vulture: 0.9,
+  warden: 0,
+  watchdog: 0.54,
+  'weapon-master': 1.02,
+};
+
+/** The mean trait of season 2 (frag difference per minute): traits without data of their own. */
+export const TRAIT_EFFECT_MEAN = 0.48;
+
+/** A trait's effect in the game model (frag difference per minute, see `TRAIT_EFFECT`). */
+export function traitEffect(code: string): number {
+  const def = traitDef(code);
+  if (!def) return 0;
+  return TRAIT_EFFECT[def.code] ?? (def.mod ? TRAIT_EFFECT_MEAN : 0);
+}
+
+/** The effects of a bot's traits added up (website codes). */
+export const traitsEffect = (codes: readonly string[]): number =>
+  codes.reduce((n, c) => n + traitEffect(c), 0);
+
+/** The same from the mod's codes (`gameTraits` of a bot in a game). */
+export const modTraitsEffect = (mods: readonly string[] = []): number =>
+  mods.reduce((n, m) => n + traitEffect(traitByMod(m)?.code ?? ''), 0);
+
 // ---------- levels and slots ----------
 
 /** Experience needed for a level: 5·(L−1)·(L+4) – level 5 after about 15 games, 10 after 50. */

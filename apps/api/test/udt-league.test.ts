@@ -3,7 +3,16 @@ import { FakeClock } from '@tourney/bridge';
 import { eq } from 'drizzle-orm';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { leagueFixtures, tournaments } from '../src/db/schema.js';
+import {
+  events,
+  leagueFixtures,
+  leagueRuns,
+  tournaments,
+  udtRoster,
+  udtTraits,
+} from '../src/db/schema.js';
+import { xpForLevel } from '@tourney/udt';
+import { UdtService } from '../src/udt/udt.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { estimateEvening, leaguePlan } from '../src/udt/udt-league.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -358,6 +367,58 @@ describe('Dream Team league', () => {
     expect(rows).toHaveLength(8);
     expect(rows.filter((r) => r.manager && !r.ai)).toHaveLength(2);
     expect(rows.filter((r) => r.ai)).toHaveLength(6);
+  });
+
+  it("AI clubs get traits like the humans of their tier, the humans' traits count in the band (decision 251)", async () => {
+    const { admin, mario, tim, db } = await setup();
+    // Every human bot with three traits.
+    const codes = ['steady-hand', 'vulture', 'phoenix'];
+    for (const c of [mario, tim]) {
+      const me = (await c.get('/me')).body.id as string;
+      for (const r of api!.app.get(UdtService).roster(me, 1)) {
+        // Level 5: three trait slots.
+        db.update(udtRoster)
+          .set({ xp: xpForLevel(5) })
+          .where(eq(udtRoster.botId, r.botId))
+          .run();
+        for (const code of codes)
+          db.insert(udtTraits)
+            .values({
+              id: `t-${r.botId}-${code}`,
+              season: 1,
+              userId: me,
+              code,
+              botId: r.botId,
+              source: 'craft',
+              createdAt: new Date().toISOString(),
+              assignedAt: new Date().toISOString(),
+            })
+            .run();
+      }
+    }
+    await admin.post('/udt/test/advance', { hours: 3 * 24 + 1 });
+    const run = db.select().from(leagueRuns).get()!;
+    const band = JSON.parse(run.bandJson) as { traits: number }[];
+    expect(band.map((b) => b.traits)).toEqual([3, 3]);
+    // An AI club of a played game takes the field with traits.
+    const f = db
+      .select()
+      .from(leagueFixtures)
+      .all()
+      .find((x) => x.real && x.tournamentId)!;
+    await admin.post(`/udt/test/simulate/${f.tournamentId}`);
+    const seeding = db
+      .select()
+      .from(events)
+      .where(eq(events.tournamentId, f.tournamentId!))
+      .all()
+      .find((e) => e.type === 'seeding.set')!;
+    const entrants = JSON.parse(seeding.json).data.entrants as {
+      id: string;
+      bots: { gameTraits?: string[] }[];
+    }[];
+    const aiClub = entrants.find((e) => e.id.startsWith('lg-'))!;
+    for (const b of aiClub.bots) expect(b.gameTraits?.length).toBe(3);
   });
 
   it('a manager who founds a team later takes over an AI club of the lowest tier', async () => {

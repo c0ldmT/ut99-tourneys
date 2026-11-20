@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   botStrength,
+  clubTraitPool,
+  clubTraits,
   eveningsOf,
   finalFour,
   leagueBots,
@@ -15,6 +17,8 @@ import {
   simulateGame,
   standings,
   tableMoney,
+  traitDef,
+  traitsEffect,
   valueScore,
   type LeagueResult,
 } from '../src/index.js';
@@ -219,6 +223,56 @@ describe('AI clubs', () => {
     expect(leagueBots('club-x', 10).map((b) => b.name)).toEqual(
       leagueBots('club-x', 20).map((b) => b.name),
     );
+  });
+
+  it('AI club traits (decision 251): seeded, within the rules, growing with the band', () => {
+    const pool = clubTraitPool(true);
+    for (const code of pool) {
+      const d = traitDef(code)!;
+      expect(d.mod, code).toBeTruthy();
+      expect(d.category).not.toBe('manager');
+    }
+    expect(pool).not.toContain('monster-bane');
+    expect(pool).not.toContain('warden');
+    expect(clubTraitPool(false).some((c) => traitDef(c)?.needsWeapon)).toBe(false);
+    const three = clubTraits('club-x', 3, 0, 3, 5, ['Botpack.FlakCannon']);
+    expect(three).toHaveLength(5);
+    expect(clubTraits('club-x', 3, 0, 3, 5, ['Botpack.FlakCannon'])).toEqual(three);
+    for (const b of three) {
+      expect(b.codes).toHaveLength(3);
+      expect(new Set(b.codes).size).toBe(3);
+      const defs = b.codes.map((c) => traitDef(c)!);
+      expect(defs.filter((d) => d.category === 'body').length).toBeLessThanOrEqual(1);
+      expect(defs.filter((d) => d.rarity === 'legendary').length).toBeLessThanOrEqual(1);
+      if (defs.some((d) => d.needsWeapon)) expect(b.weapon).toBe('Botpack.FlakCannon');
+    }
+    // More traits later in the season: the first ones stay.
+    const four = clubTraits('club-x', 3, 0, 4);
+    const noWeapon = clubTraits('club-x', 3, 0, 3);
+    four.forEach((b, i) => expect(b.codes.slice(0, 3)).toEqual(noWeapon[i]!.codes));
+    expect(clubTraits('club-x', 3, 3, 0).every((b) => b.codes.length === 0)).toBe(true);
+    // Lower tiers draw rarer legendaries: none in the lowest tier.
+    const low = Array.from({ length: 40 }, (_, i) => clubTraits(`c${i}`, 1, 3, 5)).flat();
+    expect(low.flatMap((b) => b.codes).some((c) => traitDef(c)?.rarity === 'legendary')).toBe(
+      false,
+    );
+  });
+
+  it('league bots with traits keep the target strength (the traits count in the model)', () => {
+    const traits = clubTraits('club-y', 3, 0, 4);
+    for (const target of [10, 17, 25, 36]) {
+      const bots = leagueBots('club-y', target, 5, traits);
+      const got = bots.reduce(
+        (s, b) => s + botStrength(b.skill, valueScore(b.traits), traitsEffect(b.udtTraits)),
+        0,
+      );
+      expect(Math.abs(got - target) / target, String(target)).toBeLessThan(0.06);
+      // The same bots without their traits are weaker.
+      const plain = bots.reduce((s, b) => s + botStrength(b.skill, valueScore(b.traits)), 0);
+      expect(plain).toBeLessThan(got);
+    }
+    // Four average traits: about one skill step (strength ×1.6, skill 5 → 6 is ×1.57).
+    expect(botStrength(5, 0.5, 4 * 0.48) / botStrength(5, 0.5)).toBeCloseTo(1.62, 1);
   });
 
   it('simulated games: the stronger club wins more, frags fit the result', () => {

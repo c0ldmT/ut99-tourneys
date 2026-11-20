@@ -40,6 +40,11 @@ export interface TraitReportRow {
   botKills: number;
   botDeaths: number;
   won: boolean;
+  /**
+   * Trait lab (decision 251): an AI manager's or AI club's bot - its traits were drawn at
+   * random, not chosen (from season 3; compare these rows on their own).
+   */
+  lab: boolean;
 }
 
 export interface TraitSummary {
@@ -64,6 +69,8 @@ export interface TraitSummary {
   botDeaths: number;
   /** Average skill of the bots in those games (null: unknown). */
   avgSkill: number | null;
+  /** Of `games`: bot games of the trait lab (AI managers and AI clubs). */
+  labGames: number;
 }
 
 export interface TraitReport {
@@ -75,7 +82,11 @@ export interface TraitReport {
   rows: TraitReportRow[];
 }
 
-export function traitReport(all: readonly TournamentFacts[]): TraitReport {
+export function traitReport(
+  all: readonly TournamentFacts[],
+  /** Entrants of the trait lab (AI managers, AI clubs). */
+  lab: (entrantId: string) => boolean = () => false,
+): TraitReport {
   const rows: TraitReportRow[] = [];
   const baseline = { games: 0, won: 0, kills: 0, deaths: 0 };
   for (const t of all)
@@ -118,6 +129,7 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
           botKills: kills,
           botDeaths: s.deaths,
           won: p.won,
+          lab: lab(p.entrantId),
         });
       }
     }
@@ -148,6 +160,7 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
           botKills: 0,
           botDeaths: 0,
           avgSkill: null,
+          labGames: 0,
         },
       };
       by.set(r.trait, x);
@@ -167,6 +180,7 @@ export function traitReport(all: readonly TournamentFacts[]): TraitReport {
     s.episodesKill += r.episodesKill;
     s.episodesQuiet += r.episodesQuiet;
     if (r.won) s.won++;
+    if (r.lab) s.labGames++;
     s.botKills += r.botKills;
     s.botDeaths += r.botDeaths;
   }

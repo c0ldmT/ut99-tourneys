@@ -8,7 +8,10 @@ import {
 } from '@tourney/protocol';
 import {
   botStrength,
+  CLUB_TRAITS_MAX,
   clubFactor,
+  clubTraitPool,
+  clubTraits,
   eveningsOf,
   finalFour,
   leagueBots,
@@ -23,6 +26,8 @@ import {
   simulateGame,
   standings,
   tableMoney,
+  modCodes,
+  traitsEffect,
   valueScore,
   winsNeeded,
   type LeagueResult,
@@ -46,6 +51,7 @@ import {
   udtAi,
 } from '../db/schema.js';
 import { BetsService } from '../bets/bets.service.js';
+import { BotsService } from '../bots/bots.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { isoWeekday } from '../series/series-time.js';
 import { nextDay, zonedMs } from '../seasons/season-time.js';
@@ -66,6 +72,17 @@ import { gameName, UdtService } from './udt.service.js';
 
 type FixtureRow = typeof leagueFixtures.$inferSelect;
 type RunRow = typeof leagueRuns.$inferSelect;
+
+/** Traits that act in a league game (deathmatch): the AI clubs' pool. */
+const CLUB_POOL = new Set<string>(clubTraitPool(true));
+
+/** The AI clubs' band of a tier, renewed every league evening (decisions 251, 252). */
+export interface LeagueBand {
+  /** Traits per bot of the tier's AI clubs: the humans' median, at most `CLUB_TRAITS_MAX`. */
+  traits: number;
+}
+
+const NO_BAND: LeagueBand = { traits: 0 };
 type ClubRow = typeof leagueClubs.$inferSelect;
 export type FixtureKind = 'league' | 'relegation' | 'semi' | 'final' | 'third';
 
@@ -324,6 +341,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     @Inject(EventLogService) private readonly eventLog: EventLogService,
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(BetsService) private readonly bets: BetsService,
+    @Inject(BotsService) private readonly bots: BotsService,
   ) {}
 
   onModuleInit(): void {
@@ -402,6 +420,16 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
 
   private plan(run: RunRow): LeaguePlan {
     return JSON.parse(run.planJson) as LeaguePlan;
+  }
+
+  /** The AI clubs' band per tier (renewed every league evening). */
+  private bands(run: RunRow): LeagueBand[] {
+    try {
+      const l = JSON.parse(run.bandJson) as Partial<LeagueBand>[];
+      return Array.from({ length: run.tiers }, (_, t) => ({ ...NO_BAND, ...l[t] }));
+    } catch {
+      return Array.from({ length: run.tiers }, () => ({ ...NO_BAND }));
+    }
   }
 
   private clubs(): Map<string, ClubRow> {
@@ -1322,10 +1350,21 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const members = this.members(run.season);
     const sides = members
       .filter((m) => humans.has(m.clubId))
-      .map((m) => ({
-        tier: m.tier,
-        strength: this.lineupStrength(managers.get(m.clubId)!, settings),
-      }));
+      .map((m) => ({ tier: m.tier, ...this.lineupOf(managers.get(m.clubId)!, settings) }));
+    // AI clubs' traits per bot (decision 251): the median of the tier's humans' lineup bots
+    // (a tier without humans: of all humans), at most the tier's maximum.
+    const median = (l: number[]) => {
+      if (!l.length) return 0;
+      const x = [...l].sort((a, b) => a - b);
+      const mid = x.length >> 1;
+      return x.length % 2 ? x[mid]! : (x[mid - 1]! + x[mid]!) / 2;
+    };
+    const all = sides.flatMap((x) => x.traits);
+    const band = this.bands(run).map((b, t) => {
+      const mine = sides.filter((x) => x.tier === t).flatMap((x) => x.traits);
+      const max = CLUB_TRAITS_MAX[Math.min(t, CLUB_TRAITS_MAX.length - 1)]!;
+      return { ...b, traits: Math.min(max, Math.round(median(mine.length ? mine : all))) };
+    });
     const cfg = this.cfg();
     const bands = rubberBands(sides, run.tiers, {
       factors: cfg.factors,
@@ -1334,6 +1373,10 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     });
     const clubs = this.clubs();
     this.db.transaction((tx) => {
+      tx.update(leagueRuns)
+        .set({ bandJson: JSON.stringify(band) })
+        .where(eq(leagueRuns.season, run.season))
+        .run();
       for (const m of members)
         if (!managers.has(m.clubId))
           tx.update(leagueSeasons)
@@ -1350,6 +1393,17 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
 
   /** A manager's lineup strength in the model (five bots, base bots for missing places). */
   private lineupStrength(userId: string, settings: TournamentSettings): number {
+    return this.lineupOf(userId, settings).strength;
+  }
+
+  /**
+   * A manager's lineup in the model: its strength (with the bots' traits, decision 251) and the
+   * traits per lineup bot.
+   */
+  private lineupOf(
+    userId: string,
+    settings: TournamentSettings,
+  ): { strength: number; traits: number[] } {
     try {
       const rules = {
         valueCap: null,
@@ -1362,12 +1416,22 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       };
       const l = this.events.lineup(userId, settings, rules);
       const s = l.bots.reduce(
-        (n, r) => n + botStrength(r.effective.skill, valueScore(r.effective.traits)),
+        (n, r) =>
+          n +
+          botStrength(
+            r.effective.skill,
+            valueScore(r.effective.traits),
+            traitsEffect(r.udtTraits.map((t) => t.code)),
+          ),
         0,
       );
-      return s + (settings.teamSize - l.bots.length) * botStrength(1, 0.5);
+      return {
+        strength: s + (settings.teamSize - l.bots.length) * botStrength(1, 0.5),
+        // Traits that act in a league game (what AI clubs can draw: no manager or MH ones).
+        traits: l.bots.map((r) => r.udtTraits.filter((t) => CLUB_POOL.has(t.code)).length),
+      };
     } catch {
-      return settings.teamSize * botStrength(1, 0.5);
+      return { strength: settings.teamSize * botStrength(1, 0.5), traits: [] };
     }
   }
 
@@ -1597,16 +1661,32 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       const e = this.events.leagueTeam(club.userId, settings, udtEntrantId(club.userId));
       if (e) return e;
     }
+    // Its traits (trait lab, decision 251): drawn by the club's seed, as many per bot as the
+    // tier's band says.
+    const run = this.run(season);
+    const tier =
+      this.db
+        .select()
+        .from(leagueSeasons)
+        .where(and(eq(leagueSeasons.season, season), eq(leagueSeasons.clubId, clubId)))
+        .get()?.tier ?? 0;
+    const perBot = run ? (this.bands(run)[tier]?.traits ?? 0) : 0;
+    const weapons = this.bots.assets().weapons.map((w) => w.name);
     const bots: BotSpec[] = leagueBots(
       club.seed,
       this.strengthOf(season, clubId),
       settings.teamSize,
-    ).map((b) => ({
-      name: gameName(club.tag, b.name),
-      skill: b.skill,
-      traits: b.traits,
-      botClass: b.botClass,
-    }));
+      clubTraits(club.seed, season, tier, perBot, settings.teamSize, weapons),
+    ).map((b) => {
+      const codes = modCodes(b.udtTraits.map((code) => ({ code })));
+      return {
+        name: gameName(club.tag, b.name),
+        skill: b.skill,
+        traits: b.weapon ? { ...b.traits, favoriteWeapon: b.weapon } : b.traits,
+        botClass: b.botClass,
+        ...(codes.length ? { gameTraits: codes } : {}),
+      };
+    });
     return {
       id: aiClubEntrantId(clubId),
       kind: 'team',

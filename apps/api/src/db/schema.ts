@@ -670,6 +670,8 @@ export const leagueRuns = sqliteTable('league_runs', {
   champion: text('champion'),
   startedAt: text('started_at').notNull(),
   endedAt: text('ended_at'),
+  /** Per tier the AI clubs' band (`LeagueBand[]`, decisions 251, 252). */
+  bandJson: text('band_json').notNull().default('[]'),
 });
 
 /** The clubs of a season's league: tier, the AI club's strength now, the final table. */

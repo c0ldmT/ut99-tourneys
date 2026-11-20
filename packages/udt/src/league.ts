@@ -5,8 +5,9 @@
  * a simulated game between two clubs. The API (UdtLeagueService), the season simulator and the
  * league simulation script use it alike.
  */
-import { SKILL_STRENGTH, botStrength, gameChance } from './model.js';
-import { VALUE_WEIGHTS, type BotValues } from './economy.js';
+import { SKILL_STRENGTH, TRAIT_STRENGTH, botStrength, gameChance } from './model.js';
+import { RARITIES, VALUE_WEIGHTS, type BotValues, type Rarity } from './economy.js';
+import { TRAITS, cannotAssign, traitEffect, type TraitCode } from './traits.js';
 
 // ---------- random numbers ----------
 
@@ -368,6 +369,9 @@ export interface LeagueBotSpec {
   traits: BotValues;
   /** One of the stock classes (the API picks model and skin from the class profiles). */
   botClass: string;
+  /** Its traits (website codes, decision 251; the weapon of weapon master in `weapon`). */
+  udtTraits: TraitCode[];
+  weapon?: string;
 }
 
 /** Play styles of AI clubs: how the value score is split over the values. */
@@ -479,12 +483,86 @@ function valuesFor(score: number, p: (typeof PROFILES)[number]): BotValues {
   };
 }
 
+// ---------- traits of AI clubs (decision 251) ----------
+
+/** Traits per bot of an AI club at most, per tier (Pro Series first); the humans' median caps. */
+export const CLUB_TRAITS_MAX = [4, 3, 2, 1] as const;
+
+/** Rarity chances (percent, common … legendary) of an AI club's traits per tier. */
+export const CLUB_TRAIT_RATES: readonly (readonly [number, number, number, number, number])[] = [
+  [30, 30, 25, 12, 3],
+  [40, 30, 20, 8, 2],
+  [50, 30, 15, 5, 0],
+  [60, 30, 10, 0, 0],
+];
+
+/** Traits that only act in Monster Hunt (the league plays deathmatch). */
+const MH_ONLY = new Set<TraitCode>(['monster-bane', 'titan-slayer', 'warden', 'monster-whisperer']);
+
+/**
+ * Traits an AI club can draw: what the mod plays in a deathmatch (no manager traits, nothing
+ * only for Monster Hunt); weapon traits only with weapons to choose from.
+ */
+export function clubTraitPool(withWeapons: boolean): TraitCode[] {
+  return TRAITS.filter(
+    (t) =>
+      t.mod && t.category !== 'manager' && !MH_ONLY.has(t.code) && (withWeapons || !t.needsWeapon),
+  ).map((t) => t.code);
+}
+
+/**
+ * The traits of an AI club's bots for a tier (trait lab: drawn at random, seeded by the club and
+ * the season, so they stay all season and only grow with `perBot`): per bot an order of up to
+ * five draws by the tier's rarity chances within the rules (one legendary, one body trait, no
+ * twice), the first `perBot` of them. Weapon master gets one of `weapons`.
+ */
+export function clubTraits(
+  seed: string,
+  season: number,
+  tier: number,
+  perBot: number,
+  teamSize = 5,
+  weapons: readonly string[] = [],
+): { codes: TraitCode[]; weapon?: string }[] {
+  const pool = clubTraitPool(weapons.length > 0);
+  const rates = CLUB_TRAIT_RATES[Math.min(tier, CLUB_TRAIT_RATES.length - 1)]!;
+  const n = Math.max(0, Math.min(5, Math.round(perBot)));
+  return Array.from({ length: teamSize }, (_, i) => {
+    const rng = leagueRng(`traits:${seed}:${season}:${i}`);
+    const codes: TraitCode[] = [];
+    for (let guard = 0; codes.length < 5 && guard < 40; guard++) {
+      let roll = rng() * 100;
+      let r = 0;
+      for (; r < RARITIES.length - 1; r++) {
+        roll -= rates[r]!;
+        if (roll < 0) break;
+      }
+      const rarity: Rarity = RARITIES[r]!;
+      const of = pool.filter((c) => TRAITS.find((t) => t.code === c)!.rarity === rarity);
+      const code = of[Math.floor(rng() * of.length)];
+      if (code && cannotAssign(code, codes, 99) === null) codes.push(code);
+    }
+    const picked = codes.slice(0, n);
+    const weapon = picked.some((c) => TRAITS.find((t) => t.code === c)?.needsWeapon)
+      ? weapons[Math.floor(rng() * weapons.length)]
+      : undefined;
+    return weapon ? { codes: picked, weapon } : { codes: picked };
+  });
+}
+
 /**
  * The five (team size) bots of an AI club for a lineup strength (sum of the bots' strengths,
  * the rubber band × the club's factor). Names, models and the play style come from the club's
- * seed and stay all season; skill and values follow the strength (new every market week).
+ * seed and stay all season; skill and values follow the strength (new every market week). With
+ * traits (decision 251) a bot's skill and values are what is left of its share after its traits
+ * (`botStrength` counts them), so the lineup keeps the strength.
  */
-export function leagueBots(seed: string, strength: number, teamSize = 5): LeagueBotSpec[] {
+export function leagueBots(
+  seed: string,
+  strength: number,
+  teamSize = 5,
+  traits: readonly { codes: TraitCode[]; weapon?: string }[] = [],
+): LeagueBotSpec[] {
   const rng = leagueRng(`bots:${seed}`);
   const profile = PROFILES[Math.floor(rng() * PROFILES.length)]!;
   // A star, solid players and a weaker one: shares around the mean that add up to the team size.
@@ -509,19 +587,25 @@ export function leagueBots(seed: string, strength: number, teamSize = 5): League
   }
   const classes = shuffled(CLASSES, rng);
   return targets.map((t, i) => {
-    const { skill, score } = botFor(Math.max(lo, Math.min(hi, t)));
+    const own = traits[i] ?? { codes: [] };
+    const boost = Math.exp(TRAIT_STRENGTH * own.codes.reduce((n, c) => n + traitEffect(c), 0));
+    const { skill, score } = botFor(Math.max(lo, Math.min(hi, t / boost)));
     return {
       name: leagueBotName(seed, i),
       skill,
       traits: valuesFor(score, profile),
       botClass: classes[i % classes.length]!,
+      udtTraits: own.codes,
+      ...(own.weapon ? { weapon: own.weapon } : {}),
     };
   });
 }
 
-/** Strength of a lineup of specs (the model's sum). */
-export function lineupStrength(bots: readonly { skill: number; score: number }[]): number {
-  return bots.reduce((s, b) => s + botStrength(b.skill, b.score), 0);
+/** Strength of a lineup of specs (the model's sum; `traits`: their effects, `traitsEffect`). */
+export function lineupStrength(
+  bots: readonly { skill: number; score: number; traits?: number }[],
+): number {
+  return bots.reduce((s, b) => s + botStrength(b.skill, b.score, b.traits ?? 0), 0);
 }
 
 // ---------- simulated games ----------
