@@ -78,7 +78,17 @@ export type TraitCode =
   | 'hivemind'
   | 'monster-whisperer'
   | 'dynasty'
-  | 'rewind';
+  | 'rewind'
+  // Season 3 P5, wave 1 (decision 275, mod 0.22.0).
+  | 'cool-head'
+  | 'quick-draw'
+  | 'spawn-guard'
+  | 'fast-hands'
+  | 'clutch'
+  | 'quartermaster'
+  | 'momentum'
+  | 'trigger-discipline'
+  | 'arsenal';
 
 export interface TraitDef {
   code: TraitCode;
@@ -160,7 +170,43 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'hivemind', rarity: 'legendary', category: 'behaviour', mod: 'hm' },
   { code: 'monster-whisperer', rarity: 'legendary', category: 'behaviour', mod: 'mw' },
   { code: 'dynasty', rarity: 'legendary', category: 'manager' },
+  // Season 3 P5, wave 1 (decision 275, mod 0.22.0): sizes in NEW_TRAIT_EFFECT.
+  { code: 'cool-head', rarity: 'common', category: 'values', mod: 'ch' },
+  { code: 'quick-draw', rarity: 'common', category: 'values', mod: 'qd' },
+  { code: 'spawn-guard', rarity: 'common', category: 'body', mod: 'sg' },
+  { code: 'fast-hands', rarity: 'uncommon', category: 'behaviour', mod: 'fh' },
+  { code: 'clutch', rarity: 'rare', category: 'body', mod: 'cl' },
+  { code: 'quartermaster', rarity: 'rare', category: 'behaviour', mod: 'qm' },
+  { code: 'momentum', rarity: 'epic', category: 'values', mod: 'mo' },
+  { code: 'trigger-discipline', rarity: 'epic', category: 'behaviour', mod: 'td' },
+  { code: 'arsenal', rarity: 'legendary', category: 'body', mod: 'an' },
 ];
+
+/**
+ * The sizes of the traits of wave 1 (decision 275; the mod has the same numbers in
+ * TourneyCore and TourneySkillCurve). Cool head: aim error × for `sec` after the spawn. Quick
+ * draw: aim error × from seeing a new enemy until `sec` after its reaction. Spawn guard: damage
+ * taken × for `sec` after the spawn. Fast hands: takes another weapon with `shots` or fewer
+ * left. Clutch: while its side is behind by `behind` frags (1v1) or `behindTeam` (team games,
+ * free-for-all: behind the leader by `behind`), damage × and aim error ×. Quartermaster: below
+ * `low` of the ammo in every good weapon and no enemy in sight it heads for ammo or a weapon
+ * (`sprint` ×), pickups give `pickup` × the ammo. Momentum: aim error − `perKill` for every kill
+ * of this life, at most `max` kills. Trigger discipline: in a fight a switch only to a weapon
+ * rating `gap` better and at most every `sec` (the safety distances always). Arsenal: at the
+ * spawn a full flak cannon or rocket launcher (in turns), once per life the weapon in hand
+ * back to `refill` of its ammo when it runs dry.
+ */
+export const NEW_TRAIT_EFFECT = {
+  coolHead: { aim: 0.85, sec: 6 },
+  quickDraw: { aim: 0.8, sec: 1.5 },
+  spawnGuard: { taken: 0.5, sec: 2 },
+  fastHands: { shots: 2 },
+  clutch: { dealt: 1.2, aim: 0.8, behind: 2, behindTeam: 3 },
+  quartermaster: { low: 0.25, pickup: 1.25, sprint: 1.12 },
+  momentum: { perKill: 0.12, max: 3 },
+  triggerDiscipline: { gap: 0.3, sec: 3 },
+  arsenal: { refill: 0.5 },
+} as const;
 
 const BY_CODE = new Map(TRAITS.map((t) => [t.code, t]));
 
@@ -208,10 +254,16 @@ const LOG_COUNTERS = new Set<TraitCode>([
   'weapon-master',
   // mod 0.19.2: seconds of sprint (passive before)
   'light-feet',
+  // mod 0.22.0 (decision 275)
+  'quick-draw',
+  'spawn-guard',
+  'fast-hands',
+  'trigger-discipline',
+  'arsenal',
 ]);
 
 /** Values traits that act only at times (mod 0.18.0): logged like body traits. */
-const LOG_EPISODE_VALUES = new Set<TraitCode>(['cold-blood']);
+const LOG_EPISODE_VALUES = new Set<TraitCode>(['cold-blood', 'cool-head', 'momentum']);
 export function traitLogKind(code: TraitCode): TraitLogKind {
   if (LOG_EPISODE_VALUES.has(code)) return 'episode';
   if (LOG_COUNTERS.has(code)) return 'counter';
@@ -514,6 +566,10 @@ export const RUNTIME_EDGES: Readonly<
   'cold-blood': { aim: 0.7, score: 0.04 },
   // Mod 0.19.2 (decision 259): ×0.8 with its favourite weapon (×0.7 before).
   'weapon-master': { aim: 0.8, score: 0.06 },
+  // Mod 0.22.0 (decision 275): after the spawn, against a new enemy, per kill of this life.
+  'cool-head': { aim: NEW_TRAIT_EFFECT.coolHead.aim, score: 0.015 },
+  'quick-draw': { aim: NEW_TRAIT_EFFECT.quickDraw.aim, score: 0.02 },
+  momentum: { aim: 1 - NEW_TRAIT_EFFECT.momentum.perKill, score: 0.05 },
 };
 
 /** The bot's edges in the game: multipliers multiply, degrees add. */

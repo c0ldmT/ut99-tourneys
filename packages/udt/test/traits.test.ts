@@ -109,6 +109,13 @@ describe('values traits', () => {
     expect(traitLogKind('cold-blood')).toBe('episode');
     expect(traitLogKind('juggernaut')).toBe('counter');
     expect(traitLogKind('second-wind')).toBe('episode');
+    // Wave 1 (decision 275).
+    expect(traitLogKind('cool-head')).toBe('episode');
+    expect(traitLogKind('momentum')).toBe('episode');
+    expect(traitLogKind('quick-draw')).toBe('counter');
+    expect(traitLogKind('trigger-discipline')).toBe('counter');
+    expect(traitLogKind('quartermaster')).toBe('episode');
+    expect(traitLogKind('clutch')).toBe('episode');
     const fx = managerEffects([
       { code: 'loyal' },
       { code: 'thrifty' },
@@ -162,7 +169,7 @@ describe('manager traits', () => {
 describe('packs', () => {
   it('draws a trait of the rarity', () => {
     expect(traitOfRarity('epic', () => 0).code).toBe('watchdog');
-    expect(traitOfRarity('epic', () => 0.99).code).toBe('franchise-player');
+    expect(traitOfRarity('epic', () => 0.99).code).toBe('trigger-discipline');
     expect(traitOfRarity('legendary', () => 0).rarity).toBe('legendary');
     for (const r of ['common', 'uncommon', 'rare'] as const)
       expect(traitOfRarity(r, () => 0.99).rarity).toBe(r);
@@ -176,7 +183,7 @@ describe('packs', () => {
   it('crafting costs four times the scrap', () => {
     expect(craftCost('midas')).toBe(600);
     expect(craftCost('steady-hand')).toBe(20);
-    expect(TRAITS.length).toBe(62);
+    expect(TRAITS.length).toBe(71);
   });
 
   it('gives the mod the game trait codes and values them', () => {

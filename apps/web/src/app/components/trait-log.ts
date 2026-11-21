@@ -44,12 +44,21 @@ const COUNTER: Record<string, { uses: string; effect: string }> = {
   hivemind: { uses: 'trait.log.joins', effect: '' },
   'monster-whisperer': { uses: 'trait.log.ignored', effect: 'trait.log.prevented' },
   'weapon-master': { uses: 'trait.log.favSec', effect: '' },
+  // mod 0.22.0 (decision 276)
+  'quick-draw': { uses: 'trait.log.windows', effect: 'trait.log.windowKills' },
+  'spawn-guard': { uses: 'trait.log.hits', effect: 'trait.log.prevented' },
+  'fast-hands': { uses: 'trait.log.earlySwitch', effect: 'trait.log.killsAfter' },
+  'trigger-discipline': { uses: 'trait.log.held', effect: 'trait.log.unsafe' },
+  arsenal: { uses: 'trait.log.refills', effect: 'trait.log.spawnWeaponKills' },
 };
 
 /** Episode traits with a value of their own (mod 0.18.0): what it means. */
 const EPISODE_VALUE: Record<string, string> = {
   'second-wind': 'trait.log.healed',
   'item-controller': 'trait.log.items',
+  // mod 0.22.0
+  clutch: 'trait.log.extra',
+  quartermaster: 'trait.log.ammo',
 };
 
 /**

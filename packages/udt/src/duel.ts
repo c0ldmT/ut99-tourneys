@@ -13,8 +13,10 @@ import {
   effectiveValues,
   gameEdge,
   modCodes,
+  NEW_TRAIT_EFFECT,
   RUNTIME_EDGES,
   type GameEdge,
+  type TraitCode,
   type TraitOnBot,
 } from './traits.js';
 
@@ -335,6 +337,21 @@ export interface DuelBotSpec {
  */
 export const SIGNATURE_UPTIME = { streak: 0.3, multi: 0.2, opener: 0.3 } as const;
 
+/**
+ * Traits of wave 1 (decision 275) that act at times a duel does not have (one meeting, no
+ * spawn, no score): estimates until the trait lab has measured them. Cool head: share of its
+ * fighting within 6 s of a spawn; spawn guard: share of the damage it takes within 2 s of one;
+ * clutch: share of the time its side is behind enough; momentum: mean kills of the life while
+ * it fights (at most 3 count; bots with an epic trait kill more than the mean bot). Quick draw acts in the duel itself (a meeting starts with a new
+ * enemy).
+ */
+export const TRAIT_UPTIME = {
+  'cool-head': 0.2,
+  'spawn-guard': 0.05,
+  clutch: 0.35,
+  momentum: 1.2,
+} as const;
+
 /** 0..100 (Dream Team pages) to the stored -1..1. */
 export const fromPct = (p: number) => Math.max(-1, Math.min(1, (p - 50) / 50));
 export const toPct = (v: number) => Math.round((v + 1) * 50);
@@ -378,6 +395,12 @@ export interface ResolvedBot {
   hurtAim: number;
   /** Mod 0.18.0: weapon master - its weapon (sim code; null: every weapon), aim and rate. */
   master: { weapon: WeaponCode | null; aim: number; rate: number } | null;
+  /**
+   * Wave 1 (decision 275): quick draw's aim × after it took in the enemy, and the timed traits
+   * as their mean (`TRAIT_UPTIME`): aim ×, damage dealt ×, damage taken ×.
+   */
+  quick: number;
+  timed: { aim: number; dealt: number; taken: number };
   /** Signature (decision 271): damage × with a weapon, aim × with weapons, damage taken × when hurt. */
   sig: {
     weapon: WeaponCode | null;
@@ -429,6 +452,7 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
   if (b.phase) acc = Math.max(-1, Math.min(1, acc + PHASE_EFFECT[b.phase].accuracy / 50));
   if (b.form) acc = Math.max(-1, Math.min(1, acc + FORM_EFFECT[b.form] / 50));
   const codes = new Set(modCodes(b.traits ?? []));
+  const has = (c: TraitCode) => (b.traits ?? []).some((t) => t.code === c);
   return {
     level: e.skill,
     accuracy: acc,
@@ -475,6 +499,23 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
         rate: e.rate ?? 1,
       };
     })(),
+    quick: has('quick-draw') ? NEW_TRAIT_EFFECT.quickDraw.aim : 1,
+    timed: {
+      aim:
+        (has('cool-head')
+          ? 1 - (1 - NEW_TRAIT_EFFECT.coolHead.aim) * TRAIT_UPTIME['cool-head']
+          : 1) *
+        (has('clutch') ? 1 - (1 - NEW_TRAIT_EFFECT.clutch.aim) * TRAIT_UPTIME.clutch : 1) *
+        (has('momentum')
+          ? 1 -
+            NEW_TRAIT_EFFECT.momentum.perKill *
+              Math.min(NEW_TRAIT_EFFECT.momentum.max, TRAIT_UPTIME.momentum)
+          : 1),
+      dealt: has('clutch') ? 1 + (NEW_TRAIT_EFFECT.clutch.dealt - 1) * TRAIT_UPTIME.clutch : 1,
+      taken: has('spawn-guard')
+        ? 1 - (1 - NEW_TRAIT_EFFECT.spawnGuard.taken) * TRAIT_UPTIME['spawn-guard']
+        : 1,
+    },
     sig: {
       weapon:
         b.signature?.code === 'weapon' && b.signature.weapon
@@ -941,6 +982,9 @@ function play(
     if (x.hp < 50) E *= x.r.hurtAim;
     if (masters(x)) E *= x.r.master!.aim;
     if (x.r.sig.aimWeapons.includes(w.code)) E *= x.r.sig.aim;
+    // Wave 1 (decision 275): quick draw until 1.5 s after its reaction, the timed ones as a mean.
+    if (x.r.quick !== 1 && t < x.turnAt + NEW_TRAIT_EFFECT.quickDraw.sec) E *= x.r.quick;
+    E *= x.r.timed.aim;
     if (x.r.stock) E *= Math.max(0, 1 - acc);
     else if (w.speed === 0 || acc < 0) E -= E * acc;
     return Math.max(0, E * aimModel);
@@ -1044,6 +1088,8 @@ function play(
     if (v.r.sig.hurtTaken !== 1 && v.hp < SIGNATURE_TOUGH_HEALTH)
       dmg = Math.max(1, Math.floor(dmg * v.r.sig.hurtTaken + rng()));
     if (v.r.body.tough !== 1) dmg = Math.max(1, Math.floor(dmg * v.r.body.tough + rng()));
+    if (x.r.timed.dealt !== 1) dmg = Math.floor(dmg * x.r.timed.dealt + rng());
+    if (v.r.timed.taken !== 1) dmg = Math.max(1, Math.floor(dmg * v.r.timed.taken + rng()));
     v.hurtAt = t;
     if (v.armour > 0) {
       const a = Math.min(v.armour, Math.floor(dmg * 0.5));

@@ -10,6 +10,7 @@ import {
   resolveBot,
   toPct,
   RUNTIME_EDGES,
+  TRAIT_UPTIME,
   VALUE_EDGES,
   withCurve,
 } from '../src/index.js';
@@ -38,7 +39,9 @@ describe('skill curve data', () => {
   it('has the run-time aim edges of cold blood and weapon master in the mod (242)', () => {
     const core = file('../../../mods/ut99-tournament/Classes/TourneyCore.uc');
     for (const [trait, e] of Object.entries(RUNTIME_EDGES))
-      expect(core, trait).toContain(`F *= ${e.aim};`);
+      // Wave 1 (decision 275) follows with mod 0.22.0.
+      if (trait !== 'quick-draw' && trait !== 'momentum' && trait !== 'cool-head')
+        expect(core, trait).toContain(`F *= ${e.aim};`);
   });
 
   it('has the plan for mod 0.15.0 in the mod', () => {
@@ -72,6 +75,12 @@ describe('bots for the duel', () => {
     const b = resolveBot({ level: 2, traits: [{ code: 'glass-cannon' }] });
     expect(b.body.glass).toBe(true);
     expect(b.body.thick).toBe(false);
+    // Wave 1 (decision 275): quick draw in the duel, the timed ones as their mean.
+    expect(resolveBot({ level: 3, traits: [{ code: 'quick-draw' }] }).quick).toBe(0.8);
+    const m = resolveBot({ level: 3, traits: [{ code: 'momentum' }, { code: 'clutch' }] });
+    expect(m.timed.aim).toBeLessThan(0.9);
+    expect(m.timed.dealt).toBeCloseTo(1 + 0.2 * TRAIT_UPTIME.clutch);
+    expect(resolveBot({ level: 3 }).timed).toEqual({ aim: 1, dealt: 1, taken: 1 });
   });
 });
 
