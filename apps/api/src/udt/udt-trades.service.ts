@@ -476,6 +476,9 @@ export class UdtTradesService {
             bench: null,
             acquiredAt: now,
             starter: false,
+            // Settling in starts again in the new team (decision 269).
+            settleGames: 0,
+            prestigeJson: '{}',
           })
           .where(and(eq(udtRoster.season, season), inArray(udtRoster.botId, botIds)))
           .run();

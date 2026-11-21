@@ -12,6 +12,9 @@ import {
   duelSeries,
   maxStars,
   prestigeCap,
+  prestigeCapValue,
+  PRESTIGE_CAP,
+  SETTLE_GAMES,
   prestigeCode,
   prestigeCodeEffect,
   prestigeEdge,
@@ -83,6 +86,15 @@ describe('prestige (plan P3)', () => {
     expect(starPrice(0, 2)).toBe(3000);
     expect(respecPrice(0, 2)).toBe(0);
     expect(respecPrice(4, 1)).toBe(400);
+  });
+
+  it('settles a bought bot with 2 points; prestige counts 4 % each against a value cap (269)', () => {
+    expect(PRESTIGE_CAP.settled).toBe(2);
+    expect(SETTLE_GAMES).toBe(10);
+    expect(prestigeCap('settled', 3)).toBe(2); // no stars
+    expect(prestigeCapValue(10_000, 0)).toBe(10_000);
+    expect(prestigeCapValue(10_000, 6)).toBe(12_400);
+    expect(prestigeCapValue(10_000, 11)).toBe(14_400);
   });
 
   it('lets only a fully developed Godlike of level 30 ascend', () => {

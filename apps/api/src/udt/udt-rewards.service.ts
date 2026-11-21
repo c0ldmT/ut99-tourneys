@@ -231,6 +231,7 @@ export class UdtRewardsService implements OnModuleInit {
           .set({
             stamina: Math.max(0, r.stamina - lost),
             games: r.games + games,
+            settleGames: r.settleGames + games,
             xp:
               r.xp +
               Math.round(

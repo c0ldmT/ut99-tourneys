@@ -331,6 +331,10 @@ export const udtRoster = sqliteTable(
     salaryDue: integer('salary_due').notNull().default(0),
     /** Monster Hunt focus: -2 hunter … 0 standard … 2 sprinter (decision 239). */
     mhFocus: integer('mh_focus').notNull().default(0),
+    /** Settling in (migration 54, decision 269): games for this team (a trade starts again). */
+    settleGames: integer('settle_games').notNull().default(0),
+    /** A settled bought bot's prestige points per stat (`PrestigeAlloc`). */
+    prestigeJson: text('prestige_json').notNull().default('{}'),
   },
   (t) => [primaryKey({ columns: [t.season, t.botId] })],
 );

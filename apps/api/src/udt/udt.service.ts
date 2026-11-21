@@ -44,6 +44,9 @@ import {
   TALENT_XP,
   FANSHOP_PAYS,
   ROSTER_PLACES,
+  PRESTIGE_CAP,
+  prestigeCapValue,
+  SETTLE_GAMES,
   CREST_COLORS,
   CREST_SHAPES,
   type ClubEffects,
@@ -211,6 +214,13 @@ export interface RosterBot {
     /** Prestige (plan P3, decision 262): null while still developing. */
     prestige: OwnPrestige | null;
   } | null;
+  /**
+   * A bought library bot settling in (decision 269): its games for this team, the games it needs
+   * and, once settled, its prestige (2 points, never bought ones or stars). Null for own bots.
+   */
+  settle: { games: number; need: number; prestige: OwnPrestige | null } | null;
+  /** The prestige that plays: an own bot's or a settled bought bot's. */
+  prestige: OwnPrestige | null;
 }
 
 /** An own bot's prestige as the roster shows it (decision 262). */
@@ -796,6 +806,17 @@ export class UdtService {
         const slots = traitSlots(level);
         const cards = (onBots.get(b.id) ?? []).slice(0, slots);
         const eff = effectiveValues(b.skill, b.traits ?? {}, cards);
+        const ov = ownView(
+          own.get(b.id),
+          level,
+          b.skill,
+          b.traits ?? {},
+          mentorOf,
+          cards.some((c) => c.code === 'claudius'),
+        );
+        // A bought bot settles in (decision 269); its prestige then counts like an own bot's.
+        const settle = own.has(b.id) ? null : settleView(r.settleGames, r.prestigeJson);
+        const prestige = ov?.prestige ?? settle?.prestige ?? null;
         return [
           {
             botId: b.id,
@@ -809,11 +830,15 @@ export class UdtService {
             traits: b.traits,
             price: r.price,
             value: r.starter ? 0 : this.value(b, season, cards),
-            capValue: !own.has(b.id)
-              ? this.value(b, season, cards)
-              : r.starter
-                ? Math.max(0, withTraits(plainValue(b.skill, b.traits), b, cards) - starterBase)
-                : withTraits(plainValue(b.skill, b.traits), b, cards),
+            // Prestige points set count too (decision 269: +4 % each).
+            capValue: prestigeCapValue(
+              !own.has(b.id)
+                ? this.value(b, season, cards)
+                : r.starter
+                  ? Math.max(0, withTraits(plainValue(b.skill, b.traits), b, cards) - starterBase)
+                  : withTraits(plainValue(b.skill, b.traits), b, cards),
+              prestige?.spent ?? 0,
+            ),
             starter: r.starter,
             dmSlot: r.dmSlot,
             mhSlot: r.mhSlot,
@@ -829,14 +854,9 @@ export class UdtService {
             games: r.games,
             mhFocus: r.mhFocus,
             restPrice: REST_PRICE * managerEffects(cards).restPrice * club.rest,
-            own: ownView(
-              own.get(b.id),
-              level,
-              b.skill,
-              b.traits ?? {},
-              mentorOf,
-              cards.some((c) => c.code === 'claudius'),
-            ),
+            own: ov,
+            settle,
+            prestige,
           },
         ];
       })
@@ -844,7 +864,11 @@ export class UdtService {
     // Prices of prestige follow what the whole team holds.
     const tp = teamPrestige(list.map((x) => x.own?.prestige));
     for (const x of list)
-      if (x.own?.prestige) x.own.prestige = withPrestigePrices(x.own.prestige, tp, index);
+      if (x.prestige) {
+        x.prestige = withPrestigePrices(x.prestige, tp, index);
+        if (x.own?.prestige) x.own.prestige = x.prestige;
+        if (x.settle?.prestige) x.settle.prestige = x.prestige;
+      }
     return list;
   }
 
@@ -1680,6 +1704,33 @@ export function ownPrestige(
   };
 }
 
+/** A bought bot's settling in (decision 269): games, the games it needs, its prestige once settled. */
+export function settleView(games: number, prestigeJson: string): RosterBot['settle'] {
+  if (games < SETTLE_GAMES) return { games, need: SETTLE_GAMES, prestige: null };
+  const cap = PRESTIGE_CAP.settled;
+  const alloc = cleanAlloc(parseAlloc(prestigeJson), cap);
+  const spent = prestigeSpent(alloc);
+  return {
+    games,
+    need: SETTLE_GAMES,
+    prestige: {
+      stage: 'settled',
+      cap,
+      points: cap,
+      fromLevels: 0,
+      bought: 0,
+      alloc,
+      spent,
+      free: cap - spent,
+      stars: 0,
+      maxStars: 0,
+      ascended: false,
+      ascend: 'godlike',
+      prices: { point: null, respec: null, ascend: null, star: null },
+    },
+  };
+}
+
 /** The team's prestige from its roster bots' (bots it holds, also bought points of traded ones). */
 export function teamPrestige(list: readonly (OwnPrestige | null | undefined)[]): TeamPrestige {
   return list.reduce<TeamPrestige>(
@@ -1700,7 +1751,11 @@ export function withPrestigePrices(p: OwnPrestige, team: TeamPrestige, index: nu
   return {
     ...p,
     prices: {
-      point: p.fromLevels + p.bought < p.cap ? prestigePointPrice(team.points, index) : null,
+      // A settled bought bot never buys points (decision 269).
+      point:
+        p.stage !== 'settled' && p.fromLevels + p.bought < p.cap
+          ? prestigePointPrice(team.points, index)
+          : null,
       respec: p.spent > 0 ? respecPrice(p.spent, index) : null,
       // Shown while it is Godlike (what the ascension will cost); `ascend` says whether it can.
       ascend: p.stage === 'godlike' ? ascendPrice(team.ascended, index) : null,

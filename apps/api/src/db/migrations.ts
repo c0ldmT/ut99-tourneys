@@ -826,4 +826,10 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE udt_bots ADD COLUMN anlage_news INTEGER NOT NULL DEFAULT 0;
   `,
+  // 54: settling in (decision 269): a bought bot's Dream Team games for its team (a trade starts
+  // again) and its prestige points set once settled.
+  `
+  ALTER TABLE udt_roster ADD COLUMN settle_games INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE udt_roster ADD COLUMN prestige_json TEXT NOT NULL DEFAULT '{}';
+  `,
 ];

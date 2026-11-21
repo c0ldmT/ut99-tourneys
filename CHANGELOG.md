@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Bought bots settle in after 10 Dream Team games and get 2 prestige points; prestige points count 4 % each against a team value cap (decision 269, migration 54).
 - Club house page with levels, the analysis room in the next league game, the trophy room (crest next to the team name, trophy wall with league titles), the new scout report and development tiles (decision 268, patch note 268).
 - Dream Team club house v2 (migration 51): ten buildings per season, training ground, physio and scouting office in three levels; analysis room, boarding school, workshop, fan shop, mentor wing, sports psychologist, trophy room with crest. AI managers build too. The pages follow.
 - Dream Team prestige on the website: bot details with the prestige menu, ascension and stars; cards show prestige and stars, the hub the prestige points to place.

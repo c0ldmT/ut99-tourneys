@@ -500,7 +500,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     // Body traits (category B) are played by the mod.
     const codes = modCodes(r.udtTraits);
     // Prestige (mod 0.20.0, decision 262): the points set on the menu.
-    const prestige = prestigeCode(r.own?.prestige?.alloc);
+    const prestige = prestigeCode(r.prestige?.alloc);
     return {
       ...base,
       skill: eff.skill,

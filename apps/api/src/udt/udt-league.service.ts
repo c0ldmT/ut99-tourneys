@@ -1499,8 +1499,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           botStrength(
             r.effective.skill,
             valueScore(r.effective.traits),
-            traitsEffect(r.udtTraits.map((t) => t.code)) +
-              prestigeEffect(r.own?.prestige?.spent ?? 0),
+            traitsEffect(r.udtTraits.map((t) => t.code)) + prestigeEffect(r.prestige?.spent ?? 0),
           ),
         0,
       );
@@ -1508,7 +1507,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         strength: s + (settings.teamSize - l.bots.length) * botStrength(1, 0.5),
         // Traits that act in a league game (what AI clubs can draw: no manager or MH ones).
         traits: l.bots.map((r) => r.udtTraits.filter((t) => CLUB_POOL.has(t.code)).length),
-        prestige: l.bots.map((r) => r.own?.prestige?.spent ?? 0),
+        prestige: l.bots.map((r) => r.prestige?.spent ?? 0),
       };
     } catch {
       return { strength: settings.teamSize * botStrength(1, 0.5), traits: [], prestige: [] };

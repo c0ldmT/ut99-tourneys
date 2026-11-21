@@ -30,6 +30,8 @@ import {
   cannotAllocate,
   drawAnlage,
   TALENT_LICENCE,
+  SETTLE_GAMES,
+  type PrestigeAlloc,
   type DevelopStat,
   type PrestigeStat,
   type Rarity,
@@ -668,17 +670,46 @@ export class UdtAcademyService {
     return { season, own, r, p };
   }
 
+  /**
+   * A roster bot whose prestige points can be set: an own bot at its stage or a settled bought
+   * bot (decision 269); `save` writes its menu where it lives.
+   */
+  private prestigeTarget(user: User, botId: string) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    const r = this.udt.roster(user.id, season).find((x) => x.botId === botId);
+    if (!r) throw notFound('bot in your roster');
+    if (r.own) {
+      const { p } = this.prestigeBot(user, botId);
+      const save = (alloc: PrestigeAlloc) =>
+        this.db
+          .update(udtBots)
+          .set({ prestigeJson: JSON.stringify(alloc) })
+          .where(eq(udtBots.botId, botId))
+          .run();
+      return { season, p, save };
+    }
+    const p = r.settle?.prestige;
+    if (!p)
+      throw conflict('a bought bot gets prestige points after {n} Dream Team games for your team', {
+        n: SETTLE_GAMES,
+      });
+    const save = (alloc: PrestigeAlloc) =>
+      this.db
+        .update(udtRoster)
+        .set({ prestigeJson: JSON.stringify(alloc) })
+        .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, botId)))
+        .run();
+    return { season, p, save };
+  }
+
   /** A free prestige point on a stat of the menu (at most 3 each). */
   prestigeAllocate(user: User, botId: string, stat: PrestigeStat) {
-    const { own, p } = this.prestigeBot(user, botId);
+    const { p, save } = this.prestigeTarget(user, botId);
     const why = cannotAllocate(stat, p.alloc, p.points);
     if (why === 'max') throw conflict('a prestige stat takes at most {n} points', { n: 3 });
     if (why === 'free') throw conflict('no free prestige point');
-    this.db
-      .update(udtBots)
-      .set({ prestigeJson: JSON.stringify({ ...p.alloc, [stat]: (p.alloc[stat] ?? 0) + 1 }) })
-      .where(eq(udtBots.botId, own.botId))
-      .run();
+    save({ ...p.alloc, [stat]: (p.alloc[stat] ?? 0) + 1 });
     return this.udt.view(user);
   }
 
@@ -703,7 +734,7 @@ export class UdtAcademyService {
 
   /** All prestige points of the bot free again, for Neuro per point set. */
   prestigeReset(user: User, botId: string) {
-    const { season, own, p } = this.prestigeBot(user, botId);
+    const { season, p, save } = this.prestigeTarget(user, botId);
     if (p.prices.respec === null) throw conflict('no prestige points are set');
     this.ledger.charge({
       userId: user.id,
@@ -712,7 +743,7 @@ export class UdtAcademyService {
       ref: `prestige-reset:${season}:${botId}:${this.clock.now()}`,
       meta: { botId, what: 'reset', points: p.spent },
     });
-    this.db.update(udtBots).set({ prestigeJson: '{}' }).where(eq(udtBots.botId, own.botId)).run();
+    save({});
     return this.udt.view(user);
   }
 

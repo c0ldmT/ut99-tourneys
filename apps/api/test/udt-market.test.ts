@@ -121,6 +121,44 @@ describe('Unreal Dream Team: transfer market', () => {
     expect((m2.offers as Offer[]).some((o) => o.botId === cheap.botId)).toBe(false);
   });
 
+  it('a bought bot settles in after 10 games: 2 prestige points, more team value (decision 269)', async () => {
+    const { mario, market, ledger } = await setup();
+    market.tick();
+    const marioId = (await mario.get('/me')).body.id as string;
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_reward', amount: 50_000, ref: 'gift' });
+    const o = ((await mario.get('/udt/market')).body.offers as Offer[])[0]!;
+    expect((await mario.post('/udt/market/buy', { botId: o.botId })).status).toBe(200);
+    const row = async () =>
+      ((await mario.get('/udt')).body.roster as { botId: string; [k: string]: unknown }[]).find(
+        (r) => r.botId === o.botId,
+      )!;
+    expect((await row()).settle).toEqual({ games: 0, need: 10, prestige: null });
+    expect((await mario.post(`/udt/roster/${o.botId}/prestige`, { stat: 'aim' })).body.key).toBe(
+      'a bought bot gets prestige points after {n} Dream Team games for your team',
+    );
+    const db = api!.app.get<Db>(DB);
+    db.update(udtRoster).set({ settleGames: 10 }).where(eq(udtRoster.botId, o.botId)).run();
+    const before = (await row()).capValue as number;
+    expect((await row()).prestige).toMatchObject({ stage: 'settled', cap: 2, points: 2, free: 2 });
+    for (let i = 0; i < 2; i++)
+      expect((await mario.post(`/udt/roster/${o.botId}/prestige`, { stat: 'aim' })).status).toBe(
+        200,
+      );
+    expect((await mario.post(`/udt/roster/${o.botId}/prestige`, { stat: 'fire' })).body.key).toBe(
+      'no free prestige point',
+    );
+    const set = await row();
+    expect(set.prestige).toMatchObject({ spent: 2, free: 0, alloc: { aim: 2 } });
+    expect((set.prestige as { prices: { point: null } }).prices.point).toBeNull();
+    // Each point set adds 4 % to what the bot counts against a team value cap.
+    expect(set.capValue).toBe(Math.round(before * 1.08));
+    // Bought points, the ascension and stars stay with own bots.
+    expect((await mario.post(`/udt/roster/${o.botId}/prestige/buy`)).status).toBe(404);
+    // Resetting costs as for own bots.
+    expect((await mario.post(`/udt/roster/${o.botId}/prestige/reset`)).status).toBe(200);
+    expect((await row()).prestige).toMatchObject({ spent: 0, free: 2 });
+  });
+
   it("shows library bots without their clan tag; in a roster they carry the manager's tag", async () => {
     const { admin, mario, market } = await setup();
     const clan = (await admin.post('/bot-clans', { name: 'Thunder Crash', tag: '[TC]' })).body;

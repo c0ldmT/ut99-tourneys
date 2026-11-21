@@ -51,15 +51,32 @@ export const PRESTIGE_VIEW_DEGREES = 4;
 /** A bot's prestige points per stat (missing: 0). */
 export type PrestigeAlloc = Partial<Record<PrestigeStat, number>>;
 
-/** The stages at the end of the development: mature (potential below Godlike reached), Godlike, ascended. */
-export type PrestigeStage = 'mature' | 'godlike' | 'ascended';
+/**
+ * The stages at the end of the development: mature (potential below Godlike reached), Godlike,
+ * ascended; and for a bought library bot settled (decision 269: after `SETTLE_GAMES`).
+ */
+export type PrestigeStage = 'mature' | 'godlike' | 'ascended' | 'settled';
 
 /** Points a stage holds (stars come on top of `ascended`). */
 export const PRESTIGE_CAP: Readonly<Record<PrestigeStage, number>> = {
   mature: 4,
   godlike: 6,
   ascended: 6,
+  settled: 2,
 };
+
+/**
+ * Settling in (plan P4, decision 269): a bought library bot gets `PRESTIGE_CAP.settled` prestige
+ * points after this many Dream Team games for its team - never bought points, skill or stars.
+ */
+export const SETTLE_GAMES = 10;
+
+/** A bot's value against a team value cap grows by this share per prestige point set (269). */
+export const PRESTIGE_CAP_VALUE = 0.04;
+
+/** The value a bot counts against a team value cap with its prestige points set. */
+export const prestigeCapValue = (value: number, spent: number): number =>
+  Math.round(value * (1 + PRESTIGE_CAP_VALUE * Math.max(0, spent)));
 
 /** Stars of an ascended bot (one prestige point each); Claudius' heir one more. */
 export const MAX_STARS = 5;

@@ -594,7 +594,7 @@ export class UdtAiService implements OnModuleInit {
         ? [...PRESTIGE_ORDER.gambler].sort(() => rng() - 0.5)
         : PRESTIGE_ORDER[personality];
     const now = (id: string) =>
-      this.udt.roster(user.id, season).find((x) => x.botId === id)?.own?.prestige ?? null;
+      this.udt.roster(user.id, season).find((x) => x.botId === id)?.prestige ?? null;
     const place = (id: string) => {
       for (let guard = 0; guard < 30; guard++) {
         const p = now(id);
@@ -608,7 +608,8 @@ export class UdtAiService implements OnModuleInit {
     let bought = 0;
     const bots = this.udt
       .roster(user.id, season)
-      .filter((r) => r.own?.prestige)
+      // Own bots and settled bought ones (decision 269).
+      .filter((r) => r.prestige)
       .sort((a, b) => b.skill - a.skill);
     for (const r of bots) {
       place(r.botId);
