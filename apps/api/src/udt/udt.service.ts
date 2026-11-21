@@ -40,6 +40,8 @@ import {
   clubMaxLevel,
   clubUpgradePrice,
   BOARDING_BELOW_LEVEL,
+  ANLAGE_LEVEL,
+  TALENT_XP,
   FANSHOP_PAYS,
   ROSTER_PLACES,
   type ClubEffects,
@@ -54,6 +56,7 @@ import {
 import { z } from 'zod';
 import { BotsService, PersonalitySchema, type LibraryBot } from '../bots/bots.service.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
+import { randomId } from '../common/ids.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import {
@@ -709,7 +712,8 @@ export class UdtService {
     const xp = Math.round(
       DEFAULT_ECONOMY.camp.xp *
         managerEffects(this.botTraits(season, botId)).xp *
-        this.clubFx(season, user.id).xp,
+        this.clubFx(season, user.id).xp *
+        (this.talentLearners(season, user.id).has(botId) ? TALENT_XP : 1),
     );
     this.ledger.charge({
       userId: user.id,
@@ -723,6 +727,7 @@ export class UdtService {
       .set({ xp: r.xp + xp })
       .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, botId)))
       .run();
+    this.grantAnlagen(season, user.id);
     return this.view(user);
   }
 
@@ -937,6 +942,8 @@ export class UdtService {
       },
       /** Club upgrades of this season (decision 264): bought or their price. */
       club: this.clubView(user.id, season.number),
+      /** Hidden traits of talents that came free just now (decision 267; also after games). */
+      anlagen: team ? this.grantAnlagen(season.number, user.id) : [],
       wallet: this.ledger.spendable(user.id),
       starterBudget: this.settings.get().udt.starterBudget,
       starterExtra: this.settings.get().udt.starterExtra,
@@ -1046,6 +1053,60 @@ export class UdtService {
           and(eq(udtClub.season, season), eq(udtClub.userId, userId), eq(udtClub.kind, 'fanshop')),
         )
         .run();
+  }
+
+  /**
+   * Talents still below their potential (decision 267): they learn `TALENT_XP` faster - bots the
+   * team scouted (origin "academy").
+   */
+  talentLearners(season: number, userId: string): Set<string> {
+    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
+    return new Set(
+      [...this.ownBots(season, userId).values()]
+        .filter(
+          (b) =>
+            b.origin === 'academy' &&
+            b.status === 'own' &&
+            Math.round(lib.get(b.botId)?.skill ?? 7) < b.potential,
+        )
+        .map((b) => b.botId),
+    );
+  }
+
+  /**
+   * A talent's hidden trait comes free at level 10 (decision 267): into the inventory, once.
+   * Returns the codes that came free.
+   */
+  grantAnlagen(season: number, userId: string): string[] {
+    const out: string[] = [];
+    const xp = new Map(
+      this.db
+        .select({ botId: udtRoster.botId, xp: udtRoster.xp })
+        .from(udtRoster)
+        .where(and(eq(udtRoster.season, season), eq(udtRoster.userId, userId)))
+        .all()
+        .map((r) => [r.botId, r.xp]),
+    );
+    const now = new Date(this.clock.now()).toISOString();
+    for (const b of this.ownBots(season, userId).values()) {
+      if (!b.anlage || b.anlageAt || levelOf(xp.get(b.botId) ?? 0) < ANLAGE_LEVEL) continue;
+      this.db.transaction((tx) => {
+        tx.update(udtBots).set({ anlageAt: now }).where(eq(udtBots.botId, b.botId)).run();
+        tx.insert(udtTraits)
+          .values({
+            id: `t${randomId(12)}`,
+            season,
+            userId,
+            code: b.anlage!,
+            botId: null,
+            source: 'talent',
+            createdAt: now,
+          })
+          .run();
+      });
+      out.push(b.anlage);
+    }
+    return out;
   }
 
   /** The trophy room's crest (shape and colour; decision 266). */
@@ -1250,8 +1311,11 @@ export class UdtService {
         name: r.name,
         origin: o?.origin ?? null,
         skill: r.skill,
-        // Dynasty (decision 242): a keeper without the skill loss.
-        nextSkill: managerEffects(r.udtTraits).keepsSkill ? r.skill : keeperSkill(r.skill, loss),
+        // Dynasty (decision 242) and a scouted talent (youth keeper, decision 267): no loss.
+        nextSkill:
+          managerEffects(r.udtTraits).keepsSkill || o?.origin === 'academy'
+            ? r.skill
+            : keeperSkill(r.skill, loss),
         rarity: r.rarity,
         traits: r.traits,
         level: r.level,
@@ -1469,6 +1533,8 @@ function ownView(
     keptFrom: b.keptFrom,
     maxed,
     prestige: ownPrestige(b, level, skill, maxed, points, claudius),
+    /** A talent's hidden trait still waits for level 10 (decision 267; which one stays hidden). */
+    anlage: !!b.anlage && !b.anlageAt,
   };
 }
 

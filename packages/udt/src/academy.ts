@@ -12,6 +12,8 @@ import {
   valueScore,
   type Rarity,
 } from './economy.js';
+import { clubTraitPool } from './league.js';
+import { traitDef } from './traits.js';
 
 /** Play-style values of a talent (-1..1; camping 0..1). */
 export interface TalentValues {
@@ -30,11 +32,15 @@ export interface Talent {
   values: TalentValues;
   /** Highest skill the bot can be developed to (hidden: the report shows a range). */
   potential: number;
+  /** A hidden trait (decision 267): free at level `ANLAGE_LEVEL`; the report only says there is one. */
+  anlage?: string;
 }
 
 export interface TalentReport {
   name: string;
   skill: number;
+  /** It carries a hidden trait (decision 267). */
+  anlage?: boolean;
   /** 0..100 ranges as the scout saw them. */
   ranges: Record<'accuracy' | 'alertness' | 'strafing', [number, number]>;
   potential: [number, number];
@@ -99,20 +105,51 @@ function pick<T>(options: readonly T[], weights: readonly number[], rng: () => n
   return options[options.length - 1]!;
 }
 
+/** A talent learns this much faster while below its potential (decision 267: rough diamonds). */
+export const TALENT_XP = 1.3;
+/** A talent's licence costs this share of the normal one (decision 267). */
+export const TALENT_LICENCE = 0.5;
+/** A talent's hidden trait becomes free at this level. */
+export const ANLAGE_LEVEL = 10;
+
+/** Rarity chances (percent) of a talent's hidden trait: rare, epic, legendary (decision 267). */
+export const ANLAGE_RATES: Readonly<Record<'rare' | 'epic' | 'legendary', number>> = {
+  rare: 60,
+  epic: 30,
+  legendary: 10,
+};
+
+/** A hidden trait for a talent: a trait the mod plays in a deathmatch, by `ANLAGE_RATES`. */
+export function drawAnlage(rng: () => number): string | null {
+  let roll = rng() * 100;
+  let rarity: Rarity = 'legendary';
+  for (const r of ['rare', 'epic', 'legendary'] as const) {
+    roll -= ANLAGE_RATES[r];
+    if (roll < 0) {
+      rarity = r;
+      break;
+    }
+  }
+  const pool = clubTraitPool(true).filter((c) => traitDef(c)?.rarity === rarity);
+  return pool.length ? pool[Math.floor(rng() * pool.length)]! : null;
+}
+
 /**
- * Three talents of a scout: skill 1-3 (mostly low), values around average, potential 1-4 skill
- * steps above (higher steps rarer), at most Godlike.
+ * Talents of a scout, rough diamonds (decision 267; before: skill 1-3, potential 1-4 steps
+ * above, about 4): skill 2-3, potential 2-4 steps above (mostly 5-7), at most Godlike, values
+ * around average. With `anlage` (a chance and a draw of a trait code) some carry a hidden trait.
  */
 export function scoutTalents(
   rng: () => number,
   taken: readonly string[] = [],
   count = 3,
+  anlage?: { chance: number; draw: (rng: () => number) => string | null },
 ): Talent[] {
   const names = TALENT_NAMES.filter((n) => !taken.includes(n));
   const out: Talent[] = [];
   for (let i = 0; i < count; i++) {
-    const skill = pick([1, 2, 3], [3, 4, 2], rng);
-    const up = pick([1, 2, 3, 4], [30, 40, 22, 8], rng);
+    const skill = pick([2, 3], [1, 1], rng);
+    const up = pick([2, 3, 4], [35, 45, 20], rng);
     const v = () => r3((rng() * 2 - 1) * 0.6);
     const name = names.length
       ? names.splice(Math.floor(rng() * names.length), 1)[0]!
@@ -129,6 +166,10 @@ export function scoutTalents(
       },
       potential: Math.min(7, skill + up),
     });
+    if (anlage && rng() < anlage.chance) {
+      const code = anlage.draw(rng);
+      if (code) out[out.length - 1]!.anlage = code;
+    }
   }
   return out;
 }
@@ -143,6 +184,7 @@ export function talentReport(t: Talent, rng: () => number, spread = 8): TalentRe
   return {
     name: t.name,
     skill: t.skill,
+    ...(t.anlage ? { anlage: true } : {}),
     ranges: {
       accuracy: range(t.values.accuracy),
       alertness: range(t.values.alertness),
@@ -214,6 +256,7 @@ export const KEEPER_MIN_SKILL = 3;
  * `loss` steps lower, not below Skilled; a bot at or below Skilled keeps its skill.
  */
 export function keeperSkill(skill: number, loss = 1): number {
+  if (loss <= 0) return skill;
   if (skill <= KEEPER_MIN_SKILL) return skill;
   return Math.max(KEEPER_MIN_SKILL, skill - loss);
 }

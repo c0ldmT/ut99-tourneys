@@ -566,6 +566,9 @@ export const udtBots = sqliteTable('udt_bots', {
   ascended: integer('ascended', { mode: 'boolean' }).notNull().default(false),
   /** Stages of past seasons as marks: `{ season, stage, stars }[]` (yearbook, hall of fame). */
   marksJson: text('marks_json').notNull().default('[]'),
+  /** A talent's hidden trait (migration 52, decision 267) and when it came free (level 10). */
+  anlage: text('anlage'),
+  anlageAt: text('anlage_at'),
 });
 
 /** Club upgrades of a manager per season (migration 50, decision 264). */

@@ -11,6 +11,7 @@ import {
   rewardFactor,
   teamFactor,
   roundNeuro,
+  TALENT_XP,
 } from '@tourney/udt';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { DB, type Db } from '../db/database.js';
@@ -202,8 +203,10 @@ export class UdtRewardsService implements OnModuleInit {
       if (!ids.length) continue;
       // Apprentices learn faster while their mentor is in the same roster (decision 209).
       const mentors = this.mentorsIn(season, userId, ids);
-      // The training ground (decision 264): +10 % for every bot of the club.
+      // The training ground (decisions 264, 266) for every bot of the club; talents learn
+      // faster (decision 267).
       const club = this.udt.clubFx(season, userId).xp;
+      const talents = this.udt.talentLearners(season, userId);
       // Captain (decision 242): the other bots of the lineup gain more experience.
       const captains = ids.filter((id) => managerEffects(onBots.get(id) ?? []).lineupXp > 1);
       // Only while the bot is still this manager's (never another roster's row of the same bot).
@@ -228,11 +231,21 @@ export class UdtRewardsService implements OnModuleInit {
           .set({
             stamina: Math.max(0, r.stamina - lost),
             games: r.games + games,
-            xp: r.xp + Math.round((games * XP_GAME + (won ? XP_WIN : 0)) * fx.xp * taught * club),
+            xp:
+              r.xp +
+              Math.round(
+                (games * XP_GAME + (won ? XP_WIN : 0)) *
+                  fx.xp *
+                  taught *
+                  club *
+                  (talents.has(r.botId) ? TALENT_XP : 1),
+              ),
           })
           .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))
           .run();
       }
+      // A talent's hidden trait at level 10 (decision 267).
+      this.udt.grantAnlagen(season, userId);
     }
   }
 

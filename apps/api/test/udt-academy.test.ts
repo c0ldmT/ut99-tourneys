@@ -59,9 +59,10 @@ describe('Unreal Dream Team: academy', () => {
     const { mario, marioId, db, ledger } = await setup();
     let v = (await mario.get('/udt/academy')).body;
     // The starter was the first (free) licence; the second costs 2000 × index 0.3.
+    // A talent's licence costs half (decision 267).
     expect(v).toMatchObject({
       scoutPrice: 360,
-      licence: { made: 1, nextPrice: 600 },
+      licence: { made: 1, nextPrice: 600, talentPrice: 300 },
       report: null,
     });
     expect((await mario.post('/udt/academy/sign', { pick: 0, name: 'Kid' })).status).toBe(409);
@@ -74,7 +75,10 @@ describe('Unreal Dream Team: academy', () => {
     const signed = await mario.post('/udt/academy/sign', { pick: 1, name: 'Kid' });
     expect(signed.status, JSON.stringify(signed.body)).toBe(200);
     expect(signed.body).toMatchObject({ report: null, licence: { made: 2, nextPrice: 1200 } });
-    expect(ledger.spendable(marioId).balance).toBe(before - 360 - 600);
+    expect(ledger.spendable(marioId).balance).toBe(before - 360 - 300);
+    // Rough diamonds (decision 267): skill 2-3, the potential's window from 4 up.
+    expect(r.skill).toBeGreaterThanOrEqual(2);
+    expect(r.potential[1]).toBeGreaterThanOrEqual(4);
     const kid = signed.body.own.find((b: { name: string }) => b.name === 'Kid');
     expect(kid).toMatchObject({ skill: r.skill, own: { origin: 'academy', points: 0 } });
     // The roster shows the report's window (crossing two windows told the potential).
@@ -118,6 +122,37 @@ describe('Unreal Dream Team: academy', () => {
     expect((await mario.post(`/udt/roster/${kid.botId}/develop`, { stat: 'skill' })).status).toBe(
       409,
     ); // 3 points needed
+  });
+
+  it('talents: hidden trait at level 10, faster learning, youth keepers (decision 267)', async () => {
+    const { mario, marioId, db } = await setup();
+    await mario.post('/udt/academy/scout');
+    const signed = await mario.post('/udt/academy/sign', { pick: 0, name: 'Kid' });
+    const kid = signed.body.own.find((b: { name: string }) => b.name === 'Kid');
+    db.update(udtBots)
+      .set({ anlage: 'vampire', potential: 7 })
+      .where(eq(udtBots.botId, kid.botId))
+      .run();
+    // Below level 10 nothing; at level 10 the trait goes into the inventory, once.
+    db.update(udtRoster).set({ xp: 600 }).where(eq(udtRoster.botId, kid.botId)).run();
+    expect((await mario.get('/udt')).body.anlagen).toEqual([]);
+    db.update(udtRoster).set({ xp: 630 }).where(eq(udtRoster.botId, kid.botId)).run();
+    expect((await mario.get('/udt')).body.anlagen).toEqual(['vampire']);
+    expect((await mario.get('/udt')).body.anlagen).toEqual([]);
+    const cards = db.select().from(udtTraits).where(eq(udtTraits.userId, marioId)).all();
+    expect(cards.filter((c) => c.code === 'vampire' && c.source === 'talent')).toHaveLength(1);
+    // Below its potential a talent learns 30 % faster (the training camp).
+    const udt = api!.app.get(UdtService);
+    expect(udt.talentLearners(1, marioId).has(kid.botId)).toBe(true);
+    const xp0 = (await mario.get('/udt')).body.roster.find(
+      (r: { botId: string }) => r.botId === kid.botId,
+    ).xp;
+    const camp = await mario.post(`/udt/roster/${kid.botId}/camp`);
+    const xp1 = camp.body.roster.find((r: { botId: string }) => r.botId === kid.botId).xp;
+    expect(xp1 - xp0).toBe(Math.round(60 * 1.3));
+    // A scouted talent keeps its skill as a keeper.
+    const c = udt.keeperCandidates(marioId, 1).find((x) => x.botId === kid.botId)!;
+    expect(c.nextSkill).toBe(c.skill);
   });
 
   it('a mentor of level 3 teaches a bot the team made, once per season', async () => {

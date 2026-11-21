@@ -26,7 +26,7 @@ describe('academy', () => {
       expect(t).toHaveLength(3);
       expect(new Set(t.map((x) => x.name)).size).toBe(3);
       for (const x of t) {
-        expect(x.skill).toBeGreaterThanOrEqual(1);
+        expect(x.skill).toBeGreaterThanOrEqual(2);
         expect(x.skill).toBeLessThanOrEqual(3);
         expect(x.potential).toBeGreaterThan(x.skill);
         expect(x.potential).toBeLessThanOrEqual(7);
@@ -36,6 +36,23 @@ describe('academy', () => {
         expect(r.ranges.accuracy[1] - r.ranges.accuracy[0]).toBeLessThanOrEqual(16);
       }
     }
+  });
+
+  it('talents are rough diamonds, some with a hidden trait (decision 267)', async () => {
+    const { drawAnlage, traitDef } = await import('../src/index.js');
+    let s = 11;
+    const rng = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    const all = Array.from({ length: 100 }, () =>
+      scoutTalents(rng, [], 3, { chance: 1, draw: drawAnlage }),
+    ).flat();
+    expect(all.every((t) => t.skill >= 2 && t.skill <= 3 && t.potential - t.skill >= 2)).toBe(true);
+    expect(all.reduce((n, t) => n + t.potential, 0) / all.length).toBeGreaterThan(5);
+    expect(all.every((t) => t.anlage)).toBe(true);
+    const rar = new Set(all.map((t) => traitDef(t.anlage!)?.rarity));
+    expect([...rar].sort()).toEqual(['epic', 'legendary', 'rare']);
+    expect(talentReport(all[0]!, rng).anlage).toBe(true);
+    // Without the option none.
+    expect(scoutTalents(rng).some((t) => t.anlage)).toBe(false);
   });
 
   it('prices licences and scouting at the index', () => {

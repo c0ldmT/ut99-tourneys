@@ -28,6 +28,8 @@ import {
   talentReport,
   traitOfRarity,
   cannotAllocate,
+  drawAnlage,
+  TALENT_LICENCE,
   type DevelopStat,
   type PrestigeStat,
   type Rarity,
@@ -157,7 +159,12 @@ export class UdtAcademyService {
       tag: team?.tag ?? '',
       index,
       scoutPrice: Math.round(scoutPrice(index) * this.scoutFx(season, user.id).price),
-      licence: { made, nextPrice: licencePrice(made, index) },
+      licence: {
+        made,
+        nextPrice: licencePrice(made, index),
+        /** A talent's licence (decision 267): half the price. */
+        talentPrice: Math.round((licencePrice(made, index) * TALENT_LICENCE) / 10) * 10,
+      },
       rosterFull: !this.udt.rosterHasRoom(user.id, season, true),
       report: s ? (JSON.parse(s.reportJson) as TalentReport[]) : null,
       mentors: roster.map((r) => {
@@ -273,7 +280,11 @@ export class UdtAcademyService {
       ref: `scout:${season}:${user.id}:${randomId(8)}`,
     });
     const taken = this.bots.list().map((b) => b.name);
-    const talents = scoutTalents(rng, taken, 3 + fx.extra);
+    // Rough diamonds with a hidden trait now and then (decision 267; the office: more often).
+    const talents = scoutTalents(rng, taken, 3 + fx.extra, {
+      chance: this.udt.clubFx(season, user.id).anlage,
+      draw: drawAnlage,
+    });
     const report = talents.map((t) => talentReport(t, rng, fx.spread));
     this.db
       .insert(udtScouts)
@@ -296,8 +307,8 @@ export class UdtAcademyService {
     return this.view(user);
   }
 
-  /** Checks room, the game name and the licence; charges it. */
-  private licence(user: User, season: number, name: string): void {
+  /** Checks room, the game name and the licence; charges it (a talent's at half the price). */
+  private licence(user: User, season: number, name: string, share = 1): void {
     const team = this.udt.team(user.id, season);
     if (!team) throw conflict('found your team first');
     // The boarding school (decision 266): an 8th place for a new own bot.
@@ -307,7 +318,7 @@ export class UdtAcademyService {
       throw badRequest('{tag}{name} is too long for the game', { tag: team.tag, name });
     const made = this.made(season, user.id);
     // As many licences as the manager pays for, each twice the one before (owner, 25.10.).
-    const price = licencePrice(made, this.udt.index(season));
+    const price = Math.round((licencePrice(made, this.udt.index(season)) * share) / 10) * 10;
     if (price > 0)
       this.ledger.charge({
         userId: user.id,
@@ -398,8 +409,8 @@ export class UdtAcademyService {
     if (this.bots.list().some((b) => b.name.toLowerCase() === body.name.toLowerCase()))
       throw conflict('a bot is called {name} already', { name: body.name });
     this.checkLook(undefined, body.look);
-    this.licence(user, season, body.name);
-    this.create(
+    this.licence(user, season, body.name, TALENT_LICENCE);
+    const id = this.create(
       user,
       season,
       talent,
@@ -410,6 +421,8 @@ export class UdtAcademyService {
       undefined,
       body.look,
     );
+    if (talent.anlage)
+      this.db.update(udtBots).set({ anlage: talent.anlage }).where(eq(udtBots.botId, id)).run();
     this.db
       .delete(udtScouts)
       .where(and(eq(udtScouts.season, season), eq(udtScouts.userId, user.id)))

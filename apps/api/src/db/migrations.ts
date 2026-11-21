@@ -816,4 +816,9 @@ export const MIGRATIONS: string[] = [
   UPDATE udt_club SET level = 2 WHERE kind IN ('training', 'physio');
   ALTER TABLE udt_teams ADD COLUMN crest_json TEXT;
   `,
+  // 52: a talent's hidden trait (decision 267) and when it came free (level 10).
+  `
+  ALTER TABLE udt_bots ADD COLUMN anlage TEXT;
+  ALTER TABLE udt_bots ADD COLUMN anlage_at TEXT;
+  `,
 ];
