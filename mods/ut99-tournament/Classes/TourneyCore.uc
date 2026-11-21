@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.22.0";
+const MOD_VERSION = "0.23.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -254,12 +254,23 @@ var byte CfgArUsed[16];            // arsenal: the refill was used in this life
 var Weapon CfgArW[16];             // arsenal: the weapon in hand at the last tick
 var class<Weapon> CfgArClass[16];  // arsenal: the spawn weapon of this life (kills with it count)
 var float CfgFhAt[16];             // fast hands: its last early switch (kills within 3 s count)
+// Mod 0.23.0 (decision 278, Season 3 P5 wave 2).
+var float CfgPsUntil[16];          // power surge: more damage until then
+var float CfgLsUntil[16];          // last stand: running until then
+var byte CfgLsUsed[16];            // last stand: used in this life
+var byte CfgEaOn[16];              // escape artist: on the retreat below 40 health (last tick)
+var byte FfTeam[4];                // focus fire: the team has a living focus fire bot (its configuration)
+var int FfCfg[4];
+var Pawn FfVictim[32];             // focus fire: recent hits of focus fire teams (victim, by, team, when)
+var Pawn FfBy[32];
+var byte FfTeamOf[32];
+var float FfAt[32];
 var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
 var int NestScore[12];
 var int NestCount;
 var bool bNestsDone;
-var Inventory PowItem[16];         // armour, shield belts, damage amplifiers of the map
-var float PowBack[16];             // when a taken one is back (0 = it is there)
+var Inventory PowItem[24];         // armour, shield belts, damage amplifiers (mod 0.23.0: kegs) of the map
+var float PowBack[24];             // when a taken one is back (0 = it is there)
 var int PowCount;
 var bool bPowDone;
 var byte SayCfg[192];              // chat lines: bot (index into Cfg*), occasion, text
@@ -4332,7 +4343,7 @@ function BaseItemTiming(Bot B, int c)
 	L = BotLevel(CfgName[c]);
 	if (L < 0 || Curve.TItemAhead[L] <= 0)
 		return;
-	ItemControl(B, c, Curve.TItemAhead[L], Curve.TItemPlan[L]);
+	ItemControl(B, c, Curve.TItemAhead[L], Curve.TItemPlan[L], 0);
 }
 
 // Ends a nest or item errand (stuck, orders); no new one for Secs.
@@ -4707,15 +4718,23 @@ function ShuffleDance(Bot B, int c)
 function FindPowerItems()
 {
 	local Inventory Itm;
+	local int NonKeg;
 	bPowDone = true;
 	foreach AllActors(class'Inventory', Itm)
 	{
-		if (PowCount >= 16)
+		if (PowCount >= 24)
 			break;
 		if (Itm.Owner != None || Itm.bHeldItem || Itm.RespawnTime <= 0)
 			continue;
-		if (UDamage(Itm) == None && UT_ShieldBelt(Itm) == None && Armor2(Itm) == None && ThighPads(Itm) == None)
+		if (UDamage(Itm) == None && UT_ShieldBelt(Itm) == None && Armor2(Itm) == None && ThighPads(Itm) == None && HealthPack(Itm) == None)
 			continue;
+		// At most 16 of the others as before 0.23.0 (kegs, for the belt runner, on top).
+		if (HealthPack(Itm) == None)
+		{
+			if (NonKeg >= 16)
+				continue;
+			NonKeg++;
+		}
 		PowItem[PowCount] = Itm;
 		PowBack[PowCount] = 0;
 		if (Itm.IsInState('Sleeping'))
@@ -4750,10 +4769,21 @@ function int PowIndex(Inventory Itm)
 	return -1;
 }
 
-function float PowValue(Bot B, Inventory Itm)
+function float PowValue(Bot B, Inventory Itm, int Mode)
 {
+	// Mod 0.23.0: the keg only for the belt runner (below 150 health), the amplifier not.
+	if (HealthPack(Itm) != None)
+	{
+		if (Mode == 1 && B.Health < 150)
+			return 1.8;
+		return 0;
+	}
 	if (UDamage(Itm) != None)
+	{
+		if (Mode == 1)
+			return 0;
 		return 3.0;
+	}
 	if (B.FindInventoryType(Itm.Class) != None)
 		return 0; // has one of these
 	if (UT_ShieldBelt(Itm) != None)
@@ -4766,7 +4796,9 @@ function float PowValue(Bot B, Inventory Itm)
 // Item controller. True: the bot heads for an item or waits next to it.
 // Ahead: seconds before an item is back it heads there (the trait 20, the base AI by level);
 // Chance: per look (every 3 s) that it looks at all (the trait 1).
-function bool ItemControl(Bot B, int c, float Ahead, float Chance)
+// Mode 0: the item controller and the base AI's timing (armour, belts, amplifiers); mod 0.23.0
+// mode 1: the belt runner (armour, belts and the keg, also when they are there).
+function bool ItemControl(Bot B, int c, float Ahead, float Chance, int Mode)
 {
 	local int i, Best;
 	local float Now, D, Eta, Rest, Value, BestValue;
@@ -4827,7 +4859,7 @@ function bool ItemControl(Bot B, int c, float Ahead, float Chance)
 		Itm = PowItem[i];
 		if (Itm == None || Itm.bDeleteMe || Itm.Owner != None)
 			continue;
-		Value = PowValue(B, Itm);
+		Value = PowValue(B, Itm, Mode);
 		if (Value <= 0)
 			continue;
 		D = VSize(Itm.Location - B.Location);
@@ -4837,7 +4869,7 @@ function bool ItemControl(Bot B, int c, float Ahead, float Chance)
 		Rest = 0;
 		if (PowBack[i] > 0)
 			Rest = PowBack[i] - Now;
-		else if (Ahead < 20)
+		else if (Ahead < 20 && Mode == 0)
 			continue; // the base AI: only the timing (the game's own AI takes what is there)
 		if (Rest > Eta + 4 || Rest > Ahead)
 			continue;
@@ -5174,6 +5206,8 @@ function int ParseValueTraits(string S)
 			Bits = Bits | 2048; // mod 0.22.0: cool head, momentum (run-time edges)
 		else if (Code == "mo")
 			Bits = Bits | 4096;
+		else if (Code == "hs")
+			Bits = Bits | 8192; // mod 0.23.0: hitscan sniper (TourneySkillCurve.SetEdges)
 	}
 	return Bits;
 }
@@ -5237,6 +5271,14 @@ function int ParseGameTraits(string S)
 			Bits = Bits | 262144;
 		else if (Code == "an")
 			Bits = Bits | 524288;
+		else if (Code == "ea")
+			Bits = Bits | 1048576; // mod 0.23.0: escape artist, close quarters, power surge, last stand
+		else if (Code == "cq")
+			Bits = Bits | 2097152;
+		else if (Code == "ps")
+			Bits = Bits | 4194304;
+		else if (Code == "ls")
+			Bits = Bits | 8388608;
 	}
 	return Bits;
 }
@@ -5260,7 +5302,7 @@ function int GameTraitCfg(Pawn P)
 	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
 		return -1;
 	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
-	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 7936) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
+	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 16128) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
 		return -1;
 	return c;
 }
@@ -5419,7 +5461,15 @@ function ResetGameTraits()
 		CfgArW[c] = None;
 		CfgArClass[c] = None;
 		CfgFhAt[c] = -10;
+		CfgPsUntil[c] = 0;
+		CfgLsUntil[c] = 0;
+		CfgLsUsed[c] = 0;
+		CfgEaOn[c] = 0;
 	}
+	for (c = 0; c < 4; c++)
+		FfTeam[c] = 0;
+	for (c = 0; c < 32; c++)
+		FfVictim[c] = None;
 	for (c = 0; c < 128; c++)
 	{
 		TrOn[c] = 0;
@@ -5452,6 +5502,8 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		if (ms >= 0)
 			MeleeHit[ms] = Level.TimeSeconds;
 	}
+	// Mod 0.23.0: focus fire (team games, any bot of a focus fire team).
+	FocusHit(ActualDamage, Victim, InstigatedBy);
 	cv = GameTraitCfg(Victim);
 	ci = -1;
 	if (InstigatedBy != Victim)
@@ -5503,6 +5555,26 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		ActualDamage = Max(1, PrRound(ActualDamage * 0.5));
 		TrCount(cv, 46, Before - ActualDamage, 0);
 	}
+	// Mod 0.23.0 (decision 278): close quarters +15 % within 400 units, power surge +20 % for 10 s
+	// after a power item, last stand -30 % while it runs.
+	if (ci >= 0 && (CfgBody[ci] & 2097152) != 0 && InstigatedBy != None && VSize(Victim.Location - InstigatedBy.Location) < 400)
+	{
+		Before = ActualDamage;
+		ActualDamage = PrRound(ActualDamage * 1.15);
+		TrCount(ci, 55, ActualDamage - Before, 0);
+	}
+	if (ci >= 0 && (CfgBody[ci] & 4194304) != 0 && Level.TimeSeconds < CfgPsUntil[ci])
+	{
+		Before = ActualDamage;
+		ActualDamage = PrRound(ActualDamage * 1.2);
+		TrAddVal(ci, 57, ActualDamage - Before);
+	}
+	if (cv >= 0 && (CfgBody[cv] & 8388608) != 0 && Level.TimeSeconds < CfgLsUntil[cv])
+	{
+		Before = ActualDamage;
+		ActualDamage = Max(1, PrRound(ActualDamage * 0.7));
+		TrAddVal(cv, 59, Before - ActualDamage);
+	}
 	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
 	{
 		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.11 + 0.5);
@@ -5527,6 +5599,17 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		Log("game trait phoenix:" @ CfgName[cv] @ "survives", 'UTTourney');
 		CfgPhxAt[cv] = Level.TimeSeconds;
 		TrStart(cv, 14, None);
+	}
+	// Mod 0.23.0: last stand - once per life a hit that leaves it below 30 health (not a lethal
+	// one): 4 s aim error x0.5 (the curve) and damage taken x0.7.
+	if (cv >= 0 && (CfgBody[cv] & 8388608) != 0 && CfgLsUsed[cv] == 0 && bGameLive && Victim.Health - ActualDamage > 0 && Victim.Health - ActualDamage < 30)
+	{
+		CfgLsUsed[cv] = 1;
+		CfgLsUntil[cv] = Level.TimeSeconds + 4.0;
+		TrStart(cv, 59, Victim);
+		if (Curve != None && Bot(Victim) != None)
+			Curve.AimBoost(Bot(Victim), 0.5, 4.0);
+		Log("game trait last stand:" @ CfgName[cv], 'UTTourney');
 	}
 }
 
@@ -5566,8 +5649,15 @@ function OnModifyPlayer(Pawn P)
 // once it got him.
 function GameTraitKill(Pawn Killer, Pawn Other)
 {
-	local int c;
+	local int c, t;
 	TraitKillStats(Killer, Other);
+	// Mod 0.23.0: focus fire - a kill of an enemy a team mate hit within 2 s (value2).
+	if (Bot(Killer) != None && Killer != Other && Killer.PlayerReplicationInfo != None && !SameTeam(Killer, Other))
+	{
+		t = Killer.PlayerReplicationInfo.Team;
+		if (t >= 0 && t <= 3 && FfTeam[t] != 0 && FocusTarget(Other, t, Killer))
+			TrAddVal2(FfCfg[t], 58, 1);
+	}
 	TraitDeath(Other);
 	c = GameTraitCfg(Other);
 	if (c >= 0 && (CfgBeh[c] & 8) != 0 && Killer != None && Killer != Other && Killer.PlayerReplicationInfo != None && !SameTeam(Killer, Other))
@@ -5661,6 +5751,10 @@ function int ParseBehaviourTraits(string S)
 			Bits = Bits | 262144;
 		else if (Code == "td")
 			Bits = Bits | 524288;
+		else if (Code == "br")
+			Bits = Bits | 1048576; // mod 0.23.0: belt runner, focus fire
+		else if (Code == "ff")
+			Bits = Bits | 2097152;
 	}
 	return Bits;
 }
@@ -5724,13 +5818,14 @@ function BehaviourTick()
 	local float A;
 	if (bPowDone)
 		PowerItemTick();
+	FocusTick();
 	for (c = 0; c < CfgCount; c++)
 	{
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
 			continue;
 		// Mod 0.19.1 (G3): without the item controller the level knows a little of the timing.
-		if ((CfgBeh[c] & 256) == 0)
+		if ((CfgBeh[c] & (256 | 1048576)) == 0)
 			BaseItemTiming(B, c);
 		if (CfgBeh[c] == 0)
 			continue;
@@ -5759,7 +5854,10 @@ function BehaviourTick()
 				continue;
 			if ((CfgBeh[c] & 32) != 0 && SniperNest(B, c))
 				continue;
-			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c, 20, 1))
+			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c, 20, 1, 0))
+				continue;
+			// Mod 0.23.0: belt runner (without the item controller, which takes more).
+			if ((CfgBeh[c] & (256 | 1048576)) == 1048576 && ItemControl(B, c, 12, 1, 1))
 				continue;
 			if ((CfgBeh[c] & (512 | 1024 | 262144)) != 0 && GoalErrand(B, c))
 				continue;
@@ -5770,7 +5868,7 @@ function BehaviourTick()
 			DropTraitErrand(B, 0);
 		if ((CfgBeh[c] & 16384) != 0)
 			WardenTick(B, c);
-		if (B.bCamping && (CfgBeh[c] & (32 | 256)) != 0)
+		if (B.bCamping && (CfgBeh[c] & (32 | 256 | 1048576)) != 0)
 			continue; // in its nest or waiting for an item
 		if (!AntiIdleAllowed() || B.Enemy != None || (!B.IsInState('Roaming') && !B.IsInState('Wandering')))
 			continue;
@@ -5791,10 +5889,10 @@ function float BehaviourThreat(Bot B, Pawn Other)
 	local float F;
 	if (B == None || Other == None || CfgCount == 0 || Other.PlayerReplicationInfo == None)
 		return 0;
+	F = FocusThreat(B, Other); // mod 0.23.0: every bot of a focus fire team
 	c = GameTraitCfg(B);
 	if (c < 0 || CfgBeh[c] == 0)
-		return 0;
-	F = 0;
+		return F;
 	if ((CfgBeh[c] & 8) != 0 && CfgAvenge[c] != "" && SameBotName(CfgAvenge[c], Other.PlayerReplicationInfo.PlayerName))
 		F += 0.6;
 	if ((CfgBeh[c] & 16) != 0 && LeaderFor(B) == Other)
@@ -5873,6 +5971,13 @@ function string TrCode(int t)
 		case 50: return "qm";
 		case 51: return "td";
 		case 52: return "an";
+		case 53: return "br"; // mod 0.23.0
+		case 54: return "ea";
+		case 55: return "cq";
+		case 56: return "hs";
+		case 57: return "ps";
+		case 58: return "ff";
+		case 59: return "ls";
 	}
 	return "";
 }
@@ -5881,7 +5986,7 @@ function string TrCode(int t)
 function int TrIdOf(string Code)
 {
 	local int t;
-	for (t = 0; t < 53; t++)
+	for (t = 0; t < 60; t++)
 		if (TrCode(t) == Code)
 			return t;
 	return -1;
@@ -5962,6 +6067,10 @@ function string TrName(int t)
 		case 47: return "clutch";
 		case 48: return "momentum";
 		case 50: return "quartermaster";
+		case 53: return "belt-runner";
+		case 54: return "escape-artist";
+		case 57: return "power-surge";
+		case 59: return "last-stand";
 	}
 	return TrCode(t);
 }
@@ -5996,6 +6105,16 @@ function TrAddVal(int c, int t, int Amount)
 	if (x < 0 || !bGameLive)
 		return;
 	TrVal[x] += Amount;
+}
+
+// Mod 0.23.0: adds to a trait's second value without a use (focus fire: shared kills).
+function TrAddVal2(int c, int t, int Amount)
+{
+	local int x;
+	x = TrX(c, t);
+	if (x < 0 || !bGameLive)
+		return;
+	TrVal2[x] += Amount;
 }
 
 // P: the bot for the log (None: no health in the line).
@@ -6112,6 +6231,15 @@ function TrItemTaken(Pawn P, string Code)
 	x = TrX(c, 8);
 	if (x >= 0 && (TrOn[x] != 0 || Level.TimeSeconds - TrLast[x] < 3))
 		TrAddVal(c, 8, 1);
+	// Mod 0.23.0: belt runner (items of its runs), power surge (10 s more damage).
+	x = TrX(c, 53);
+	if (x >= 0 && (TrOn[x] != 0 || Level.TimeSeconds - TrLast[x] < 3))
+		TrAddVal(c, 53, 1);
+	if (c >= 0 && (CfgBody[c] & 4194304) != 0 && P.Health > 0)
+	{
+		CfgPsUntil[c] = Level.TimeSeconds + 10.0;
+		TrStart(c, 57, P);
+	}
 }
 
 // Once a second after BehaviourTick: which episodes run now; mod 0.18.0: second wind,
@@ -6123,7 +6251,7 @@ function TraitTelemetryTick()
 	local bool bOn;
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 7936) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 16128) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
 			continue;
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
@@ -6158,6 +6286,8 @@ function TraitTelemetryTick()
 			TrSampleLate(c, 29, CfgGoal[c] != None && CfgGoalKind[c] == 2, B);
 		if ((CfgBeh[c] & 262144) != 0)
 			TrSampleLate(c, 50, CfgGoal[c] != None && CfgGoalKind[c] == 3, B);
+		if ((CfgBeh[c] & 1048576) != 0)
+			TrSampleLate(c, 53, CfgItem[c] != None, B);
 		if ((CfgBeh[c] & 4096) != 0)
 			TrSample(c, 34, Level.TimeSeconds < CfgCaUntil[c], B);
 		if ((CfgBody[c] & 4) != 0)
@@ -6226,9 +6356,32 @@ function TraitBodyTick(Bot B, int c)
 		TrSampleLate(c, 47, CfgClBehind[c] != 0, B);
 	}
 	SetRunAimOf(B, c);
+	// Mod 0.23.0: escape artist on the retreat below 40 health (speed in ApplySpeed, dodges on the
+	// curve), hitscan sniper (seconds with an instant hit weapon in hand), the end of a power
+	// surge and of a last stand.
+	if ((CfgBody[c] & 1048576) != 0)
+	{
+		CfgEaOn[c] = 0;
+		if (B.Health < 40 && B.IsInState('Retreating'))
+			CfgEaOn[c] = 1;
+		TrSampleLate(c, 54, CfgEaOn[c] != 0, B);
+		if (Curve != None)
+		{
+			if (CfgEaOn[c] != 0)
+				Curve.SetRunDodge(B, 1.3);
+			else
+				Curve.SetRunDodge(B, 1.0);
+		}
+	}
+	if ((CfgVal[c] & 8192) != 0 && B.Weapon != None && (B.Weapon.IsA('SniperRifle') || B.Weapon.IsA('ShockRifle') || B.Weapon.IsA('enforcer') || B.Weapon.IsA('minigun2')))
+		TrCount(c, 56, 1, 0);
+	if ((CfgBody[c] & 4194304) != 0 && Level.TimeSeconds >= CfgPsUntil[c])
+		TrEnd(c, 57, 0);
+	if ((CfgBody[c] & 8388608) != 0 && Level.TimeSeconds >= CfgLsUntil[c])
+		TrEnd(c, 59, 0);
 	// Pathfinder: faster without an enemy (seconds boosted as its value). Light feet (mod
 	// 0.19.2): faster on the way to items and on the retreat (seconds of sprint as its uses).
-	if ((CfgBeh[c] & (2048 | 262144)) != 0 || (CfgBody[c] & 64) != 0 || PrPts(c, 7) > 0)
+	if ((CfgBeh[c] & (2048 | 262144 | 1048576)) != 0 || (CfgBody[c] & (64 | 1048576)) != 0 || PrPts(c, 7) > 0)
 		ApplySpeed(B, c);
 	if ((CfgBeh[c] & 2048) != 0 && B.Enemy == None)
 		TrCount(c, 30, 1, 0);
@@ -6457,7 +6610,7 @@ function bool LightSprint(Pawn P)
 function ApplySpeed(Pawn P, int c)
 {
 	local float F;
-	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & (2048 | 262144)) == 0 && PrPts(c, 7) == 0))
+	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192 | 1048576)) == 0 && (CfgBeh[c] & (2048 | 262144 | 1048576)) == 0 && PrPts(c, 7) == 0))
 		return;
 	F = 1.0;
 	if ((CfgBody[c] & 64) != 0 && LightSprint(P))
@@ -6472,6 +6625,10 @@ function ApplySpeed(Pawn P, int c)
 		F *= 1.1;
 	if ((CfgBeh[c] & 262144) != 0 && CfgGoal[c] != None && CfgGoalKind[c] == 3)
 		F *= 1.12; // mod 0.22.0: quartermaster on its way to ammo
+	if ((CfgBeh[c] & 1048576) != 0 && CfgItem[c] != None && Bot(P) != None && !Bot(P).bCamping && P.Enemy == None)
+		F *= 1.12; // mod 0.23.0: belt runner on its way to an item
+	if ((CfgBody[c] & 1048576) != 0 && CfgEaOn[c] != 0)
+		F *= 1.15; // mod 0.23.0: escape artist
 	P.GroundSpeed = P.default.GroundSpeed * F;
 }
 
@@ -6492,6 +6649,17 @@ function TraitSpawn(Pawn P, int c)
 	CfgArW[c] = None;
 	CfgArClass[c] = None;
 	CfgGoal[c] = None; // an errand of the last life ends
+	CfgPsUntil[c] = 0; // mod 0.23.0
+	CfgLsUntil[c] = 0;
+	CfgLsUsed[c] = 0;
+	CfgEaOn[c] = 0;
+	if ((CfgBeh[c] & 1048576) != 0)
+		CfgItem[c] = None; // a belt runner's item run of the last life ends
+	if (Curve != None && Bot(P) != None)
+	{
+		Curve.AimBoost(Bot(P), 1.0, 0); // a last stand and an escape of the last life end
+		Curve.SetRunDodge(Bot(P), 1.0);
+	}
 	ApplySpeed(P, c);
 	if (Bot(P) != None)
 		SetRunAimOf(Bot(P), c); // the aim edges of the last life end now
@@ -6566,6 +6734,107 @@ function TraitKill(Pawn Killer, Pawn Other, int c)
 		TrAddVal(c, 49, 1);
 	if ((CfgBody[c] & 524288) != 0 && CfgArClass[c] != None && Killer.Weapon != None && Killer.Weapon.Class == CfgArClass[c])
 		TrAddVal(c, 52, 1);
+}
+
+// Mod 0.23.0 (decision 278): focus fire, once a second - which teams have a living focus fire
+// bot (team games only).
+function FocusTick()
+{
+	local int c, t;
+	local Bot B;
+	for (t = 0; t < 4; t++)
+		FfTeam[t] = 0;
+	if (TeamSize <= 1 && !Game.bTeamGame)
+		return;
+	for (c = 0; c < CfgCount; c++)
+	{
+		if ((CfgBeh[c] & 2097152) == 0)
+			continue;
+		B = FindBotPawn(CfgName[c]);
+		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
+			continue;
+		t = B.PlayerReplicationInfo.Team;
+		if (t >= 0 && t <= 3 && FfTeam[t] == 0)
+		{
+			FfTeam[t] = 1;
+			FfCfg[t] = c;
+		}
+	}
+}
+
+// Victim was hit by a bot of team T other than NotBy within the last 2 s (a focus fire team).
+function bool FocusTarget(Pawn Victim, int T, Pawn NotBy)
+{
+	local int k;
+	if (Victim == None || T < 0 || T > 3 || FfTeam[T] == 0)
+		return false;
+	for (k = 0; k < 32; k++)
+		if (FfVictim[k] == Victim && FfTeamOf[k] == T && FfBy[k] != NotBy && FfBy[k] != None && Level.TimeSeconds - FfAt[k] < 2.0)
+			return true;
+	return false;
+}
+
+// From OnTakeDamage: a bot of a focus fire team hits an enemy - +5 % when a team mate hit him
+// within 2 s (counted for the team's focus fire bot); every such hit is remembered.
+function FocusHit(out int ActualDamage, Pawn Victim, Pawn By)
+{
+	local int t, k, Free, Before;
+	local float Oldest;
+	if (ActualDamage <= 0 || Victim == None || Bot(By) == None || By == Victim || !bGameLive)
+		return;
+	if (By.PlayerReplicationInfo == None || Victim.PlayerReplicationInfo == None || SameTeam(By, Victim))
+		return;
+	if (TeamSize <= 1 && !Game.bTeamGame)
+		return;
+	t = By.PlayerReplicationInfo.Team;
+	if (t < 0 || t > 3 || FfTeam[t] == 0)
+		return;
+	if (FocusTarget(Victim, t, By))
+	{
+		Before = ActualDamage;
+		ActualDamage = PrRound(ActualDamage * 1.05);
+		TrCount(FfCfg[t], 58, ActualDamage - Before, 0);
+	}
+	// The same shooter on the same victim refreshes its entry, else the oldest one goes.
+	Free = 0;
+	Oldest = 1000000;
+	for (k = 0; k < 32; k++)
+	{
+		if (FfVictim[k] == Victim && FfBy[k] == By)
+		{
+			Free = k;
+			break;
+		}
+		if (FfVictim[k] == None || FfVictim[k].bDeleteMe)
+		{
+			Free = k;
+			Oldest = -1;
+		}
+		else if (Oldest >= 0 && FfAt[k] < Oldest)
+		{
+			Free = k;
+			Oldest = FfAt[k];
+		}
+	}
+	FfVictim[Free] = Victim;
+	FfBy[Free] = By;
+	FfTeamOf[Free] = t;
+	FfAt[Free] = Level.TimeSeconds;
+}
+
+// The game's GameThreatAdd for focus fire: a bot of its team prefers an enemy a team mate hit
+// within 2 s.
+function float FocusThreat(Bot B, Pawn Other)
+{
+	local int t;
+	if (B.PlayerReplicationInfo == None || (TeamSize <= 1 && !Game.bTeamGame))
+		return 0;
+	t = B.PlayerReplicationInfo.Team;
+	if (t < 0 || t > 3 || FfTeam[t] == 0 || SameTeam(B, Other))
+		return 0;
+	if (FocusTarget(Other, t, B))
+		return 0.5;
+	return 0;
 }
 
 // From OnKilled through GameTraitKill (victim side): rewind remembers where it died.

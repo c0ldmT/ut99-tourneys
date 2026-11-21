@@ -29,6 +29,8 @@
 //   core's item timing).
 // - 0.22.0: Dream Team traits of wave 1 (decision 276) - quick draw (aim after a new enemy),
 //   fast hands and trigger discipline in the weapon choice (BotSwitch).
+// - 0.23.0: wave 2 (decision 278) - hitscan sniper and last stand (AimSpread), escape artist
+//   (a run-time dodge edge in DodgeMul).
 // - SmartStockBots: its MoveWithDodge (it sets bCanDuck every 0.1 s) and
 //   FixMinigun (doubles the minigun's aim error) are switched off at run time;
 //   the ini stays untouched, everything else of it keeps working.
@@ -89,6 +91,10 @@ var byte CAi[32];                 // traits for the weapon choice: 1 fast hands,
 var float CTdAt[32];              // trigger discipline: when the weapon in hand last changed
 var Weapon CTdW[32];              // trigger discipline: the weapon in hand then
 var float CTdLog[32], CTdSafeLog[32], CFhLog[32]; // trait log: at most one count a second
+// Mod 0.23.0 (decision 278, wave 2)
+var byte CHitscan[32];            // hitscan sniper: aim error x0.85 for instant hit shots
+var float CBoostMul[32], CBoostUntil[32]; // last stand: aim error x CBoostMul until then
+var float CERunDodge[32];         // escape artist: run-time dodge edge (1 = none)
 
 // The curve, index = level 0..7 (Novice, Average, Experienced, Skilled, Adept, Masterful,
 // Inhuman, Godlike). See docs/decisions.md 149.
@@ -215,6 +221,9 @@ function int Slot(Bot B, bool bCreate)
 	CTdLog[Free] = -10;
 	CTdSafeLog[Free] = -10;
 	CFhLog[Free] = -10;
+	CBoostMul[Free] = 1.0;
+	CBoostUntil[Free] = 0;
+	CERunDodge[Free] = 1.0;
 	return Free;
 }
 
@@ -312,7 +321,7 @@ function SetCurve(Bot B)
 // The values traits as edges on the curve (the same numbers as gameEdge in packages/udt
 // traits.ts): 1 steady hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16 eagle eye,
 // 32 all-rounder, 64 daredevil, 128 bouncer (mod 0.18.0: reacts and dodges, no longer jumpy),
-// 1024 quick draw (mod 0.22.0).
+// 1024 quick draw (mod 0.22.0), 8192 hitscan sniper (mod 0.23.0).
 function SetEdges(int s, int Bits)
 {
 	CEAim[s] = 1.0;
@@ -353,6 +362,30 @@ function SetEdges(int s, int Bits)
 	CQuick[s] = 0;
 	if ((Bits & 1024) != 0)
 		CQuick[s] = 1;
+	// Mod 0.23.0: hitscan sniper (8192) acts in AimSpread.
+	CHitscan[s] = 0;
+	if ((Bits & 8192) != 0)
+		CHitscan[s] = 1;
+}
+
+// Mod 0.23.0: last stand - aim error x Mul for Secs.
+function AimBoost(Bot B, float Mul, float Secs)
+{
+	local int s;
+	s = Slot(B, false);
+	if (s < 0)
+		return;
+	CBoostMul[s] = Mul;
+	CBoostUntil[s] = Level.TimeSeconds + Secs;
+}
+
+// Mod 0.23.0: escape artist - a run-time dodge edge (TourneyCore sets it once a second).
+function SetRunDodge(Bot B, float F)
+{
+	local int s;
+	s = Slot(B, false);
+	if (s >= 0)
+		CERunDodge[s] = F;
 }
 
 // Mod 0.22.0: the bot's traits for the weapon choice (TourneyCore.TraitAiBits): 1 fast hands,
@@ -413,7 +446,7 @@ function SetRunAim(Bot B, float F)
 // Dodge chances x: the trait edge and the strafing value (TStrafeDodge).
 function float DodgeMul(int s)
 {
-	return CEDodge[s] * FMax(0, 1 + TStrafeDodge[CLv[s]] * CTraitStrafe[s]);
+	return CEDodge[s] * CERunDodge[s] * FMax(0, 1 + TStrafeDodge[CLv[s]] * CTraitStrafe[s]);
 }
 
 // Turn rate of slot s now (0 while it takes in a new enemy).
@@ -1318,6 +1351,12 @@ function float AimSpread(Bot B, float ProjSpeed, int AimError)
 	s = Slot(B, false);
 	if (s >= 0 && CQuick[s] != 0 && Level.TimeSeconds < CQuickUntil[s])
 		E *= 0.8;
+	// Mod 0.23.0: hitscan sniper for instant hit shots (TraceFire aims with speed 1000000), last
+	// stand while it runs.
+	if (s >= 0 && CHitscan[s] != 0 && (ProjSpeed == 0 || ProjSpeed >= 1000000))
+		E *= 0.85;
+	if (s >= 0 && Level.TimeSeconds < CBoostUntil[s])
+		E *= CBoostMul[s];
 	return E;
 }
 

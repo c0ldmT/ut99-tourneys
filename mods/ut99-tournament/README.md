@@ -196,6 +196,19 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > unsafe modes skipped, arsenal refills and kills with the spawn weapon). The health hound and scavenger log their
 > errands by kind now; a goal errand (scavenger, health hound, quartermaster) ends at the bot's death.
 
+> Mod 0.23.0: Dream Team traits of wave 2 (decision 278, plan Season 3 P5) - new `btrt` codes. Values: `hs` hitscan
+> sniper (aim error -15 % for instant hit shots - shock beam, sniper rifle, enforcer, minigun; TourneySkillCurve). Body:
+> `ea` escape artist (on the retreat below 40 health 15 % faster, dodges x1.3), `cq` close quarters (damage +15 %
+> within 400 units), `ps` power surge (damage +20 % for 10 s after an amplifier, a shield belt, body armour or the keg),
+> `ls` last stand (once per life a hit that leaves it below 30 health: 4 s aim error x0.5 and damage taken x0.7).
+> Behaviour: `br` belt runner (belts, armour and the keg from 12 s before they are back and when they lie there, 12 %
+> faster on the way while no enemy is around), `ff` focus fire (team games: every bot of its team prefers an enemy a
+> team mate hit within 2 s, +5 % damage on him). The power item list takes kegs now (only the belt runner goes for
+> them; at most 16 other items as before). Hitscan sniper and last stand's aim act through the skill curve. Trait log
+> ids 53-59 (episodes: belt runner runs with items taken, escape artist, power surge with extra damage, last stand with
+> damage prevented; counters: close quarters hits and extra damage, hitscan sniper seconds with an instant hit weapon,
+> focus fire focused hits, extra damage and kills).
+
 ## Classes
 
 | Class | Role |
@@ -399,6 +412,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 73 | **Prestige** (mod 0.20.0) | Mod 0.20.0 built, bridge updated. Test instance: a Dream Team bot with prestige points (test mode: set them on the bot, or in the database `prestige_json`), e.g. armour 3 and sprint 3, in a 1v1 against a bot without. 1) Bridge log: `bprs` line after `btrt` with nine digits. 2) Spectate: the bot spawns with 15 armour (HUD of the bot view; 40 with starter armour), it runs visibly faster to items and when it flees, not in a fight. 3) Aim/firepower/toughness: no visible check, `pnpm --filter @tourney/api bot:sim` shows their sizes. 4) A bot without points and a normal tournament behave as in 0.19.2. No `Accessed None` |
 | 74 | **Signatures** (mod 0.21.0) | Mod 0.21.0 built, bridge updated. Test instance: a bought library bot with a signature (test mode / database `bots.signature_json`, e.g. `{"code":"tough","level":2,"since":1}` or `home` with the map of the game) in a Dream Team 1v1. 1) Bridge log: `bsig` line after `bprs` (`s=t2`, `m=` for home). 2) Server log without `Accessed None` in `OnTakeDamage`/`SigDealt`. 3) Effects are not visible by eye; `pnpm --filter @tourney/api bot:sim` shows their sizes (section Signaturen). 4) A bot without a signature and a normal tournament behave as in 0.20.0 |
 | 75 | **Traits of wave 1** (mod 0.22.0) | Mod 0.22.0 built, website updated, skill curve on. Dream Team DM (team game, 3on3 or larger) with roster bots carrying the new traits (test mode: put them on bots). 1) Server log: `game trait arsenal: <bot> gets UT_FlakCannon` at the first spawn, `UT_Eightball` at the next; once per life `refills` when a weapon runs dry. 2) Bot log: `quartermaster heads for <ammo or weapon>` when it runs low and sees no enemy. 3) Trait log of the game on the match page: cool head and momentum episodes, clutch episodes while its side is behind by 3+ frags, quick draw windows, spawn guard damage prevented, fast hands switches, trigger discipline weapons kept / unsafe modes skipped, arsenal refills. 4) Server log without `Accessed None` in `Behind`, `ArsenalTick`, `AmmoGoal`, `BotSwitch`. 5) A bot without the new traits and a normal tournament behave as in 0.21.0 |
+| 76 | **Traits of wave 2** (mod 0.23.0) | Mod 0.23.0 built, website updated, skill curve on. Dream Team team DM (3on3 or larger) on a map with shield belt, armour and keg, roster bots carrying the new traits. 1) Bot log: `item timing heads for` lines for a belt runner (also for the keg). 2) Server log: `game trait last stand: <bot>` once per life at most. 3) Trait log of the game: belt runner runs with items, escape artist episodes, close quarters hits, hitscan sniper seconds, power surge episodes after amp/belt/armour/keg, focus fire hits and kills (on the team mates' targets), last stand episodes with damage prevented. 4) Server log without `Accessed None` in `FocusHit`, `FocusThreat`, `ItemControl`, `AimSpread`. 5) A bot without the new traits and a normal tournament behave as in 0.22.0 |
 
 ## SmartStockBots (optional)
 

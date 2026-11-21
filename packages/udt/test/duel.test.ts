@@ -69,6 +69,29 @@ describe('skill curve data', () => {
     expect(curve).toContain(`CTdAt[s] < ${n.triggerDiscipline.sec} `);
   });
 
+  it('has the numbers of the traits of wave 2 in the mod (277, 278)', () => {
+    const core = file('../../../mods/ut99-tournament/Classes/TourneyCore.uc');
+    const curve = file('../../../mods/ut99-tournament/Classes/TourneySkillCurve.uc');
+    const n = NEW_TRAIT_EFFECT;
+    expect(core).toContain(`ItemControl(B, c, ${n.beltRunner.ahead}, 1, 1)`);
+    expect(core).toContain(`F *= ${n.beltRunner.sprint}; // mod 0.23.0: belt runner`);
+    expect(core).toContain(`B.Health < ${n.escapeArtist.below} && B.IsInState('Retreating')`);
+    expect(core).toContain(`F *= ${n.escapeArtist.speed}; // mod 0.23.0: escape artist`);
+    expect(core).toContain(`Curve.SetRunDodge(B, ${n.escapeArtist.dodge});`);
+    expect(core).toContain(`InstigatedBy.Location) < ${n.closeQuarters.range})`);
+    expect(core).toContain(`ActualDamage * ${n.closeQuarters.dealt})`);
+    expect(curve).toContain(`E *= ${n.hitscanSniper.aim};`);
+    expect(core).toContain(`ActualDamage * ${n.powerSurge.dealt})`);
+    expect(core).toContain(`CfgPsUntil[c] = Level.TimeSeconds + ${n.powerSurge.sec}.0;`);
+    expect(core).toContain(`ActualDamage * ${n.focusFire.dealt})`);
+    expect(core).toContain(`Level.TimeSeconds - FfAt[k] < ${n.focusFire.sec}.0`);
+    expect(core).toContain(`Victim.Health - ActualDamage < ${n.lastStand.below})`);
+    expect(core).toContain(
+      `Curve.AimBoost(Bot(Victim), ${n.lastStand.aim}, ${n.lastStand.sec}.0);`,
+    );
+    expect(core).toContain(`ActualDamage * ${n.lastStand.taken})`);
+  });
+
   it('has the plan for mod 0.15.0 in the mod', () => {
     const raw = JSON.parse(file('../../../apps/api/scripts/bot-curves/plan-0.15.json'));
     const c = withCurve(CURRENT_CURVE, raw);

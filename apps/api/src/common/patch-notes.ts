@@ -22,6 +22,29 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 278,
+    date: '2026-11-22',
+    mod: '0.23.0',
+    en: {
+      title: 'Seven more traits',
+      items: [
+        'Uncommon: belt runner (knows when shield belts, armour and the keg come back, faster on the way), escape artist (faster and dodges more on the retreat when hurt), close quarters (more damage up close).',
+        'Rare: Hitscan Sniper (better aim with shock beam, sniper rifle, enforcer and minigun), power surge (more damage for 10 s after a power item).',
+        'Epic: focus fire (team games: the whole team goes for the enemy a team mate is hitting). Legendary: last stand (once per life below 30 health: 4 s of much better aim and less damage taken).',
+        'The match page shows what the new traits did in the trait log.',
+      ],
+    },
+    de: {
+      title: 'Sieben weitere Traits',
+      items: [
+        'Uncommon: Belt runner (kennt die Respawn-Zeiten von Gürteln, Rüstung und Keg, auf dem Weg schneller), Escape artist (schneller und mehr Ausweichen auf dem Rückzug, wenn angeschlagen), Close quarters (mehr Schaden aus der Nähe).',
+        'Rare: Hitscan Sniper (besser zielen mit Shock-Strahl, Sniper Rifle, Enforcer und Minigun), Power surge (mehr Schaden für 10 s nach einem Power-Item).',
+        'Epic: Focus fire (Teamspiele: das ganze Team nimmt den Gegner, den ein Teamkollege gerade trifft). Legendary: Last stand (einmal pro Leben unter 30 Leben: 4 s viel besser zielen und weniger Schaden nehmen).',
+        'Die Match-Seite zeigt im Trait-Log, was die neuen Traits getan haben.',
+      ],
+    },
+  },
+  {
     id: 276,
     date: '2026-11-21',
     mod: '0.22.0',
