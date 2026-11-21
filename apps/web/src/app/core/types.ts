@@ -62,6 +62,8 @@ export interface UdtHub {
     points: number;
     /** Free prestige points of the own bots (decision 265). */
     prestige?: number;
+    /** The trophy room's crest (decision 268). */
+    crest?: UdtCrest | null;
   } | null;
   league: {
     visible: boolean;
@@ -1239,6 +1241,8 @@ export interface UdtRosterBot {
     mentor?: { botId: string; name: string; here: boolean } | null;
     /** Prestige (decision 262): null while it is still developing. */
     prestige?: UdtPrestige | null;
+    /** A talent's hidden trait waits for level 10 (decision 267; which one stays hidden). */
+    anlage?: boolean;
   } | null;
   career?: UdtCareer | null;
 }
@@ -1400,8 +1404,57 @@ export interface UdtView {
   keepers?: { botId: string; name: string; skill: number; nextSkill: number }[];
   /** Training camp (decision 254): price, experience, the bots trained today. */
   camp?: UdtCamp;
-  /** Club upgrades of the season (decision 264). */
+  /** Club buildings of the season (decisions 264, 266). */
   club?: UdtClubUpgrade[];
+  /** The trophy room's crest (decision 266; null without the room). */
+  crest?: UdtCrest | null;
+  /** Neuro put into the club house this season (decision 268). */
+  clubSpent?: number;
+  /** Hidden traits that came free since the last look (decision 268; scrap: held already). */
+  anlagen?: { code: string; scrap: boolean }[];
+}
+
+/** A club's crest (decision 266): shape and colour of CREST_SHAPES / CREST_COLORS. */
+export interface UdtCrest {
+  shape: string;
+  color: string;
+}
+
+/** The trophy wall (decisions 266, 268). */
+export interface UdtTrophies {
+  crest: UdtCrest | null;
+  trophyRoom: boolean;
+  league: {
+    season: number;
+    kind: 'champion' | 'final' | 'up';
+    tier: number;
+    place: number | null;
+  }[];
+  cups: { season: number; wins: number }[];
+  stages: { season: number; botId: string; name: string; stage: string; stars: number }[];
+}
+
+/** The analysis room (decision 266): the next league game and the club's map record. */
+export interface UdtAnalysis {
+  next: {
+    fixtureId: string;
+    day: string;
+    at: string;
+    home: boolean;
+    opponent: { clubId: string; name: string; tag: string; ai: boolean };
+    bots: {
+      name: string;
+      skill: number;
+      accuracy: number;
+      alertness: number;
+      strafing: number;
+      traits: string[];
+      prestige: number;
+    }[];
+    strength: { ours: number; theirs: number };
+    chance: number;
+  } | null;
+  maps: { map: string; won: number; lost: number }[];
 }
 
 /** Training camp (decision 254): experience for Neuro, once per bot and day. */
@@ -1601,6 +1654,8 @@ export interface LeagueClubRef {
   id: string;
   name: string;
   tag: string;
+  /** The trophy room's crest (decision 266). */
+  crest?: UdtCrest;
   /** A manager's club (else an AI club). */
   manager: boolean;
   /** An AI manager's club (decision 250; `manager` is true as well). */
@@ -1887,6 +1942,8 @@ export interface UdtTradePreview {
 export interface UdtTalentReport {
   name: string;
   skill: number;
+  /** A rough diamond with a hidden trait (decision 267). */
+  anlage?: boolean;
   ranges: Record<'accuracy' | 'alertness' | 'strafing', [number, number]>;
   potential: [number, number];
 }
@@ -1936,8 +1993,11 @@ export interface UdtAcademy {
   tag: string;
   index: number;
   scoutPrice: number;
-  licence: { made: number; nextPrice: number | null };
+  /** talentPrice: a talent's licence, half the price (decision 267). */
+  licence: { made: number; nextPrice: number | null; talentPrice?: number };
   rosterFull: boolean;
+  /** The scouting office's level (0: none). */
+  scoutLevel?: number;
   report: UdtTalentReport[] | null;
   mentors: UdtMentor[];
   own: UdtRosterBot[];

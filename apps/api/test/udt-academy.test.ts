@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { SCRAP, traitDef } from '@tourney/udt';
+import { clubUpgradePrice, SCRAP, traitDef, type ClubUpgrade } from '@tourney/udt';
 import type { RunningApi } from '../src/app.js';
 import { BotsService } from '../src/bots/bots.service.js';
 import { DB, type Db } from '../src/db/database.js';
@@ -153,19 +153,24 @@ describe('Unreal Dream Team: academy', () => {
     db.update(udtRoster).set({ xp: 600 }).where(eq(udtRoster.botId, kid.botId)).run();
     expect((await mario.get('/udt')).body.anlagen).toEqual([]);
     db.update(udtRoster).set({ xp: 630 }).where(eq(udtRoster.botId, kid.botId)).run();
-    expect((await mario.get('/udt')).body.anlagen).toEqual(['vampire']);
+    expect((await mario.get('/udt')).body.anlagen).toEqual([{ code: 'vampire', scrap: false }]);
     expect((await mario.get('/udt')).body.anlagen).toEqual([]);
     const cards = db.select().from(udtTraits).where(eq(udtTraits.userId, marioId)).all();
     expect(cards.filter((c) => c.code === 'vampire' && c.source === 'talent')).toHaveLength(1);
     // The same trait a second time (already in the inventory) becomes scrap.
     const scrap0 = db.select().from(udtTeams).where(eq(udtTeams.userId, marioId)).get()!.scrap;
     db.update(udtBots).set({ anlageAt: null }).where(eq(udtBots.botId, kid.botId)).run();
-    expect((await mario.get('/udt')).body.anlagen).toEqual(['vampire']);
+    expect((await mario.get('/udt')).body.anlagen).toEqual([{ code: 'vampire', scrap: true }]);
     const after = db.select().from(udtTraits).where(eq(udtTraits.userId, marioId)).all();
     expect(after.filter((c) => c.code === 'vampire')).toHaveLength(1);
     expect(db.select().from(udtTeams).where(eq(udtTeams.userId, marioId)).get()!.scrap).toBe(
       scrap0 + SCRAP[traitDef('vampire')!.rarity],
     );
+    // Came free after a game (no page open): the Dream Team page tells it once (decision 268).
+    db.update(udtBots).set({ anlageAt: null }).where(eq(udtBots.botId, kid.botId)).run();
+    expect(api!.app.get(UdtService).grantAnlagen(1, marioId)).toEqual(['vampire']);
+    expect((await mario.get('/udt')).body.anlagen).toEqual([{ code: 'vampire', scrap: true }]);
+    expect((await mario.get('/udt')).body.anlagen).toEqual([]);
     // Below its potential a talent learns 30 % faster (the training camp).
     const udt = api!.app.get(UdtService);
     expect(udt.talentLearners(1, marioId).has(kid.botId)).toBe(true);
@@ -436,6 +441,24 @@ describe('Unreal Dream Team: academy', () => {
     ).toBe(400);
     const tro = (await mario.get('/udt/trophies')).body;
     expect(tro).toMatchObject({ crest: { shape: 'star', color: '#f5c75e' }, trophyRoom: true });
+    // Decision 268: league titles on the wall, the crest in the views, Neuro put in, office level.
+    expect(tro.league).toEqual([]);
+    const v268 = (await mario.get('/udt')).body;
+    expect(v268.crest).toEqual({ shape: 'star', color: '#f5c75e' });
+    const paid = v268.club.reduce(
+      (n: number, c: { kind: string; level: number }) =>
+        n +
+        Array.from({ length: c.level }, (_, l) =>
+          clubUpgradePrice(c.kind as ClubUpgrade, l, v268.index)!,
+        ).reduce((a, b) => a + b, 0),
+      0,
+    );
+    expect(v268.clubSpent).toBe(paid);
+    expect((await mario.get('/udt/hub')).body.team.crest).toEqual({
+      shape: 'star',
+      color: '#f5c75e',
+    });
+    expect((await mario.get('/udt/academy')).body.scoutLevel).toBe(1);
     // The fan shop pays a home game once (decision 266).
     const shop = api!.app.get(UdtService);
     shop.fanshopPay(1, marioId, 'home', 'fanshop:test');

@@ -14,6 +14,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
+  ANLAGE_LEVEL,
   BREAKTHROUGH_LEVEL,
   BREAKTHROUGH_VALUE,
   breakthroughStep,
@@ -104,6 +105,12 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 {{ 'udt.keep.kept' | t: { n: kf } }}</span
               >
             }
+            @if (b.own?.anlage) {
+              <span class="small"
+                ><span class="udt-mark anlage">{{ 'udt.scout.anlageShort' | t }}</span>
+                {{ 'udt.scout.anlageAt' | t: { n: anlageLevel } }}</span
+              >
+            }
             @if (b.own?.mentor; as mt) {
               <span class="small" [class.muted]="!mt.here">
                 {{
@@ -161,25 +168,57 @@ const SHORT: Readonly<Record<Stat, string>> = {
                   [next]="bt(b)?.to ?? null"
                 />
                 <p class="muted small">{{ 'udt.points.explain' | t }}</p>
+                <!-- Development steps as tiles like the prestige menu (decision 268). -->
                 <div class="steps">
                   @for (s of stats; track s) {
                     @let why = whyNot(b, s);
-                    <button
-                      type="button"
-                      class="step"
+                    @let st = stepOf(b, s);
+                    <div
+                      class="dtile"
                       [class.capped]="why === 'potential'"
-                      [disabled]="busy() || why !== null"
-                      [title]="why ? ('udt.points.why.' + why | t) : ''"
-                      (click)="develop(b, s)"
+                      [class.ready]="why === null"
                     >
-                      <b>{{ 'udt.academy.dev.' + s | t }}</b>
-                      @if (why === 'potential') {
-                        <span class="small">{{ 'udt.points.skillMax' | t }}</span>
-                      } @else {
-                        <span class="mono small">{{ preview(b, s) }}</span>
-                        <span class="cost">{{ 'udt.points.cost' | t: { n: cost[s] } }}</span>
-                      }
-                    </button>
+                      <div class="dhead">
+                        <b>{{ s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t) }}</b>
+                        @if (why !== 'potential') {
+                          <span class="dcost">{{ 'udt.points.cost' | t: { n: cost[s] } }}</span>
+                        }
+                      </div>
+                      <div class="dvals" aria-hidden="true">
+                        <span class="dnow">{{ st.now }}</span>
+                        @if (why !== 'potential') {
+                          <svg class="darr" viewBox="0 0 16 16">
+                            <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" />
+                          </svg>
+                          <span class="dnext">{{ st.next }}</span>
+                        }
+                      </div>
+                      <div class="dbar" aria-hidden="true">
+                        <i class="have" [style.width.%]="st.pctNow"></i>
+                        @if (why !== 'potential') {
+                          <i
+                            class="gain"
+                            [style.left.%]="st.pctNow"
+                            [style.width.%]="st.pctNext - st.pctNow"
+                          ></i>
+                        }
+                      </div>
+                      <button
+                        type="button"
+                        class="add"
+                        [class.primary]="why === null"
+                        [disabled]="busy() || why !== null"
+                        [title]="why ? ('udt.points.why.' + why | t) : ''"
+                        [attr.aria-label]="
+                          (s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t)) +
+                          ' ' +
+                          (why === 'potential' ? ('udt.points.skillMax' | t) : preview(b, s))
+                        "
+                        (click)="develop(b, s)"
+                      >
+                        {{ why === 'potential' ? ('udt.points.skillMax' | t) : st.add }}
+                      </button>
+                    </div>
                   }
                 </div>
                 @if (bt(b); as x) {
@@ -450,20 +489,82 @@ const SHORT: Readonly<Record<Stat, string>> = {
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 8px;
     }
-    .step {
+    .dtile {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
+      gap: 6px;
       padding: 8px 10px;
-      text-align: left;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: var(--panel);
     }
-    .step .cost {
+    .dtile.ready {
+      border-color: rgba(34, 211, 238, 0.45);
+      background: rgba(34, 211, 238, 0.05);
+    }
+    .dtile.capped {
+      border-style: dashed;
+    }
+    .dhead {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 6px;
+    }
+    .dcost {
       font-size: 0.72rem;
       color: var(--neuro-text);
+      white-space: nowrap;
     }
-    .step.capped {
-      border-style: dashed;
+    .dvals {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.45rem;
+      line-height: 1;
+    }
+    .dnow {
+      color: var(--text-2);
+    }
+    .dtile.capped .dnow {
+      color: var(--live);
+    }
+    .dnext {
+      color: var(--accent);
+    }
+    .darr {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .dbar {
+      position: relative;
+      height: 5px;
+      border-radius: 3px;
+      background: var(--panel-3);
+      overflow: hidden;
+    }
+    .dbar i {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+    }
+    .dbar .have {
+      background: var(--text-2);
+      opacity: 0.6;
+    }
+    .dbar .gain {
+      background: var(--accent);
+    }
+    .dtile .add {
+      min-height: 34px;
     }
     .tx {
       min-height: 0;
@@ -515,6 +616,8 @@ export class UdtBotPanel {
   protected readonly cost = DEVELOP_COST;
   protected readonly restPrice = DEFAULT_ECONOMY.restPrice;
   protected readonly blueprintPct = Math.round(DEFAULT_ECONOMY.blueprintSalary * 100);
+  /** A talent's hidden trait comes free at this level (decision 267). */
+  protected readonly anlageLevel = ANLAGE_LEVEL;
   /** Weekly salary of the bot (0: none). */
   protected salary(b: UdtRosterBot): number {
     return rosterSalary(b, this.index());
@@ -564,6 +667,24 @@ export class UdtBotPanel {
       { skill: b.skill, potential: b.own.potential[1], values: b.traits },
       b.own.points,
     );
+  }
+
+  /** A development tile: the value now and after the step, the bar (0-100, skill 0-7). */
+  protected stepOf(b: UdtRosterBot, s: Stat) {
+    if (s === 'skill') {
+      const now = Math.round(b.skill);
+      const next = Math.min(7, now + 1);
+      return {
+        now,
+        next,
+        pctNow: (100 * now) / 7,
+        pctNext: (100 * next) / 7,
+        add: `Skill +1`,
+      };
+    }
+    const now = Math.round(((b.traits[s] ?? 0) + 1) * 50);
+    const next = Math.min(100, now + 5);
+    return { now, next, pctNow: now, pctNext: next, add: `+${next - now}` };
   }
 
   /** The value now and after the step: "50 → 55" (skill "4 → 5"). */

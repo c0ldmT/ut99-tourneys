@@ -166,6 +166,8 @@ export class UdtAcademyService {
         talentPrice: Math.round((licencePrice(made, index) * TALENT_LICENCE) / 10) * 10,
       },
       rosterFull: !this.udt.rosterHasRoom(user.id, season, true, roster),
+      /** The scouting office's level (decision 266; 0: none). */
+      scoutLevel: this.udt.clubLevels(season, user.id).scouting ?? 0,
       report: s ? (JSON.parse(s.reportJson) as TalentReport[]) : null,
       mentors: roster.map((r) => {
         const mentorTrait = r.udtTraits.some((t) => t.code === 'mentor');

@@ -16,6 +16,7 @@ import { I18n, TPipe } from '../core/i18n';
 import { Loading } from '../core/loading';
 import type { LeagueGame, LeagueHistorySeason, LeagueRow, LeagueView } from '../core/types';
 import { UdtNav } from '../core/udt';
+import { UdtCrestMark } from '../components/udt-crest';
 
 /** A played league game with the pause before the next (as GAME_MINUTES of the API). */
 const GAME_MS = 4 * 60_000;
@@ -33,7 +34,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
  */
 @Component({
   selector: 'app-udt-league',
-  imports: [TPipe, RouterLink, UdtNav, NgTemplateOutlet],
+  imports: [TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -127,9 +128,13 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                           <td class="l pl">{{ r.place }}</td>
                           <td class="l">
                             <span class="lg-team">
-                              <span class="lg-tag opt" [class.me]="r.me">{{
-                                shortTag(r.tag)
-                              }}</span>
+                              @if (r.crest; as c) {
+                                <udt-crest class="opt" [crest]="c" [tag]="r.tag" [size]="22" />
+                              } @else {
+                                <span class="lg-tag opt" [class.me]="r.me">{{
+                                  shortTag(r.tag)
+                                }}</span>
+                              }
                               <span class="nm">{{ r.name }}</span>
                               <span
                                 class="lg-chip"
@@ -296,9 +301,19 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                           'league.badge.' + badge(g) | t
                         }}</span>
                         <span class="lg-qteams">
-                          <span [class.lg-win]="g.winner === g.home.id">{{ g.home.name }}</span>
+                          <span [class.lg-win]="g.winner === g.home.id">
+                            @if (g.home.crest; as c) {
+                              <udt-crest [crest]="c" [tag]="g.home.tag" [size]="18" />
+                            }
+                            {{ g.home.name }}</span
+                          >
                           <span class="muted">vs</span>
-                          <span [class.lg-win]="g.winner === g.away.id">{{ g.away.name }}</span>
+                          <span [class.lg-win]="g.winner === g.away.id">
+                            @if (g.away.crest; as c) {
+                              <udt-crest [crest]="c" [tag]="g.away.tag" [size]="18" />
+                            }
+                            {{ g.away.name }}</span
+                          >
                         </span>
                         <span class="mono small muted">{{ info(g) }}</span>
                         @if (g.tournament; as t) {

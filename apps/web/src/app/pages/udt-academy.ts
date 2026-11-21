@@ -16,6 +16,7 @@ import type {
   UdtTalentReport,
 } from '../core/types';
 import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from '../core/udt';
+import { ANLAGE_LEVEL } from '@tourney/udt';
 
 /**
  * Dream Team academy: licences, scouting three talents (values and potential as ranges),
@@ -65,57 +66,84 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
           {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt/team">{{ 'udt.nav.team' | t }}</a>
         </p>
       } @else {
-        <section class="card">
-          <div class="row between">
-            <h2>{{ 'udt.academy.scouting' | t }}</h2>
-            <button type="button" class="primary" [disabled]="busy()" (click)="scout()">
-              {{ 'udt.academy.scout' | t }} · {{ v.scoutPrice | neuro }}
+        <section class="card scout" aria-labelledby="scout-title">
+          <div class="shead">
+            <div class="sintro">
+              <div class="kpi">
+                {{ 'udt.nav.academy' | t }}
+                @if (v.scoutLevel) {
+                  · {{ 'udt.scout.office' | t: { n: v.scoutLevel } }}
+                }
+              </div>
+              <h2 id="scout-title">{{ 'udt.scout.title' | t }}</h2>
+              <p class="muted">{{ 'udt.scout.intro' | t }}</p>
+            </div>
+            <button type="button" class="sbtn" [disabled]="busy()" (click)="scout()">
+              {{ (v.report ? 'udt.scout.again' : 'udt.academy.scout') | t }} ·
+              {{ v.scoutPrice | neuro }}
             </button>
           </div>
-          <p class="muted small">{{ 'udt.academy.scoutText' | t }}</p>
           @if (v.report; as r) {
-            <div class="talents">
+            <div class="tgrid">
               @for (t of r; track $index; let i = $index) {
-                <div class="talent">
-                  <udt-card [bot]="talentCard(t, v.tag)" [small]="true" />
-                  <div class="tinfo">
-                    <div class="kpi">{{ 'udt.academy.report' | t }}</div>
-                    @for (k of keys; track k) {
-                      <div class="rg">
-                        <span>{{ 'udt.academy.stat.' + k | t }}</span>
-                        <span class="mono">{{ t.ranges[k][0] }}–{{ t.ranges[k][1] }}</span>
-                      </div>
-                    }
-                    <udt-potential [skill]="t.skill" [potential]="t.potential" [compact]="true" />
-                    <label
-                      >{{ 'udt.academy.name' | t }}
-                      <input
-                        type="text"
-                        maxlength="20"
-                        [name]="'n' + i"
-                        [ngModel]="names()[i] ?? t.name"
-                        (ngModelChange)="setName(i, $event)"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      class="primary"
-                      [disabled]="busy() || v.rosterFull || v.licence.nextPrice === null"
-                      (click)="sign(i, t)"
-                    >
-                      {{ 'udt.academy.sign' | t }}
-                      @if (v.licence.nextPrice) {
-                        · {{ v.licence.nextPrice | neuro }}
-                      }
-                    </button>
+                <div class="talent" [class.anlage]="t.anlage">
+                  <div class="thead">
+                    <b class="tname">{{ names()[i] ?? t.name }}</b>
+                    <span class="tskill"><span class="sr">Skill </span>{{ t.skill }}</span>
                   </div>
+                  <span class="tpot">{{
+                    'udt.scout.potential' | t: { a: t.potential[0], b: t.potential[1] }
+                  }}</span>
+                  <div class="tvals">
+                    @for (k of keys; track k) {
+                      <span class="tval" [title]="'udt.academy.stat.' + k | t"
+                        ><i>{{ short[k] }}</i
+                        ><b class="mono">{{ t.ranges[k][0] }}–{{ t.ranges[k][1] }}</b></span
+                      >
+                    }
+                  </div>
+                  <div class="tchips">
+                    <span class="tchip dia">{{ 'udt.scout.diamond' | t }}</span>
+                    @if (t.anlage) {
+                      <span class="tchip anl">{{
+                        'udt.scout.anlage' | t: { n: anlageLevel }
+                      }}</span>
+                    }
+                  </div>
+                  <label class="small tlabel"
+                    >{{ 'udt.academy.name' | t }}
+                    <input
+                      type="text"
+                      maxlength="20"
+                      [name]="'n' + i"
+                      [ngModel]="names()[i] ?? t.name"
+                      (ngModelChange)="setName(i, $event)"
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    class="primary"
+                    [disabled]="busy() || v.rosterFull || v.licence.nextPrice === null"
+                    (click)="sign(i, t)"
+                  >
+                    {{ 'udt.academy.sign' | t }}
+                    @if (talentPrice(v); as p) {
+                      · {{ p | neuro }}
+                    }
+                  </button>
+                  @if (talentPrice(v) !== null) {
+                    <span class="muted small thalf">{{ 'udt.scout.licence' | t }}</span>
+                  }
                 </div>
               }
             </div>
+          } @else {
+            <p class="muted small">{{ 'udt.academy.scoutText' | t }}</p>
           }
           @if (v.rosterFull) {
             <p class="muted small">{{ 'udt.academy.full' | t }}</p>
           }
+          <p class="muted small snote">{{ 'udt.scout.note' | t }}</p>
         </section>
 
         @if (v.blueprints.length) {
@@ -286,14 +314,12 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       justify-content: space-between;
       align-items: center;
     }
-    .talents,
     .own {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
       gap: 16px;
       margin-top: 12px;
     }
-    .talent,
     .ob {
       display: flex;
       gap: 12px;
@@ -303,7 +329,6 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
       border: 1px solid var(--border);
       background: #0c0f16;
     }
-    .tinfo,
     .oinfo {
       flex: 1;
       min-width: 0;
@@ -331,6 +356,136 @@ import { botRarity, buildCost, SKILL_NAMES, UdtCard, UdtNav, type CardBot } from
     .over {
       color: var(--danger);
     }
+    /* Scout report (decision 268, design "Scout-Bericht neu") */
+    .scout {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .shead {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .sintro {
+      flex: 1 1 420px;
+      min-width: 0;
+    }
+    .sintro h2 {
+      margin: 4px 0 0;
+    }
+    .sintro p {
+      margin: 6px 0 0;
+      max-width: 760px;
+    }
+    .sbtn {
+      margin-left: auto;
+    }
+    .tgrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 14px;
+    }
+    .talent {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--bg-2);
+    }
+    .talent.anlage {
+      border-color: rgba(178, 107, 255, 0.6);
+    }
+    .thead {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .tname {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      text-transform: uppercase;
+      overflow-wrap: anywhere;
+    }
+    .tskill {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-style: italic;
+      font-size: 1.9rem;
+      line-height: 1;
+    }
+    .tpot {
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .tvals {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .tval {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 4px 0;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .tval i {
+      font-style: normal;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+    .tval b {
+      font-size: 0.82rem;
+    }
+    .tchips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .tchip {
+      padding: 2px 9px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .tchip.dia {
+      color: var(--live);
+      border: 1px solid rgba(74, 222, 128, 0.45);
+    }
+    .tchip.anl {
+      color: var(--udt);
+      border: 1px solid rgba(178, 107, 255, 0.5);
+    }
+    .talent label {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .talent .tlabel {
+      margin-top: auto;
+    }
+    .sr {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+    .thalf {
+      margin-top: -4px;
+      text-align: center;
+    }
+    .snote {
+      margin: 0;
+    }
   `,
 })
 export class UdtAcademyPage {
@@ -341,6 +496,9 @@ export class UdtAcademyPage {
   protected readonly busy = signal(false);
   protected readonly names = signal<Partial<Record<number, string>>>({});
   protected readonly keys = ['accuracy', 'alertness', 'strafing'] as const;
+  protected readonly short = { accuracy: 'ACC', alertness: 'ALT', strafing: 'STR' } as const;
+  /** A hidden trait comes free at this level (decision 267). */
+  protected readonly anlageLevel = ANLAGE_LEVEL;
   private readonly router = inject(Router);
   protected readonly bpId = signal<string | null>(null);
   /** Blueprints build one skill (3): the points go into the values. */
@@ -416,18 +574,10 @@ export class UdtAcademyPage {
     });
   }
 
-  /** The talent as a card: values in the middle of the scout's ranges. */
-  protected talentCard(t: UdtTalentReport, tag: string): CardBot {
-    const mid = (k: 'accuracy' | 'alertness' | 'strafing') =>
-      (t.ranges[k][0] + t.ranges[k][1]) / 100 - 1;
-    return {
-      name: t.name,
-      skill: t.skill,
-      rarity: botRarity(t.skill),
-      tag,
-      traits: { accuracy: mid('accuracy'), alertness: mid('alertness'), strafing: mid('strafing') },
-      potential: t.potential,
-    };
+  /** A talent's licence: half the price (decision 267; null: no licence left). */
+  protected talentPrice(v: UdtAcademy): number | null {
+    if (v.licence.nextPrice === null) return null;
+    return v.licence.talentPrice ?? v.licence.nextPrice;
   }
 
   protected ownCard(b: UdtRosterBot, tag: string): CardBot {

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { CLUB_UPGRADES, clubMaxLevel, CREST_SHAPES } from '@tourney/udt';
 import { DICT, translate } from '../src/app/core/i18n-dict';
 
 function sources(dir: string): string[] {
@@ -25,6 +26,24 @@ describe('translations', () => {
     const missing = [...used].filter((k) => !(k in DICT.en));
     expect(missing).toEqual([]);
     expect(used.size).toBeGreaterThan(100);
+  });
+
+  it('has the club house keys (decision 268)', () => {
+    for (const lang of ['en', 'de'] as const) {
+      for (const k of CLUB_UPGRADES) {
+        expect(DICT[lang][`udt.club.k.${k}`]).toBeDefined();
+        expect(DICT[lang][`udt.club.n.${k}`]).toBeDefined();
+        for (let n = 1; n <= clubMaxLevel(k); n++)
+          expect(DICT[lang][`udt.club.e.${k}.${n}`]).toBeDefined();
+      }
+      for (const k of ['analysis', 'trophy'])
+        expect(DICT[lang][`udt.club.link.${k}`]).toBeDefined();
+      for (const s of CREST_SHAPES) expect(DICT[lang][`udt.crest.s.${s}`]).toBeDefined();
+      for (const c of ['violet', 'cyan', 'gold', 'green', 'red', 'blue', 'pink', 'silver'])
+        expect(DICT[lang][`udt.crest.c.${c}`]).toBeDefined();
+      for (const k of ['league', 'cup', 'stage'])
+        expect(DICT[lang][`udt.wall.kind.${k}`]).toBeDefined();
+    }
   });
 
   it('has the dynamic keys', () => {

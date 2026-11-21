@@ -44,6 +44,8 @@ import {
   TALENT_XP,
   FANSHOP_PAYS,
   ROSTER_PLACES,
+  CREST_COLORS,
+  CREST_SHAPES,
   type ClubEffects,
   type ClubLevels,
   type ClubUpgrade,
@@ -588,6 +590,8 @@ export class UdtService {
       striking: roster.filter((r) => r.striking).length,
       points,
       prestige,
+      /** The trophy room's crest (decision 268: next to the name in the hub). */
+      crest: this.crestOf(season, userId),
     };
   }
 
@@ -915,7 +919,7 @@ export class UdtService {
       return { enabled, season: season?.number ?? null, team: null, roster: [], index: 0.3 };
     const team = this.team(user.id, season.number);
     // First: a talent's hidden trait that came free shows in this very view (decision 267).
-    const anlagen = team ? this.grantAnlagen(season.number, user.id) : [];
+    if (team) this.grantAnlagen(season.number, user.id);
     const roster = team ? this.roster(user.id, season.number) : [];
     return {
       enabled,
@@ -945,12 +949,30 @@ export class UdtService {
       },
       /** Club upgrades of this season (decision 264): bought or their price. */
       club: this.clubView(user.id, season.number),
-      /** Hidden traits of talents that came free just now (decision 267; also after games). */
-      anlagen,
+      /** The trophy room's crest (decision 266; null without the room). */
+      crest: team ? this.crestOf(season.number, user.id) : null,
+      /** Neuro put into the club house this season (decision 268). */
+      clubSpent: team ? this.clubSpent(season.number, user.id) : 0,
       wallet: this.ledger.spendable(user.id),
       starterBudget: this.settings.get().udt.starterBudget,
       starterExtra: this.settings.get().udt.starterExtra,
     };
+  }
+
+  /** Neuro a manager paid for club buildings in a season. */
+  private clubSpent(season: number, userId: string): number {
+    const r = this.db
+      .select({ n: sql<number>`coalesce(-sum(${neuroLedger.amount}), 0)` })
+      .from(neuroLedger)
+      .where(
+        and(
+          eq(neuroLedger.season, season),
+          eq(neuroLedger.userId, userId),
+          eq(neuroLedger.kind, 'udt_club'),
+        ),
+      )
+      .get();
+    return Number(r?.n ?? 0);
   }
 
   /** A manager's club buildings of a season and their levels (decisions 264, 266). */
@@ -1137,7 +1159,7 @@ export class UdtService {
       const done = this.db.transaction((tx) => {
         const r = tx
           .update(udtBots)
-          .set({ anlageAt: now })
+          .set({ anlageAt: now, anlageNews: held ? 2 : 1 })
           .where(and(eq(udtBots.botId, b.botId), isNull(udtBots.anlageAt)))
           .run();
         if (r.changes !== 1) return false;
@@ -1160,6 +1182,32 @@ export class UdtService {
       out.push(code);
     }
     return out;
+  }
+
+  /**
+   * Hidden traits that came free since the manager last looked (decision 268; after games, the
+   * camp or on a page): told once, on the Dream Team page.
+   */
+  takeAnlageNews(season: number, userId: string): { code: string; scrap: boolean }[] {
+    const news = [...this.ownBots(season, userId).values()].filter(
+      (b) => b.anlage && b.anlageNews > 0,
+    );
+    if (!news.length) return [];
+    this.db
+      .update(udtBots)
+      .set({ anlageNews: 0 })
+      .where(
+        and(
+          eq(udtBots.season, season),
+          eq(udtBots.userId, userId),
+          inArray(
+            udtBots.botId,
+            news.map((b) => b.botId),
+          ),
+        ),
+      )
+      .run();
+    return news.map((b) => ({ code: b.anlage!, scrap: b.anlageNews === 2 }));
   }
 
   /** The trophy room's crest (shape and colour; decision 266). */
@@ -1229,10 +1277,12 @@ export class UdtService {
       .from(udtTeams)
       .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, userId)))
       .get();
+    // Until the manager picks one: the first shape and colour (decision 268).
+    const first: Crest = { shape: CREST_SHAPES[0], color: CREST_COLORS[0] };
     try {
-      return t?.c ? (JSON.parse(t.c) as Crest) : null;
+      return t?.c ? (JSON.parse(t.c) as Crest) : first;
     } catch {
-      return null;
+      return first;
     }
   }
 

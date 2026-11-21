@@ -44,6 +44,9 @@ import type {
   UdtTrades,
   UdtTestState,
   UdtView,
+  UdtCrest,
+  UdtTrophies,
+  UdtAnalysis,
   UdtWorkshopResult,
   AgentView,
   BetBoard,
@@ -272,7 +275,17 @@ export class Api {
     this.call<WebsiteSettings>('PUT', '/settings/udt', body, { ok: 'ok.settings' });
 
   // --- Unreal Dream Team
-  udt = () => this.call<UdtView>('GET', '/udt');
+  /** The team view; a talent's hidden trait that came free shows as a toast (decision 268). */
+  udt = async () => {
+    const v = await this.call<UdtView>('GET', '/udt');
+    for (const a of v.anlagen ?? [])
+      this.toasts.success(
+        this.i18n.t(a.scrap ? 'udt.anlage.scrap' : 'udt.anlage.free', {
+          trait: this.i18n.t(`udt.trait.${a.code}`),
+        }),
+      );
+    return v;
+  };
   udtHub = () => this.call<UdtHub>('GET', '/udt/hub');
   udtCreateTeam = (body: unknown) =>
     this.call<UdtView>('POST', '/udt/team', body, { ok: 'ok.udt.team' });
@@ -467,6 +480,12 @@ export class Api {
     this.call<UdtView>('POST', `/udt/club/${encodeURIComponent(kind)}`, undefined, {
       ok: 'ok.udt.club',
     });
+  /** The crest of the trophy room (decision 266). */
+  udtCrest = (crest: UdtCrest) => this.call<UdtView>('PUT', '/udt/club/crest', crest);
+  udtTrophies = () => this.call<UdtTrophies>('GET', '/udt/trophies');
+  /** The analysis room before the next league game (quiet: without the room it is refused). */
+  udtLeagueAnalysis = () =>
+    this.call<UdtAnalysis>('GET', '/udt/league/analysis', undefined, { quiet: true });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');
   /** The league (quiet: the page's refresh while games run). */
   udtLeague = (season?: number, quiet = false) =>

@@ -569,6 +569,8 @@ export const udtBots = sqliteTable('udt_bots', {
   /** A talent's hidden trait (migration 52, decision 267) and when it came free (level 10). */
   anlage: text('anlage'),
   anlageAt: text('anlage_at'),
+  /** Came free, not told yet (migration 53, decision 268): 1 inventory, 2 scrap. */
+  anlageNews: integer('anlage_news').notNull().default(0),
 });
 
 /** Club upgrades of a manager per season (migration 50, decision 264). */

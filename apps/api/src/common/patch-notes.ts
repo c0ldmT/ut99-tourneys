@@ -22,6 +22,30 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 268,
+    date: '2026-11-21',
+    en: {
+      title: 'Club house and scouting',
+      items: [
+        'New page Club house (My team): ten buildings for the season, some in three levels - training ground, physio, scouting office, analysis room, boarding school, workshop, fan shop, mentor wing, sports psychologist and trophy room.',
+        "Analysis room: before a league game My team shows the opponent's lineup with values, traits and prestige, both sides' strength and your record per map with a recommended home map.",
+        "Trophy room: pick a crest - it shows next to your team name in the league, the hub and My team - and see your trophy wall with titles, cup wins and your bots' final stages.",
+        'Scouting reworked: talents are rough diamonds (skill 2-3, high potential) that learn 30 % faster until they reach it, their licence costs half, and some carry a hidden trait that comes free at level 10. As keepers they lose no skill.',
+        'Development points: the buttons are tiles now, with the value before and after and a bar.',
+      ],
+    },
+    de: {
+      title: 'Vereinshaus und Scouting',
+      items: [
+        'Neue Seite Vereinshaus (Mein Team): zehn Gebäude für die Season, einige in drei Stufen – Trainingsplatz, Physio, Scouting-Büro, Analyse-Raum, Jugendinternat, Werkstatt, Fanshop, Mentoren-Flügel, Sportpsychologe und Trophäenraum.',
+        'Analyse-Raum: Vor einem Ligaspiel zeigt „Mein Team“ die Aufstellung des Gegners mit Werten, Traits und Prestige, die Stärke beider Seiten und deine Bilanz je Map mit einer empfohlenen Heim-Map.',
+        'Trophäenraum: Wähle ein Wappen – es steht neben deinem Teamnamen in der Liga, im Hub und bei „Mein Team“ – und sieh deine Trophäenwand mit Titeln, Cup-Siegen und den Endstufen deiner Bots.',
+        'Scouting überarbeitet: Talente sind Rohdiamanten (Skill 2–3, hohes Potenzial), lernen bis dahin 30 % schneller, ihre Lizenz kostet die Hälfte, und manche tragen eine verborgene Anlage, die mit Level 10 frei wird. Als Keeper verlieren sie keinen Skill.',
+        'Entwicklungspunkte: Die Knöpfe sind jetzt Kacheln mit dem Wert vorher und nachher und einem Balken.',
+      ],
+    },
+  },
+  {
     id: 265,
     date: '2026-11-21',
     mod: '0.20.0',

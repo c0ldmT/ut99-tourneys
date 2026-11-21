@@ -821,4 +821,9 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_bots ADD COLUMN anlage TEXT;
   ALTER TABLE udt_bots ADD COLUMN anlage_at TEXT;
   `,
+  // 53: a hidden trait that came free and the manager has not been told yet (decision 268):
+  // 1 into the inventory, 2 held already (scrap).
+  `
+  ALTER TABLE udt_bots ADD COLUMN anlage_news INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

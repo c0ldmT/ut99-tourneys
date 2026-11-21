@@ -196,6 +196,23 @@ describe('Dream Team league', () => {
     expect(kindsOf).not.toContain('udt_reward');
     const hist = (await mario.get('/udt/league/history')).body;
     expect(hist[0]).toMatchObject({ season: 1, test: false });
+    // The trophy wall's league titles (decision 268) follow the history (Nexus made champion).
+    db.update(leagueRuns).set({ champion: end.myClub.id }).run();
+    hist[0].champion = { name: 'Nexus' };
+    const tier = (hist[0].tiers as { name: string }[][]).findIndex((t) =>
+      t.some((c) => c.name === 'Nexus'),
+    );
+    const me = (
+      hist[0].tiers[tier] as { name: string; finalPlace: number | null; nextTier: number | null }[]
+    ).find((c) => c.name === 'Nexus')!;
+    const want: unknown[] = [];
+    if (hist[0].champion?.name === 'Nexus')
+      want.push({ season: 1, kind: 'champion', tier, place: 1 });
+    else if (me.finalPlace) want.push({ season: 1, kind: 'final', tier, place: me.finalPlace });
+    if (me.nextTier !== null && me.nextTier < tier)
+      want.push({ season: 1, kind: 'up', tier: me.nextTier, place: null });
+    expect(want[0]).toMatchObject({ kind: 'champion' });
+    expect((await mario.get('/udt/trophies')).body.league).toEqual(want);
   });
 
   it('the Dream Team hub shows the league and a short state of every area (decision 228)', async () => {

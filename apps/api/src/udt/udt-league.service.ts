@@ -2515,9 +2515,8 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const record = [...maps]
       .map(([map, m]) => ({ map, ...m }))
       .sort((a, b) => b.won - b.lost - (a.won - a.lost) || b.won - a.won);
-    const next = fixtures
-      .filter((f) => f.kind === 'league' && f.status === 'scheduled')
-      .sort((a, b) => a.day.localeCompare(b.day) || a.scheduledAt.localeCompare(b.scheduledAt))[0];
+    // The same next game as the league page's (also relegation and final four games).
+    const next = fixtures.find((f) => f.status === 'scheduled');
     if (!next) return { next: null, maps: record };
     const settings = this.leagueSettings('league');
     const opp = next.home === mine ? next.away : next.home;
@@ -2720,6 +2719,35 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       .all()
       .map((r) => r.s)
       .sort((a, b) => b - a);
+  }
+
+  /**
+   * A manager's league titles for the trophy wall (decision 268): champion, final four places
+   * and promotions of the finished (not test) leagues.
+   */
+  titles(
+    userId: string,
+  ): { season: number; kind: 'champion' | 'final' | 'up'; tier: number; place: number | null }[] {
+    const clubs = this.clubs();
+    const out: {
+      season: number;
+      kind: 'champion' | 'final' | 'up';
+      tier: number;
+      place: number | null;
+    }[] = [];
+    for (const r of this.db.select().from(leagueRuns).all()) {
+      if (r.status !== 'done' || r.test) continue;
+      for (const m of this.members(r.season)) {
+        if (clubs.get(m.clubId)?.userId !== userId) continue;
+        if (r.champion === m.clubId)
+          out.push({ season: r.season, kind: 'champion', tier: m.tier, place: 1 });
+        else if (m.finalPlace)
+          out.push({ season: r.season, kind: 'final', tier: m.tier, place: m.finalPlace });
+        if (m.nextTier !== null && m.nextTier < m.tier)
+          out.push({ season: r.season, kind: 'up', tier: m.nextTier, place: null });
+      }
+    }
+    return out.sort((a, b) => b.season - a.season);
   }
 
   /** History: champions and the tiers of every finished league season. */

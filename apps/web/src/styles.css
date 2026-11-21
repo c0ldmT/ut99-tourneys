@@ -1410,6 +1410,10 @@ main section[id] {
   color: var(--accent-hover);
   border-color: rgba(34, 211, 238, 0.4);
 }
+.udt-mark.anlage {
+  color: var(--udt);
+  border-color: rgba(178, 107, 255, 0.5);
+}
 @media (max-width: 560px) {
   .udt-card.small {
     width: 128px;
@@ -3348,6 +3352,127 @@ tr[class*='lg-z-'] .pl {
 }
 .lg-mynext p {
   margin: 10px 0 0;
+}
+/* Analysis room in the next league game (decision 268, design "Analyse-Raum") */
+.lg-an-chip {
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.5);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+.lg-an {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 14px;
+}
+.lg-an h3 {
+  margin: 0;
+  font: 700 1.25rem var(--font-display);
+  text-transform: uppercase;
+}
+.lg-an-main {
+  flex: 999 1 520px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lg-an-side {
+  flex: 1 1 280px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lg-an-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.lg-an-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+.lg-an-table th {
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.lg-an-table td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+}
+.lg-an-table td.nm {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.lg-an-table td.mono {
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+.lg-an-table td.pres {
+  color: var(--neuro-text);
+}
+.lg-an-str {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lg-an-strhead {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.9rem;
+}
+.lg-an-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--border);
+}
+.lg-an-bar .ours {
+  background: var(--accent);
+}
+.lg-an-bar .theirs {
+  background: var(--danger);
+}
+.lg-an-maps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.lg-an-map {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.lg-an-map .nm {
+  font-weight: 700;
+}
+.lg-an-map.best {
+  border-color: rgba(74, 222, 128, 0.5);
+  background: rgba(74, 222, 128, 0.06);
+}
+.lg-an-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--text-2);
 }
 
 /* Settings tab "UDT Liga" (components/settings-league.ts, decision 230) */

@@ -39,9 +39,10 @@ export const UDT_AREAS: readonly UdtArea[] = [
     items: [
       { label: 'udt.tab.team', link: '/udt/team' },
       { label: 'udt.nav.academy', link: '/udt/academy' },
+      { label: 'udt.nav.club', link: '/udt/club' },
       { label: 'udt.nav.yearbook', link: '/udt/yearbook' },
     ],
-    paths: ['/udt/team', '/udt/academy', '/udt/yearbook', '/udt/bot/'],
+    paths: ['/udt/team', '/udt/academy', '/udt/club', '/udt/yearbook', '/udt/bot/'],
   },
   {
     id: 'league',

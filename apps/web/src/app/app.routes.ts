@@ -78,6 +78,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/udt-trades').then((m) => m.UdtTradesPage),
       },
       {
+        path: 'udt/club',
+        title: 'udt.nav.club',
+        loadComponent: () => import('./pages/udt-club').then((m) => m.UdtClubPage),
+      },
+      {
         path: 'udt/academy',
         title: 'udt.nav.academy',
         loadComponent: () => import('./pages/udt-academy').then((m) => m.UdtAcademyPage),

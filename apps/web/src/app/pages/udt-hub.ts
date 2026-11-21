@@ -7,6 +7,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { UdtCrestMark } from '../components/udt-crest';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
@@ -40,13 +41,18 @@ interface AreaView {
  */
 @Component({
   selector: 'app-udt-hub',
-  imports: [RouterLink, TPipe, UdtNav],
+  imports: [RouterLink, TPipe, UdtNav, UdtCrestMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav [bare]="true" (changed)="load()" />
     <div class="hub-head">
       <h1 class="disp">{{ 'udt.title' | t }}</h1>
-      <span class="muted">{{ headLine() }}</span>
+      <span class="muted hub-who">
+        @if (hub()?.team?.crest; as c) {
+          <udt-crest [crest]="c" [tag]="hub()?.team?.tag ?? ''" [size]="22" />
+        }
+        {{ headLine() }}</span
+      >
     </div>
 
     <!-- Large screens: the shape with the fields of every area. -->
@@ -231,6 +237,11 @@ interface AreaView {
     }
     .hub-head h1 {
       margin: 0;
+    }
+    .hub-who {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
     .hub-stage {
       position: relative;

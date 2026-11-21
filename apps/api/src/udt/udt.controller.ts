@@ -100,6 +100,8 @@ export class UdtController {
       ...v,
       roster: v.roster.map((r) => ({ ...r, career: careers.get(r.botId) ?? null })),
       tradesIn,
+      /** Hidden traits that came free since the last look (decision 268): told once. */
+      anlagen: v.team && v.season !== null ? this.udt.takeAnlageNews(v.season, user.id) : [],
     };
   }
 
@@ -254,11 +256,12 @@ export class UdtController {
     return this.udt.setCrest(user, body);
   }
 
-  /** The trophy wall (decision 266): cup wins, the bots' stages and marks, the crest. */
+  /** The trophy wall (decisions 266, 268): league titles, cup wins, the bots' stages, the crest. */
   @Get('trophies')
   trophies(@CurrentUser() user: User) {
     this.udt.assertOn();
-    return this.udt.trophies(user.id);
+    // League titles (decision 268) next to cups and stages.
+    return { ...this.udt.trophies(user.id), league: this.league.titles(user.id) };
   }
 
   /** A club upgrade for the rest of the season (decision 264). */

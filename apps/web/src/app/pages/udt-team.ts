@@ -2,6 +2,7 @@ import { emptyLook, lookBody, UdtBotLook, type UdtLooks } from '../components/ud
 import { UdtBotPanel } from '../components/udt-bot-panel';
 import { UdtKeepersPanel } from '../components/udt-keepers';
 import { UdtLeagueNext } from '../components/udt-league-next';
+import { UdtCrestMark } from '../components/udt-crest';
 import { UdtLineupBoard, type TraitDrop } from '../components/udt-lineup-board';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -40,6 +41,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
     UdtBotPanel,
     UdtKeepersPanel,
     UdtLeagueNext,
+    UdtCrestMark,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -132,6 +134,9 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           <div>
             <div class="kpi" style="color: var(--udt)">{{ 'udt.season' | t: { n: v.season } }}</div>
             <h1 class="disp">
+              @if (v.crest; as c) {
+                <udt-crest [crest]="c" [tag]="v.team.tag" [size]="34" />
+              }
               <span style="color: var(--hot-text)">{{ v.team.tag }}</span> {{ v.team.name }}
             </h1>
           </div>
