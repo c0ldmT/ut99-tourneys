@@ -50,6 +50,10 @@ const COUNTER: Record<string, { uses: string; effect: string }> = {
   'fast-hands': { uses: 'trait.log.earlySwitch', effect: 'trait.log.killsAfter' },
   'trigger-discipline': { uses: 'trait.log.held', effect: 'trait.log.unsafe' },
   arsenal: { uses: 'trait.log.refills', effect: 'trait.log.spawnWeaponKills' },
+  // mod 0.23.0 (decision 278)
+  'close-quarters': { uses: 'trait.log.hits', effect: 'trait.log.extra' },
+  'hitscan-sniper': { uses: 'trait.log.hitscanSec', effect: '' },
+  'focus-fire': { uses: 'trait.log.focusHits', effect: 'trait.log.focusEffect' },
 };
 
 /** Episode traits with a value of their own (mod 0.18.0): what it means. */
@@ -59,6 +63,10 @@ const EPISODE_VALUE: Record<string, string> = {
   // mod 0.22.0
   clutch: 'trait.log.extra',
   quartermaster: 'trait.log.ammo',
+  // mod 0.23.0
+  'belt-runner': 'trait.log.items',
+  'power-surge': 'trait.log.extra',
+  'last-stand': 'trait.log.prevented',
 };
 
 /**

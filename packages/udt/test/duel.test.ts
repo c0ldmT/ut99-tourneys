@@ -40,7 +40,7 @@ describe('skill curve data', () => {
   it('has the run-time aim edges of cold blood and weapon master in the mod (242)', () => {
     const core = file('../../../mods/ut99-tournament/Classes/TourneyCore.uc');
     for (const [trait, e] of Object.entries(RUNTIME_EDGES))
-      if (trait !== 'quick-draw' && trait !== 'momentum')
+      if (trait !== 'quick-draw' && trait !== 'momentum' && trait !== 'hitscan-sniper')
         expect(core, trait).toContain(`F *= ${e.aim};`);
   });
 
@@ -106,6 +106,11 @@ describe('bots for the duel', () => {
     expect(m.timed.aim).toBeLessThan(0.9);
     expect(m.timed.dealt).toBeCloseTo(1 + 0.2 * TRAIT_UPTIME.clutch);
     expect(resolveBot({ level: 3 }).timed).toEqual({ aim: 1, dealt: 1, taken: 1 });
+    // Wave 2 (decision 277).
+    expect(resolveBot({ level: 3, traits: [{ code: 'hitscan-sniper' }] }).hitscanAim).toBe(0.85);
+    expect(resolveBot({ level: 3, traits: [{ code: 'close-quarters' }] }).close.dealt).toBe(1.15);
+    expect(resolveBot({ level: 3, traits: [{ code: 'last-stand' }] }).lastStand?.below).toBe(30);
+    expect(resolveBot({ level: 3 }).lastStand).toBeNull();
   });
 });
 

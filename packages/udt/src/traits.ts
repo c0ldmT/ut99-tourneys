@@ -88,7 +88,15 @@ export type TraitCode =
   | 'quartermaster'
   | 'momentum'
   | 'trigger-discipline'
-  | 'arsenal';
+  | 'arsenal'
+  // Wave 2 (decision 277, mod 0.23.0).
+  | 'belt-runner'
+  | 'escape-artist'
+  | 'close-quarters'
+  | 'hitscan-sniper'
+  | 'power-surge'
+  | 'focus-fire'
+  | 'last-stand';
 
 export interface TraitDef {
   code: TraitCode;
@@ -180,6 +188,15 @@ export const TRAITS: readonly TraitDef[] = [
   { code: 'momentum', rarity: 'epic', category: 'values', mod: 'mo' },
   { code: 'trigger-discipline', rarity: 'epic', category: 'behaviour', mod: 'td' },
   { code: 'arsenal', rarity: 'legendary', category: 'body', mod: 'an' },
+  // Wave 2 (decision 277, mod 0.23.0). Hitscan sniper: "marksman" of the concept (owner's name,
+  // the signature marksman is another thing).
+  { code: 'belt-runner', rarity: 'uncommon', category: 'behaviour', mod: 'br' },
+  { code: 'escape-artist', rarity: 'uncommon', category: 'body', mod: 'ea' },
+  { code: 'close-quarters', rarity: 'uncommon', category: 'body', mod: 'cq' },
+  { code: 'hitscan-sniper', rarity: 'rare', category: 'values', mod: 'hs' },
+  { code: 'power-surge', rarity: 'rare', category: 'body', mod: 'ps' },
+  { code: 'focus-fire', rarity: 'epic', category: 'behaviour', mod: 'ff' },
+  { code: 'last-stand', rarity: 'legendary', category: 'body', mod: 'ls' },
 ];
 
 /**
@@ -195,6 +212,14 @@ export const TRAITS: readonly TraitDef[] = [
  * rating `gap` better and at most every `sec` (the safety distances always). Arsenal: at the
  * spawn a full flak cannon or rocket launcher (in turns), once per life the weapon in hand
  * back to `refill` of its ammo when it runs dry.
+ *
+ * Wave 2 (decision 277): belt runner - shield belts, armour and the keg from `ahead` seconds
+ * before they are back, `sprint` × on the way; escape artist - on the retreat below `below`
+ * health speed × and dodges ×; close quarters - damage × within `range` units; hitscan sniper -
+ * aim error × for instant hit shots (shock beam, sniper, enforcer, minigun); power surge - damage
+ * × for `sec` after an amplifier, a shield belt, body armour or the keg; focus fire (team games) - its team
+ * prefers an enemy a team mate hit within `sec`, damage × on him; last stand - once per life
+ * below `below` health for `sec` aim error × and damage taken ×.
  */
 export const NEW_TRAIT_EFFECT = {
   coolHead: { aim: 0.85, sec: 6 },
@@ -206,6 +231,14 @@ export const NEW_TRAIT_EFFECT = {
   momentum: { perKill: 0.12, max: 3 },
   triggerDiscipline: { gap: 0.3, sec: 3 },
   arsenal: { refill: 0.5 },
+  // Wave 2 (decision 277).
+  beltRunner: { sprint: 1.12, ahead: 12 },
+  escapeArtist: { below: 40, speed: 1.15, dodge: 1.3 },
+  closeQuarters: { dealt: 1.15, range: 400 },
+  hitscanSniper: { aim: 0.85 },
+  powerSurge: { dealt: 1.2, sec: 10 },
+  focusFire: { dealt: 1.05, sec: 2 },
+  lastStand: { below: 30, aim: 0.5, taken: 0.7, sec: 4 },
 } as const;
 
 const BY_CODE = new Map(TRAITS.map((t) => [t.code, t]));
@@ -260,6 +293,10 @@ const LOG_COUNTERS = new Set<TraitCode>([
   'fast-hands',
   'trigger-discipline',
   'arsenal',
+  // mod 0.23.0 (decision 277)
+  'close-quarters',
+  'hitscan-sniper',
+  'focus-fire',
 ]);
 
 /** Values traits that act only at times (mod 0.18.0): logged like body traits. */
@@ -570,6 +607,8 @@ export const RUNTIME_EDGES: Readonly<
   'cool-head': { aim: NEW_TRAIT_EFFECT.coolHead.aim, score: 0.015 },
   'quick-draw': { aim: NEW_TRAIT_EFFECT.quickDraw.aim, score: 0.02 },
   momentum: { aim: 1 - NEW_TRAIT_EFFECT.momentum.perKill, score: 0.05 },
+  // Mod 0.23.0 (decision 277): instant hit shots.
+  'hitscan-sniper': { aim: NEW_TRAIT_EFFECT.hitscanSniper.aim, score: 0.04 },
 };
 
 /** The bot's edges in the game: multipliers multiply, degrees add. */

@@ -350,6 +350,9 @@ export const TRAIT_UPTIME = {
   'spawn-guard': 0.05,
   clutch: 0.35,
   momentum: 1.2,
+  // Wave 2 (decision 277): share of its fighting within 10 s after an amplifier, a shield belt,
+  // body armour or the keg.
+  'power-surge': 0.2,
 } as const;
 
 /** 0..100 (Dream Team pages) to the stored -1..1. */
@@ -401,6 +404,14 @@ export interface ResolvedBot {
    */
   quick: number;
   timed: { aim: number; dealt: number; taken: number };
+  /**
+   * Wave 2 (decision 277): aim × for instant hit weapons (hitscan sniper), damage × within its
+   * range (close quarters), last stand (once per meeting below its health: aim × and damage
+   * taken × for its seconds).
+   */
+  hitscanAim: number;
+  close: { dealt: number; range: number };
+  lastStand: { below: number; aim: number; taken: number; sec: number } | null;
   /** Signature (decision 271): damage × with a weapon, aim × with weapons, damage taken × when hurt. */
   sig: {
     weapon: WeaponCode | null;
@@ -511,11 +522,21 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
             NEW_TRAIT_EFFECT.momentum.perKill *
               Math.min(NEW_TRAIT_EFFECT.momentum.max, TRAIT_UPTIME.momentum)
           : 1),
-      dealt: has('clutch') ? 1 + (NEW_TRAIT_EFFECT.clutch.dealt - 1) * TRAIT_UPTIME.clutch : 1,
+      dealt:
+        (has('clutch') ? 1 + (NEW_TRAIT_EFFECT.clutch.dealt - 1) * TRAIT_UPTIME.clutch : 1) *
+        (has('power-surge')
+          ? 1 + (NEW_TRAIT_EFFECT.powerSurge.dealt - 1) * TRAIT_UPTIME['power-surge']
+          : 1),
       taken: has('spawn-guard')
         ? 1 - (1 - NEW_TRAIT_EFFECT.spawnGuard.taken) * TRAIT_UPTIME['spawn-guard']
         : 1,
     },
+    hitscanAim: has('hitscan-sniper') ? NEW_TRAIT_EFFECT.hitscanSniper.aim : 1,
+    close: {
+      dealt: has('close-quarters') ? NEW_TRAIT_EFFECT.closeQuarters.dealt : 1,
+      range: NEW_TRAIT_EFFECT.closeQuarters.range,
+    },
+    lastStand: has('last-stand') ? { ...NEW_TRAIT_EFFECT.lastStand } : null,
     sig: {
       weapon:
         b.signature?.code === 'weapon' && b.signature.weapon
@@ -626,6 +647,8 @@ interface Fighter {
   hurtAt: number;
   windUsed: boolean;
   windUntil: number;
+  /** Wave 2: last stand running until (Infinity: not yet, -1: used). */
+  standUntil: number;
   aware: boolean;
   awareAt: number;
   turnAt: number;
@@ -697,6 +720,7 @@ function fighter(
     hurtAt: -99,
     windUsed: false,
     windUntil: -1,
+    standUntil: Infinity,
     aware: false,
     awareAt: Infinity,
     turnAt: Infinity,
@@ -985,6 +1009,9 @@ function play(
     // Wave 1 (decision 275): quick draw until 1.5 s after its reaction, the timed ones as a mean.
     if (x.r.quick !== 1 && t < x.turnAt + NEW_TRAIT_EFFECT.quickDraw.sec) E *= x.r.quick;
     E *= x.r.timed.aim;
+    // Wave 2 (decision 277): hitscan sniper with instant hit weapons, last stand while it runs.
+    if (w.speed === 0) E *= x.r.hitscanAim;
+    if (x.r.lastStand && t < x.standUntil && x.standUntil !== Infinity) E *= x.r.lastStand.aim;
     if (x.r.stock) E *= Math.max(0, 1 - acc);
     else if (w.speed === 0 || acc < 0) E -= E * acc;
     return Math.max(0, E * aimModel);
@@ -1090,6 +1117,10 @@ function play(
     if (v.r.body.tough !== 1) dmg = Math.max(1, Math.floor(dmg * v.r.body.tough + rng()));
     if (x.r.timed.dealt !== 1) dmg = Math.floor(dmg * x.r.timed.dealt + rng());
     if (v.r.timed.taken !== 1) dmg = Math.max(1, Math.floor(dmg * v.r.timed.taken + rng()));
+    if (x.r.close.dealt !== 1 && D < x.r.close.range)
+      dmg = Math.floor(dmg * x.r.close.dealt + rng());
+    if (v.r.lastStand && v.standUntil !== Infinity && t < v.standUntil)
+      dmg = Math.max(1, Math.floor(dmg * v.r.lastStand.taken + rng()));
     v.hurtAt = t;
     if (v.armour > 0) {
       const a = Math.min(v.armour, Math.floor(dmg * 0.5));
@@ -1110,6 +1141,8 @@ function play(
       v.armour = 0;
     }
     v.hp -= dmg;
+    if (v.r.lastStand && v.standUntil === Infinity && v.hp > 0 && v.hp < v.r.lastStand.below)
+      v.standUntil = t + v.r.lastStand.sec;
     x.hits++;
     x.damage += dmg;
     if (v.hp <= 0) return;

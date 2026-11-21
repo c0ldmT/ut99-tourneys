@@ -1204,6 +1204,9 @@ const en = {
   'trait.log.unsafe': '{v}× no splash up close',
   'trait.log.refills': '{n} refills',
   'trait.log.spawnWeaponKills': '{v} kills with the spawn weapon',
+  'trait.log.hitscanSec': '{n} s with an instant hit weapon',
+  'trait.log.focusHits': '{n} focused hits',
+  'trait.log.focusEffect': '+{v} damage, {w} kills',
   'match.deathsShort': 'Deaths',
   'match.spree': 'Spree',
   'match.suicides': 'Suicides',
@@ -1719,6 +1722,25 @@ const en = {
   'udt.trait.arsenal': 'Arsenal',
   'udt.traitE.arsenal':
     'Spawns with a full flak cannon or rocket launcher (in turns); once per life the weapon in hand refills to half when it runs dry',
+  'udt.trait.belt-runner': 'Belt runner',
+  'udt.traitE.belt-runner':
+    'Knows when shield belts, armour and the keg come back and fetches them, 12 % faster on the way',
+  'udt.trait.escape-artist': 'Escape artist',
+  'udt.traitE.escape-artist': 'On the retreat below 40 health: 15 % faster, dodges ×1.3',
+  'udt.trait.close-quarters': 'Close quarters',
+  'udt.traitE.close-quarters': 'Damage +15 % within 400 units',
+  'udt.trait.hitscan-sniper': 'Hitscan Sniper',
+  'udt.traitE.hitscan-sniper':
+    'Aim error −15 % with instant hit shots (shock beam, sniper rifle, enforcer, minigun; with the skill curve)',
+  'udt.trait.power-surge': 'Power surge',
+  'udt.traitE.power-surge':
+    'Damage +20 % for 10 s after an amplifier, a shield belt, body armour or the keg',
+  'udt.trait.focus-fire': 'Focus fire',
+  'udt.traitE.focus-fire':
+    'Team games: the bots of its team go for an enemy a team mate hit within 2 s, damage +5 % on him',
+  'udt.trait.last-stand': 'Last stand',
+  'udt.traitE.last-stand':
+    'Once per life below 30 health: 4 s aim error −50 % (with the skill curve) and damage taken −30 %',
   'udt.trait.hivemind': 'Hivemind',
   'udt.traitE.hivemind': "Team games: every bot of its team joins a team mate's fight",
   'udt.trait.monster-whisperer': 'Monster whisperer',
@@ -4164,6 +4186,9 @@ const de: Record<TKey, string> = {
   'trait.log.unsafe': '{v}× kein Flächenschaden aus der Nähe',
   'trait.log.refills': '{n} Nachfüllungen',
   'trait.log.spawnWeaponKills': '{v} Kills mit der Spawn-Waffe',
+  'trait.log.hitscanSec': '{n} s mit Sofort-Treffer-Waffe',
+  'trait.log.focusHits': '{n} gebündelte Treffer',
+  'trait.log.focusEffect': '+{v} Schaden, {w} Kills',
   'match.deathsShort': 'Tode',
   'match.spree': 'Serie',
   'match.suicides': 'Selbstmorde',
@@ -4685,6 +4710,24 @@ const de: Record<TKey, string> = {
   'udt.trait.arsenal': 'Arsenal',
   'udt.traitE.arsenal':
     'Spawnt mit voller Flak oder Rocket Launcher (abwechselnd); einmal pro Leben füllt sich die Waffe in der Hand auf die Hälfte, wenn sie leer wird',
+  'udt.trait.belt-runner': 'Belt runner',
+  'udt.traitE.belt-runner':
+    'Kennt die Respawn-Zeiten von Gürteln, Rüstung und Keg und holt sie, auf dem Weg 12 % schneller',
+  'udt.trait.escape-artist': 'Escape artist',
+  'udt.traitE.escape-artist': 'Auf dem Rückzug unter 40 Leben: 15 % schneller, Ausweichen ×1,3',
+  'udt.trait.close-quarters': 'Close quarters',
+  'udt.traitE.close-quarters': 'Schaden +15 % innerhalb 400 Einheiten',
+  'udt.trait.hitscan-sniper': 'Hitscan Sniper',
+  'udt.traitE.hitscan-sniper':
+    'Zielfehler −15 % bei Sofort-Treffern (Shock-Strahl, Sniper Rifle, Enforcer, Minigun; mit Skill-Kurve)',
+  'udt.trait.power-surge': 'Power surge',
+  'udt.traitE.power-surge': 'Schaden +20 % für 10 s nach Amp, Gürtel, Rüstung oder Keg',
+  'udt.trait.focus-fire': 'Focus fire',
+  'udt.traitE.focus-fire':
+    'Teamspiele: Die Bots seines Teams nehmen einen Gegner, den ein Teamkollege in den letzten 2 s getroffen hat, auf ihn Schaden +5 %',
+  'udt.trait.last-stand': 'Last stand',
+  'udt.traitE.last-stand':
+    'Einmal pro Leben unter 30 Leben: 4 s Zielfehler −50 % (mit Skill-Kurve) und erlittener Schaden −30 %',
   'udt.trait.hivemind': 'Hivemind',
   'udt.traitE.hivemind':
     'Team-Modi: jeder Bot seines Teams steigt in den Kampf eines Mitspielers ein',
