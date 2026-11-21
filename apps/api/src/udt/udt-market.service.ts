@@ -599,7 +599,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     if (!last || !offer) throw notFound('offer');
     if (this.udt.owners(season.number).has(body.botId)) throw conflict('the bot is sold');
     if (!this.bots.list().some((b) => b.id === body.botId)) throw notFound('offer');
-    if (this.udt.roster(user.id, season.number).length >= ROSTER_MAX)
+    if (!this.udt.rosterHasRoom(user.id, season.number, false))
       throw conflict('at most {max} bots: your roster is full', { max: ROSTER_MAX });
     // Unique per purchase: a bot sold back can be bought again the same day.
     const ref = `buy:${season.number}:${last.day}:${body.botId}:${randomId(6)}`;

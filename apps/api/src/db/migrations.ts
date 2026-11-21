@@ -807,4 +807,13 @@ export const MIGRATIONS: string[] = [
     PRIMARY KEY (season, user_id, kind)
   );
   `,
+  // 51: the club house in levels (decision 266): a building's level, what the fan shop earned,
+  // the trophy room's crest. The one-level training ground and physio of 264 were +10 % / −20 %:
+  // level 2 now.
+  `
+  ALTER TABLE udt_club ADD COLUMN level INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE udt_club ADD COLUMN earned INTEGER NOT NULL DEFAULT 0;
+  UPDATE udt_club SET level = 2 WHERE kind IN ('training', 'physio');
+  ALTER TABLE udt_teams ADD COLUMN crest_json TEXT;
+  `,
 ];

@@ -106,14 +106,34 @@ describe('prestige (plan P3)', () => {
     expect(full / botStrength(6, 0.5)).toBeLessThan(SKILL_STRENGTH[7]! / SKILL_STRENGTH[6]!);
   });
 
-  it('club upgrades: prices at the full index, effects for the season (decision 264)', () => {
-    expect(clubUpgradePrice('training', 2.7)).toBe(16200);
-    expect(clubEffects([])).toEqual({ xp: 1, rest: 1, scout: 1, spread: 8 });
-    expect(clubEffects(['training', 'physio', 'scouting'])).toEqual({
-      xp: 1.1,
-      rest: 0.8,
-      scout: 0.75,
+  it('club house: levels, prices at the full index, effects (decisions 264, 266)', () => {
+    expect(clubUpgradePrice('training', 0, 2.7)).toBe(8100);
+    expect(clubUpgradePrice('training', 2, 1)).toBe(9000);
+    expect(clubUpgradePrice('training', 3, 1)).toBeNull();
+    expect(clubUpgradePrice('trophy', 1, 1)).toBeNull();
+    expect(clubEffects()).toMatchObject({ xp: 1, rest: 1, scout: 1, spread: 8, extraTalent: 0 });
+    const all = clubEffects({
+      training: 3,
+      physio: 2,
+      scouting: 3,
+      boarding: 1,
+      workshop: 1,
+      mentor: 1,
+      psych: 1,
+    });
+    expect(all.xp).toBeCloseTo(1.15);
+    expect(all.rest).toBeCloseTo(0.8);
+    expect(all).toMatchObject({
+      scout: 0.8,
       spread: 4,
+      extraTalent: 1,
+      anlage: 0.45,
+      boarding: true,
+      workshop: 0.8,
+      craft: 0.9,
+      mentorLessons: 2,
+      coldForm: -5,
+      tiredBelow: 30,
     });
     // The scouting office's report: value ranges 8 wide instead of 16.
     const t = {

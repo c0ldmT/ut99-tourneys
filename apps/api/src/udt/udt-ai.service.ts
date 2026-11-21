@@ -277,7 +277,7 @@ export class UdtAiService implements OnModuleInit {
       };
       act('trades', () => (out.trades += this.answerTrades(m.user, style.tradeMin)));
       act('develop', () => this.develop(m.user, season.number));
-      act('club', () => this.club(m.user, season.number, style.spend * strength));
+      act('club', () => this.club(m.user, season.number, style.spend * strength, day));
       act('prestige', () =>
         this.prestige(m.user, season.number, style.spend * strength, m.personality, rng),
       );
@@ -553,21 +553,29 @@ export class UdtAiService implements OnModuleInit {
   }
 
   /**
-   * Club upgrades (decision 264): the training ground first, then the physio, when one fits its
-   * share of the spendable Neuro; the scouting office only a breeder.
+   * Club house (decisions 264, 266): the training ground and the physio level by level, the fan
+   * shop in the first half of the season (it pays back per home game), a breeder also the
+   * scouting office - one level a day, when it fits its share of the spendable Neuro.
    */
-  private club(user: User, season: number, share: number) {
-    const have = new Set(this.udt.clubUpgrades(season, user.id));
+  private club(user: User, season: number, share: number, day: string) {
+    const levels = this.udt.clubLevels(season, user.id);
     const breeder = this.managers().find((m) => m.user.id === user.id)?.personality === 'breeder';
-    const kinds: ClubUpgrade[] = breeder
-      ? ['training', 'physio', 'scouting']
-      : ['training', 'physio'];
+    const s = this.udt.season();
+    const early = !s.endDate || day <= midpoint(s.startDate, s.endDate);
+    const kinds: ClubUpgrade[] = [
+      ...(early ? (['fanshop'] as const) : []),
+      'training',
+      'physio',
+      ...(breeder ? (['scouting'] as const) : []),
+      'training',
+      'physio',
+    ];
     for (const kind of kinds) {
-      if (have.has(kind)) continue;
-      const price = clubUpgradePrice(kind, this.udt.index(season));
+      const price = clubUpgradePrice(kind, levels[kind] ?? 0, this.udt.index(season));
+      if (price === null) continue;
       if (price > this.spendable(user) * Math.min(0.9, share)) return;
       this.udt.buyClubUpgrade(user, kind);
-      return; // one a day
+      return; // one level a day
     }
   }
 
@@ -732,4 +740,10 @@ export class UdtAiService implements OnModuleInit {
     }
     return 0;
   }
+}
+
+/** The day halfway between two days (YYYY-MM-DD). */
+function midpoint(a: string, b: string): string {
+  const t = (Date.parse(`${a}T00:00:00Z`) + Date.parse(`${b}T00:00:00Z`)) / 2;
+  return new Date(t).toISOString().slice(0, 10);
 }

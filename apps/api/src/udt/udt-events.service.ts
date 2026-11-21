@@ -16,9 +16,10 @@ import {
   FORM_EFFECT,
   PHASE_EFFECT,
   roundNeuro,
-  tiredPenalty,
   type Career,
   prestigeCode,
+  clubEffects,
+  type ClubEffects,
 } from '@tourney/udt';
 import { UsersService, type User } from '../auth/users.service.js';
 import { BotsService, type LibraryBot } from '../bots/bots.service.js';
@@ -41,9 +42,6 @@ import { pickTeamNames } from '../common/names.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { botsOf, lockedTournaments, playingIn, type LockedTournament } from './udt-playing.js';
 import { ServerActivity } from '../common/activity.js';
-
-/** Bots below this stamina are tired: they play worse and the bench comes first. */
-const TIRED = 40;
 
 export interface Lineup {
   bots: RosterBot[];
@@ -214,7 +212,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const careers = this.career.careers();
     const named = uniqueNames();
     const specs: BotSpec[] = l.bots
-      .map((r) => this.spec(r, team.tag, lib, careers))
+      .map((r) => this.spec(r, team.tag, lib, careers, this.udt.clubFx(season, userId)))
       .map((s) => ({ ...s, name: named(s.name) }));
     for (let i = specs.length; i < settings.teamSize; i++)
       specs.push({ name: named(gameName(team.tag, `Rookie${i + 1}`)), skill: 1 });
@@ -442,7 +440,9 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       .filter((r) => r.bench !== null && slot(r) === null)
       .sort((a, b) => a.bench! - b.bench!);
     const playable = (r: RosterBot) => !r.striking && !busy.has(r.botId);
-    const fit = (r: RosterBot) => r.stamina >= TIRED;
+    // The sports psychologist (decision 266): tired only below 30.
+    const tiredBelow = this.udt.clubFx(season, userId).tiredBelow;
+    const fit = (r: RosterBot) => r.stamina >= tiredBelow;
     const order = [
       ...slotted.filter((r) => playable(r) && fit(r)),
       ...bench.filter((r) => playable(r) && fit(r)),
@@ -486,15 +486,16 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     tag: string,
     lib: Map<string, LibraryBot>,
     careers: Map<string, Career>,
+    club: ClubEffects = clubEffects(),
   ): BotSpec {
     const b = lib.get(r.botId);
     const base = this.bots.resolveSpec({ id: r.botId, name: r.name, skill: r.skill }, lib);
-    const tired = tiredPenalty(r.stamina);
+    const tired = r.stamina < club.tiredBelow;
     // Values traits (category A) raise the skill and the play-style values the game gets.
     const eff = effectiveValues(base.skill, { ...(base.traits ?? b?.traits ?? {}) }, r.udtTraits);
     const traits = eff.values;
     if (tired) traits.accuracy = Math.max(-1, (traits.accuracy ?? 0) - 0.2);
-    withCareer(traits, careers.get(r.botId));
+    withCareer(traits, careers.get(r.botId), club.coldForm);
     // Body traits (category B) are played by the mod.
     const codes = modCodes(r.udtTraits);
     // Prestige (mod 0.20.0, decision 262): the points set on the menu.
@@ -588,7 +589,10 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       // Monster Hunt: each bot plays its own focus (decision 239).
       const mh = settings.game.adapter === ADAPTER_MH;
       const specs = l.bots
-        .map((r) => ({ s: this.spec(r, team.tag, lib, careers), focus: mh ? r.mhFocus : 0 }))
+        .map((r) => ({
+          s: this.spec(r, team.tag, lib, careers, this.udt.clubFx(season, userId)),
+          focus: mh ? r.mhFocus : 0,
+        }))
         .map(({ s, focus }) => ({
           ...s,
           name: named(s.name),
@@ -902,9 +906,15 @@ export function uniqueNames(max = 24): (name: string) => string {
  * The accuracy change (0..100 scale) of the career phase and the form of the day (the day of
  * the seeding) on the values sent to the game.
  */
-function withCareer(traits: { accuracy?: number }, c: Career | undefined): void {
+function withCareer(
+  traits: { accuracy?: number },
+  c: Career | undefined,
+  coldForm = FORM_EFFECT.cold,
+): void {
   if (!c) return;
-  const d = (PHASE_EFFECT[c.phase].accuracy + FORM_EFFECT[c.form]) / 50;
+  // The sports psychologist (decision 266): a cold form costs less.
+  const form = c.form === 'cold' ? coldForm : FORM_EFFECT[c.form];
+  const d = (PHASE_EFFECT[c.phase].accuracy + form) / 50;
   if (d)
     traits.accuracy = Math.max(
       -1,

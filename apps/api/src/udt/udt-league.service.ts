@@ -38,6 +38,13 @@ import {
   CLUB_PRESTIGE_MAX,
   clubPrestige,
   prestigeCode,
+  gameChance,
+  modTraitsEffect,
+  prestigeCodeEffect,
+  prestigeSpent,
+  prestigeFromCode,
+  traitByMod,
+  type Crest,
 } from '@tourney/udt';
 import { z } from 'zod';
 import { UsersService, type User } from '../auth/users.service.js';
@@ -1591,6 +1598,14 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       })
       .where(eq(leagueFixtures.id, f.id))
       .run();
+    this.fanshop(f);
+  }
+
+  /** The fan shop of the home club's manager (decision 266): a home league game pays. */
+  private fanshop(f: FixtureRow): void {
+    if (f.kind !== 'league') return;
+    const userId = this.clubs().get(f.home)?.userId;
+    if (userId) this.udt.fanshopPay(f.season, userId, 'home', `fanshop:home:${f.id}`);
   }
 
   /** Settings of a league game (5v5 deathmatch, league rules; best of three at the end). */
@@ -1829,6 +1844,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       })
       .where(eq(leagueFixtures.id, f.id))
       .run();
+    if (r.outcome !== 'forfeit') this.fanshop(f);
   }
 
   /** A played game did not happen: the next league evening (the relegation day simulates it). */
@@ -2479,6 +2495,70 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
    * conference (games with live tournaments and the simulated results shown so far), the
    * fixture list, the season's end, the viewer's next game.
    */
+  /**
+   * The analysis room (decision 266): before the club's next league game the opponent's lineup
+   * (values, traits, prestige), both lineups' strength in the game model and the win chance, and
+   * the club's record per map of its played league games this season.
+   */
+  analysis(user: User) {
+    this.udt.assertOn();
+    const season = this.udt.season().number;
+    if (!this.udt.clubFx(season, user.id).analysis)
+      throw conflict('the analysis needs the analysis room');
+    const mine = [...this.managerClubs()].find(([, u]) => u === user.id)?.[0];
+    if (!mine) throw conflict('your team has no league club this season');
+    const fixtures = this.fixtures(season).filter((f) => f.home === mine || f.away === mine);
+    const maps = new Map<string, { won: number; lost: number }>();
+    for (const f of fixtures) {
+      if (!f.map || !f.winner || (f.status !== 'played' && f.status !== 'simulated')) continue;
+      const m = maps.get(f.map) ?? { won: 0, lost: 0 };
+      if (f.winner === mine) m.won++;
+      else m.lost++;
+      maps.set(f.map, m);
+    }
+    const record = [...maps]
+      .map(([map, m]) => ({ map, ...m }))
+      .sort((a, b) => b.won - b.lost - (a.won - a.lost) || b.won - a.won);
+    const next = fixtures
+      .filter((f) => f.status === 'scheduled')
+      .sort((a, b) => a.day.localeCompare(b.day) || a.scheduledAt.localeCompare(b.scheduledAt))[0];
+    if (!next) return { next: null, maps: record };
+    const settings = this.leagueSettings('league');
+    const opp = next.home === mine ? next.away : next.home;
+    const club = this.clubs().get(opp);
+    const e = this.entrant(season, opp, settings);
+    const bots: BotSpec[] = e.kind === 'team' ? e.bots : [];
+    const strength = (b: BotSpec) =>
+      botStrength(
+        b.skill,
+        valueScore(b.traits),
+        modTraitsEffect(b.gameTraits) + prestigeCodeEffect(b.prestige),
+      );
+    const theirs = bots.reduce((n, b) => n + strength(b), 0);
+    const ours = this.lineupOf(user.id, settings).strength;
+    return {
+      next: {
+        fixtureId: next.id,
+        day: next.day,
+        at: next.scheduledAt,
+        home: next.home === mine,
+        opponent: { clubId: opp, name: club?.name ?? opp, tag: club?.tag ?? '', ai: !club?.userId },
+        bots: bots.map((b) => ({
+          name: b.name,
+          skill: b.skill,
+          accuracy: b.traits?.accuracy ?? 0,
+          alertness: b.traits?.alertness ?? 0,
+          strafing: b.traits?.strafing ?? 0,
+          traits: (b.gameTraits ?? []).map((c) => traitByMod(c)?.code ?? c),
+          prestige: prestigeSpent(prestigeFromCode(b.prestige)),
+        })),
+        strength: { ours: Math.round(ours * 100) / 100, theirs: Math.round(theirs * 100) / 100 },
+        chance: Math.round(gameChance(ours, theirs, settings.teamSize) * 1000) / 1000,
+      },
+      maps: record,
+    };
+  }
+
   view(user: User, seasonQ?: number) {
     this.udt.assertOn();
     const current = this.seasons.current()?.number ?? this.seasons.latestStarted()?.number;
@@ -2500,8 +2580,14 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const fixtures = this.fixtures(season);
     const mine = [...clubs.values()].find((c) => c.userId === user.id && members.has(c.id));
     const ai = this.udt.aiIds();
+    const crests = new Map<string, Crest | null>();
+    const crestOf = (userId: string) => {
+      if (!crests.has(userId)) crests.set(userId, this.udt.crestOf(season, userId));
+      return crests.get(userId) ?? null;
+    };
     const club = (id: string) => {
       const c = clubs.get(id);
+      const crest = c?.userId ? crestOf(c.userId) : null;
       return {
         id,
         name: c?.name ?? '?',
@@ -2510,6 +2596,8 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         /** An AI manager's club (decision 250). */
         ai: !!c?.userId && ai.has(c.userId),
         me: c?.userId === user.id,
+        /** The trophy room's crest (decision 266). */
+        ...(crest ? { crest } : {}),
       };
     };
     const today = this.udt.today();

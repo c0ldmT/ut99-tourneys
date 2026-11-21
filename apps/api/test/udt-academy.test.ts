@@ -3,8 +3,9 @@ import type { RunningApi } from '../src/app.js';
 import { BotsService } from '../src/bots/bots.service.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
-import { udtBlueprints, udtBots, udtRoster, udtTraits } from '../src/db/schema.js';
+import { udtBlueprints, udtBots, udtClub, udtRoster, udtTraits } from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
+import { UdtService } from '../src/udt/udt.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -327,31 +328,64 @@ describe('Unreal Dream Team: academy', () => {
     expect((await post('/star')).body.key).toBe('the bot has all its stars');
   });
 
-  it('club upgrades for the season: training ground, physio, scouting office (decision 264)', async () => {
-    const { mario } = await setup();
+  it('club house: levels, effects, crest and trophies (decisions 264, 266)', async () => {
+    const { mario, marioId, db } = await setup();
     const view = (await mario.get('/udt')).body;
     expect(view.club.map((c: { kind: string }) => c.kind)).toEqual([
       'training',
       'physio',
       'scouting',
+      'analysis',
+      'boarding',
+      'workshop',
+      'fanshop',
+      'mentor',
+      'psych',
+      'trophy',
     ]);
-    expect(view.club.every((c: { done: boolean; price: number }) => !c.done && c.price > 0)).toBe(
-      true,
-    );
+    const training = view.club.find((c: { kind: string }) => c.kind === 'training');
+    expect(training).toMatchObject({ level: 0, max: 3, earned: 0 });
     const rest = view.roster[0].restPrice as number;
     const scout = (await mario.get('/udt/academy')).body.scoutPrice as number;
-    for (const kind of ['training', 'physio', 'scouting']) {
-      const r = await mario.post(`/udt/club/${kind}`);
-      expect(r.status, JSON.stringify(r.body)).toBe(200);
-    }
-    expect((await mario.post('/udt/club/physio')).body.key).toBe(
-      'the club has this upgrade this season',
+    // Training ground up to its top level, one level after the other.
+    for (let i = 0; i < 3; i++) expect((await mario.post('/udt/club/training')).status).toBe(200);
+    expect((await mario.post('/udt/club/training')).body.key).toBe(
+      'the club has this upgrade at its top level',
     );
+    for (const kind of ['physio', 'physio', 'scouting', 'workshop', 'trophy', 'fanshop']) {
+      const r = await mario.post(`/udt/club/${kind}`);
+      expect(r.status, `${kind} ${JSON.stringify(r.body)}`).toBe(200);
+    }
     expect((await mario.post('/udt/club/nope')).status).toBe(404);
     const after = (await mario.get('/udt')).body;
-    expect(after.club.every((c: { done: boolean }) => c.done)).toBe(true);
+    expect(after.club.find((c: { kind: string }) => c.kind === 'training')).toMatchObject({
+      level: 3,
+      price: null,
+    });
     expect(after.roster[0].restPrice).toBeCloseTo(rest * 0.8);
-    expect((await mario.get('/udt/academy')).body.scoutPrice).toBe(Math.round(scout * 0.75));
+    expect((await mario.get('/udt/academy')).body.scoutPrice).toBe(Math.round(scout * 0.8));
+    // The analysis needs its room; the crest the trophy room.
+    expect((await mario.get('/udt/league/analysis')).body.key).toBe(
+      'the analysis needs the analysis room',
+    );
+    expect(
+      (await mario.req('PUT', '/udt/club/crest', { shape: 'star', color: '#f5c75e' })).status,
+    ).toBe(200);
+    expect(
+      (await mario.req('PUT', '/udt/club/crest', { shape: 'x', color: '#f5c75e' })).status,
+    ).toBe(400);
+    const tro = (await mario.get('/udt/trophies')).body;
+    expect(tro).toMatchObject({ crest: { shape: 'star', color: '#f5c75e' }, trophyRoom: true });
+    // The fan shop pays a home game once (decision 266).
+    const shop = api!.app.get(UdtService);
+    shop.fanshopPay(1, marioId, 'home', 'fanshop:test');
+    shop.fanshopPay(1, marioId, 'home', 'fanshop:test');
+    const fan = (await mario.get('/udt')).body.club.find(
+      (c: { kind: string }) => c.kind === 'fanshop',
+    );
+    expect(fan.earned).toBeGreaterThan(0);
+    const row = db.select().from(udtClub).where(eq(udtClub.kind, 'fanshop')).get()!;
+    expect(row.earned).toBe(fan.earned);
   });
 
   it('builds an own bot from a blueprint: skill 3, points, potential, model, start trait', async () => {

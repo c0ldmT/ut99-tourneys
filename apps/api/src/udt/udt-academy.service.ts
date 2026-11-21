@@ -130,12 +130,15 @@ export class UdtAcademyService {
       .get();
   }
 
-  private mentorsUsed(season: number): Set<string> {
-    return new Set(
-      [...this.udt.ownBots(season).values()].flatMap((b) =>
-        b.mentorId && b.mentorSeason === season ? [b.mentorId] : [],
-      ),
-    );
+  /**
+   * Mentors that taught as often as they may this season: once, twice with the club's mentor
+   * wing (decision 266).
+   */
+  private mentorsUsed(season: number, lessons = 1): Set<string> {
+    const n = new Map<string, number>();
+    for (const b of this.udt.ownBots(season).values())
+      if (b.mentorId && b.mentorSeason === season) n.set(b.mentorId, (n.get(b.mentorId) ?? 0) + 1);
+    return new Set([...n].filter(([, c]) => c >= lessons).map(([id]) => id));
   }
 
   view(user: User) {
@@ -145,7 +148,7 @@ export class UdtAcademyService {
     const team = this.udt.team(user.id, season);
     const made = this.made(season, user.id);
     const roster = team ? this.udt.roster(user.id, season) : [];
-    const used = this.mentorsUsed(season);
+    const used = this.mentorsUsed(season, this.udt.clubFx(season, user.id).mentorLessons);
     const own = this.udt.ownBots(season, user.id);
     const s = this.scout(season, user.id);
     const mentorships = this.mentorships(season, user.id, roster);
@@ -155,7 +158,7 @@ export class UdtAcademyService {
       index,
       scoutPrice: Math.round(scoutPrice(index) * this.scoutFx(season, user.id).price),
       licence: { made, nextPrice: licencePrice(made, index) },
-      rosterFull: roster.length >= ROSTER_MAX,
+      rosterFull: !this.udt.rosterHasRoom(user.id, season, true),
       report: s ? (JSON.parse(s.reportJson) as TalentReport[]) : null,
       mentors: roster.map((r) => {
         const mentorTrait = r.udtTraits.some((t) => t.code === 'mentor');
@@ -251,7 +254,7 @@ export class UdtAcademyService {
     const club = this.udt.clubFx(season, userId);
     return {
       price: (scout ? 0.75 : 1) * club.scout,
-      extra: scout ? 1 : 0,
+      extra: (scout ? 1 : 0) + club.extraTalent,
       spread: club.spread,
     };
   }
@@ -297,7 +300,8 @@ export class UdtAcademyService {
   private licence(user: User, season: number, name: string): void {
     const team = this.udt.team(user.id, season);
     if (!team) throw conflict('found your team first');
-    if (this.udt.roster(user.id, season).length >= ROSTER_MAX)
+    // The boarding school (decision 266): an 8th place for a new own bot.
+    if (!this.udt.rosterHasRoom(user.id, season, true))
       throw conflict('at most {max} bots: make room first', { max: ROSTER_MAX });
     if (gameName(team.tag, name).length < `${team.tag}${name}`.length)
       throw badRequest('{tag}{name} is too long for the game', { tag: team.tag, name });
@@ -428,7 +432,7 @@ export class UdtAcademyService {
       throw conflict('a mentor needs skill {skill}', { skill: MENTOR_SKILL });
     if (m.level < MENTOR_LEVEL)
       throw conflict('a mentor needs level {level}', { level: MENTOR_LEVEL });
-    if (this.mentorsUsed(season).has(m.botId))
+    if (this.mentorsUsed(season, this.udt.clubFx(season, user.id).mentorLessons).has(m.botId))
       throw conflict('{name} has an apprentice this season', { name: m.name });
     const p = roster.find((r) => r.botId === body.apprenticeId);
     if (!p) throw notFound('apprentice in your roster');

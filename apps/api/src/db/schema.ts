@@ -302,6 +302,8 @@ export const udtTeams = sqliteTable(
     autoEnter: integer('auto_enter', { mode: 'boolean' }).notNull().default(false),
     /** Unused since decision 239 (the focus is per bot: `udt_roster.mh_focus`). */
     mhFocus: integer('mh_focus').notNull().default(0),
+    /** The trophy room's crest `{ shape, color }` (migration 51, decision 266). */
+    crestJson: text('crest_json'),
   },
   (t) => [primaryKey({ columns: [t.season, t.userId] })],
 );
@@ -575,6 +577,10 @@ export const udtClub = sqliteTable(
     /** "training", "physio" or "scouting" (`ClubUpgrade`). */
     kind: text('kind').notNull(),
     boughtAt: text('bought_at').notNull(),
+    /** Level of the building (migration 51, decision 266). */
+    level: integer('level').notNull().default(1),
+    /** The fan shop: Neuro it brought in. */
+    earned: integer('earned').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.userId, t.kind] })],
 );

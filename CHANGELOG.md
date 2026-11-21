@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team club house v2 (migration 51): ten buildings per season, training ground, physio and scouting office in three levels; analysis room, boarding school, workshop, fan shop, mentor wing, sports psychologist, trophy room with crest. AI managers build too. The pages follow.
 - Dream Team prestige on the website: bot details with the prestige menu, ascension and stars; cards show prestige and stars, the hub the prestige points to place.
 - Dream Team club upgrades per season (migration 50): training ground (+10 % experience), physio (rest 20 % cheaper), scouting office (scouting 25 % cheaper, sharper reports); AI managers buy them too. The page follows.
 - Mod 0.20.0: Dream Team prestige in the game - the bridge sends a bot's prestige points (bprs), the mod plays them: aim, reaction, dodges and view on the skill curve, damage dealt and taken, armour at the spawn, sprint to items and on the retreat, ammo.

@@ -7,3 +7,4 @@ export * from './duel.js';
 export * from './model.js';
 export * from './league.js';
 export * from './prestige.js';
+export * from './club.js';

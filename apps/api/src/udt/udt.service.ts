@@ -37,8 +37,15 @@ import {
   starPrice,
   CLUB_UPGRADES,
   clubEffects,
+  clubMaxLevel,
   clubUpgradePrice,
+  BOARDING_BELOW_LEVEL,
+  FANSHOP_PAYS,
+  ROSTER_PLACES,
+  type ClubEffects,
+  type ClubLevels,
   type ClubUpgrade,
+  type Crest,
   type PrestigeAlloc,
   type PrestigeStage,
   type TraitCode,
@@ -58,6 +65,7 @@ import {
   udtBots,
   udtDays,
   udtEntries,
+  neuroLedger,
   udtHall,
   udtKeepers,
   udtClub,
@@ -572,7 +580,7 @@ export class UdtService {
       tag: team.tag,
       bots: roster.length,
       lineup: roster.filter((r) => r.dmSlot !== null).length,
-      tired: roster.filter((r) => r.stamina < 40).length,
+      tired: roster.filter((r) => r.stamina < this.clubFx(season, userId).tiredBelow).length,
       striking: roster.filter((r) => r.striking).length,
       points,
       prestige,
@@ -935,51 +943,183 @@ export class UdtService {
     };
   }
 
-  /** A manager's club upgrades of a season (decision 264). */
-  clubUpgrades(season: number, userId: string): ClubUpgrade[] {
-    return this.db
-      .select({ kind: udtClub.kind })
-      .from(udtClub)
-      .where(and(eq(udtClub.season, season), eq(udtClub.userId, userId)))
-      .all()
-      .map((r) => r.kind as ClubUpgrade);
+  /** A manager's club buildings of a season and their levels (decisions 264, 266). */
+  clubLevels(season: number, userId: string): ClubLevels {
+    return Object.fromEntries(
+      this.db
+        .select({ kind: udtClub.kind, level: udtClub.level })
+        .from(udtClub)
+        .where(and(eq(udtClub.season, season), eq(udtClub.userId, userId)))
+        .all()
+        .map((r) => [r.kind, r.level]),
+    ) as ClubLevels;
   }
 
-  /** The effects of a manager's club upgrades this season (multipliers). */
-  clubFx(season: number, userId: string) {
-    return clubEffects(this.clubUpgrades(season, userId));
+  /** The effects of a manager's club buildings this season. */
+  clubFx(season: number, userId: string): ClubEffects {
+    return clubEffects(this.clubLevels(season, userId));
   }
 
   private clubView(userId: string, season: number) {
-    const have = new Set(this.clubUpgrades(season, userId));
+    const rows = new Map(
+      this.db
+        .select()
+        .from(udtClub)
+        .where(and(eq(udtClub.season, season), eq(udtClub.userId, userId)))
+        .all()
+        .map((r) => [r.kind, r]),
+    );
     const index = this.index(season);
-    return CLUB_UPGRADES.map((kind) => ({
-      kind,
-      done: have.has(kind),
-      price: clubUpgradePrice(kind, index),
-    }));
+    return CLUB_UPGRADES.map((kind) => {
+      const level = rows.get(kind)?.level ?? 0;
+      return {
+        kind,
+        level,
+        max: clubMaxLevel(kind),
+        /** The next level's price (null: at the top). */
+        price: clubUpgradePrice(kind, level, index),
+        /** The fan shop: Neuro it brought in this season. */
+        earned: rows.get(kind)?.earned ?? 0,
+      };
+    });
   }
 
-  /** Buys a club upgrade for the rest of the season (once per season). */
+  /** Builds the next level of a club building for the rest of the season. */
   buyClubUpgrade(user: User, kind: ClubUpgrade) {
     this.assertOn();
     const season = this.season().number;
     if (!this.team(user.id, season)) throw conflict('found your team first');
-    if (this.clubUpgrades(season, user.id).includes(kind))
-      throw conflict('the club has this upgrade this season');
+    const level = this.clubLevels(season, user.id)[kind] ?? 0;
+    const price = clubUpgradePrice(kind, level, this.index(season));
+    if (price === null) throw conflict('the club has this upgrade at its top level');
     this.ledger.charge({
       userId: user.id,
       kind: 'udt_club',
-      amount: clubUpgradePrice(kind, this.index(season)),
-      ref: `club:${season}:${user.id}:${kind}`,
-      meta: { kind },
+      amount: price,
+      ref: `club:${season}:${user.id}:${kind}:${level + 1}`,
+      meta: { kind, level: level + 1 },
     });
+    const now = new Date(this.clock.now()).toISOString();
     this.db
       .insert(udtClub)
-      .values({ season, userId: user.id, kind, boughtAt: new Date(this.clock.now()).toISOString() })
-      .onConflictDoNothing()
+      .values({ season, userId: user.id, kind, boughtAt: now, level: level + 1 })
+      .onConflictDoUpdate({
+        target: [udtClub.season, udtClub.userId, udtClub.kind],
+        set: { level: level + 1, boughtAt: now },
+      })
       .run();
     return this.view(user);
+  }
+
+  /**
+   * Whether one more bot fits the roster: 7 places, the boarding school (decision 266) an 8th
+   * for own bots below level 10 - `young`: the new bot is one (a talent, a blueprint build).
+   */
+  rosterHasRoom(userId: string, season: number, young: boolean): boolean {
+    const roster = this.roster(userId, season);
+    if (roster.length < ROSTER_PLACES) return true;
+    if (roster.length > ROSTER_PLACES || !this.clubFx(season, userId).boarding) return false;
+    return young || roster.some((r) => r.own && r.level < BOARDING_BELOW_LEVEL);
+  }
+
+  /**
+   * The fan shop (decision 266): pays a share × index for a home league game or a cup win while
+   * the club has it; books it once per `ref` and counts it in the shop's takings.
+   */
+  fanshopPay(season: number, userId: string, what: 'home' | 'cupWin', ref: string): void {
+    if (!this.clubFx(season, userId).fanshop) return;
+    const amount = Math.round((FANSHOP_PAYS[what] * this.index(season)) / 10) * 10;
+    if (!this.ledger.book({ season, userId, kind: 'udt_fanshop', amount, ref, meta: { what } }))
+      return;
+    const row = this.db
+      .select()
+      .from(udtClub)
+      .where(
+        and(eq(udtClub.season, season), eq(udtClub.userId, userId), eq(udtClub.kind, 'fanshop')),
+      )
+      .get();
+    if (row)
+      this.db
+        .update(udtClub)
+        .set({ earned: row.earned + amount })
+        .where(
+          and(eq(udtClub.season, season), eq(udtClub.userId, userId), eq(udtClub.kind, 'fanshop')),
+        )
+        .run();
+  }
+
+  /** The trophy room's crest (shape and colour; decision 266). */
+  setCrest(user: User, crest: Crest) {
+    this.assertOn();
+    const season = this.season().number;
+    if (!this.team(user.id, season)) throw conflict('found your team first');
+    if (!this.clubFx(season, user.id).trophy) throw conflict('the crest needs the trophy room');
+    this.db
+      .update(udtTeams)
+      .set({ crestJson: JSON.stringify(crest) })
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, user.id)))
+      .run();
+    return this.view(user);
+  }
+
+  /**
+   * The trophy wall (decision 266): cup wins per season (first places of Dream Team cups), the
+   * stages of the team's own bots this season and the marks of past ones (keepers). League
+   * titles come from the league history (the page adds them).
+   */
+  trophies(userId: string) {
+    const season = this.season().number;
+    const cups = new Map<number, number>();
+    for (const e of this.db
+      .select()
+      .from(neuroLedger)
+      .where(and(eq(neuroLedger.userId, userId), eq(neuroLedger.kind, 'udt_place')))
+      .all()) {
+      const meta = e.metaJson ? (JSON.parse(e.metaJson) as { place?: number }) : {};
+      if (meta.place === 1) cups.set(e.season, (cups.get(e.season) ?? 0) + 1);
+    }
+    const lib = new Map(this.bots.list().map((b) => [b.id, b]));
+    const stages: { season: number; botId: string; name: string; stage: string; stars: number }[] =
+      [];
+    for (const r of this.roster(userId, season))
+      if (r.own?.prestige)
+        stages.push({
+          season,
+          botId: r.botId,
+          name: r.name,
+          stage: r.own.prestige.stage,
+          stars: r.own.prestige.stars,
+        });
+    for (const b of this.db.select().from(udtBots).where(eq(udtBots.userId, userId)).all())
+      for (const m of marksOf(b.marksJson))
+        stages.push({
+          season: m.season,
+          botId: b.botId,
+          name: lib.get(b.botId)?.name ?? '?',
+          stage: m.stage,
+          stars: m.stars,
+        });
+    return {
+      crest: this.crestOf(season, userId),
+      trophyRoom: this.clubFx(season, userId).trophy,
+      cups: [...cups].map(([s, n]) => ({ season: s, wins: n })).sort((a, b) => b.season - a.season),
+      stages: stages.sort((a, b) => b.season - a.season || b.stars - a.stars),
+    };
+  }
+
+  /** A team's crest while its trophy room stands (null otherwise). */
+  crestOf(season: number, userId: string): Crest | null {
+    if (!this.clubFx(season, userId).trophy) return null;
+    const t = this.db
+      .select({ c: udtTeams.crestJson })
+      .from(udtTeams)
+      .where(and(eq(udtTeams.season, season), eq(udtTeams.userId, userId)))
+      .get();
+    try {
+      return t?.c ? (JSON.parse(t.c) as Crest) : null;
+    } catch {
+      return null;
+    }
   }
 
   /** The manager's bookings of the running season. */

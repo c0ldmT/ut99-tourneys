@@ -3,7 +3,15 @@ import { StatsService } from '../stats/stats.service.js';
 import { traitReport } from '../stats/trait-report.js';
 import { udtEntrantId } from '@tourney/protocol';
 import { z } from 'zod';
-import { CLUB_UPGRADES, PRESTIGE_STATS, type ClubUpgrade, type PrestigeStat } from '@tourney/udt';
+import {
+  CLUB_UPGRADES,
+  CREST_COLORS,
+  CREST_SHAPES,
+  PRESTIGE_STATS,
+  type ClubUpgrade,
+  type Crest,
+  type PrestigeStat,
+} from '@tourney/udt';
 import {
   Body,
   Controller,
@@ -227,6 +235,30 @@ export class UdtController {
     body: { focus: number },
   ) {
     return this.udt.setMhFocus(user, botId, body.focus);
+  }
+
+  /** The trophy room's crest (decision 266). */
+  @Put('club/crest')
+  crest(
+    @CurrentUser() user: User,
+    @Body(
+      new ZodPipe(
+        z.object({
+          shape: z.enum(CREST_SHAPES),
+          color: z.enum(CREST_COLORS),
+        }),
+      ),
+    )
+    body: Crest,
+  ) {
+    return this.udt.setCrest(user, body);
+  }
+
+  /** The trophy wall (decision 266): cup wins, the bots' stages and marks, the crest. */
+  @Get('trophies')
+  trophies(@CurrentUser() user: User) {
+    this.udt.assertOn();
+    return this.udt.trophies(user.id);
   }
 
   /** A club upgrade for the rest of the season (decision 264). */
@@ -538,6 +570,12 @@ export class UdtController {
   }
 
   /** The league: tables, the matchday as a conference, fixtures, the viewer's next game. */
+  /** The analysis room (decision 266): the next league opponent and the club's map record. */
+  @Get('league/analysis')
+  leagueAnalysis(@CurrentUser() user: User) {
+    return this.league.analysis(user);
+  }
+
   @Get('league')
   leagueView(@CurrentUser() user: User, @Query('season') season?: string) {
     return this.league.view(user, season ? Number(season) || undefined : undefined);

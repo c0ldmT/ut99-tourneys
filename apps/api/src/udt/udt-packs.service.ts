@@ -160,6 +160,7 @@ export class UdtPacksService {
     this.udt.assertOn();
     const season = this.udt.season().number;
     const index = this.udt.index(season);
+    const club = this.udt.clubFx(season, user.id);
     const team = this.udt.team(user.id, season);
     const boxes = BOXES.map((box) => {
       const p = DEFAULT_ECONOMY.packs[box];
@@ -192,8 +193,8 @@ export class UdtPacksService {
           needsWeapon: !!traitDef(t.code)?.needsWeapon,
           /** Trait workshop (decision 255): what rerolling / upgrading costs (null: not possible). */
           workshop: {
-            reroll: workshopCost('reroll', rarity, index),
-            upgrade: workshopCost('upgrade', rarity, index),
+            reroll: clubWorkshop(workshopCost('reroll', rarity, index), club.workshop),
+            upgrade: clubWorkshop(workshopCost('upgrade', rarity, index), club.workshop),
           },
         };
       }),
@@ -212,7 +213,7 @@ export class UdtPacksService {
       catalog: TRAITS.map((t) => ({
         ...t,
         scrap: SCRAP[t.rarity],
-        craft: craftCost(t.code),
+        craft: Math.round(craftCost(t.code) * club.craft),
         owned: inv.some((x) => x.code === t.code),
       })),
     };
@@ -417,7 +418,10 @@ export class UdtPacksService {
     if (card.botId) throw conflict('take the trait off the bot first');
     const def = traitDef(card.code);
     if (!def) throw badRequest('unknown trait');
-    const cost = workshopCost(kind, def.rarity, this.udt.index(season));
+    const cost = clubWorkshop(
+      workshopCost(kind, def.rarity, this.udt.index(season)),
+      this.udt.clubFx(season, user.id).workshop,
+    );
     if (!cost) throw conflict('a legendary trait cannot be upgraded');
     const held = this.inventory(season, user.id).map((t) => t.code);
     const code = workshopDraw(kind, def.code, held, rng);
@@ -452,7 +456,8 @@ export class UdtPacksService {
     if (!isTraitCode(code)) throw badRequest('unknown trait');
     if (this.inventory(season, user.id).some((t) => t.code === code))
       throw conflict('you have this trait in your inventory');
-    const cost = craftCost(code);
+    // The club's workshop (decision 266): crafting 10 % cheaper.
+    const cost = Math.round(craftCost(code) * this.udt.clubFx(season, user.id).craft);
     if (!this.udt.addScrap(season, user.id, -cost))
       throw conflict('crafting costs {cost} scrap', { cost });
     this.db
@@ -468,4 +473,13 @@ export class UdtPacksService {
       .run();
     return this.view(user);
   }
+}
+
+/** The club's workshop (decision 266): scrap and Neuro of the trait workshop × its factor. */
+function clubWorkshop(
+  cost: { scrap: number; neuro: number } | null,
+  f: number,
+): { scrap: number; neuro: number } | null {
+  if (!cost || f === 1) return cost;
+  return { scrap: Math.round(cost.scrap * f), neuro: Math.round((cost.neuro * f) / 10) * 10 };
 }

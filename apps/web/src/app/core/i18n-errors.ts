@@ -286,7 +286,11 @@ export const ERRORS_DE: Record<string, string> = {
   'the bot cannot ascend now': 'Der Bot kann jetzt nicht aufsteigen.',
   'stars are for ascended bots': 'Sterne gibt es nur für aufgestiegene Bots.',
   'the bot has all its stars': 'Der Bot hat schon alle Sterne.',
-  'the club has this upgrade this season': 'Den Ausbau hat dein Verein in dieser Season schon.',
+  'the club has this upgrade at its top level':
+    'Dieses Gebäude hat dein Verein schon in der höchsten Stufe.',
+  'the crest needs the trophy room': 'Ein Wappen braucht den Trophäenraum.',
+  'the analysis needs the analysis room': 'Die Analyse braucht den Analyse-Raum.',
+  'your team has no league club this season': 'Dein Team hat in dieser Season keinen Liga-Club.',
   'club upgrade not found': 'Diesen Vereinsausbau gibt es nicht.',
   'the potential is skill {potential}': 'Das Potenzial ist Skill {potential}.',
   'the value is at its maximum': 'Der Wert ist schon am Maximum.',
