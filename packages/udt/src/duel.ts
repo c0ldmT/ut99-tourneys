@@ -8,6 +8,7 @@
  */
 import { FORM_EFFECT, PHASE_EFFECT, type CareerForm, type CareerPhase } from './career.js';
 import { PRESTIGE_EFFECT, PRESTIGE_VIEW_DEGREES, type PrestigeAlloc } from './prestige.js';
+import { SIGNATURE_TOUGH_HEALTH, signatureEffect, type Signature } from './signature.js';
 import {
   effectiveValues,
   gameEdge,
@@ -324,7 +325,15 @@ export interface DuelBotSpec {
   form?: CareerForm;
   /** Prestige points per stat (plan P3): edges, damage, armour (sprint and ammo not in a duel). */
   prestige?: PrestigeAlloc;
+  /** A library bot's signature (decision 271; `SIGNATURE_UPTIME` for the timed ones). */
+  signature?: Signature | null;
 }
+
+/**
+ * Share of a duel's damage a timed signature is on for (one life, so estimated from games): a
+ * streak from 3 kills, 3 s after a kill, 8 s after the spawn. Sizes the effects only.
+ */
+export const SIGNATURE_UPTIME = { streak: 0.3, multi: 0.2, opener: 0.3 } as const;
 
 /** 0..100 (Dream Team pages) to the stored -1..1. */
 export const fromPct = (p: number) => Math.max(-1, Math.min(1, (p - 50) / 50));
@@ -369,6 +378,14 @@ export interface ResolvedBot {
   hurtAim: number;
   /** Mod 0.18.0: weapon master - its weapon (sim code; null: every weapon), aim and rate. */
   master: { weapon: WeaponCode | null; aim: number; rate: number } | null;
+  /** Signature (decision 271): damage × with a weapon, aim × with weapons, damage taken × when hurt. */
+  sig: {
+    weapon: WeaponCode | null;
+    dealt: number;
+    aimWeapons: readonly WeaponCode[];
+    aim: number;
+    hurtTaken: number;
+  };
 }
 
 /** Weapon classes of the game to the duel's weapon codes (the favourite of a weapon master). */
@@ -436,11 +453,17 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
       regen: codes.has('rn'),
       backstab: codes.has('as') ? 1.25 : 1,
       counter: codes.has('ca') ? 0.25 : 1,
-      dealt: 1 + PRESTIGE_EFFECT.fire * (b.prestige?.fire ?? 0),
+      dealt:
+        (1 + PRESTIGE_EFFECT.fire * (b.prestige?.fire ?? 0)) *
+        (b.signature && b.signature.code in SIGNATURE_UPTIME
+          ? 1 +
+            signatureEffect(b.signature) *
+              SIGNATURE_UPTIME[b.signature.code as keyof typeof SIGNATURE_UPTIME]
+          : 1),
       tough: 1 - PRESTIGE_EFFECT.tough * (b.prestige?.tough ?? 0),
       extraArmour: PRESTIGE_EFFECT.armour * (b.prestige?.armour ?? 0),
     },
-    edge: prestigeEdge(gameEdge(b.traits ?? []), b.prestige),
+    edge: homeEdge(prestigeEdge(gameEdge(b.traits ?? []), b.prestige), b.signature),
     hurtAim: codes.has('cb') ? RUNTIME_EDGES['cold-blood']!.aim : 1,
     master: (() => {
       const t = (b.traits ?? []).find((x) => x.code === 'weapon-master');
@@ -452,7 +475,24 @@ export function resolveBot(b: DuelBotSpec): ResolvedBot {
         rate: e.rate ?? 1,
       };
     })(),
+    sig: {
+      weapon:
+        b.signature?.code === 'weapon' && b.signature.weapon
+          ? (WEAPON_CLASS[`botpack.${b.signature.weapon.toLowerCase()}`] ?? null)
+          : null,
+      dealt: b.signature?.code === 'weapon' ? 1 + signatureEffect(b.signature) : 1,
+      aimWeapons: b.signature?.code === 'marksman' ? ['sniper', 'enforcer'] : [],
+      aim: b.signature?.code === 'marksman' ? 1 - signatureEffect(b.signature) : 1,
+      hurtTaken: b.signature?.code === 'tough' ? 1 - signatureEffect(b.signature) : 1,
+    },
   };
+}
+
+/** Lieblings-Map (decision 271): aim and reaction on its map (the duel assumes it is). */
+function homeEdge(e: GameEdge, s: Signature | null | undefined): GameEdge {
+  if (s?.code !== 'home') return e;
+  const k = 1 - signatureEffect(s);
+  return { ...e, aim: e.aim * k, react: e.react * k };
 }
 
 // ---------- the duel ----------
@@ -900,6 +940,7 @@ function play(
     // Mod 0.18.0: cold blood when hurt, weapon master with its weapon.
     if (x.hp < 50) E *= x.r.hurtAim;
     if (masters(x)) E *= x.r.master!.aim;
+    if (x.r.sig.aimWeapons.includes(w.code)) E *= x.r.sig.aim;
     if (x.r.stock) E *= Math.max(0, 1 - acc);
     else if (w.speed === 0 || acc < 0) E -= E * acc;
     return Math.max(0, E * aimModel);
@@ -997,6 +1038,11 @@ function play(
     if (v.r.body.taken !== 1) dmg = Math.max(1, Math.round(dmg * v.r.body.taken));
     // Prestige (firepower, toughness): a share of a point rounds by chance, as in the mod.
     if (x.r.body.dealt !== 1) dmg = Math.floor(dmg * x.r.body.dealt + rng());
+    // Signatures (decision 271): its weapon, toughness below 40 health.
+    if (x.r.sig.weapon === w.code && x.r.sig.dealt !== 1)
+      dmg = Math.floor(dmg * x.r.sig.dealt + rng());
+    if (v.r.sig.hurtTaken !== 1 && v.hp < SIGNATURE_TOUGH_HEALTH)
+      dmg = Math.max(1, Math.floor(dmg * v.r.sig.hurtTaken + rng()));
     if (v.r.body.tough !== 1) dmg = Math.max(1, Math.floor(dmg * v.r.body.tough + rng()));
     v.hurtAt = t;
     if (v.armour > 0) {

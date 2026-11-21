@@ -29,6 +29,8 @@ import {
   duelSeries,
   fromPct,
   prestigeSpent,
+  SIGNATURES,
+  signatureEffect,
   withCurve,
   type Component,
   type CurveKey,
@@ -36,6 +38,7 @@ import {
   type DuelOptions,
   type DuelSeries,
   type PrestigeAlloc,
+  type Signature,
   type SkillCurve,
   type TraitCode,
 } from '@tourney/udt';
@@ -100,6 +103,8 @@ interface CurveRun {
   values: ValueRow[];
   /** Prestige (plan P3) at Inhuman against Inhuman: the win and its share of a skill step (logits). */
   prestige: { label: string; points: number; win: number; frac: number }[];
+  /** Signatures (decision 271) at Inhuman against Inhuman, as prestige. */
+  signatures: { label: string; win: number; frac: number }[];
 }
 
 // Play-style values: each at 100 against 0 (the rest 50) per level; camping does not act in a duel.
@@ -241,7 +246,30 @@ const runs = curves.map(({ curve }) => {
     tough: 2,
     fire: 2,
   });
+  // Signatures (decision 271): the weapon one with four weapons, its share of the kills 40 %.
+  const signatures: CurveRun['signatures'] = [];
+  for (const code of SIGNATURES)
+    for (const level of [1, 2] as const) {
+      const sig: Signature = {
+        code,
+        level,
+        since: 1,
+        ...(code === 'weapon' ? { weapon: 'ShockRifle' } : {}),
+      };
+      const four = opts(curve, {
+        duels: duels * 3,
+        weapons: ['shock', 'flak', 'rocket', 'minigun'],
+      });
+      const w = win(bot(6, 50, { signature: sig }), bot(6), code === 'weapon' ? four : po);
+      const f = logit(w) / stepLogit;
+      signatures.push({
+        label: `${code} ${level === 2 ? '★' : '1'} (${signatureEffect(sig)})`,
+        win: w,
+        frac: code === 'weapon' ? f * 1.6 : f,
+      });
+    }
   const run: CurveRun = {
+    signatures,
     prestige,
     values,
     g1,
@@ -272,6 +300,11 @@ for (const [i, c] of curves.entries()) {
 for (const p of runs[0]!.prestige)
   console.log(
     `Prestige ${p.label.padEnd(64)} ${pct(p.win)}  ${(p.frac * 100).toFixed(0)} % einer Stufe (${p.points ? ((p.frac / p.points) * 100).toFixed(1) : '-'} % je Punkt)`,
+  );
+
+for (const p of runs[0]!.signatures)
+  console.log(
+    `Signatur ${p.label.padEnd(24)} ${pct(p.win)}  ${(p.frac * 100).toFixed(0)} % einer Stufe`,
   );
 
 // --- Report --------------------------------------------------------------------------------------
@@ -445,6 +478,13 @@ ${curves.map((c, i) => `<div class="card"><h3>${c.name}</h3>${valuesHtml(runs[i]
   .map(
     (p) =>
       `<tr><td>${p.label}</td><td>${p.points}</td><td>${pct(p.win)}</td><td>${(p.frac * 100).toFixed(0)} %</td><td>${p.points ? ((p.frac / p.points) * 100).toFixed(1) : '-'} %</td></tr>`,
+  )
+  .join('')}</table></div>
+<h2>Signaturen (Inhuman gegen Inhuman; Leibwaffe mit 4 Waffen, auf 40 % der Kills hochgerechnet; die zeitlichen mit SIGNATURE_UPTIME)</h2>
+<div class="wrap"><table><tr><th>Signatur</th><th>Duell</th><th>Anteil einer Stufe</th></tr>${runs[0]!.signatures
+  .map(
+    (p) =>
+      `<tr><td>${p.label}</td><td>${pct(p.win)}</td><td>${(p.frac * 100).toFixed(0)} %</td></tr>`,
   )
   .join('')}</table></div>
 <h2>Marios Fall je Waffe: Skill 3/Acc 80 gegen Skill 5/Acc 45</h2>
