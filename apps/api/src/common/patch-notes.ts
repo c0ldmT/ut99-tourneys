@@ -22,6 +22,27 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 265,
+    date: '2026-11-21',
+    mod: '0.20.0',
+    en: {
+      title: 'Prestige',
+      items: [
+        'Own bots at the end of their development get prestige points: mature bots up to 4, Godlike up to 6, Godlike+ after the ascension up to 11 with stars.',
+        'Points come from left-over level points (2 = 1) or for Neuro; place them on nine stats (precision, reflex, evasion, overview, toughness, firepower, plating, sprint, supply), at most 3 each. Resetting costs a little.',
+        'Prestige lasts the season like traits; the stage stays as a mark. AI managers and AI clubs use it too.',
+      ],
+    },
+    de: {
+      title: 'Prestige',
+      items: [
+        'Eigene Bots am Ende ihrer Entwicklung bekommen Prestige-Punkte: ausgereifte bis 4, Godlike bis 6, Godlike+ nach dem Aufstieg mit Sternen bis 11.',
+        'Punkte kommen aus übrigen Level-Punkten (je 2 = 1) oder gegen Neuro; verteile sie auf neun Werte (Präzision, Reflex, Ausweichen, Übersicht, Zähigkeit, Feuerkraft, Panzerung, Sprint, Vorrat), je höchstens 3. Umverteilen kostet etwas.',
+        'Prestige gilt die Season wie Traits; die Endstufe bleibt als Marke. KI-Manager und KI-Clubs nutzen es auch.',
+      ],
+    },
+  },
+  {
     id: 263,
     date: '2026-11-21',
     en: {

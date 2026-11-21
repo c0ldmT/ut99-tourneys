@@ -118,6 +118,7 @@ export interface TraitDrop {
                   [bot]="card(b)"
                   [small]="true"
                   [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
+                  [prestigeFree]="b.own?.prestige?.free ?? 0"
                   (pointsClick)="open.emit(b.botId)"
                 />
                 @if (mode() === 'mh' && b.mhFocus) {
@@ -174,6 +175,7 @@ export interface TraitDrop {
                   [bot]="card(b)"
                   [small]="true"
                   [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
+                  [prestigeFree]="b.own?.prestige?.free ?? 0"
                   (pointsClick)="open.emit(b.botId)"
                 />
                 @if (mode() === 'mh' && b.mhFocus) {
@@ -311,6 +313,7 @@ export interface TraitDrop {
                     [small]="true"
                     [note]="placeLabel(b.botId)"
                     [points]="b.own?.maxed ? 0 : (b.own?.points ?? 0)"
+                    [prestigeFree]="b.own?.prestige?.free ?? 0"
                     (pointsClick)="open.emit(b.botId)"
                   />
                   <!-- Phones: a compact strip instead of full cards (the field stays in view). -->

@@ -287,6 +287,8 @@ describe('Unreal Dream Team: academy', () => {
     expect((await post('/prestige', { stat: 'aim' })).body.key).toBe('no free prestige point');
     const before = ledger.spendable(marioId).balance;
     for (let i = 0; i < 4; i++) expect((await post('/prestige/buy')).status).toBe(200);
+    // The hub counts the free prestige points (decision 265).
+    expect((await mario.get('/udt/hub')).body.team.prestige).toBe(4);
     expect(ledger.spendable(marioId).balance).toBeLessThan(before);
     expect((await post('/prestige/buy')).body.key).toBe(
       'the bot holds all the prestige points it can',

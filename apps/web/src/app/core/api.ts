@@ -440,6 +440,33 @@ export class Api {
     this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/breakthrough`, undefined, {
       ok: 'ok.udt.breakthrough',
     });
+  /** Prestige (decision 262): a free point on a stat, a bought point, reset, ascension, star. */
+  udtPrestige = (botId: string, stat: string) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/prestige`, { stat });
+  udtPrestigeBuy = (botId: string) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/prestige/buy`, undefined, {
+      ok: 'ok.udt.prestigeBuy',
+    });
+  udtPrestigeReset = (botId: string) =>
+    this.call<UdtView>(
+      'POST',
+      `/udt/roster/${encodeURIComponent(botId)}/prestige/reset`,
+      undefined,
+      { ok: 'ok.udt.prestigeReset' },
+    );
+  udtAscend = (botId: string) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/ascend`, undefined, {
+      ok: 'ok.udt.ascend',
+    });
+  udtStar = (botId: string) =>
+    this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/star`, undefined, {
+      ok: 'ok.udt.star',
+    });
+  /** A club upgrade for the season (decision 264). */
+  udtClub = (kind: string) =>
+    this.call<UdtView>('POST', `/udt/club/${encodeURIComponent(kind)}`, undefined, {
+      ok: 'ok.udt.club',
+    });
   udtGraduation = () => this.call<UdtGraduation>('GET', '/udt/graduation');
   /** The league (quiet: the page's refresh while games run). */
   udtLeague = (season?: number, quiet = false) =>

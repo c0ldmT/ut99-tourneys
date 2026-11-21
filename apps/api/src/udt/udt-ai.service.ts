@@ -607,7 +607,7 @@ export class UdtAiService implements OnModuleInit {
     for (const r of bots) {
       place(r.botId);
       let p = now(r.botId);
-      if (p && p.prices.ascend !== null && p.prices.ascend <= budget())
+      if (p && p.ascend === null && p.prices.ascend !== null && p.prices.ascend <= budget())
         this.academy.ascend(user, r.botId);
       p = now(r.botId);
       if (p && p.prices.star !== null && p.prices.star <= budget())

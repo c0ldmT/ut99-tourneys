@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team prestige on the website: bot details with the prestige menu, ascension and stars; cards show prestige and stars, the hub the prestige points to place.
 - Dream Team club upgrades per season (migration 50): training ground (+10 % experience), physio (rest 20 % cheaper), scouting office (scouting 25 % cheaper, sharper reports); AI managers buy them too. The page follows.
 - Mod 0.20.0: Dream Team prestige in the game - the bridge sends a bot's prestige points (bprs), the mod plays them: aim, reaction, dodges and view on the skill curve, damage dealt and taken, armour at the spawn, sprint to items and on the retreat, ammo.
 - Dream Team prestige rules (plan Season 3 P3): stages mature / Godlike / ascended with caps 4 / 6 / 6 + stars, the prestige menu (nine stats, at most 3 points each), points from left-over level points and Neuro, progressive prices; the duel simulator and the game model know prestige (bot:sim section "Prestige"). No change on the website yet.

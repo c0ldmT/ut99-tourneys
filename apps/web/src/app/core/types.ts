@@ -60,6 +60,8 @@ export interface UdtHub {
     tired: number;
     striking: number;
     points: number;
+    /** Free prestige points of the own bots (decision 265). */
+    prestige?: number;
   } | null;
   league: {
     visible: boolean;
@@ -1235,8 +1237,43 @@ export interface UdtRosterBot {
     banked?: number;
     /** The mentor it learned from; `here`: in the roster (faster XP). */
     mentor?: { botId: string; name: string; here: boolean } | null;
+    /** Prestige (decision 262): null while it is still developing. */
+    prestige?: UdtPrestige | null;
   } | null;
   career?: UdtCareer | null;
+}
+
+export type UdtPrestigeStat =
+  'aim' | 'react' | 'dodge' | 'view' | 'tough' | 'fire' | 'armour' | 'sprint' | 'ammo';
+
+/** An own bot's prestige (decision 262). */
+export interface UdtPrestige {
+  stage: 'mature' | 'godlike' | 'ascended';
+  cap: number;
+  points: number;
+  fromLevels: number;
+  bought: number;
+  alloc: Partial<Record<UdtPrestigeStat, number>>;
+  spent: number;
+  free: number;
+  stars: number;
+  maxStars: number;
+  ascended: boolean;
+  /** Why it cannot ascend now (null: it can). */
+  ascend: 'done' | 'godlike' | 'level' | 'values' | null;
+  prices: {
+    point: number | null;
+    respec: number | null;
+    ascend: number | null;
+    star: number | null;
+  };
+}
+
+/** A club upgrade of the season (decision 264). */
+export interface UdtClubUpgrade {
+  kind: string;
+  done: boolean;
+  price: number;
 }
 
 export interface UdtTraitOnBot {
@@ -1359,6 +1396,8 @@ export interface UdtView {
   keepers?: { botId: string; name: string; skill: number; nextSkill: number }[];
   /** Training camp (decision 254): price, experience, the bots trained today. */
   camp?: UdtCamp;
+  /** Club upgrades of the season (decision 264). */
+  club?: UdtClubUpgrade[];
 }
 
 /** Training camp (decision 254): experience for Neuro, once per bot and day. */

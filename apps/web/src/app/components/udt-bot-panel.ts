@@ -38,6 +38,7 @@ import {
 } from '../core/udt';
 import { lookBody, lookFromBot, UdtBotLook, type LookDraft, type UdtLooks } from './udt-bot-look';
 import { UdtPotential } from './udt-potential';
+import { UdtPrestigeBox } from './udt-prestige';
 import { UdtRename } from './udt-rename';
 
 type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
@@ -65,6 +66,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
     UdtBotLook,
     UdtRename,
     UdtPotential,
+    UdtPrestigeBox,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -225,6 +227,14 @@ const SHORT: Readonly<Record<Stat, string>> = {
                   </p>
                 }
               </section>
+              @if (own.prestige; as pr) {
+                <udt-prestige
+                  [bot]="b"
+                  [prestige]="pr"
+                  [spendable]="spendable()"
+                  (changed)="changed.emit()"
+                />
+              }
             } @else {
               <p class="muted small">{{ 'udt.points.bought' | t }}</p>
             }

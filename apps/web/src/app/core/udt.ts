@@ -143,13 +143,18 @@ export interface CardBot {
   career?: UdtCareer | null;
   /** Bots a manager made (and talents, blueprints): the skill they can grow to. */
   potential?: readonly [number, number];
+  /** Prestige (decision 265): points set / cap and stars of an own bot at its stage. */
+  prestige?: { spent: number; cap: number; stars: number; stage: string } | null;
 }
 
 /** A roster bot (own, another team's, a trade partner's) as a card, with the team's tag. */
 export function rosterCard(
   b: Omit<CardBot, 'tag'> & {
     career?: CardBot['career'];
-    own?: { potential: [number, number] } | null;
+    own?: {
+      potential: [number, number];
+      prestige?: { spent: number; cap: number; stars: number; stage: string } | null;
+    } | null;
   },
   tag?: string,
 ): CardBot {
@@ -157,6 +162,16 @@ export function rosterCard(
     ...b,
     ...(tag ? { tag } : {}),
     ...(b.own ? { potential: b.own.potential } : {}),
+    ...(b.own?.prestige
+      ? {
+          prestige: {
+            spent: b.own.prestige.spent,
+            cap: b.own.prestige.cap,
+            stars: b.own.prestige.stars,
+            stage: b.own.prestige.stage,
+          },
+        }
+      : {}),
     career: b.career ?? null,
   };
 }
@@ -186,6 +201,19 @@ export function rosterCard(
           (touchstart)="$event.stopPropagation()"
         >
           +{{ points() }}
+        </button>
+      } @else if (prestigeFree() > 0) {
+        <button
+          type="button"
+          class="udt-plaque pres"
+          [title]="'udt.pres.plaque' | t: { n: prestigeFree() }"
+          [attr.aria-label]="'udt.pres.plaque' | t: { n: prestigeFree() }"
+          (click)="$event.stopPropagation(); pointsClick.emit()"
+          (pointerdown)="$event.stopPropagation()"
+          (mousedown)="$event.stopPropagation()"
+          (touchstart)="$event.stopPropagation()"
+        >
+          +{{ prestigeFree() }} P
         </button>
       }
       <div class="in">
@@ -228,7 +256,13 @@ export function rosterCard(
             }
           </div>
         </div>
-        <div class="tier">{{ skillName(sk) }}</div>
+        <div class="tier">{{ skillName(sk) }}{{ b.prestige?.stage === 'ascended' ? '+' : '' }}</div>
+        @if (b.prestige; as pr) {
+          <div class="udt-pres" [title]="'udt.pres.chipTitle' | t">
+            <span>{{ stars(pr.stars) }}</span
+            ><span>Prestige {{ pr.spent }}/{{ pr.cap }}</span>
+          </div>
+        }
         @if (!small()) {
           <div class="pic">
             <svg width="96" height="68" viewBox="0 0 120 100" aria-hidden="true">
@@ -304,7 +338,12 @@ export class UdtCard {
   readonly badge = input<string | null>(null);
   /** Development points to give (own bots): a gold plaque, a click opens them. */
   readonly points = input(0);
+  /** Free prestige points (decision 265): a gold "P" plaque when no development points wait. */
+  readonly prestigeFree = input(0);
   readonly pointsClick = output<void>();
+  protected stars(n: number) {
+    return '★'.repeat(Math.max(0, n));
+  }
   /** XP within the level and what the next level needs (roster bots). */
   protected readonly xpStep = computed(() => xpStep(this.bot().xp, this.bot().level));
   private readonly i18n = inject(I18n);

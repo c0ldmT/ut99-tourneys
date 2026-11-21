@@ -548,23 +548,24 @@ export class UdtService {
     // Points to give: not those of fully developed bots (decision 256).
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     let points = 0;
+    // Prestige points to place (decision 265): free ones of every own bot at its stage.
+    let prestige = 0;
     for (const r of roster) {
       const b = own.get(r.botId);
       const bot = lib.get(r.botId);
       if (!b || !bot) continue;
       const level = levelOf(r.xp);
       const values = bot.traits ?? {};
-      if (
-        fullyDeveloped({
-          level,
-          skill: bot.skill,
-          potential: b.potential,
-          breakthrough: b.breakthrough,
-          values,
-        })
-      )
-        continue;
-      points += Math.max(0, developPoints(level, b.pointsSpent));
+      const maxed = fullyDeveloped({
+        level,
+        skill: bot.skill,
+        potential: b.potential,
+        breakthrough: b.breakthrough,
+        values,
+      });
+      const left = Math.max(0, developPoints(level, b.pointsSpent));
+      prestige += ownPrestige(b, level, bot.skill, maxed, left)?.free ?? 0;
+      if (!maxed) points += left;
     }
     return {
       name: team.name,
@@ -574,6 +575,7 @@ export class UdtService {
       tired: roster.filter((r) => r.stamina < 40).length,
       striking: roster.filter((r) => r.striking).length,
       points,
+      prestige,
     };
   }
 
@@ -1391,7 +1393,8 @@ export function withPrestigePrices(p: OwnPrestige, team: TeamPrestige, index: nu
     prices: {
       point: p.fromLevels + p.bought < p.cap ? prestigePointPrice(team.points, index) : null,
       respec: p.spent > 0 ? respecPrice(p.spent, index) : null,
-      ascend: p.ascend === null ? ascendPrice(team.ascended, index) : null,
+      // Shown while it is Godlike (what the ascension will cost); `ascend` says whether it can.
+      ascend: p.stage === 'godlike' ? ascendPrice(team.ascended, index) : null,
       star: p.stage === 'ascended' && p.stars < p.maxStars ? starPrice(team.stars, index) : null,
     },
   };

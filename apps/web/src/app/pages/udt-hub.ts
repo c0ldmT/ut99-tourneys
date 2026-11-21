@@ -675,6 +675,7 @@ export class UdtHubPage {
         const m = h.team;
         if (!m) return { hint: t('udt.hub.team.none'), badge: null };
         const parts: string[] = [];
+        if (m.prestige) parts.push(t('udt.hub.team.prestige', { n: m.prestige }));
         if (m.points) parts.push(t('udt.hub.team.points', { n: m.points }));
         if (m.striking) parts.push(t('udt.hub.team.striking', { n: m.striking }));
         if (m.tired) parts.push(t('udt.hub.team.tired', { n: m.tired }));
