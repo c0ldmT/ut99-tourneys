@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.21.0";
+const MOD_VERSION = "0.22.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -243,6 +243,17 @@ var string CfgSigMap[16];
 var float CfgSpawnAt[16];
 var float CfgItemUntil[16];
 var float CfgItemNext[16];
+// Mod 0.22.0 (decision 276, Season 3 P5 wave 1): per bot configuration.
+var int CfgMoKills[16];            // momentum: kills in this life (at most 3 count)
+var float CfgQdUntil[16];          // quick draw: its window runs until then (kills in it count)
+var byte CfgGoalKind[16];          // the goal errand (CfgGoal): 1 scavenger, 2 health hound, 3 quartermaster
+var byte CfgClBehind[16];          // clutch: its side was behind at the last tick
+var byte CfgArNext[16];            // arsenal: 0 flak cannon, 1 rocket launcher at the next spawn
+var byte CfgArGiven[16];           // arsenal: the spawn weapon came in this life
+var byte CfgArUsed[16];            // arsenal: the refill was used in this life
+var Weapon CfgArW[16];             // arsenal: the weapon in hand at the last tick
+var class<Weapon> CfgArClass[16];  // arsenal: the spawn weapon of this life (kills with it count)
+var float CfgFhAt[16];             // fast hands: its last early switch (kills within 3 s count)
 var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
 var int NestScore[12];
 var int NestCount;
@@ -3347,7 +3358,10 @@ function ApplyBotConfig(Bot B, string BName)
 	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
 		B.PlayerReplicationInfo.VoiceType = class<VoicePack>(DynamicLoadObject(B.VoiceType, class'Class'));
 	if (Curve != None)
+	{
 		Curve.Setup(B, BotLevel(BName), Edges, PrestigeEdges(c), SigHome(c));
+		Curve.SetTraitAi(B, TraitAiBits(c));
+	}
 }
 
 // Mod 0.20.0: the prestige points that act on the curve (aim, react, dodge, view) packed for
@@ -4309,7 +4323,7 @@ function BaseItemTiming(Bot B, int c)
 	// Orders (team games) or a trait's errand (nest, team play, goals): no item timing, a
 	// pending item errand ends.
 	if ((B.Orders != '' && B.Orders != 'FreeLance' && B.Orders != 'Attack')
-		|| (CfgBeh[c] & (32 | 64 | 512 | 1024)) != 0 || CfgNest[c] != None || CfgGoal[c] != None)
+		|| (CfgBeh[c] & (32 | 64 | 512 | 1024 | 262144)) != 0 || CfgNest[c] != None || CfgGoal[c] != None)
 	{
 		if (CfgItem[c] != None && CfgNest[c] == None && CfgGoal[c] == None)
 			DropTraitErrand(B, 0);
@@ -5154,6 +5168,12 @@ function int ParseValueTraits(string S)
 			Bits = Bits | 256; // mod 0.18.0: run-time edges, not on the curve's SetEdges
 		else if (Code == "wm")
 			Bits = Bits | 512;
+		else if (Code == "qd")
+			Bits = Bits | 1024; // mod 0.22.0: quick draw (TourneySkillCurve.SetEdges)
+		else if (Code == "ch")
+			Bits = Bits | 2048; // mod 0.22.0: cool head, momentum (run-time edges)
+		else if (Code == "mo")
+			Bits = Bits | 4096;
 	}
 	return Bits;
 }
@@ -5211,6 +5231,12 @@ function int ParseGameTraits(string S)
 			Bits = Bits | 32768;
 		else if (Code == "rw")
 			Bits = Bits | 65536;
+		else if (Code == "sg")
+			Bits = Bits | 131072; // mod 0.22.0: spawn guard, clutch, arsenal
+		else if (Code == "cl")
+			Bits = Bits | 262144;
+		else if (Code == "an")
+			Bits = Bits | 524288;
 	}
 	return Bits;
 }
@@ -5234,7 +5260,7 @@ function int GameTraitCfg(Pawn P)
 	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
 		return -1;
 	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
-	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
+	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 7936) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
 		return -1;
 	return c;
 }
@@ -5383,6 +5409,16 @@ function ResetGameTraits()
 		CfgAmmoW[c] = None;
 		CfgAmmoN[c] = 0;
 		CfgRunAim[c] = 1.0;
+		CfgMoKills[c] = 0;
+		CfgQdUntil[c] = 0;
+		CfgGoalKind[c] = 0;
+		CfgClBehind[c] = 0;
+		CfgArNext[c] = 0;
+		CfgArGiven[c] = 0;
+		CfgArUsed[c] = 0;
+		CfgArW[c] = None;
+		CfgArClass[c] = None;
+		CfgFhAt[c] = -10;
 	}
 	for (c = 0; c < 128; c++)
 	{
@@ -5453,6 +5489,20 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		ActualDamage = PrRound(ActualDamage * SigDealt(ci, InstigatedBy));
 	if (cv >= 0 && CfgSig[cv] == 5 && Victim.Health < 40)
 		ActualDamage = Max(1, PrRound(ActualDamage * (1.0 - SigEffect(cv))));
+	// Mod 0.22.0 (decision 276): clutch +20 % while its side is behind (the last tick), spawn
+	// guard -50 % within 2 s of its spawn.
+	if (ci >= 0 && (CfgBody[ci] & 262144) != 0 && CfgClBehind[ci] != 0)
+	{
+		Before = ActualDamage;
+		ActualDamage = PrRound(ActualDamage * 1.2);
+		TrAddVal(ci, 47, ActualDamage - Before);
+	}
+	if (cv >= 0 && (CfgBody[cv] & 131072) != 0 && Level.TimeSeconds - CfgSpawnAt[cv] < 2.0)
+	{
+		Before = ActualDamage;
+		ActualDamage = Max(1, PrRound(ActualDamage * 0.5));
+		TrCount(cv, 46, Before - ActualDamage, 0);
+	}
 	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
 	{
 		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.11 + 0.5);
@@ -5605,6 +5655,12 @@ function int ParseBehaviourTraits(string S)
 			Bits = Bits | 32768;
 		else if (Code == "mw")
 			Bits = Bits | 65536;
+		else if (Code == "fh")
+			Bits = Bits | 131072; // mod 0.22.0: fast hands, quartermaster, trigger discipline
+		else if (Code == "qm")
+			Bits = Bits | 262144;
+		else if (Code == "td")
+			Bits = Bits | 524288;
 	}
 	return Bits;
 }
@@ -5705,7 +5761,7 @@ function BehaviourTick()
 				continue;
 			if ((CfgBeh[c] & 256) != 0 && ItemControl(B, c, 20, 1))
 				continue;
-			if ((CfgBeh[c] & (512 | 1024)) != 0 && GoalErrand(B, c))
+			if ((CfgBeh[c] & (512 | 1024 | 262144)) != 0 && GoalErrand(B, c))
 				continue;
 			if ((CfgBeh[c] & 32768) != 0)
 				Hivemind(B, c);
@@ -5808,6 +5864,15 @@ function string TrCode(int t)
 		case 41: return "rw";
 		case 42: return "hm";
 		case 43: return "mw";
+		case 44: return "ch"; // mod 0.22.0
+		case 45: return "qd";
+		case 46: return "sg";
+		case 47: return "cl";
+		case 48: return "mo";
+		case 49: return "fh";
+		case 50: return "qm";
+		case 51: return "td";
+		case 52: return "an";
 	}
 	return "";
 }
@@ -5816,7 +5881,7 @@ function string TrCode(int t)
 function int TrIdOf(string Code)
 {
 	local int t;
-	for (t = 0; t < 44; t++)
+	for (t = 0; t < 53; t++)
 		if (TrCode(t) == Code)
 			return t;
 	return -1;
@@ -5893,6 +5958,10 @@ function string TrName(int t)
 		case 34: return "counter-attacker";
 		case 37: return "overload";
 		case 41: return "rewind";
+		case 44: return "cool-head";
+		case 47: return "clutch";
+		case 48: return "momentum";
+		case 50: return "quartermaster";
 	}
 	return TrCode(t);
 }
@@ -6054,7 +6123,7 @@ function TraitTelemetryTick()
 	local bool bOn;
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 7936) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
 			continue;
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
@@ -6084,9 +6153,11 @@ function TraitTelemetryTick()
 		if ((CfgBeh[c] & 256) != 0)
 			TrSampleLate(c, 8, CfgItem[c] != None, B);
 		if ((CfgBeh[c] & 512) != 0)
-			TrSampleLate(c, 26, CfgGoal[c] != None && Weapon(CfgGoal[c]) != None, B);
+			TrSampleLate(c, 26, CfgGoal[c] != None && CfgGoalKind[c] == 1, B);
 		if ((CfgBeh[c] & 1024) != 0)
-			TrSampleLate(c, 29, CfgGoal[c] != None && Weapon(CfgGoal[c]) == None, B);
+			TrSampleLate(c, 29, CfgGoal[c] != None && CfgGoalKind[c] == 2, B);
+		if ((CfgBeh[c] & 262144) != 0)
+			TrSampleLate(c, 50, CfgGoal[c] != None && CfgGoalKind[c] == 3, B);
 		if ((CfgBeh[c] & 4096) != 0)
 			TrSample(c, 34, Level.TimeSeconds < CfgCaUntil[c], B);
 		if ((CfgBody[c] & 4) != 0)
@@ -6106,7 +6177,6 @@ function TraitTelemetryTick()
 function TraitBodyTick(Bot B, int c)
 {
 	local int Heal, Got, Gain, Pct;
-	local float F;
 	local bool bFav;
 	// Second wind: once per life below 35 health, +3 health a second for 10 s.
 	if ((CfgBody[c] & 512) != 0)
@@ -6133,41 +6203,46 @@ function TraitBodyTick(Bot B, int c)
 		B.Health += Heal;
 		TrCount(c, 32, Heal, 0);
 	}
-	// Cold blood (below 50 health) and weapon master (its favourite weapon in hand): aim edges.
-	F = 1.0;
+	// Run-time aim edges (RunAimOf) and their trait log: cold blood below 50 health, weapon
+	// master with its favourite weapon (seconds), mod 0.22.0 cool head after the spawn, clutch
+	// while its side is behind, momentum on 3 kills.
 	if ((CfgVal[c] & 256) != 0)
-	{
 		TrSample(c, 31, B.Health < 50, B);
-		if (B.Health < 50)
-			F *= 0.7;
-	}
 	if ((CfgVal[c] & 512) != 0)
 	{
 		bFav = B.Weapon != None && B.FavoriteWeapon != None && B.Weapon.Class == B.FavoriteWeapon;
 		if (bFav)
-		{
-			F *= 0.8; // mod 0.19.2 (0.7 before)
 			TrCount(c, 35, 1, 0); // seconds with it
-		}
 	}
-	// Mod 0.21.0: the marksman signature with the sniper rifle or the enforcer in hand.
-	if (CfgSig[c] == 2 && B.Weapon != None && (B.Weapon.IsA('SniperRifle') || B.Weapon.IsA('enforcer')))
-		F *= 1.0 - SigEffect(c);
-	CfgRunAim[c] = F;
-	if (Curve != None)
-		Curve.SetRunAim(B, F);
+	if ((CfgVal[c] & 2048) != 0)
+		TrSample(c, 44, Level.TimeSeconds - CfgSpawnAt[c] < 6.0, B);
+	if ((CfgVal[c] & 4096) != 0)
+		TrSample(c, 48, CfgMoKills[c] >= 3, B);
+	if ((CfgBody[c] & 262144) != 0)
+	{
+		CfgClBehind[c] = 0;
+		if (Behind(B))
+			CfgClBehind[c] = 1;
+		TrSampleLate(c, 47, CfgClBehind[c] != 0, B);
+	}
+	SetRunAimOf(B, c);
 	// Pathfinder: faster without an enemy (seconds boosted as its value). Light feet (mod
 	// 0.19.2): faster on the way to items and on the retreat (seconds of sprint as its uses).
-	if ((CfgBeh[c] & 2048) != 0 || (CfgBody[c] & 64) != 0 || PrPts(c, 7) > 0)
+	if ((CfgBeh[c] & (2048 | 262144)) != 0 || (CfgBody[c] & 64) != 0 || PrPts(c, 7) > 0)
 		ApplySpeed(B, c);
 	if ((CfgBeh[c] & 2048) != 0 && B.Enemy == None)
 		TrCount(c, 30, 1, 0);
 	if ((CfgBody[c] & 64) != 0 && LightSprint(B))
 		TrCount(c, 23, 1, 0);
+	// Mod 0.22.0: arsenal (its spawn weapon, the refill) before the ammo counts below.
+	if ((CfgBody[c] & 524288) != 0)
+		ArsenalTick(B, c);
 	// Ammo hoarder: ammo the held weapon gained since the last tick (a pickup) +25 %; mod 0.20.0
-	// prestige supply +15 % a point.
+	// prestige supply +15 % a point; mod 0.22.0 quartermaster +25 %.
 	Pct = 15 * PrPts(c, 8);
 	if ((CfgBody[c] & 128) != 0)
+		Pct += 25;
+	if ((CfgBeh[c] & 262144) != 0)
 		Pct += 25;
 	if (Pct > 0 && B.Weapon != None && B.Weapon.AmmoType != None)
 	{
@@ -6181,6 +6256,8 @@ function TraitBodyTick(Bot B, int c)
 				B.Weapon.AmmoType.AmmoAmount += Got;
 				if ((CfgBody[c] & 128) != 0)
 					TrCount(c, 24, Min(Got, (Gain * 25 + 50) / 100), 0);
+				if ((CfgBeh[c] & 262144) != 0)
+					TrAddVal(c, 50, Min(Got, (Gain * 25 + 50) / 100));
 			}
 		}
 		CfgAmmoW[c] = B.Weapon;
@@ -6196,6 +6273,173 @@ function TraitBodyTick(Bot B, int c)
 	}
 }
 
+// The run-time aim edge of a bot with game traits: cold blood below 50 health x0.7, weapon master
+// with its favourite weapon x0.8 (mod 0.19.2), the marksman signature (mod 0.21.0); mod 0.22.0
+// (decision 276) cool head x0.85 for 6 s after the spawn, clutch x0.8 while its side is behind
+// (the last tick), momentum -12 % a kill of this life (at most 3).
+function float RunAimOf(Bot B, int c)
+{
+	local float F;
+	F = 1.0;
+	if ((CfgVal[c] & 256) != 0 && B.Health < 50)
+		F *= 0.7;
+	if ((CfgVal[c] & 512) != 0 && B.Weapon != None && B.FavoriteWeapon != None && B.Weapon.Class == B.FavoriteWeapon)
+		F *= 0.8;
+	if (CfgSig[c] == 2 && B.Weapon != None && (B.Weapon.IsA('SniperRifle') || B.Weapon.IsA('enforcer')))
+		F *= 1.0 - SigEffect(c);
+	if ((CfgVal[c] & 2048) != 0 && Level.TimeSeconds - CfgSpawnAt[c] < 6.0)
+		F *= 0.85;
+	if ((CfgBody[c] & 262144) != 0 && CfgClBehind[c] != 0)
+		F *= 0.8;
+	if ((CfgVal[c] & 4096) != 0)
+		F *= 1.0 - 0.12 * Min(CfgMoKills[c], 3);
+	return F;
+}
+
+function SetRunAimOf(Bot B, int c)
+{
+	CfgRunAim[c] = RunAimOf(B, c);
+	if (Curve != None)
+		Curve.SetRunAim(B, CfgRunAim[c]);
+}
+
+// Mod 0.22.0 (clutch): P's side is behind - in team games by 3 frags against the best other
+// team (scores of its players added up), else by 2 against the best other player.
+function bool Behind(Pawn P)
+{
+	local Pawn O;
+	local int t, k;
+	local float Own, Best, Sum[4];
+	local int Cnt[4];
+	local bool bTeams;
+	if (P == None || P.PlayerReplicationInfo == None || !bGameLive)
+		return false;
+	bTeams = TeamSize > 1 || Game.bTeamGame;
+	Best = -10000;
+	Own = P.PlayerReplicationInfo.Score;
+	t = P.PlayerReplicationInfo.Team;
+	if (bTeams && (t < 0 || t > 3))
+		return false;
+	for (O = Level.PawnList; O != None; O = O.NextPawn)
+	{
+		if (!O.bIsPlayer || O.PlayerReplicationInfo == None || O.PlayerReplicationInfo.bIsSpectator)
+			continue;
+		if (bTeams)
+		{
+			k = O.PlayerReplicationInfo.Team;
+			if (k >= 0 && k <= 3)
+			{
+				Sum[k] += O.PlayerReplicationInfo.Score;
+				Cnt[k]++;
+			}
+		}
+		else if (O != P && O.PlayerReplicationInfo.Score > Best)
+			Best = O.PlayerReplicationInfo.Score;
+	}
+	if (!bTeams)
+		return Best > -10000 && Best - Own >= 2;
+	for (k = 0; k < 4; k++)
+		if (k != t && Cnt[k] > 0 && Sum[k] - Sum[t] >= 3)
+			return true;
+	return false;
+}
+
+// Mod 0.22.0 (arsenal), once a second: at the first tick of a life a full flak cannon or rocket
+// launcher (in turns; only ammo when it has one); once per life the weapon in hand (or the one
+// it just held) back to half its ammo when it ran dry.
+function ArsenalTick(Bot B, int c)
+{
+	local Weapon W;
+	local string Cls;
+	if (CfgArGiven[c] == 0 && B.Weapon != None && bGameLive)
+	{
+		CfgArGiven[c] = 1;
+		Cls = "Botpack.UT_FlakCannon";
+		if (CfgArNext[c] != 0)
+			Cls = "Botpack.UT_Eightball";
+		CfgArNext[c] = 1 - CfgArNext[c];
+		CfgArClass[c] = class<Weapon>(DynamicLoadObject(Cls, class'Class'));
+		if (CfgArClass[c] != None)
+		{
+			Game.GiveWeapon(B, Cls);
+			W = Weapon(B.FindInventoryType(CfgArClass[c]));
+			if (W != None && W.AmmoType != None)
+			{
+				W.AmmoType.AmmoAmount = W.AmmoType.MaxAmmo;
+				if (CfgAmmoW[c] == W)
+					CfgAmmoN[c] = W.AmmoType.AmmoAmount;
+				Log("game trait arsenal:" @ CfgName[c] @ "gets" @ W.Class.Name, 'UTTourney');
+			}
+		}
+	}
+	if (CfgArUsed[c] == 0)
+	{
+		W = None;
+		if (Spent(B.Weapon))
+			W = B.Weapon;
+		else if (CfgArW[c] != None && !CfgArW[c].bDeleteMe && CfgArW[c].Owner == B && Spent(CfgArW[c]))
+			W = CfgArW[c];
+		if (W != None)
+		{
+			CfgArUsed[c] = 1;
+			W.AmmoType.AmmoAmount = Max(1, W.AmmoType.MaxAmmo / 2);
+			if (CfgAmmoW[c] == W)
+				CfgAmmoN[c] = W.AmmoType.AmmoAmount;
+			TrCount(c, 52, 0, 0);
+			Log("game trait arsenal:" @ CfgName[c] @ "refills" @ W.Class.Name, 'UTTourney');
+		}
+	}
+	CfgArW[c] = B.Weapon;
+}
+
+// A good weapon without ammo (arsenal's refill).
+function bool Spent(Weapon W)
+{
+	return GoodWeapon(W) && W.AmmoType != None && W.AmmoType.MaxAmmo > 0 && W.AmmoType.AmmoAmount <= 0;
+}
+
+// Mod 0.22.0, from TourneySkillCurve.SightReact: a quick draw window (aim error x0.8) runs
+// until EndAt - kills in it count.
+function QuickDrawOn(Bot B, float EndAt)
+{
+	local int c;
+	c = GameTraitCfg(B);
+	if (c < 0 || (CfgVal[c] & 1024) == 0)
+		return;
+	CfgQdUntil[c] = EndAt;
+	TrCount(c, 45, 0, 0);
+}
+
+// Mod 0.22.0, from TourneySkillCurve.BotSwitch: fast hands switched early (t 49), trigger
+// discipline kept its weapon (t 51, a use) or skipped an unsafe mode (t 51, Val 1).
+function TraitAiUse(Bot B, int t, int Uses, int Val)
+{
+	local int c;
+	c = GameTraitCfg(B);
+	if (c < 0)
+		return;
+	if (Uses > 0)
+		TrCount(c, t, 0, 0);
+	if (Val > 0)
+		TrAddVal(c, t, Val);
+	if (t == 49)
+		CfgFhAt[c] = Level.TimeSeconds;
+}
+
+// Mod 0.22.0: the traits the curve's weapon choice knows (TourneySkillCurve.SetTraitAi): 1 fast
+// hands, 2 trigger discipline.
+function int TraitAiBits(int c)
+{
+	local int Bits;
+	if (c < 0)
+		return 0;
+	if ((CfgBeh[c] & 131072) != 0)
+		Bits = Bits | 1;
+	if ((CfgBeh[c] & 524288) != 0)
+		Bits = Bits | 2;
+	return Bits;
+}
+
 // Mod 0.19.2: light feet sprints on the way to items (roaming without an enemy, not camping)
 // and on the retreat; in a fight it runs as fast as the others.
 function bool LightSprint(Pawn P)
@@ -6208,12 +6452,12 @@ function bool LightSprint(Pawn P)
 }
 
 // Speed of a bot with speed traits: light feet x1.12 while it sprints (mod 0.19.2; always x1.1
-// before), juggernaut x0.92, adrenaline boost x1.3, pathfinder without an enemy x1.1 (on the
-// class's ground speed).
+// before), juggernaut x0.92, adrenaline boost x1.3, pathfinder without an enemy x1.1, mod 0.22.0
+// quartermaster x1.12 on its way to ammo (on the class's ground speed).
 function ApplySpeed(Pawn P, int c)
 {
 	local float F;
-	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & 2048) == 0 && PrPts(c, 7) == 0))
+	if (P == None || c < 0 || ((CfgBody[c] & (4 | 64 | 8192)) == 0 && (CfgBeh[c] & (2048 | 262144)) == 0 && PrPts(c, 7) == 0))
 		return;
 	F = 1.0;
 	if ((CfgBody[c] & 64) != 0 && LightSprint(P))
@@ -6226,6 +6470,8 @@ function ApplySpeed(Pawn P, int c)
 		F *= 1.3;
 	if ((CfgBeh[c] & 2048) != 0 && P.Enemy == None)
 		F *= 1.1;
+	if ((CfgBeh[c] & 262144) != 0 && CfgGoal[c] != None && CfgGoalKind[c] == 3)
+		F *= 1.12; // mod 0.22.0: quartermaster on its way to ammo
 	P.GroundSpeed = P.default.GroundSpeed * F;
 }
 
@@ -6239,7 +6485,16 @@ function TraitSpawn(Pawn P, int c)
 	CfgOlKills[c] = 0;
 	CfgHitAt[c] = Level.TimeSeconds;
 	CfgAmmoW[c] = None;
+	// Mod 0.22.0: momentum starts anew, arsenal gives its weapon at the next tick.
+	CfgMoKills[c] = 0;
+	CfgArGiven[c] = 0;
+	CfgArUsed[c] = 0;
+	CfgArW[c] = None;
+	CfgArClass[c] = None;
+	CfgGoal[c] = None; // an errand of the last life ends
 	ApplySpeed(P, c);
+	if (Bot(P) != None)
+		SetRunAimOf(Bot(P), c); // the aim edges of the last life end now
 	// Ammo hoarder: the start weapon with +50 % ammo; mod 0.20.0 prestige supply +15 % a point.
 	W = P.Weapon;
 	Pct = 15 * PrPts(c, 8);
@@ -6267,7 +6522,8 @@ function TraitSpawn(Pawn P, int c)
 	}
 }
 
-// From GameTraitKill for the killer (mod 0.18.0, no team kills): overload, scavenger.
+// From GameTraitKill for the killer (mod 0.18.0, no team kills): overload, scavenger; mod 0.22.0
+// momentum and the trait log of quick draw, fast hands and arsenal.
 function TraitKill(Pawn Killer, Pawn Other, int c)
 {
 	local UDamage Amp;
@@ -6296,6 +6552,20 @@ function TraitKill(Pawn Killer, Pawn Other, int c)
 		CfgSvLoc[c] = Other.Location;
 		CfgSvUntil[c] = Level.TimeSeconds + 6;
 	}
+	// Mod 0.22.0: momentum aims better at once; kills in a quick draw window, within 3 s of a
+	// fast hands switch and with the arsenal's spawn weapon count.
+	if ((CfgVal[c] & 4096) != 0)
+	{
+		CfgMoKills[c]++;
+		if (Bot(Killer) != None)
+			SetRunAimOf(Bot(Killer), c);
+	}
+	if ((CfgVal[c] & 1024) != 0 && Level.TimeSeconds < CfgQdUntil[c])
+		TrAddVal(c, 45, 1);
+	if ((CfgBeh[c] & 131072) != 0 && Level.TimeSeconds - CfgFhAt[c] < 3.0)
+		TrAddVal(c, 49, 1);
+	if ((CfgBody[c] & 524288) != 0 && CfgArClass[c] != None && Killer.Weapon != None && Killer.Weapon.Class == CfgArClass[c])
+		TrAddVal(c, 52, 1);
 }
 
 // From OnKilled through GameTraitKill (victim side): rewind remembers where it died.
@@ -6387,20 +6657,21 @@ function bool TraitDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, 
 	return false;
 }
 
-// Scavenger (the weapon its victim dropped) and health hound (health below 85 since 0.19.2, 70
-// before) when no enemy is
-// in sight. True: the bot heads for the item.
+// Scavenger (the weapon its victim dropped), health hound (health below 85 since 0.19.2, 70
+// before) and mod 0.22.0 quartermaster (ammo) when no enemy is in sight. True: the bot heads for
+// the item.
 function bool GoalErrand(Bot B, int c)
 {
 	local Weapon W, BestW;
 	local TournamentHealth H, BestH;
 	local float D, BestD;
+	local Actor Goal;
 	if (B.Enemy != None && B.LineOfSightTo(B.Enemy))
 		return false;
 	if (CfgGoal[c] != None)
 	{
 		if (CfgGoal[c].bDeleteMe || CfgGoal[c].Owner != None || CfgGoal[c].IsInState('Sleeping') || Level.TimeSeconds > CfgGoalUntil[c]
-			|| VSize(CfgGoal[c].Location - B.Location) < 40 || !SteerTo(B, CfgGoal[c]))
+			|| VSize(CfgGoal[c].Location - B.Location) < 40 || (CfgGoalKind[c] == 3 && !LowAmmo(B)) || !SteerTo(B, CfgGoal[c]))
 		{
 			CfgGoal[c] = None;
 			CfgGoalNext[c] = Level.TimeSeconds + 4;
@@ -6427,6 +6698,7 @@ function bool GoalErrand(Bot B, int c)
 		if (BestW != None && B.FindInventoryType(BestW.Class) == None && SteerTo(B, BestW))
 		{
 			CfgGoal[c] = BestW;
+			CfgGoalKind[c] = 1;
 			CfgGoalUntil[c] = Level.TimeSeconds + 8;
 			BotLog(BName(B) $ ": scavenger heads for" @ BestW.Name);
 			return true;
@@ -6448,13 +6720,102 @@ function bool GoalErrand(Bot B, int c)
 		if (BestH != None && SteerTo(B, BestH))
 		{
 			CfgGoal[c] = BestH;
+			CfgGoalKind[c] = 2;
 			CfgGoalUntil[c] = Level.TimeSeconds + 10;
 			BotLog(BName(B) $ ": health hound heads for" @ BestH.Name);
 			return true;
 		}
 		CfgGoalNext[c] = Level.TimeSeconds + 3;
 	}
+	// Mod 0.22.0: quartermaster - low on ammo in every good weapon, it fetches ammo or a weapon.
+	if ((CfgBeh[c] & 262144) != 0 && LowAmmo(B))
+	{
+		Goal = AmmoGoal(B);
+		if (Goal != None && SteerTo(B, Goal))
+		{
+			CfgGoal[c] = Goal;
+			CfgGoalKind[c] = 3;
+			CfgGoalUntil[c] = Level.TimeSeconds + 10;
+			BotLog(BName(B) $ ": quartermaster heads for" @ Goal.Name);
+			ApplySpeed(B, c);
+			return true;
+		}
+		CfgGoalNext[c] = Level.TimeSeconds + 3;
+	}
 	return false;
+}
+
+// Mod 0.22.0: a weapon whose ammo counts for the quartermaster and the arsenal's refill (not
+// melee weapons, the enforcer, the translocator or the redeemer).
+function bool GoodWeapon(Weapon W)
+{
+	return W != None && !W.bMeleeWeapon && W.AmmoName != None && Translocator(W) == None && enforcer(W) == None && WarheadLauncher(W) == None;
+}
+
+// Below a quarter of the ammo in every good weapon it holds (also: no good weapon at all).
+function bool LowAmmo(Bot B)
+{
+	local Inventory Inv;
+	local Weapon W;
+	local int n;
+	for (Inv = B.Inventory; Inv != None && n < 64; Inv = Inv.Inventory)
+	{
+		n++;
+		W = Weapon(Inv);
+		if (!GoodWeapon(W) || W.AmmoType == None || W.AmmoType.MaxAmmo <= 0)
+			continue;
+		if (W.AmmoType.AmmoAmount * 4 >= W.AmmoType.MaxAmmo)
+			return false;
+	}
+	return true;
+}
+
+// The nearest ammo for a good weapon it holds (not full) or good weapon it does not hold yet,
+// within 2500 units (None: nothing there).
+function Actor AmmoGoal(Bot B)
+{
+	local Ammo A;
+	local Weapon W, Held;
+	local Inventory Inv;
+	local Actor Best;
+	local float D, BestD;
+	local int n;
+	BestD = 2500;
+	foreach AllActors(class'Ammo', A)
+		if (A.Owner == None && !A.bHidden && !A.IsInState('Sleeping'))
+		{
+			D = VSize(A.Location - B.Location);
+			if (D >= BestD)
+				continue;
+			Held = None;
+			n = 0;
+			for (Inv = B.Inventory; Inv != None && n < 64; Inv = Inv.Inventory)
+			{
+				n++;
+				W = Weapon(Inv);
+				if (GoodWeapon(W) && (W.AmmoName == A.Class || W.AmmoName == A.ParentAmmo))
+				{
+					Held = W;
+					break;
+				}
+			}
+			if (Held != None && Held.AmmoType != None && Held.AmmoType.AmmoAmount < Held.AmmoType.MaxAmmo)
+			{
+				Best = A;
+				BestD = D;
+			}
+		}
+	foreach AllActors(class'Weapon', W)
+		if (W.Owner == None && !W.bHidden && !W.IsInState('Sleeping') && GoodWeapon(W) && B.FindInventoryType(W.Class) == None)
+		{
+			D = VSize(W.Location - B.Location);
+			if (D < BestD)
+			{
+				Best = W;
+				BestD = D;
+			}
+		}
+	return Best;
 }
 
 // Hivemind (team games): every bot of its team without an enemy in sight joins a team mate's

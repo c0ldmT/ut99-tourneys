@@ -22,6 +22,29 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 276,
+    date: '2026-11-21',
+    mod: '0.22.0',
+    en: {
+      title: 'Nine new traits',
+      items: [
+        'Common: cool head (better aim for 6 s after a spawn), quick draw (better aim against a new enemy), spawn guard (half the damage for 2 s after a spawn).',
+        'Uncommon: fast hands (another weapon before the last shots). Rare: clutch (more damage and better aim while its side is behind), quartermaster (fetches ammo when it runs low, more ammo from pickups).',
+        'Epic: momentum (better aim with every kill of a life), trigger discipline (keeps its weapon in a fight and never fires splash up close). Legendary: arsenal (a full flak cannon or rocket launcher at every spawn, a refill once per life).',
+        'The match page shows what the new traits did in the trait log.',
+      ],
+    },
+    de: {
+      title: 'Neun neue Traits',
+      items: [
+        'Common: Cool head (besser zielen für 6 s nach dem Spawn), Quick draw (besser zielen gegen einen neuen Gegner), Spawn guard (halber Schaden für 2 s nach dem Spawn).',
+        'Uncommon: Fast hands (wechselt vor den letzten Schüssen). Rare: Clutch (mehr Schaden und besser zielen, solange seine Seite hinten liegt), Quartermaster (holt Munition, wenn sie knapp wird, mehr Munition aus Pickups).',
+        'Epic: Momentum (besser zielen mit jedem Kill eines Lebens), Trigger discipline (bleibt im Kampf bei seiner Waffe und schießt nie Flächenschaden aus der Nähe). Legendary: Arsenal (volle Flak oder Rocket Launcher bei jedem Spawn, einmal pro Leben nachgefüllt).',
+        'Die Match-Seite zeigt im Trait-Log, was die neuen Traits getan haben.',
+      ],
+    },
+  },
+  {
     id: 274,
     date: '2026-11-21',
     mod: '0.21.0',

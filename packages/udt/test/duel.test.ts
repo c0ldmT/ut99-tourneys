@@ -9,6 +9,7 @@ import {
   fromPct,
   resolveBot,
   toPct,
+  NEW_TRAIT_EFFECT,
   RUNTIME_EDGES,
   TRAIT_UPTIME,
   VALUE_EDGES,
@@ -39,9 +40,33 @@ describe('skill curve data', () => {
   it('has the run-time aim edges of cold blood and weapon master in the mod (242)', () => {
     const core = file('../../../mods/ut99-tournament/Classes/TourneyCore.uc');
     for (const [trait, e] of Object.entries(RUNTIME_EDGES))
-      // Wave 1 (decision 275) follows with mod 0.22.0.
-      if (trait !== 'quick-draw' && trait !== 'momentum' && trait !== 'cool-head')
+      if (trait !== 'quick-draw' && trait !== 'momentum')
         expect(core, trait).toContain(`F *= ${e.aim};`);
+  });
+
+  it('has the numbers of the traits of wave 1 in the mod (275, 276)', () => {
+    const core = file('../../../mods/ut99-tournament/Classes/TourneyCore.uc');
+    const curve = file('../../../mods/ut99-tournament/Classes/TourneySkillCurve.uc');
+    const n = NEW_TRAIT_EFFECT;
+    expect(core).toContain(`Level.TimeSeconds - CfgSpawnAt[c] < ${n.coolHead.sec}.0)`);
+    expect(core).toContain(`F *= ${n.coolHead.aim};`);
+    expect(core).toContain(
+      `F *= 1.0 - ${n.momentum.perKill} * Min(CfgMoKills[c], ${n.momentum.max});`,
+    );
+    expect(core).toContain(`F *= ${n.clutch.aim};`);
+    expect(core).toContain(`ActualDamage * ${n.clutch.dealt})`);
+    expect(core).toContain(`Best - Own >= ${n.clutch.behind}`);
+    expect(core).toContain(`Sum[k] - Sum[t] >= ${n.clutch.behindTeam}`);
+    expect(core).toContain(`CfgSpawnAt[cv] < ${n.spawnGuard.sec}.0`);
+    expect(core).toContain(`ActualDamage * ${n.spawnGuard.taken})`);
+    expect(core).toContain(`AmmoAmount * 4 >= W.AmmoType.MaxAmmo`);
+    expect(n.quartermaster.low).toBe(0.25);
+    expect(core).toContain(`F *= ${n.quartermaster.sprint};`);
+    expect(curve).toContain(`E *= ${n.quickDraw.aim};`);
+    expect(curve).toContain(`+ FMax(0, T) + ${n.quickDraw.sec};`);
+    expect(curve).toContain(`Rec.AmmoType.AmmoAmount <= ${n.fastHands.shots} `);
+    expect(curve).toContain(`Gap = FMax(Gap, ${n.triggerDiscipline.gap});`);
+    expect(curve).toContain(`CTdAt[s] < ${n.triggerDiscipline.sec} `);
   });
 
   it('has the plan for mod 0.15.0 in the mod', () => {

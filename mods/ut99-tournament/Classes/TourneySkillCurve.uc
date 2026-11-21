@@ -27,6 +27,8 @@
 //   switches in a fight (TSwitchGap), a switch before the last shot (TAmmoCare), less push next
 //   to a drop (TPitPush), power items planned a few seconds ahead (TItemAhead, TItemPlan; the
 //   core's item timing).
+// - 0.22.0: Dream Team traits of wave 1 (decision 276) - quick draw (aim after a new enemy),
+//   fast hands and trigger discipline in the weapon choice (BotSwitch).
 // - SmartStockBots: its MoveWithDodge (it sets bCanDuck every 0.1 s) and
 //   FixMinigun (doubles the minigun's aim error) are switched off at run time;
 //   the ini stays untouched, everything else of it keeps working.
@@ -80,6 +82,13 @@ var float CSafeAt[32];            // next roll of the safety distances
 var byte CSafeOn[32];             // 1: it keeps the safety distances of splash weapons now
 var float CCareAt[32];            // next roll of the ammo care
 var byte CCareOn[32];             // 1: it takes another weapon before its last shot now
+// Mod 0.22.0 (decision 276, Dream Team traits of wave 1)
+var byte CQuick[32];              // quick draw: aim error x0.8 until CQuickUntil
+var float CQuickUntil[32];
+var byte CAi[32];                 // traits for the weapon choice: 1 fast hands, 2 trigger discipline
+var float CTdAt[32];              // trigger discipline: when the weapon in hand last changed
+var Weapon CTdW[32];              // trigger discipline: the weapon in hand then
+var float CTdLog[32], CTdSafeLog[32], CFhLog[32]; // trait log: at most one count a second
 
 // The curve, index = level 0..7 (Novice, Average, Experienced, Skilled, Adept, Masterful,
 // Inhuman, Godlike). See docs/decisions.md 149.
@@ -199,6 +208,13 @@ function int Slot(Bot B, bool bCreate)
 	CSafeOn[Free] = 0;
 	CCareAt[Free] = 0;
 	CCareOn[Free] = 0;
+	CQuickUntil[Free] = 0;
+	CAi[Free] = 0;
+	CTdAt[Free] = -10;
+	CTdW[Free] = None;
+	CTdLog[Free] = -10;
+	CTdSafeLog[Free] = -10;
+	CFhLog[Free] = -10;
 	return Free;
 }
 
@@ -295,7 +311,8 @@ function SetCurve(Bot B)
 
 // The values traits as edges on the curve (the same numbers as gameEdge in packages/udt
 // traits.ts): 1 steady hand, 2 watchdog, 4 side-stepper, 8 patient hunter, 16 eagle eye,
-// 32 all-rounder, 64 daredevil, 128 bouncer (mod 0.18.0: reacts and dodges, no longer jumpy).
+// 32 all-rounder, 64 daredevil, 128 bouncer (mod 0.18.0: reacts and dodges, no longer jumpy),
+// 1024 quick draw (mod 0.22.0).
 function SetEdges(int s, int Bits)
 {
 	CEAim[s] = 1.0;
@@ -332,6 +349,31 @@ function SetEdges(int s, int Bits)
 		CEReact[s] *= 0.9;
 		CEDodge[s] *= 1.6;
 	}
+	// Mod 0.22.0: quick draw (1024) acts in SightReact and AimSpread.
+	CQuick[s] = 0;
+	if ((Bits & 1024) != 0)
+		CQuick[s] = 1;
+}
+
+// Mod 0.22.0: the bot's traits for the weapon choice (TourneyCore.TraitAiBits): 1 fast hands,
+// 2 trigger discipline.
+function SetTraitAi(Bot B, int Bits)
+{
+	local int s;
+	s = Slot(B, false);
+	if (s >= 0)
+		CAi[s] = byte(Bits & 3);
+}
+
+// Mod 0.22.0: quick draw - after seeing a new enemy its aim error is x0.8 until 1.5 s after its
+// reaction (T); the core counts the window.
+function QuickDraw(Bot B, int s, float T)
+{
+	if (CQuick[s] == 0)
+		return;
+	CQuickUntil[s] = Level.TimeSeconds + FMax(0, T) + 1.5;
+	if (Core != None)
+		Core.QuickDrawOn(B, CQuickUntil[s]);
 }
 
 // Mod 0.20.0: prestige points on top of the traits' edges (the same numbers as prestigeEdge in
@@ -474,8 +516,9 @@ function Weapon SafeOther(Bot B, Weapon NotW, float Dist, out int Alt)
 // Bot.SwitchToBestWeapon with the base AI of the level (returns: use the secondary mode).
 function bool BotSwitch(Bot B)
 {
-	local float Rating, Cur, Dist, R;
+	local float Rating, Cur, Dist, R, Gap;
 	local int UseAlt, CurAlt, FavAlt, OtherAlt, s;
+	local bool bHold;
 	local Inventory MyFav;
 	local Weapon Rec, W, Other;
 
@@ -519,18 +562,42 @@ function bool BotSwitch(Bot B)
 			if (FRand() < TAmmoCare[CLv[s]])
 				CCareOn[s] = 1;
 		}
-		// G4: the weapon in hand stays unless another one is clearly better.
-		if (TSwitchGap[CLv[s]] > 0 && Rec != W && !W.bMeleeWeapon && (W.AmmoType == None || W.AmmoType.AmmoAmount > 0))
+		// Mod 0.22.0: trigger discipline always keeps the safety distances; it knows when the
+		// weapon in hand last changed.
+		if ((CAi[s] & 2) != 0)
+			CSafeOn[s] = 1;
+		if (CTdW[s] != W)
+		{
+			CTdW[s] = W;
+			CTdAt[s] = Level.TimeSeconds;
+		}
+		// G4: the weapon in hand stays unless another one is clearly better; trigger discipline
+		// (mod 0.22.0): 0.3 better and at most a switch every 3 s (not when the weapon in hand
+		// would hurt the bot itself here).
+		Gap = TSwitchGap[CLv[s]];
+		if ((CAi[s] & 2) != 0)
+			Gap = FMax(Gap, 0.3);
+		if (Gap > 0 && Rec != W && !W.bMeleeWeapon && (W.AmmoType == None || W.AmmoType.AmmoAmount > 0))
 		{
 			Cur = W.RateSelf(CurAlt) + 0.21;
-			if (Cur > 0 && Rating < Cur + TSwitchGap[CLv[s]])
+			bHold = Cur > 0 && Rating < Cur + Gap;
+			// Not while a switch is under way (the weapon goes down): holding it would cancel it.
+			if (!bHold && (CAi[s] & 2) != 0 && Cur > 0 && Level.TimeSeconds - CTdAt[s] < 3 && !W.IsInState('DownWeapon') && (AltOnly(W) || !Unsafe(W, 0, Dist)))
+				bHold = true;
+			if (bHold)
 			{
+				// Counted when the level alone would have switched.
+				if ((CAi[s] & 2) != 0 && (TSwitchGap[CLv[s]] <= 0 || Rating >= Cur + TSwitchGap[CLv[s]]) && Level.TimeSeconds - CTdLog[s] >= 1 && Core != None)
+				{
+					CTdLog[s] = Level.TimeSeconds;
+					Core.TraitAiUse(B, 51, 1, 0);
+				}
 				Rec = W;
 				UseAlt = CurAlt;
 			}
 		}
 		// G4: before the last shot another weapon (melee weapons have no ammo).
-		if (CCareOn[s] != 0 && Rec == W && W.AmmoType != None && W.AmmoType.AmmoAmount == 1 && !W.IsInState('ComboMove'))
+		if (CCareOn[s] != 0 && (CAi[s] & 1) == 0 && Rec == W && W.AmmoType != None && W.AmmoType.AmmoAmount == 1 && !W.IsInState('ComboMove'))
 		{
 			Other = SafeOther(B, W, Dist, OtherAlt);
 			if (Other != None)
@@ -539,9 +606,31 @@ function bool BotSwitch(Bot B)
 				UseAlt = OtherAlt;
 			}
 		}
+		// Mod 0.22.0, fast hands: never the last 2 shots of the weapon it would fire (the one in
+		// hand or the one recommended - else it would switch back and forth), not a weapon that
+		// holds only that much (redeemer).
+		if ((CAi[s] & 1) != 0 && Rec.AmmoType != None && Rec.AmmoType.MaxAmmo > 2 && Rec.AmmoType.AmmoAmount >= 1 && Rec.AmmoType.AmmoAmount <= 2 && !Rec.IsInState('ComboMove'))
+		{
+			Other = SafeOther(B, Rec, Dist, OtherAlt);
+			if (Other != None)
+			{
+				if (Rec == W && Level.TimeSeconds - CFhLog[s] >= 1 && Core != None)
+				{
+					CFhLog[s] = Level.TimeSeconds;
+					Core.TraitAiUse(B, 49, 1, 0);
+				}
+				Rec = Other;
+				UseAlt = OtherAlt;
+			}
+		}
 		// G1: no splash within the safety distance.
 		if (CSafeOn[s] != 0 && Unsafe(Rec, UseAlt, Dist))
 		{
+			if ((CAi[s] & 2) != 0 && Level.TimeSeconds - CTdSafeLog[s] >= 1 && Core != None)
+			{
+				CTdSafeLog[s] = Level.TimeSeconds;
+				Core.TraitAiUse(B, 51, 0, 1);
+			}
 			if (AltOnly(Rec))
 				UseAlt = 0;
 			else
@@ -971,8 +1060,12 @@ function SightReact(Bot B, int s)
 	CPrevEnemy[s] = CLastEnemy[s];
 	CLastEnemy[s] = E;
 	if (Level.TimeSeconds - CReactAt[s] < 1.5)
+	{
+		QuickDraw(B, s, 0);
 		return;
+	}
 	T = TSightReact[CLv[s]] * CEReact[s] * (0.8 + 0.4 * FRand());
+	QuickDraw(B, s, T);
 	if (T <= 0)
 		return;
 	CReactAt[s] = Level.TimeSeconds;
@@ -1200,6 +1293,7 @@ function float AimSpread(Bot B, float ProjSpeed, int AimError)
 {
 	local Actor T;
 	local float E, D;
+	local int s;
 	T = B.Target;
 	if (T == None)
 		T = B.Enemy;
@@ -1220,6 +1314,10 @@ function float AimSpread(Bot B, float ProjSpeed, int AimError)
 	if (B.LastAcquireTime > Level.TimeSeconds - 2.5 + B.Skill)
 		E *= 2;
 	E *= FMax(0, 1 - B.Accuracy);
+	// Mod 0.22.0: quick draw against a new enemy.
+	s = Slot(B, false);
+	if (s >= 0 && CQuick[s] != 0 && Level.TimeSeconds < CQuickUntil[s])
+		E *= 0.8;
 	return E;
 }
 

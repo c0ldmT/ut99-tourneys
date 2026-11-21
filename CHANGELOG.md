@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Mod 0.22.0: the nine traits of wave 1 in the game, with their trait log (decision 276, README test 75, patch note 276).
 - Nine Dream Team traits of wave 1 (cool head, quick draw, spawn guard, fast hands, clutch, quartermaster, momentum, trigger discipline, arsenal) in the catalogue, the duel simulator, the texts and the trait log (decision 275; in the game with mod 0.22.0).
 - Market pages: signatures, mentors and loans on the market, loan banner, settling in and the prestige of settled bots in the bot details (decision 274, patch note 274).
 - Signatures in the API: drawn on the market day from the bots' lifetime statistics, in market values, the league model and the games; mentors pass them on (decision 273, migration 56).

@@ -181,6 +181,21 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > weapon one counts the weapon in hand when the damage lands. Bots with a signature only count as bots with game traits.
 > No trait log lines yet.
 
+> Mod 0.22.0: Dream Team traits of wave 1 (decision 276, plan Season 3 P5) - new `btrt` codes. Values: `ch` cool head
+> (aim error -15 % for 6 s after a spawn), `qd` quick draw (aim error -20 % from a new enemy until 1.5 s after its
+> reaction, TourneySkillCurve), `mo` momentum (aim error -12 % a kill of this life, at most 3). Body: `sg` spawn guard
+> (damage taken -50 % for 2 s after a spawn), `cl` clutch (while its side is behind - 1v1 / free for all by 2 frags,
+> team games by 3: damage +20 %, aim error -20 %), `an` arsenal (a full flak cannon or rocket launcher in turns at every
+> spawn, once per life the weapon in hand back to half its ammo when it runs dry). Behaviour: `fh` fast hands (in a
+> fight another weapon with 2 shots left), `qm` quartermaster (below a quarter of the ammo in every good weapon and no
+> enemy in sight it runs 12 % faster to ammo or a weapon; ammo pickups +25 %), `td` trigger discipline (in a fight a
+> switch only to a weapon rating 0.3 better and at most every 3 s, the safety distances of splash weapons always).
+> Quick draw, fast hands and trigger discipline act through the skill curve (only with the curve on). Trait log ids
+> 44-52 (episodes: cool head, clutch, momentum on 3 kills, quartermaster runs; counters: quick draw windows and kills
+> in them, spawn guard damage prevented, fast hands switches and kills within 3 s, trigger discipline weapons kept and
+> unsafe modes skipped, arsenal refills and kills with the spawn weapon). The health hound and scavenger log their
+> errands by kind now; a goal errand (scavenger, health hound, quartermaster) ends at the bot's death.
+
 ## Classes
 
 | Class | Role |
@@ -383,6 +398,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 72 | **Trait rework** (mod 0.19.2) | Mod 0.19.2 built, website updated. Dream Team DM with roster bots carrying the reworked traits. 1) Light feet: spectate - faster only while it runs to items or flees, normal speed in a fight; match page → "Traits in this game": light feet with a count (seconds of sprint). 2) Sniper's nest on DM-Deck16][ or DM-Morpheus: server log `heads for the sniper's nest …` only while it holds the sniper rifle, shock rifle or minigun, it camps 5-9 s; shoot it on the way or in the nest → `given up after a hit` / `leaves the sniper's nest …`, no new nest for 30 s. 3) Overload: `game trait overload: <bot> amplified` on every 6th kill of a life. 4) Thick skin/vampire/weapon master/regeneration: counters on the match page in line with the new numbers. Trait texts on the website (packs, bot details) show the new numbers. No `Accessed None` |
 | 73 | **Prestige** (mod 0.20.0) | Mod 0.20.0 built, bridge updated. Test instance: a Dream Team bot with prestige points (test mode: set them on the bot, or in the database `prestige_json`), e.g. armour 3 and sprint 3, in a 1v1 against a bot without. 1) Bridge log: `bprs` line after `btrt` with nine digits. 2) Spectate: the bot spawns with 15 armour (HUD of the bot view; 40 with starter armour), it runs visibly faster to items and when it flees, not in a fight. 3) Aim/firepower/toughness: no visible check, `pnpm --filter @tourney/api bot:sim` shows their sizes. 4) A bot without points and a normal tournament behave as in 0.19.2. No `Accessed None` |
 | 74 | **Signatures** (mod 0.21.0) | Mod 0.21.0 built, bridge updated. Test instance: a bought library bot with a signature (test mode / database `bots.signature_json`, e.g. `{"code":"tough","level":2,"since":1}` or `home` with the map of the game) in a Dream Team 1v1. 1) Bridge log: `bsig` line after `bprs` (`s=t2`, `m=` for home). 2) Server log without `Accessed None` in `OnTakeDamage`/`SigDealt`. 3) Effects are not visible by eye; `pnpm --filter @tourney/api bot:sim` shows their sizes (section Signaturen). 4) A bot without a signature and a normal tournament behave as in 0.20.0 |
+| 75 | **Traits of wave 1** (mod 0.22.0) | Mod 0.22.0 built, website updated, skill curve on. Dream Team DM (team game, 3on3 or larger) with roster bots carrying the new traits (test mode: put them on bots). 1) Server log: `game trait arsenal: <bot> gets UT_FlakCannon` at the first spawn, `UT_Eightball` at the next; once per life `refills` when a weapon runs dry. 2) Bot log: `quartermaster heads for <ammo or weapon>` when it runs low and sees no enemy. 3) Trait log of the game on the match page: cool head and momentum episodes, clutch episodes while its side is behind by 3+ frags, quick draw windows, spawn guard damage prevented, fast hands switches, trigger discipline weapons kept / unsafe modes skipped, arsenal refills. 4) Server log without `Accessed None` in `Behind`, `ArsenalTick`, `AmmoGoal`, `BotSwitch`. 5) A bot without the new traits and a normal tournament behave as in 0.21.0 |
 
 ## SmartStockBots (optional)
 
