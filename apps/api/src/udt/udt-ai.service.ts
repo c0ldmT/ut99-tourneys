@@ -389,8 +389,9 @@ export class UdtAiService implements OnModuleInit {
     const score = (r: RosterBot) =>
       r.effective.skill * 10 + (r.effective.traits.accuracy ?? 0) * 3 - (r.striking ? 100 : 0);
     const roster = this.udt.roster(user.id, season);
-    const fit = roster.filter((r) => !restTired || r.stamina >= 40);
-    const tired = roster.filter((r) => restTired && r.stamina < 40);
+    const tiredBelow = this.udt.clubFx(season, user.id).tiredBelow;
+    const fit = roster.filter((r) => !restTired || r.stamina >= tiredBelow);
+    const tired = roster.filter((r) => restTired && r.stamina < tiredBelow);
     const order = [
       ...fit.sort((a, b) => score(b) - score(a)),
       ...tired.sort((a, b) => score(b) - score(a)),
@@ -567,13 +568,10 @@ export class UdtAiService implements OnModuleInit {
       'training',
       'physio',
       ...(breeder ? (['scouting'] as const) : []),
-      'training',
-      'physio',
     ];
     for (const kind of kinds) {
       const price = clubUpgradePrice(kind, levels[kind] ?? 0, this.udt.index(season));
-      if (price === null) continue;
-      if (price > this.spendable(user) * Math.min(0.9, share)) return;
+      if (price === null || price > this.spendable(user) * Math.min(0.9, share)) continue;
       this.udt.buyClubUpgrade(user, kind);
       return; // one level a day
     }

@@ -308,8 +308,11 @@ export class UdtRewardsService implements OnModuleInit {
         ref: `udt-place:${tournamentId}:${userId}`,
         meta: { tournamentId, place },
       });
-      // The fan shop (decision 266): a cup won pays.
-      if (place === 1)
+    }
+    // The fan shop (decision 266): a cup won pays, AI managers' shops too.
+    for (const s of all) {
+      const userId = udtManagerOf(s.entrantId);
+      if (userId && s.placement === 1)
         this.udt.fanshopPay(season, userId, 'cupWin', `fanshop:cup:${tournamentId}:${userId}`);
     }
     this.payPot(tournamentId, season, managers);

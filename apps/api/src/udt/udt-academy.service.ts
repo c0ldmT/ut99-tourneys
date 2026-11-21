@@ -165,7 +165,7 @@ export class UdtAcademyService {
         /** A talent's licence (decision 267): half the price. */
         talentPrice: Math.round((licencePrice(made, index) * TALENT_LICENCE) / 10) * 10,
       },
-      rosterFull: !this.udt.rosterHasRoom(user.id, season, true),
+      rosterFull: !this.udt.rosterHasRoom(user.id, season, true, roster),
       report: s ? (JSON.parse(s.reportJson) as TalentReport[]) : null,
       mentors: roster.map((r) => {
         const mentorTrait = r.udtTraits.some((t) => t.code === 'mentor');
@@ -253,7 +253,7 @@ export class UdtAcademyService {
   private scoutFx(
     season: number,
     userId: string,
-  ): { price: number; extra: number; spread: number } {
+  ): { price: number; extra: number; spread: number; anlage: number } {
     const scout = this.udt
       .roster(userId, season)
       .some((r) => r.udtTraits.some((t) => t.code === 'talent-scout'));
@@ -263,6 +263,7 @@ export class UdtAcademyService {
       price: (scout ? 0.75 : 1) * club.scout,
       extra: (scout ? 1 : 0) + club.extraTalent,
       spread: club.spread,
+      anlage: club.anlage,
     };
   }
 
@@ -282,7 +283,7 @@ export class UdtAcademyService {
     const taken = this.bots.list().map((b) => b.name);
     // Rough diamonds with a hidden trait now and then (decision 267; the office: more often).
     const talents = scoutTalents(rng, taken, 3 + fx.extra, {
-      chance: this.udt.clubFx(season, user.id).anlage,
+      chance: fx.anlage,
       draw: drawAnlage,
     });
     const report = talents.map((t) => talentReport(t, rng, fx.spread));
@@ -390,6 +391,8 @@ export class UdtAcademyService {
         ...windowOf(window),
         mentorId,
         ...(mentorId ? { mentorSeason: season } : {}),
+        // A rough diamond's hidden trait (decision 267), free at level 10.
+        ...(t.anlage ? { anlage: t.anlage } : {}),
         createdAt: now,
       })
       .run();
@@ -410,7 +413,7 @@ export class UdtAcademyService {
       throw conflict('a bot is called {name} already', { name: body.name });
     this.checkLook(undefined, body.look);
     this.licence(user, season, body.name, TALENT_LICENCE);
-    const id = this.create(
+    this.create(
       user,
       season,
       talent,
@@ -421,8 +424,6 @@ export class UdtAcademyService {
       undefined,
       body.look,
     );
-    if (talent.anlage)
-      this.db.update(udtBots).set({ anlage: talent.anlage }).where(eq(udtBots.botId, id)).run();
     this.db
       .delete(udtScouts)
       .where(and(eq(udtScouts.season, season), eq(udtScouts.userId, user.id)))

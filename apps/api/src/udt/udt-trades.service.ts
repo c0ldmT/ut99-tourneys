@@ -260,9 +260,11 @@ export class UdtTradesService {
         { giveValue, takeValue, tradeBalancePct: cfg.tradeBalancePct },
       );
     const [fromSize, toSize] = this.sizes(season, from, to);
+    // The boarding school (decision 266) holds an 8th place while an own bot below level 10 is
+    // in the roster after the trade.
     if (
-      fromSize - give.length + take.length > ROSTER_MAX ||
-      toSize - take.length + give.length > ROSTER_MAX
+      fromSize - give.length + take.length > this.udt.rosterCap(from, season, give, take) ||
+      toSize - take.length + give.length > this.udt.rosterCap(to, season, take, give)
     )
       throw conflict('at most {max} bots per roster', { max: ROSTER_MAX });
     // Every manager keeps at least one bot (own bots and the starter can be traded too).

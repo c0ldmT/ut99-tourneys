@@ -569,13 +569,13 @@ export class UdtController {
     return { season: n, ...traitReport(n ? this.stats.udtFacts(n) : [], lab) };
   }
 
-  /** The league: tables, the matchday as a conference, fixtures, the viewer's next game. */
   /** The analysis room (decision 266): the next league opponent and the club's map record. */
   @Get('league/analysis')
   leagueAnalysis(@CurrentUser() user: User) {
     return this.league.analysis(user);
   }
 
+  /** The league: tables, the matchday as a conference, fixtures, the viewer's next game. */
   @Get('league')
   leagueView(@CurrentUser() user: User, @Query('season') season?: string) {
     return this.league.view(user, season ? Number(season) || undefined : undefined);

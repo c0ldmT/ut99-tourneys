@@ -509,7 +509,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
         nextAt,
         offers: [],
         rosterSize: size,
-        rosterMax: ROSTER_MAX,
+        rosterMax: this.udt.rosterMax(user.id, season.number),
       };
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const owners = this.udt.owners(season.number);
@@ -526,7 +526,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       index: last.economyIndex,
       nextAt,
       rosterSize: size,
-      rosterMax: ROSTER_MAX,
+      rosterMax: this.udt.rosterMax(user.id, season.number),
       offers: offers.flatMap((o) => {
         const b = lib.get(o.botId);
         if (!b) return [];

@@ -211,8 +211,9 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const careers = this.career.careers();
     const named = uniqueNames();
+    const club = this.udt.clubFx(season, userId);
     const specs: BotSpec[] = l.bots
-      .map((r) => this.spec(r, team.tag, lib, careers, this.udt.clubFx(season, userId)))
+      .map((r) => this.spec(r, team.tag, lib, careers, club))
       .map((s) => ({ ...s, name: named(s.name) }));
     for (let i = specs.length; i < settings.teamSize; i++)
       specs.push({ name: named(gameName(team.tag, `Rookie${i + 1}`)), skill: 1 });
@@ -588,9 +589,10 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       }
       // Monster Hunt: each bot plays its own focus (decision 239).
       const mh = settings.game.adapter === ADAPTER_MH;
+      const club = this.udt.clubFx(season, userId);
       const specs = l.bots
         .map((r) => ({
-          s: this.spec(r, team.tag, lib, careers, this.udt.clubFx(season, userId)),
+          s: this.spec(r, team.tag, lib, careers, club),
           focus: mh ? r.mhFocus : 0,
         }))
         .map(({ s, focus }) => ({

@@ -1,9 +1,18 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { SCRAP, traitDef } from '@tourney/udt';
 import type { RunningApi } from '../src/app.js';
 import { BotsService } from '../src/bots/bots.service.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
-import { udtBlueprints, udtBots, udtClub, udtRoster, udtTraits } from '../src/db/schema.js';
+import {
+  udtBlueprints,
+  udtBots,
+  udtClub,
+  udtRoster,
+  udtScouts,
+  udtTeams,
+  udtTraits,
+} from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtService } from '../src/udt/udt.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
@@ -127,12 +136,19 @@ describe('Unreal Dream Team: academy', () => {
   it('talents: hidden trait at level 10, faster learning, youth keepers (decision 267)', async () => {
     const { mario, marioId, db } = await setup();
     await mario.post('/udt/academy/scout');
+    // A rough diamond of the report: signing keeps its hidden trait.
+    const scout = db.select().from(udtScouts).get()!;
+    const talents = JSON.parse(scout.talentsJson) as { anlage?: string }[];
+    talents[0]!.anlage = 'vampire';
+    db.update(udtScouts)
+      .set({ talentsJson: JSON.stringify(talents) })
+      .run();
     const signed = await mario.post('/udt/academy/sign', { pick: 0, name: 'Kid' });
     const kid = signed.body.own.find((b: { name: string }) => b.name === 'Kid');
-    db.update(udtBots)
-      .set({ anlage: 'vampire', potential: 7 })
-      .where(eq(udtBots.botId, kid.botId))
-      .run();
+    expect(db.select().from(udtBots).where(eq(udtBots.botId, kid.botId)).get()!.anlage).toBe(
+      'vampire',
+    );
+    db.update(udtBots).set({ potential: 7 }).where(eq(udtBots.botId, kid.botId)).run();
     // Below level 10 nothing; at level 10 the trait goes into the inventory, once.
     db.update(udtRoster).set({ xp: 600 }).where(eq(udtRoster.botId, kid.botId)).run();
     expect((await mario.get('/udt')).body.anlagen).toEqual([]);
@@ -141,6 +157,15 @@ describe('Unreal Dream Team: academy', () => {
     expect((await mario.get('/udt')).body.anlagen).toEqual([]);
     const cards = db.select().from(udtTraits).where(eq(udtTraits.userId, marioId)).all();
     expect(cards.filter((c) => c.code === 'vampire' && c.source === 'talent')).toHaveLength(1);
+    // The same trait a second time (already in the inventory) becomes scrap.
+    const scrap0 = db.select().from(udtTeams).where(eq(udtTeams.userId, marioId)).get()!.scrap;
+    db.update(udtBots).set({ anlageAt: null }).where(eq(udtBots.botId, kid.botId)).run();
+    expect((await mario.get('/udt')).body.anlagen).toEqual(['vampire']);
+    const after = db.select().from(udtTraits).where(eq(udtTraits.userId, marioId)).all();
+    expect(after.filter((c) => c.code === 'vampire')).toHaveLength(1);
+    expect(db.select().from(udtTeams).where(eq(udtTeams.userId, marioId)).get()!.scrap).toBe(
+      scrap0 + SCRAP[traitDef('vampire')!.rarity],
+    );
     // Below its potential a talent learns 30 % faster (the training camp).
     const udt = api!.app.get(UdtService);
     expect(udt.talentLearners(1, marioId).has(kid.botId)).toBe(true);

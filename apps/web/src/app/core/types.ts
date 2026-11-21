@@ -1270,10 +1270,14 @@ export interface UdtPrestige {
 }
 
 /** A club upgrade of the season (decision 264). */
+/** A club house building (decision 266): its level, the next level's price (null at the top). */
 export interface UdtClubUpgrade {
   kind: string;
-  done: boolean;
-  price: number;
+  level: number;
+  max: number;
+  price: number | null;
+  /** What the fan shop earned this season (fan shop only). */
+  earned: number;
 }
 
 export interface UdtTraitOnBot {

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, inArray, isNotNull, isNull, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { BotTraitsSchema } from '@tourney/protocol';
 import {
   baseValue,
@@ -561,6 +561,7 @@ export class UdtService {
     let points = 0;
     // Prestige points to place (decision 265): free ones of every own bot at its stage.
     let prestige = 0;
+    const tiredBelow = this.clubFx(season, userId).tiredBelow;
     for (const r of roster) {
       const b = own.get(r.botId);
       const bot = lib.get(r.botId);
@@ -583,7 +584,7 @@ export class UdtService {
       tag: team.tag,
       bots: roster.length,
       lineup: roster.filter((r) => r.dmSlot !== null).length,
-      tired: roster.filter((r) => r.stamina < this.clubFx(season, userId).tiredBelow).length,
+      tired: roster.filter((r) => r.stamina < tiredBelow).length,
       striking: roster.filter((r) => r.striking).length,
       points,
       prestige,
@@ -913,6 +914,8 @@ export class UdtService {
     if (!enabled || !season)
       return { enabled, season: season?.number ?? null, team: null, roster: [], index: 0.3 };
     const team = this.team(user.id, season.number);
+    // First: a talent's hidden trait that came free shows in this very view (decision 267).
+    const anlagen = team ? this.grantAnlagen(season.number, user.id) : [];
     const roster = team ? this.roster(user.id, season.number) : [];
     return {
       enabled,
@@ -943,7 +946,7 @@ export class UdtService {
       /** Club upgrades of this season (decision 264): bought or their price. */
       club: this.clubView(user.id, season.number),
       /** Hidden traits of talents that came free just now (decision 267; also after games). */
-      anlagen: team ? this.grantAnlagen(season.number, user.id) : [],
+      anlagen,
       wallet: this.ledger.spendable(user.id),
       starterBudget: this.settings.get().udt.starterBudget,
       starterExtra: this.settings.get().udt.starterExtra,
@@ -1022,11 +1025,44 @@ export class UdtService {
    * Whether one more bot fits the roster: 7 places, the boarding school (decision 266) an 8th
    * for own bots below level 10 - `young`: the new bot is one (a talent, a blueprint build).
    */
-  rosterHasRoom(userId: string, season: number, young: boolean): boolean {
-    const roster = this.roster(userId, season);
+  rosterHasRoom(
+    userId: string,
+    season: number,
+    young: boolean,
+    roster: readonly RosterBot[] = this.roster(userId, season),
+  ): boolean {
     if (roster.length < ROSTER_PLACES) return true;
     if (roster.length > ROSTER_PLACES || !this.clubFx(season, userId).boarding) return false;
     return young || roster.some((r) => r.own && r.level < BOARDING_BELOW_LEVEL);
+  }
+
+  /** The roster's places now: 7, an 8th with the boarding school while a young own bot is in it. */
+  rosterMax(userId: string, season: number, roster = this.roster(userId, season)): number {
+    return this.clubFx(season, userId).boarding &&
+      roster.some((r) => r.own && r.level < BOARDING_BELOW_LEVEL)
+      ? ROSTER_PLACES + 1
+      : ROSTER_PLACES;
+  }
+
+  /**
+   * The roster's places after a trade (`out` leaves, `inIds` come from the partner): 7, an 8th
+   * with the boarding school while an own bot below level 10 is in it afterwards.
+   */
+  rosterCap(
+    userId: string,
+    season: number,
+    out: readonly string[],
+    inIds: readonly string[],
+  ): number {
+    if (!this.clubFx(season, userId).boarding) return ROSTER_PLACES;
+    const young = (r: RosterBot) => !!r.own && r.level < BOARDING_BELOW_LEVEL;
+    const mine = this.roster(userId, season).filter((r) => !out.includes(r.botId));
+    const owner = this.owners(season);
+    const theirs = inIds.flatMap((id) => {
+      const u = owner.get(id);
+      return u ? this.roster(u, season).filter((r) => r.botId === id) : [];
+    });
+    return [...mine, ...theirs].some(young) ? ROSTER_PLACES + 1 : ROSTER_PLACES;
   }
 
   /**
@@ -1036,23 +1072,17 @@ export class UdtService {
   fanshopPay(season: number, userId: string, what: 'home' | 'cupWin', ref: string): void {
     if (!this.clubFx(season, userId).fanshop) return;
     const amount = Math.round((FANSHOP_PAYS[what] * this.index(season)) / 10) * 10;
-    if (!this.ledger.book({ season, userId, kind: 'udt_fanshop', amount, ref, meta: { what } }))
-      return;
-    const row = this.db
-      .select()
-      .from(udtClub)
-      .where(
-        and(eq(udtClub.season, season), eq(udtClub.userId, userId), eq(udtClub.kind, 'fanshop')),
-      )
-      .get();
-    if (row)
+    this.db.transaction(() => {
+      if (!this.ledger.book({ season, userId, kind: 'udt_fanshop', amount, ref, meta: { what } }))
+        return;
       this.db
         .update(udtClub)
-        .set({ earned: row.earned + amount })
+        .set({ earned: sql`${udtClub.earned} + ${amount}` })
         .where(
           and(eq(udtClub.season, season), eq(udtClub.userId, userId), eq(udtClub.kind, 'fanshop')),
         )
         .run();
+    });
   }
 
   /**
@@ -1090,21 +1120,44 @@ export class UdtService {
     const now = new Date(this.clock.now()).toISOString();
     for (const b of this.ownBots(season, userId).values()) {
       if (!b.anlage || b.anlageAt || levelOf(xp.get(b.botId) ?? 0) < ANLAGE_LEVEL) continue;
-      this.db.transaction((tx) => {
-        tx.update(udtBots).set({ anlageAt: now }).where(eq(udtBots.botId, b.botId)).run();
+      const code = b.anlage;
+      // A trait already in the inventory becomes scrap, as from a pack (no twice).
+      const held = this.db
+        .select({ id: udtTraits.id })
+        .from(udtTraits)
+        .where(
+          and(
+            eq(udtTraits.season, season),
+            eq(udtTraits.userId, userId),
+            eq(udtTraits.code, code),
+            isNull(udtTraits.botId),
+          ),
+        )
+        .get();
+      const done = this.db.transaction((tx) => {
+        const r = tx
+          .update(udtBots)
+          .set({ anlageAt: now })
+          .where(and(eq(udtBots.botId, b.botId), isNull(udtBots.anlageAt)))
+          .run();
+        if (r.changes !== 1) return false;
+        if (held) return true;
         tx.insert(udtTraits)
           .values({
             id: `t${randomId(12)}`,
             season,
             userId,
-            code: b.anlage!,
+            code,
             botId: null,
             source: 'talent',
             createdAt: now,
           })
           .run();
+        return true;
       });
-      out.push(b.anlage);
+      if (!done) continue;
+      if (held) this.addScrap(season, userId, SCRAP[traitDef(code)?.rarity ?? 'common']);
+      out.push(code);
     }
     return out;
   }

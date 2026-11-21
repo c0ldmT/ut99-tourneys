@@ -39,8 +39,6 @@ import {
   clubPrestige,
   prestigeCode,
   gameChance,
-  modTraitsEffect,
-  prestigeCodeEffect,
   prestigeSpent,
   prestigeFromCode,
   traitByMod,
@@ -2491,11 +2489,6 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   // ------------------------------------------------------------------------------------------
 
   /**
-   * The league page: tables of all tiers (the viewer's tier first), the matchday as a
-   * conference (games with live tournaments and the simulated results shown so far), the
-   * fixture list, the season's end, the viewer's next game.
-   */
-  /**
    * The analysis room (decision 266): before the club's next league game the opponent's lineup
    * (values, traits, prestige), both lineups' strength in the game model and the win chance, and
    * the club's record per map of its played league games this season.
@@ -2510,9 +2503,12 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const fixtures = this.fixtures(season).filter((f) => f.home === mine || f.away === mine);
     const maps = new Map<string, { won: number; lost: number }>();
     for (const f of fixtures) {
-      if (!f.map || !f.winner || (f.status !== 'played' && f.status !== 'simulated')) continue;
+      // League games only, and only what the league shows already (simulated ones after their
+      // reveal).
+      const res = f.kind === 'league' && f.map ? this.result(f) : null;
+      if (!res || !f.map) continue;
       const m = maps.get(f.map) ?? { won: 0, lost: 0 };
-      if (f.winner === mine) m.won++;
+      if (res.winner === mine) m.won++;
       else m.lost++;
       maps.set(f.map, m);
     }
@@ -2520,7 +2516,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       .map(([map, m]) => ({ map, ...m }))
       .sort((a, b) => b.won - b.lost - (a.won - a.lost) || b.won - a.won);
     const next = fixtures
-      .filter((f) => f.status === 'scheduled')
+      .filter((f) => f.kind === 'league' && f.status === 'scheduled')
       .sort((a, b) => a.day.localeCompare(b.day) || a.scheduledAt.localeCompare(b.scheduledAt))[0];
     if (!next) return { next: null, maps: record };
     const settings = this.leagueSettings('league');
@@ -2528,14 +2524,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     const club = this.clubs().get(opp);
     const e = this.entrant(season, opp, settings);
     const bots: BotSpec[] = e.kind === 'team' ? e.bots : [];
-    const strength = (b: BotSpec) =>
-      botStrength(
-        b.skill,
-        valueScore(b.traits),
-        modTraitsEffect(b.gameTraits) + prestigeCodeEffect(b.prestige),
-      );
-    const theirs = bots.reduce((n, b) => n + strength(b), 0);
-    const ours = this.lineupOf(user.id, settings).strength;
+    // Both sides as the simulation measures them (AI: the band; a manager: the lineup).
+    const theirs = this.strengthOf(season, opp);
+    const ours = this.strengthOf(season, mine);
     return {
       next: {
         fixtureId: next.id,
@@ -2559,6 +2550,11 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     };
   }
 
+  /**
+   * The league page: tables of all tiers (the viewer's tier first), the matchday as a
+   * conference (games with live tournaments and the simulated results shown so far), the
+   * fixture list, the season's end, the viewer's next game.
+   */
   view(user: User, seasonQ?: number) {
     this.udt.assertOn();
     const current = this.seasons.current()?.number ?? this.seasons.latestStarted()?.number;
