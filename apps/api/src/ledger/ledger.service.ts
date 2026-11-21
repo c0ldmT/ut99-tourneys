@@ -31,6 +31,7 @@ export type LedgerKind =
   | 'udt_workshop'
   | 'udt_prestige'
   | 'udt_club'
+  | 'udt_loan'
   | 'udt_fanshop'
   | 'udt_league'
   | 'udt_cup_bonus';

@@ -1244,6 +1244,12 @@ export interface UdtRosterBot {
     /** A talent's hidden trait waits for level 10 (decision 267; which one stays hidden). */
     anlage?: boolean;
   } | null;
+  /** A bought bot settling in (decision 269): games, games needed, its prestige once settled. */
+  settle?: { games: number; need: number; prestige: UdtPrestige | null } | null;
+  /** The prestige that plays (an own bot's or a settled bought bot's). */
+  prestige?: UdtPrestige | null;
+  /** A loan (decision 270): the market day it goes back, the fee paid. */
+  loan?: { until: string; fee: number } | null;
   career?: UdtCareer | null;
 }
 
@@ -1252,7 +1258,7 @@ export type UdtPrestigeStat =
 
 /** An own bot's prestige (decision 262). */
 export interface UdtPrestige {
-  stage: 'mature' | 'godlike' | 'ascended';
+  stage: 'mature' | 'godlike' | 'ascended' | 'settled';
   cap: number;
   points: number;
   fromLevels: number;
@@ -1908,7 +1914,7 @@ export interface UdtPartnerBot {
   starter: boolean;
   /** Made by its team (starter, talent, apprentice, blueprint): no salary, develops. */
   homemade?: boolean;
-  blocked: 'nominated' | 'playing' | 'striking' | 'locked' | null;
+  blocked: 'nominated' | 'playing' | 'striking' | 'locked' | 'loan' | null;
   unlocksAt: string | null;
 }
 

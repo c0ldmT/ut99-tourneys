@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Loans: an offer of the day plays 7 market days for 15 % of its value without salary, one per team; buying it then costs the price less the fee (decision 270, migration 55).
 - Bought bots settle in after 10 Dream Team games and get 2 prestige points; prestige points count 4 % each against a team value cap (decision 269, migration 54).
 - Club house page with levels, the analysis room in the next league game, the trophy room (crest next to the team name, trophy wall with league titles), the new scout report and development tiles (decision 268, patch note 268).
 - Dream Team club house v2 (migration 51): ten buildings per season, training ground, physio and scouting office in three levels; analysis room, boarding school, workshop, fan shop, mentor wing, sports psychologist, trophy room with crest. AI managers build too. The pages follow.

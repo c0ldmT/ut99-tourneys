@@ -303,6 +303,13 @@ export class UdtController {
     return this.market.buy(user, body);
   }
 
+  /** Loans an offer for 7 market days without salary (decision 270). */
+  @Post('market/loan')
+  @HttpCode(200)
+  loan(@CurrentUser() user: User, @Body(new ZodPipe(BuyBody)) body: BuyInput) {
+    return this.market.loan(user, body);
+  }
+
   /** Sells a roster bot to the market (85 % of its value). */
   @Post('roster/:botId/sell')
   @HttpCode(200)

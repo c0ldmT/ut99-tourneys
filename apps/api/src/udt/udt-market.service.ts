@@ -1,5 +1,5 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, lt } from 'drizzle-orm';
 import {
   baseValue,
   botRarity,
@@ -8,6 +8,8 @@ import {
   demandFactor,
   economyIndex,
   formFactor,
+  LOAN_DAYS,
+  loanFee,
   madeSalaryShare,
   managerEffects,
   PHASE_EFFECT,
@@ -33,6 +35,7 @@ import {
   udtDays,
   udtOffers,
   udtRoster,
+  udtTraits,
   udtValues,
 } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -78,6 +81,7 @@ const MANAGER_ACTIONS = [
   'udt_workshop',
   'udt_prestige',
   'udt_club',
+  'udt_loan',
   'udt_ticket',
 ];
 
@@ -219,6 +223,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
           this.log.error(`udt market closing: ${e instanceof Error ? e.message : String(e)}`);
         }
     const sales = this.salesByBracket(s, last?.day);
+    // Loans that end today go back to the market first (decision 270): free for the offers.
+    this.endLoans(s, day);
     const library = this.bots.list();
     const byId = new Map(library.map((b) => [b.id, b]));
     // 2. Rest, 3. salaries (Mondays).
@@ -515,6 +521,8 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const owners = this.udt.owners(season.number);
     const tags = new Map(this.udt.teams(season.number).map((t) => [t.userId, t.tag]));
     const offers = this.db.select().from(udtOffers).where(eq(udtOffers.day, last.day)).all();
+    const loaned = this.loaned(season.number);
+    const myLoan = [...loaned.values()].find((l) => l.userId === user.id) ?? null;
     const homegrown = this.career.homegrown();
     const careers = this.career.careers();
     const history = this.history(
@@ -554,10 +562,129 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             mine: owner === user.id,
             homegrown: homegrown.get(b.id) ?? null,
             career: careers.get(b.id) ?? null,
+            /** A loan for `LOAN_DAYS` market days (decision 270): its fee; on loan to a team. */
+            loanFee: loanFee(h.at(-1)?.value ?? o.minPrice),
+            onLoan: loaned.has(b.id),
           },
         ];
       }),
+      /** The team's loan (one at a time): bot and the market day it goes back. */
+      loan: myLoan ? { botId: myLoan.botId, until: myLoan.loanUntil } : null,
+      loanDays: LOAN_DAYS,
     };
+  }
+
+  /** Loaned bots of the season (roster rows with a loan). */
+  private loaned(season: number) {
+    return new Map(
+      this.db
+        .select()
+        .from(udtRoster)
+        .where(and(eq(udtRoster.season, season), isNotNull(udtRoster.loanUntil)))
+        .all()
+        .map((r) => [r.botId, r as typeof r & { loanUntil: string }]),
+    );
+  }
+
+  /**
+   * Loans whose last day has come go back to the market; traits on the bot go back to the
+   * team's inventory (no scrap).
+   */
+  private endLoans(season: number, day: string) {
+    for (const r of this.loaned(season).values()) {
+      if (r.loanUntil > day) continue;
+      this.db.transaction((tx) => {
+        tx.update(udtTraits)
+          .set({ botId: null, assignedAt: null })
+          .where(
+            and(
+              eq(udtTraits.season, season),
+              eq(udtTraits.userId, r.userId),
+              eq(udtTraits.botId, r.botId),
+            ),
+          )
+          .run();
+        tx.delete(udtRoster)
+          .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))
+          .run();
+      });
+      this.log.info(`udt loan of ${r.botId} by ${r.userId} ended`);
+    }
+  }
+
+  /**
+   * Loans an offer of the day for `LOAN_DAYS` market days (decision 270): no salary, one loan
+   * per team, it takes a roster place; it cannot be sold or traded.
+   */
+  loan(user: User, body: BuyInput) {
+    this.udt.assertOn();
+    const season = this.udt.season();
+    if (!this.udt.team(user.id, season.number)) throw conflict('found your team first');
+    const last = this.lastDay(season.number);
+    const offer = last
+      ? this.db
+          .select()
+          .from(udtOffers)
+          .where(and(eq(udtOffers.day, last.day), eq(udtOffers.botId, body.botId)))
+          .get()
+      : undefined;
+    if (!last || !offer) throw notFound('offer');
+    if (this.udt.owners(season.number).has(body.botId)) throw conflict('the bot is sold');
+    if ([...this.loaned(season.number).values()].some((l) => l.userId === user.id))
+      throw conflict('one loan at a time');
+    if (!this.udt.rosterHasRoom(user.id, season.number, false))
+      throw conflict('at most {max} bots: your roster is full', { max: ROSTER_MAX });
+    const value = this.history([body.botId], 1).get(body.botId)?.at(-1)?.value ?? offer.minPrice;
+    const fee = loanFee(value);
+    this.ledger.charge({
+      userId: user.id,
+      kind: 'udt_loan',
+      amount: fee,
+      ref: `loan:${season.number}:${last.day}:${body.botId}:${randomId(6)}`,
+      meta: { botId: body.botId, day: last.day },
+    });
+    this.db
+      .insert(udtRoster)
+      .values({
+        season: season.number,
+        botId: body.botId,
+        userId: user.id,
+        price: 0,
+        acquiredAt: new Date(this.clock.now()).toISOString(),
+        loanUntil: addDays(last.day, LOAN_DAYS),
+        loanFee: fee,
+      })
+      .run();
+    return this.view(user);
+  }
+
+  /** Buys the team's loaned bot: today's price less the fee paid (decision 270). */
+  private buyLoaned(user: User, season: number, r: typeof udtRoster.$inferSelect) {
+    const b = this.bots.list().find((x) => x.id === r.botId);
+    if (!b) throw notFound('bot');
+    const value = this.history([r.botId], 1).get(r.botId)?.at(-1)?.value ?? r.loanFee * 7;
+    const price = Math.max(0, buyPrice(value, b.skill) - r.loanFee);
+    const ref = `buy-loan:${season}:${r.botId}:${randomId(6)}`;
+    if (price > 0)
+      this.ledger.charge({
+        userId: user.id,
+        kind: 'udt_purchase',
+        amount: price,
+        ref,
+        meta: { botId: r.botId, loan: true },
+      });
+    this.db
+      .update(udtRoster)
+      .set({
+        loanUntil: null,
+        loanFee: 0,
+        price: price + r.loanFee,
+        acquiredAt: new Date(this.clock.now()).toISOString(),
+        settleGames: 0,
+      })
+      .where(and(eq(udtRoster.season, season), eq(udtRoster.botId, r.botId)))
+      .run();
+    this.career.saleBonus(season, r.botId, price + r.loanFee, ref);
   }
 
   /**
@@ -588,6 +715,12 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     this.udt.assertOn();
     const season = this.udt.season();
     if (!this.udt.team(user.id, season.number)) throw conflict('found your team first');
+    // The team's loaned bot: bought for today's price less the fee (decision 270).
+    const mine = this.loaned(season.number).get(body.botId);
+    if (mine?.userId === user.id) {
+      this.buyLoaned(user, season.number, mine);
+      return this.view(user);
+    }
     const last = this.lastDay(season.number);
     const offer = last
       ? this.db
@@ -642,6 +775,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
       .get();
     if (!r) throw notFound('bot in your roster');
     if (r.starter) throw conflict('the starter bot stays with your team');
+    if (r.loanUntil) throw conflict('a loaned bot goes back by itself');
     if (this.udt.isOwnBot(season.number, botId))
       throw conflict('a bot made by a team cannot be sold to the market, only traded');
     const bot = this.bots.list().find((b) => b.id === botId);
@@ -688,9 +822,11 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
  * salary (blueprint bots, owner 25.10.); keepers play for free (league plan L-E7).
  */
 export function salaryShare(
-  r: Pick<typeof udtRoster.$inferSelect, 'starter'>,
+  r: Pick<typeof udtRoster.$inferSelect, 'starter'> & { loanUntil?: string | null },
   own: { origin: string; keptFrom: number | null } | undefined,
 ): number {
+  // A loaned bot plays without salary (decision 270).
+  if (r.loanUntil) return 0;
   return r.starter || (own?.keptFrom ?? null) !== null ? 0 : madeSalaryShare(own?.origin);
 }
 
@@ -700,7 +836,7 @@ export function salaryShare(
  * the day (missing: its price).
  */
 export function botSalary(
-  r: Pick<typeof udtRoster.$inferSelect, 'starter' | 'price'>,
+  r: Pick<typeof udtRoster.$inferSelect, 'starter' | 'price'> & { loanUntil?: string | null },
   own: { origin: string; keptFrom: number | null } | undefined,
   value: number | undefined,
   b: LibraryBot | undefined,
@@ -733,6 +869,12 @@ export function mondaysAfter(from: string, to: string): number {
     if (new Date(Date.UTC(y, m - 1, d + i)).getUTCDay() === 1) n++;
   }
   return n;
+}
+
+/** A day (YYYY-MM-DD) `n` days later. */
+function addDays(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
 }
 
 function daysBetween(a: string, b: string): number {

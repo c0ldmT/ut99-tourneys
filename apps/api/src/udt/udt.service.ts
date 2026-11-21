@@ -221,6 +221,8 @@ export interface RosterBot {
   settle: { games: number; need: number; prestige: OwnPrestige | null } | null;
   /** The prestige that plays: an own bot's or a settled bought bot's. */
   prestige: OwnPrestige | null;
+  /** A loan (decision 270): the market day it goes back, the fee paid. */
+  loan: { until: string; fee: number } | null;
 }
 
 /** An own bot's prestige as the roster shows it (decision 262). */
@@ -815,7 +817,9 @@ export class UdtService {
           cards.some((c) => c.code === 'claudius'),
         );
         // A bought bot settles in (decision 269); its prestige then counts like an own bot's.
-        const settle = own.has(b.id) ? null : settleView(r.settleGames, r.prestigeJson);
+        // A loaned bot does not settle in (decision 270).
+        const settle =
+          own.has(b.id) || r.loanUntil ? null : settleView(r.settleGames, r.prestigeJson);
         const prestige = ov?.prestige ?? settle?.prestige ?? null;
         return [
           {
@@ -857,6 +861,7 @@ export class UdtService {
             own: ov,
             settle,
             prestige,
+            loan: r.loanUntil ? { until: r.loanUntil, fee: r.loanFee } : null,
           },
         ];
       })

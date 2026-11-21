@@ -335,6 +335,9 @@ export const udtRoster = sqliteTable(
     settleGames: integer('settle_games').notNull().default(0),
     /** A settled bought bot's prestige points per stat (`PrestigeAlloc`). */
     prestigeJson: text('prestige_json').notNull().default('{}'),
+    /** A loan (migration 55, decision 270): the market day it goes back, the fee paid. */
+    loanUntil: text('loan_until'),
+    loanFee: integer('loan_fee').notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.season, t.botId] })],
 );

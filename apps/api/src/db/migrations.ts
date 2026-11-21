@@ -832,4 +832,9 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_roster ADD COLUMN settle_games INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE udt_roster ADD COLUMN prestige_json TEXT NOT NULL DEFAULT '{}';
   `,
+  // 55: loans (decision 270): the market day a loaned bot goes back and the fee paid.
+  `
+  ALTER TABLE udt_roster ADD COLUMN loan_until TEXT;
+  ALTER TABLE udt_roster ADD COLUMN loan_fee INTEGER NOT NULL DEFAULT 0;
+  `,
 ];

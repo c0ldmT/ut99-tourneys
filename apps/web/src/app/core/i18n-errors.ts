@@ -276,6 +276,10 @@ export const ERRORS_DE: Record<string, string> = {
     'Prestige gibt es, sobald der Bot sein Potenzial erreicht hat (ab Level 5).',
   'a prestige stat takes at most {n} points': 'Ein Prestige-Wert nimmt höchstens {n} Punkte.',
   'no free prestige point': 'Kein freier Prestige-Punkt.',
+  'one loan at a time': 'Nur eine Leihe gleichzeitig.',
+  'a loaned bot goes back by itself': 'Ein Leihbot geht von selbst zurück.',
+  '{name} is on loan: it goes back to the market':
+    '{name} ist geliehen und geht zurück an den Markt.',
   'a bought bot gets prestige points after {n} Dream Team games for your team':
     'Ein gekaufter Bot bekommt Prestige-Punkte nach {n} Dream-Team-Spielen für dein Team.',
   'the bot holds all the prestige points it can':

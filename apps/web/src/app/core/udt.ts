@@ -67,11 +67,12 @@ export function rosterSalary(
     starter: boolean;
     udtTraits?: { code: string }[];
     own?: { origin: string; keptFrom?: number | null } | null;
+    loan?: unknown;
   },
   index: number,
 ): number {
-  // The starter and keepers play for free.
-  if (b.starter || b.own?.keptFrom) return 0;
+  // The starter, keepers and loaned bots (decision 270) play for free.
+  if (b.starter || b.own?.keptFrom || b.loan) return 0;
   const share = madeSalaryShare(b.own?.origin);
   return share ? salaryOf(b, index, share) : 0;
 }

@@ -4,7 +4,15 @@ import type { RunningApi } from '../src/app.js';
 import { buyPrice, weeklySalary } from '@tourney/udt';
 import { desc, eq } from 'drizzle-orm';
 import { DB, type Db } from '../src/db/database.js';
-import { bots, udtBids, udtBots, udtDays, udtRoster, udtValues } from '../src/db/schema.js';
+import {
+  bots,
+  udtBids,
+  udtBots,
+  udtDays,
+  udtRoster,
+  udtTraits,
+  udtValues,
+} from '../src/db/schema.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { UdtMarketService } from '../src/udt/udt-market.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -157,6 +165,86 @@ describe('Unreal Dream Team: transfer market', () => {
     // Resetting costs as for own bots.
     expect((await mario.post(`/udt/roster/${o.botId}/prestige/reset`)).status).toBe(200);
     expect((await row()).prestige).toMatchObject({ spent: 0, free: 2 });
+  });
+
+  it('loans an offer for 7 market days without salary, then it goes back (decision 270)', async () => {
+    const { clock, mario, tim, market, ledger } = await setup();
+    market.tick();
+    const marioId = (await mario.get('/me')).body.id as string;
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_reward', amount: 50_000, ref: 'gift' });
+    const m = (await mario.get('/udt/market')).body;
+    const [o, o2] = [...(m.offers as (Offer & { loanFee: number })[])].sort(
+      (a, b) => b.skill - a.skill,
+    );
+    expect(o!.loanFee).toBe(Math.round((o!.value * 0.15) / 10) * 10);
+    const before = ledger.spendable(marioId).spendable;
+    const lent = await mario.post('/udt/market/loan', { botId: o!.botId });
+    expect(lent.status, JSON.stringify(lent.body)).toBe(200);
+    expect(lent.body.loan).toMatchObject({ botId: o!.botId, until: '2026-10-26' });
+    expect(lent.body.offers.find((x: Offer) => x.botId === o!.botId)).toMatchObject({
+      sold: true,
+      mine: true,
+      onLoan: true,
+    });
+    expect(ledger.spendable(marioId).spendable).toBe(before - o!.loanFee);
+    // One loan at a time; others cannot buy it; it cannot be sold.
+    expect((await mario.post('/udt/market/loan', { botId: o2!.botId })).body.key).toBe(
+      'one loan at a time',
+    );
+    expect((await tim.post('/udt/market/buy', { botId: o!.botId })).body.key).toBe(
+      'the bot is sold',
+    );
+    expect((await mario.post(`/udt/roster/${o!.botId}/sell`)).body.key).toBe(
+      'a loaned bot goes back by itself',
+    );
+    const row = (
+      (await mario.get('/udt')).body.roster as { botId: string; loan: unknown; settle: unknown }[]
+    ).find((r) => r.botId === o!.botId)!;
+    expect(row.loan).toEqual({ until: '2026-10-26', fee: o!.loanFee });
+    expect(row.settle).toBeNull();
+    // A trait on it goes back to the inventory when the loan ends.
+    const db = api!.app.get<Db>(DB);
+    db.insert(udtTraits)
+      .values({
+        id: 'tL',
+        season: 1,
+        userId: marioId,
+        code: 'bouncer',
+        botId: o!.botId,
+        source: 'pack',
+        createdAt: 'x',
+        assignedAt: 'x',
+      })
+      .run();
+    // Monday 26.10. (no salary for it on the Monday): back to the market.
+    for (let d = 0; d < 7; d++) {
+      clock.advance(DAY);
+      market.tick();
+    }
+    const salaries = ledger
+      .entries(marioId, 1, 100)
+      .filter((e) => e.kind === 'udt_salary' && (e.meta as { botId?: string })?.botId === o!.botId);
+    expect(salaries).toEqual([]);
+    const after = (await mario.get('/udt')).body.roster as { botId: string }[];
+    expect(after.some((r) => r.botId === o!.botId)).toBe(false);
+    expect(db.select().from(udtTraits).where(eq(udtTraits.id, 'tL')).get()!.botId).toBeNull();
+    expect((await mario.get('/udt/market')).body.loan).toBeNull();
+  });
+
+  it('buys its loaned bot for the price less the fee paid (decision 270)', async () => {
+    const { mario, market, ledger } = await setup();
+    market.tick();
+    const marioId = (await mario.get('/me')).body.id as string;
+    ledger.book({ season: 1, userId: marioId, kind: 'udt_reward', amount: 50_000, ref: 'gift' });
+    const o = ((await mario.get('/udt/market')).body.offers as (Offer & { loanFee: number })[])[0]!;
+    await mario.post('/udt/market/loan', { botId: o.botId });
+    const before = ledger.spendable(marioId).spendable;
+    expect((await mario.post('/udt/market/buy', { botId: o.botId })).status).toBe(200);
+    expect(ledger.spendable(marioId).spendable).toBe(before - (o.price - o.loanFee));
+    const row = (
+      (await mario.get('/udt')).body.roster as { botId: string; loan: unknown; price: number }[]
+    ).find((r) => r.botId === o.botId)!;
+    expect(row).toMatchObject({ loan: null, price: o.price });
   });
 
   it("shows library bots without their clan tag; in a roster they carry the manager's tag", async () => {

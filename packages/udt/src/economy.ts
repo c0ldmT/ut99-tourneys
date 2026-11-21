@@ -321,6 +321,15 @@ export function buyPrice(
   return roundNeuro(value * (1 + cfg.buyPremium[bracketOf(skill)]));
 }
 
+/**
+ * A loan (plan P4, decision 270): an offer of the day plays for a team for `LOAN_DAYS` market
+ * days without salary, for `LOAN_SHARE` of its market value; buying it then costs the price
+ * less the fee paid.
+ */
+export const LOAN_DAYS = 7;
+export const LOAN_SHARE = 0.15;
+export const loanFee = (value: number): number => roundNeuro(value * LOAN_SHARE);
+
 /** What selling a bot to the market pays. */
 export function sellPrice(value: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number {
   return roundNeuro(value * cfg.sellBack);
