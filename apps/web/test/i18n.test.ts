@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CLUB_UPGRADES, clubMaxLevel, CREST_SHAPES } from '@tourney/udt';
+import { CLUB_UPGRADES, clubMaxLevel, CREST_SHAPES, SIGNATURES } from '@tourney/udt';
 import { DICT, translate } from '../src/app/core/i18n-dict';
 
 function sources(dir: string): string[] {
@@ -43,6 +43,13 @@ describe('translations', () => {
         expect(DICT[lang][`udt.crest.c.${c}`]).toBeDefined();
       for (const k of ['league', 'cup', 'stage'])
         expect(DICT[lang][`udt.wall.kind.${k}`]).toBeDefined();
+      // Signatures (decision 274) and the settled stage.
+      for (const c of SIGNATURES) {
+        expect(DICT[lang][`udt.sig.${c}`]).toBeDefined();
+        expect(DICT[lang][`udt.sig.e.${c}`]).toBeDefined();
+      }
+      for (const st of ['mature', 'godlike', 'ascended', 'settled'])
+        expect(DICT[lang][`udt.pres.stage.${st}`]).toBeDefined();
     }
   });
 

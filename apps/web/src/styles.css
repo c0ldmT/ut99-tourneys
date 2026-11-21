@@ -1376,6 +1376,7 @@ main section[id] {
 }
 .udt-mark {
   display: inline-flex;
+  white-space: nowrap;
   align-items: center;
   height: 20px;
   padding: 0 7px;
@@ -1409,6 +1410,21 @@ main section[id] {
 .udt-mark.own {
   color: var(--accent-hover);
   border-color: rgba(34, 211, 238, 0.4);
+}
+.udt-mark.sig {
+  color: #d4adff;
+  border-color: rgba(178, 107, 255, 0.5);
+}
+.udt-mark.sig.star {
+  background: rgba(178, 107, 255, 0.14);
+}
+.udt-mark.mentor {
+  color: var(--accent-hover);
+  border-color: rgba(34, 211, 238, 0.4);
+}
+.udt-mark.loan {
+  color: var(--info);
+  border-color: rgba(122, 169, 255, 0.5);
 }
 .udt-mark.anlage {
   color: var(--udt);

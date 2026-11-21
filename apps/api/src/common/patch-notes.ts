@@ -22,6 +22,29 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 274,
+    date: '2026-11-21',
+    mod: '0.21.0',
+    en: {
+      title: 'Market: signatures, loans, settling in',
+      items: [
+        'Library bots with a career (2 seasons, career level 10) earn a signature: an effect of their own from their statistics - signature weapon, marksman, streak killer, clean-up, comeback kid, early starter or home map. It stays with the bot, needs no trait slot and gets stronger (★) from career level 20. A mentor passes it on to its apprentice with 25 % for the season.',
+        "Loan a bot of the day's offers for 7 market days for 15 % of its value, without salary (one at a time). Buying it meanwhile costs the price less the fee.",
+        'Bought bots settle in after 10 Dream Team games for your team and get 2 prestige points.',
+        "Prestige points count 4 % each against a cup's team value cap.",
+      ],
+    },
+    de: {
+      title: 'Markt: Signaturen, Leihe, Eingewöhnung',
+      items: [
+        'Bibliotheks-Bots mit Karriere (2 Seasons, Karriere-Level 10) bekommen eine Signatur: einen eigenen Effekt aus ihrer Statistik – Leibwaffe, Präzisionsschütze, Serienkiller, Abräumer, Stehaufmann, Frühstarter oder Lieblings-Map. Sie bleibt beim Bot, braucht keinen Trait-Slot und wird ab Karriere-Level 20 stärker (★). Ein Mentor gibt sie mit 25 % für die Season an seinen Lehrling weiter.',
+        'Leihe einen Bot aus dem Tagesangebot für 7 Markttage für 15 % seines Werts, ohne Gehalt (eine Leihe gleichzeitig). Kaufen während der Leihe kostet den Preis minus Leihgebühr.',
+        'Gekaufte Bots sind nach 10 Dream-Team-Spielen für dein Team eingewöhnt und bekommen 2 Prestige-Punkte.',
+        'Prestige-Punkte zählen mit je 4 % zur Teamwert-Grenze eines Cups.',
+      ],
+    },
+  },
+  {
     id: 268,
     date: '2026-11-21',
     en: {

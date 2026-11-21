@@ -45,6 +45,7 @@ import {
   FANSHOP_PAYS,
   ROSTER_PLACES,
   PRESTIGE_CAP,
+  buyPrice,
   parseSignature,
   prestigeCapValue,
   SETTLE_GAMES,
@@ -224,8 +225,8 @@ export interface RosterBot {
   settle: { games: number; need: number; prestige: OwnPrestige | null } | null;
   /** The prestige that plays: an own bot's or a settled bought bot's. */
   prestige: OwnPrestige | null;
-  /** A loan (decision 270): the market day it goes back, the fee paid. */
-  loan: { until: string; fee: number } | null;
+  /** A loan (decision 270): the market day it goes back, the fee paid, what buying it costs. */
+  loan: { until: string; fee: number; price: number } | null;
   /** Its signature (decision 273): a library bot's for good, an apprentice's for the season. */
   signature: Signature | null;
 }
@@ -584,6 +585,9 @@ export class UdtService {
     for (const r of roster) {
       const b = own.get(r.botId);
       const bot = lib.get(r.botId);
+      // A settled bought bot's free points count too (decision 274).
+      if (!b && !r.loanUntil)
+        prestige += settleView(r.settleGames, r.prestigeJson)?.prestige?.free ?? 0;
       if (!b || !bot) continue;
       const level = levelOf(r.xp);
       const values = bot.traits ?? {};
@@ -871,7 +875,14 @@ export class UdtService {
             own: ov,
             settle,
             prestige,
-            loan: r.loanUntil ? { until: r.loanUntil, fee: r.loanFee } : null,
+            loan: r.loanUntil
+              ? {
+                  until: r.loanUntil,
+                  fee: r.loanFee,
+                  // Buying it now: today's buy price less the fee paid (as the market charges).
+                  price: Math.max(0, buyPrice(this.value(b, season, []), b.skill) - r.loanFee),
+                }
+              : null,
             signature,
           },
         ];

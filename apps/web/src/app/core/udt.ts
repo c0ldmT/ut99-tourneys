@@ -156,6 +156,8 @@ export function rosterCard(
       potential: [number, number];
       prestige?: { spent: number; cap: number; stars: number; stage: string } | null;
     } | null;
+    /** The prestige that plays (an own bot's or a settled bought bot's, decision 269). */
+    prestige?: { spent: number; cap: number; stars: number; stage: string } | null;
   },
   tag?: string,
 ): CardBot {
@@ -163,16 +165,16 @@ export function rosterCard(
     ...b,
     ...(tag ? { tag } : {}),
     ...(b.own ? { potential: b.own.potential } : {}),
-    ...(b.own?.prestige
+    ...((b.prestige ?? b.own?.prestige)
       ? {
           prestige: {
-            spent: b.own.prestige.spent,
-            cap: b.own.prestige.cap,
-            stars: b.own.prestige.stars,
-            stage: b.own.prestige.stage,
+            spent: (b.prestige ?? b.own?.prestige)!.spent,
+            cap: (b.prestige ?? b.own?.prestige)!.cap,
+            stars: (b.prestige ?? b.own?.prestige)!.stars,
+            stage: (b.prestige ?? b.own?.prestige)!.stage,
           },
         }
-      : {}),
+      : { prestige: null }),
     career: b.career ?? null,
   };
 }

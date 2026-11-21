@@ -8,6 +8,7 @@ import {
   input,
   signal,
 } from '@angular/core';
+import { UdtSignatureBox } from '../components/udt-signature';
 import { RouterLink } from '@angular/router';
 import { UdtPotential } from '../components/udt-potential';
 import { Api } from '../core/api';
@@ -24,7 +25,7 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
  */
 @Component({
   selector: 'app-udt-bot',
-  imports: [RouterLink, TPipe, NeuroPipe, UdtNav, UdtCard, UdtPotential],
+  imports: [RouterLink, TPipe, NeuroPipe, UdtNav, UdtCard, UdtPotential, UdtSignatureBox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -157,6 +158,9 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
             </section>
           }
 
+          @if (p.signature; as sg) {
+            <udt-signature [signature]="sg" />
+          }
           @if (p.career; as c) {
             <section class="card">
               <h2>{{ 'udt.career.title' | t }}</h2>

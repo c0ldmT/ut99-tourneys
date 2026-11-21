@@ -618,7 +618,9 @@ export class UdtAcademyPage {
       const v = await this.api.udtApprentice(m.botId, p.botId);
       this.a.set(v);
       this.grad.set(await this.api.udtGraduation());
-      if (v.apprentice?.inherited)
+      if (v.apprentice?.signature)
+        alert(this.i18n.t('udt.academy.inheritedSig', { mentor: m.name }));
+      else if (v.apprentice?.inherited)
         alert(
           this.i18n.t('udt.academy.inherited', {
             trait: this.i18n.t(`udt.trait.${v.apprentice.inherited}`),

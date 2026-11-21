@@ -200,7 +200,11 @@ describe('Unreal Dream Team: transfer market', () => {
     const row = (
       (await mario.get('/udt')).body.roster as { botId: string; loan: unknown; settle: unknown }[]
     ).find((r) => r.botId === o!.botId)!;
-    expect(row.loan).toEqual({ until: '2026-10-26', fee: o!.loanFee });
+    expect(row.loan).toEqual({
+      until: '2026-10-26',
+      fee: o!.loanFee,
+      price: o!.price - o!.loanFee,
+    });
     expect(row.settle).toBeNull();
     // A trait on it goes back to the inventory when the loan ends.
     const db = api!.app.get<Db>(DB);

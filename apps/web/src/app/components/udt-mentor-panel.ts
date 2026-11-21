@@ -172,6 +172,9 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
                   {{ 'udt.mentor.noTrait' | t: { mentor: m.name } }}
                 }
               </li>
+              @if (m.signature) {
+                <li>{{ 'udt.mentor.signature' | t: { mentor: m.name } }}</li>
+              }
               <li>{{ 'udt.mentor.once' | t: { pupil: p.name, mentor: m.name } }}</li>
             </ul>
             <button

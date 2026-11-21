@@ -26,7 +26,7 @@ import {
 } from '@tourney/udt';
 import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
-import { NeuroPipe } from '../core/neuro';
+import { formatNeuro, NeuroPipe } from '../core/neuro';
 import type { UdtCamp, UdtRosterBot, UdtTraitOnBot } from '../core/types';
 import {
   rosterCard,
@@ -40,6 +40,7 @@ import {
 import { lookBody, lookFromBot, UdtBotLook, type LookDraft, type UdtLooks } from './udt-bot-look';
 import { UdtPotential } from './udt-potential';
 import { UdtPrestigeBox } from './udt-prestige';
+import { UdtSignatureBox } from './udt-signature';
 import { UdtRename } from './udt-rename';
 
 type Stat = 'accuracy' | 'alertness' | 'strafing' | 'skill';
@@ -68,6 +69,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
     UdtRename,
     UdtPotential,
     UdtPrestigeBox,
+    UdtSignatureBox,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -87,6 +89,8 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 {{ 'udt.starter' | t }}
               } @else if (b.own) {
                 {{ 'udt.academy.origin.' + b.own.origin | t }}
+              } @else if (b.loan) {
+                {{ 'udt.loan.feePaid' | t }} {{ b.loan.fee | neuro }}
               } @else {
                 {{ 'udt.paid' | t }} {{ b.price | neuro }}
               }
@@ -124,6 +128,21 @@ const SHORT: Readonly<Record<Stat, string>> = {
             }}</a>
           </div>
           <div class="right">
+            @if (b.loan; as ln) {
+              <!-- A loaned bot (decision 270): until when, buying it now. -->
+              <section class="loan">
+                <b>{{ 'udt.loan.until' | t: { at: dayText(ln.until) } }}</b>
+                <span class="muted small grow">{{ 'udt.loan.text' | t }}</span>
+                <button
+                  type="button"
+                  class="primary"
+                  [disabled]="busy() || tooDear(ln.price)"
+                  (click)="buyLoaned(b, ln.price)"
+                >
+                  {{ 'udt.loan.buy' | t: { price: (ln.price | neuro) } }}
+                </button>
+              </section>
+            }
             <section>
               <h3>{{ 'udt.level' | t }} {{ b.level }}</h3>
               @if (xp(); as x) {
@@ -275,7 +294,34 @@ const SHORT: Readonly<Record<Stat, string>> = {
                 />
               }
             } @else {
+              @if (b.settle; as st) {
+                @if (st.prestige; as pr) {
+                  <udt-prestige
+                    [bot]="b"
+                    [prestige]="pr"
+                    [spendable]="spendable()"
+                    (changed)="changed.emit()"
+                  />
+                } @else {
+                  <!-- Settling in (decision 269): 2 prestige points after its games. -->
+                  <section class="settle">
+                    <div class="row between">
+                      <h3>{{ 'udt.settle.title' | t }}</h3>
+                      <b class="mono">{{
+                        'udt.settle.games' | t: { n: st.games, need: st.need }
+                      }}</b>
+                    </div>
+                    <div class="udt-bar settlebar">
+                      <i [style.width.%]="(100 * st.games) / st.need"></i>
+                    </div>
+                    <p class="muted small">{{ 'udt.settle.text' | t: { need: st.need } }}</p>
+                  </section>
+                }
+              }
               <p class="muted small">{{ 'udt.points.bought' | t }}</p>
+            }
+            @if (b.signature; as sg) {
+              <udt-signature [signature]="sg" [inherited]="!!b.own" />
             }
 
             <section>
@@ -377,7 +423,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
                   </button>
                 }
               </section>
-            } @else if (!b.starter) {
+            } @else if (!b.starter && !b.loan) {
               <section>
                 <button type="button" class="danger" [disabled]="busy()" (click)="sell(b)">
                   {{ 'udt.sell' | t }} · {{ sellPrice(b) | neuro }}
@@ -457,6 +503,35 @@ const SHORT: Readonly<Record<Stat, string>> = {
     }
     .udt-bar.xp.big {
       height: 8px;
+    }
+    .loan {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 14px;
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--info);
+      background: rgba(122, 169, 255, 0.07);
+    }
+    .loan b {
+      color: var(--info);
+    }
+    .loan .grow {
+      flex: 1 1 240px;
+    }
+    .settle {
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      border: 1px dashed var(--line);
+      background: var(--panel-2);
+    }
+    .settle h3 {
+      margin: 0;
+    }
+    .settlebar i {
+      background: var(--neuro-text);
     }
     .dev {
       padding: 12px;
@@ -793,6 +868,25 @@ export class UdtBotPanel {
       await this.api.udtEditBot(b.botId, lookBody(d));
       this.look.set(null);
     });
+  }
+
+  protected dayText(day: string): string {
+    return this.i18n.date(`${day}T12:00:00Z`);
+  }
+
+  protected tooDear(n: number): boolean {
+    const s = this.spendable();
+    return s !== null && n > s;
+  }
+
+  /** Buys the team's loaned bot for the price less the fee paid (decision 270). */
+  protected async buyLoaned(b: UdtRosterBot, price: number) {
+    const msg = this.i18n.t('udt.market.buyConfirm', {
+      name: b.name,
+      price: formatNeuro(price, this.i18n.lang()),
+    });
+    if (!confirm(msg)) return;
+    await this.act(() => this.api.udtBuy(b.botId));
   }
 
   protected async sell(b: UdtRosterBot) {

@@ -1249,7 +1249,9 @@ export interface UdtRosterBot {
   /** The prestige that plays (an own bot's or a settled bought bot's). */
   prestige?: UdtPrestige | null;
   /** A loan (decision 270): the market day it goes back, the fee paid. */
-  loan?: { until: string; fee: number } | null;
+  loan?: { until: string; fee: number; price: number } | null;
+  /** Its signature (decision 273): a library bot's for good, an apprentice's for the season. */
+  signature?: UdtSignature | null;
   career?: UdtCareer | null;
 }
 
@@ -1525,6 +1527,22 @@ export interface UdtOffer {
   /** A graduate of a manager's academy. */
   homegrown?: { breeder: string; honours: boolean } | null;
   career?: UdtCareer | null;
+  /** A loan for the market's loan days: its fee; on loan to a team (decision 270). */
+  loanFee?: number;
+  onLoan?: boolean;
+  /** Its signature (decision 273) and whether it can be a mentor (skill 6+). */
+  signature?: UdtSignature | null;
+  mentor?: boolean;
+}
+
+/** A library bot's signature (decisions 271-273). */
+export interface UdtSignature {
+  code: 'weapon' | 'marksman' | 'streak' | 'multi' | 'tough' | 'opener' | 'home';
+  level: 1 | 2;
+  /** Leibwaffe: the weapon's class name ("ShockRifle"); Lieblings-Map: the map. */
+  weapon?: string;
+  map?: string;
+  since: number;
 }
 
 export interface UdtMarket {
@@ -1536,6 +1554,9 @@ export interface UdtMarket {
   /** Bots in the own roster and the most a roster holds. */
   rosterSize: number;
   rosterMax: number;
+  /** The team's loan (one at a time) and how many market days a loan lasts (decision 270). */
+  loan?: { botId: string; until: string } | null;
+  loanDays?: number;
 }
 
 export interface UdtEventRules {
@@ -1973,6 +1994,8 @@ export interface UdtMentor {
   /** Traits that can be passed on and the chance that one is. */
   traits: string[];
   inheritChance: number;
+  /** Its signature passes on with 25 % instead of a trait (decision 273). */
+  signature?: UdtSignature | null;
   /** Bots the team made that could learn from it: their values before and after. */
   pupils: UdtPupil[];
 }
@@ -2021,7 +2044,7 @@ export interface UdtAcademy {
   mentorSkill?: number;
   /** XP factor of an apprentice while its mentor is in the roster (1.5). */
   apprenticeXp?: number;
-  apprentice?: { botId: string; inherited: string | null };
+  apprentice?: { botId: string; inherited: string | null; signature?: UdtSignature | null };
   blueprints: UdtBlueprint[];
   botClasses: AssetItem[];
   built?: { botId: string; startTrait: string | null };
@@ -2177,6 +2200,8 @@ export interface UdtBotPage {
     mine: boolean;
   } | null;
   roster: UdtRosterBot | null;
+  /** A library bot's signature (decision 273). */
+  signature?: UdtSignature | null;
   career: UdtCareer | null;
   made: { origin: string; season: number; status: string; breeder: string } | null;
   /** The running season (null between seasons: no team, no season row). */

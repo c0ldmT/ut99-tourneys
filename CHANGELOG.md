@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Market pages: signatures, mentors and loans on the market, loan banner, settling in and the prestige of settled bots in the bot details (decision 274, patch note 274).
 - Signatures in the API: drawn on the market day from the bots' lifetime statistics, in market values, the league model and the games; mentors pass them on (decision 273, migration 56).
 - Mod 0.21.0: signatures of library bots in the game, new line `bsig` (decision 272, README test 74).
 - Signature rules for library bots: seven career marks with two levels, sized with bot:sim (decision 271).

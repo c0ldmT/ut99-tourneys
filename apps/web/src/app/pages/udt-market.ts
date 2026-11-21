@@ -5,13 +5,15 @@ import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
 import type { UdtMarket, UdtOffer } from '../core/types';
 import { bracketOf, UdtCard, UdtNav, weeklySalary } from '../core/udt';
+import { UdtSignatureBox } from '../components/udt-signature';
+import { buyPrice } from '@tourney/udt';
 
 type Filter = 'all' | 'weak' | 'mid' | 'strong';
 
 /** Dream Team transfer market: today's offers at fixed prices (buy at once), the next market day. */
 @Component({
   selector: 'app-udt-market',
-  imports: [TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
+  imports: [TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -77,6 +79,14 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                       'udt.market.cheap' | t
                     }}</span>
                   }
+                  @if (o.signature; as sg) {
+                    <udt-signature [signature]="sg" [mark]="true" />
+                  }
+                  @if (o.mentor) {
+                    <span class="udt-mark mentor" [title]="'udt.market.mentorTitle' | t">{{
+                      'udt.market.mentor' | t
+                    }}</span>
+                  }
                   @if (o.homegrown) {
                     <span
                       class="udt-mark star"
@@ -84,8 +94,12 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                       >{{ 'udt.market.homegrown' | t }}</span
                     >
                   }
-                  @if (o.mine) {
+                  @if (o.mine && o.onLoan) {
+                    <span class="udt-mark loan">{{ 'udt.market.yourLoan' | t }}</span>
+                  } @else if (o.mine) {
                     <span class="udt-mark own">{{ 'udt.market.yours' | t }}</span>
+                  } @else if (o.onLoan) {
+                    <span class="udt-mark loan">{{ 'udt.market.onLoan' | t }}</span>
                   } @else if (o.sold) {
                     <span class="udt-mark">{{
                       o.buyer
@@ -121,8 +135,13 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                     <span class="muted">{{
                       'udt.market.days' | t: { n: o.history.length }
                     }}</span></span
-                  ></span
-                >
+                  >
+                  @if (o.loanFee && !o.sold) {
+                    <span class="muted small">{{
+                      'udt.market.loanShort' | t: { fee: (o.loanFee | neuro) }
+                    }}</span>
+                  }
+                </span>
               </button>
             } @empty {
               <p class="muted">{{ 'udt.market.empty' | t }}</p>
@@ -131,6 +150,9 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
           <aside>
             @if (sel(); as o) {
               <udt-card [bot]="o" />
+              @if (o.signature; as sg) {
+                <udt-signature class="full" [signature]="sg" />
+              }
               <div class="card bid">
                 <h2>{{ 'udt.market.buyTitle' | t }}</h2>
                 <div class="line">
@@ -145,14 +167,29 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                   <span>{{ 'udt.market.salary' | t }}</span
                   ><span class="mono">{{ salaryOf(o) | neuro }}</span>
                 </div>
-                <button
-                  type="button"
-                  class="primary"
-                  [disabled]="busy() || o.sold || full() || tooDear(o)"
-                  (click)="buy(o)"
-                >
-                  {{ 'udt.market.buy' | t: { price: neuro(o.price) } }}
-                </button>
+                @if (o.mine && o.onLoan) {
+                  <!-- The team's loaned bot (decision 270): buy it for the price less the fee. -->
+                  <p class="small loaninfo">
+                    {{ 'udt.market.loanedUntil' | t: { at: dayText(m.loan?.until) } }}
+                  </p>
+                  <button
+                    type="button"
+                    class="primary"
+                    [disabled]="busy() || tooDearN(loanBuyPrice(o))"
+                    (click)="buy(o, loanBuyPrice(o))"
+                  >
+                    {{ 'udt.market.buyLoaned' | t: { price: neuro(loanBuyPrice(o)) } }}
+                  </button>
+                } @else {
+                  <button
+                    type="button"
+                    class="primary"
+                    [disabled]="busy() || o.sold || full() || tooDear(o)"
+                    (click)="buy(o)"
+                  >
+                    {{ 'udt.market.buy' | t: { price: neuro(o.price) } }}
+                  </button>
+                }
                 @if (!o.sold) {
                   @if (full()) {
                     <p class="muted small">
@@ -163,6 +200,25 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                   }
                 }
                 <p class="muted small">{{ 'udt.market.surcharge' | t }}</p>
+                @if (!o.sold && o.loanFee) {
+                  <div class="sep"></div>
+                  <div class="line">
+                    <b>{{ 'udt.market.loanTitle' | t: { n: m.loanDays ?? 7 } }}</b
+                    ><span class="neuro mono">{{ o.loanFee | neuro }}</span>
+                  </div>
+                  <p class="muted small">{{ 'udt.market.loanText' | t }}</p>
+                  <button
+                    type="button"
+                    [disabled]="busy() || !!m.loan || full() || tooDearN(o.loanFee)"
+                    (click)="loan(o)"
+                  >
+                    {{ 'udt.market.loan' | t: { price: neuro(o.loanFee) } }}
+                  </button>
+                  @if (m.loan) {
+                    <p class="muted small">{{ 'udt.market.oneLoan' | t }}</p>
+                  }
+                }
+                <p class="muted small">{{ 'udt.market.settleHint' | t }}</p>
               </div>
             }
           </aside>
@@ -263,6 +319,20 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
     .up {
       color: var(--live);
     }
+    .sep {
+      height: 1px;
+      background: var(--border);
+    }
+    .bid p {
+      margin: 0;
+    }
+    udt-signature.full {
+      width: 100%;
+    }
+    .loaninfo {
+      margin: 0;
+      color: var(--info);
+    }
     .down {
       color: var(--danger);
     }
@@ -317,8 +387,39 @@ export class UdtMarketPage {
 
   /** More than can be spent (unknown yet: the server decides). */
   protected tooDear(o: UdtOffer): boolean {
+    return this.tooDearN(o.price);
+  }
+
+  protected tooDearN(n: number): boolean {
     const s = this.spendable();
-    return s !== null && o.price > s;
+    return s !== null && n > s;
+  }
+
+  /** The team's loaned bot: today's buy price less the fee paid (decision 270). */
+  protected loanBuyPrice(o: UdtOffer): number {
+    return Math.max(0, buyPrice(o.value, o.skill) - (o.loanFee ?? 0));
+  }
+
+  protected dayText(day: string | undefined): string {
+    return day ? this.i18n.date(`${day}T12:00:00Z`) : '–';
+  }
+
+  protected async loan(o: UdtOffer) {
+    const days = this.market()?.loanDays ?? 7;
+    const msg = this.i18n.t('udt.market.loanConfirm', {
+      name: o.name,
+      price: this.neuro(o.loanFee ?? 0),
+      n: days,
+    });
+    if (!confirm(msg)) return;
+    this.busy.set(true);
+    try {
+      this.market.set(await this.api.udtLoan(o.botId));
+    } catch {
+      void this.load();
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected neuro(n: number): string {
@@ -361,8 +462,8 @@ export class UdtMarketPage {
     return weeklySalary(o.value, o.skill, this.market()?.index ?? 1);
   }
 
-  protected async buy(o: UdtOffer) {
-    const msg = this.i18n.t('udt.market.buyConfirm', { name: o.name, price: this.neuro(o.price) });
+  protected async buy(o: UdtOffer, price = o.price) {
+    const msg = this.i18n.t('udt.market.buyConfirm', { name: o.name, price: this.neuro(price) });
     if (!confirm(msg)) return;
     this.busy.set(true);
     try {

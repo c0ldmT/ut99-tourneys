@@ -297,6 +297,9 @@ export class Api {
   udtMarket = () => this.call<UdtMarket>('GET', '/udt/market');
   udtBuy = (botId: string) =>
     this.call<UdtMarket>('POST', '/udt/market/buy', { botId }, { ok: 'ok.udt.bought' });
+  /** Loans an offer for the market's loan days (decision 270). */
+  udtLoan = (botId: string) =>
+    this.call<UdtMarket>('POST', '/udt/market/loan', { botId }, { ok: 'ok.udt.loan' });
   udtSell = (botId: string) =>
     this.call<UdtView>('POST', `/udt/roster/${encodeURIComponent(botId)}/sell`, undefined, {
       ok: 'ok.udt.sold',

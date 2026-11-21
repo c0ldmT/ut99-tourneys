@@ -51,7 +51,9 @@ const STATS: readonly UdtPrestigeStat[] = [
             <span class="stage st-{{ p.stage }}">{{ 'udt.pres.stage.' + p.stage | t }}</span>
           </div>
           <span class="muted small">{{
-            'udt.pres.source' | t: { lv: p.fromLevels, b: p.bought }
+            p.stage === 'settled'
+              ? ('udt.pres.sourceSettled' | t)
+              : ('udt.pres.source' | t: { lv: p.fromLevels, b: p.bought })
           }}</span>
         </div>
         <div class="count">
@@ -94,18 +96,21 @@ const STATS: readonly UdtPrestigeStat[] = [
       </div>
 
       <div class="acts">
-        <button
-          type="button"
-          class="primary"
-          [disabled]="busy() || p.prices.point === null || tooDear(p.prices.point)"
-          (click)="buy()"
-        >
-          {{
-            p.prices.point === null
-              ? ('udt.pres.capReached' | t: { n: p.cap })
-              : ('udt.pres.buy' | t: { price: (p.prices.point | neuro) })
-          }}
-        </button>
+        <!-- A settled bought bot never buys points (decision 269). -->
+        @if (p.stage !== 'settled') {
+          <button
+            type="button"
+            class="primary"
+            [disabled]="busy() || p.prices.point === null || tooDear(p.prices.point)"
+            (click)="buy()"
+          >
+            {{
+              p.prices.point === null
+                ? ('udt.pres.capReached' | t: { n: p.cap })
+                : ('udt.pres.buy' | t: { price: (p.prices.point | neuro) })
+            }}
+          </button>
+        }
         <button
           type="button"
           [disabled]="busy() || p.prices.respec === null || tooDear(p.prices.respec)"
@@ -117,7 +122,9 @@ const STATS: readonly UdtPrestigeStat[] = [
               : ('udt.pres.reset' | t: { price: (p.prices.respec | neuro) })
           }}
         </button>
-        <span class="muted small note">{{ 'udt.pres.priceNote' | t }}</span>
+        @if (p.stage !== 'settled') {
+          <span class="muted small note">{{ 'udt.pres.priceNote' | t }}</span>
+        }
       </div>
       <p class="muted small">{{ 'udt.pres.season' | t }}</p>
     </section>
@@ -258,6 +265,9 @@ const STATS: readonly UdtPrestigeStat[] = [
     }
     .st-ascended {
       background: #f5c75e;
+    }
+    .st-settled {
+      background: #4f9dff;
     }
     .pgrid {
       display: grid;
