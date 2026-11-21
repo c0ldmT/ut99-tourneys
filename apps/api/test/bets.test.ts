@@ -638,7 +638,10 @@ describe('bots bet with Neuro', () => {
       (s, p) => s + p.amount,
       0,
     );
-    expect(closed.odds[against]).toBeCloseTo(total / closed.pools[against].amount, 2);
+    // Odds are rounded to two decimals: at most half a cent off (toBeCloseTo is exclusive there).
+    expect(
+      Math.abs(closed.odds[against] - total / closed.pools[against].amount),
+    ).toBeLessThanOrEqual(0.005 + 1e-9);
     // Bots never bet on their own match.
     const playing = new Set(
       m.entrants.map((e: string) => seeded.body.projection.entrants[e].bot.id),
