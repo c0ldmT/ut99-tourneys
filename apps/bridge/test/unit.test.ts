@@ -201,6 +201,28 @@ describe('website bot lines', () => {
     expect(none.map((l) => l.t)).toEqual(['bcfg', 'btr']);
   });
 
+  it("sends a library bot's signature after the prestige (mod 0.21.0)", async () => {
+    const { botConfigLines } = await import('../src/snapshot.js');
+    const { encodeModLine } = await import('@tourney/protocol');
+    const lines = botConfigLines({
+      id: 'bS',
+      name: '[NX]Loque',
+      skill: 6,
+      prestige: '200000000',
+      signature: { s: 'w2', w: 'ShockRifle' },
+    });
+    expect(lines.map((l) => l.t)).toEqual(['bcfg', 'btr', 'bprs', 'bsig']);
+    expect(lines[3]).toEqual({ t: 'bsig', name: '[NX]Loque', s: 'w2', w: 'ShockRifle' });
+    for (const l of lines) expect(() => encodeModLine(l)).not.toThrow();
+    const home = botConfigLines({
+      name: 'Ash',
+      skill: 5,
+      signature: { s: 'h1', m: 'DM-Deck16][' },
+    });
+    expect(home.map((l) => l.t)).toEqual(['bcfg', 'btr', 'bsig']);
+    expect(() => encodeModLine(home[2]!)).not.toThrow();
+  });
+
   it('sends the Monster Hunt focus with the game traits, also without traits (mod 0.17.0)', async () => {
     const { botConfigLines } = await import('../src/snapshot.js');
     const { encodeModLine } = await import('@tourney/protocol');

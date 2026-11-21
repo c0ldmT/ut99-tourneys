@@ -17,7 +17,7 @@
 //=============================================================================
 class TourneyCore extends Info;
 
-const MOD_VERSION = "0.20.0";
+const MOD_VERSION = "0.21.0";
 const MAXBOTS = 10;
 const MAXSAVED = 16;
 const PROTOCOL_VERSION = 1;
@@ -233,6 +233,14 @@ var int CfgFocus[16];              // mod 0.17.0: Monster Hunt focus of its mana
 // order aim, react, dodge, view, tough, fire, armour, sprint, ammo), 0..3 each, and their sum.
 var byte CfgPr[144];
 var int CfgPrSum[16];
+// Mod 0.21.0: the signature of a library bot (bsig, decision 272): code 1 weapon, 2 marksman,
+// 3 streak, 4 multi, 5 tough, 6 opener, 7 home (0: none), its level (1, 2), the weapon class
+// name or the map, and when the bot last spawned (opener).
+var byte CfgSig[16];
+var byte CfgSigLv[16];
+var string CfgSigW[16];
+var string CfgSigMap[16];
+var float CfgSpawnAt[16];
 var float CfgItemUntil[16];
 var float CfgItemNext[16];
 var NavigationPoint Nest[12];      // high points with a view (sniper's nest), found once per map
@@ -566,6 +574,11 @@ function HandleBridgeMessage(TourneyMsg M)
 			i = FindCfg(M.Get("name"), true);
 			if (i >= 0)
 				ParsePrestige(i, M.Get("p"));
+			break;
+		case "bsig":
+			i = FindCfg(M.Get("name"), true);
+			if (i >= 0)
+				ParseSignature(i, M.Get("s"), M.Get("w"), M.Get("m"));
 			break;
 		case "bpers":
 			i = FindCfg(M.Get("name"), true);
@@ -3223,6 +3236,11 @@ function int FindCfg(string BName, bool bCreate)
 	CfgPrSum[i] = 0;
 	for (k = 0; k < 9; k++)
 		CfgPr[i * 9 + k] = 0;
+	CfgSig[i] = 0;
+	CfgSigLv[i] = 0;
+	CfgSigW[i] = "";
+	CfgSigMap[i] = "";
+	CfgSpawnAt[i] = 0;
 	CfgPhoenix[i] = 0;
 	CfgAdrUntil[i] = 0;
 	CfgBeh[i] = 0;
@@ -3329,7 +3347,7 @@ function ApplyBotConfig(Bot B, string BName)
 	if (B.PlayerReplicationInfo.VoiceType == None && B.VoiceType != "")
 		B.PlayerReplicationInfo.VoiceType = class<VoicePack>(DynamicLoadObject(B.VoiceType, class'Class'));
 	if (Curve != None)
-		Curve.Setup(B, BotLevel(BName), Edges, PrestigeEdges(c));
+		Curve.Setup(B, BotLevel(BName), Edges, PrestigeEdges(c), SigHome(c));
 }
 
 // Mod 0.20.0: the prestige points that act on the curve (aim, react, dodge, view) packed for
@@ -5216,7 +5234,7 @@ function int GameTraitCfg(Pawn P)
 	if (P == None || CfgCount == 0 || Bot(P) == None || P.PlayerReplicationInfo == None)
 		return -1;
 	c = FindCfg(P.PlayerReplicationInfo.PlayerName, false);
-	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0)
+	if (c >= 0 && CfgBody[c] == 0 && CfgBeh[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
 		return -1;
 	return c;
 }
@@ -5234,6 +5252,82 @@ function ParsePrestige(int c, string Code)
 		CfgPr[c * 9 + k] = v;
 		CfgPrSum[c] += v;
 	}
+}
+
+// Mod 0.21.0: the bsig line (decision 272): s = code letter and level ("w2"), w = weapon class
+// name (weapon), m = map (home).
+function ParseSignature(int c, string S, string W, string Mp)
+{
+	CfgSig[c] = 0;
+	CfgSigLv[c] = 0;
+	CfgSigW[c] = W;
+	CfgSigMap[c] = Mp;
+	if (Len(S) < 2)
+		return;
+	CfgSig[c] = InStr("wmsktoh", Left(S, 1)) + 1;
+	CfgSigLv[c] = Clamp(int(Mid(S, 1, 1)), 1, 2);
+}
+
+// The effect of a signature at its level (the same numbers as SIGNATURE_EFFECT in packages/udt
+// signature.ts): damage share, damage taken less or aim error less.
+function float SigEffect(int c)
+{
+	local float A, B;
+	if (c < 0 || CfgSig[c] == 0)
+		return 0;
+	switch (CfgSig[c])
+	{
+		case 1: A = 0.15; B = 0.25; break;
+		case 2: A = 0.20; B = 0.30; break;
+		case 3: A = 0.35; B = 0.50; break;
+		case 4: A = 0.50; B = 0.75; break;
+		case 5: A = 0.10; B = 0.20; break;
+		case 6: A = 0.35; B = 0.50; break;
+		case 7: A = 0.10; B = 0.15; break;
+		default: return 0;
+	}
+	if (CfgSigLv[c] >= 2)
+		return B;
+	return A;
+}
+
+// Damage dealt x by a signature now: weapon (its weapon in hand), streak (3 kills or more
+// without dying), multi (a kill less than 3 s ago), opener (less than 8 s since the spawn).
+function float SigDealt(int c, Pawn P)
+{
+	local int k;
+	if (c < 0 || P == None)
+		return 1.0;
+	if (CfgSig[c] == 1)
+	{
+		if (P.Weapon != None && CfgSigW[c] != "" && string(P.Weapon.Class.Name) ~= CfgSigW[c])
+			return 1.0 + SigEffect(c);
+		return 1.0;
+	}
+	if (CfgSig[c] == 3 || CfgSig[c] == 4)
+	{
+		k = StatIndex(P, false);
+		if (k < 0)
+			return 1.0;
+		if (CfgSig[c] == 3 && StSpree[k] >= 3)
+			return 1.0 + SigEffect(c);
+		if (CfgSig[c] == 4 && Level.TimeSeconds - StLastKill[k] < 3)
+			return 1.0 + SigEffect(c);
+		return 1.0;
+	}
+	if (CfgSig[c] == 6 && Level.TimeSeconds - CfgSpawnAt[c] < 8)
+		return 1.0 + SigEffect(c);
+	return 1.0;
+}
+
+// Home: aim and reaction x on its map (1: not its map or another signature).
+function float SigHome(int c)
+{
+	if (c < 0 || CfgSig[c] != 7 || CfgSigMap[c] == "")
+		return 1.0;
+	if (!(CfgSigMap[c] ~= CurrentMapName()))
+		return 1.0;
+	return 1.0 - SigEffect(c);
 }
 
 // Prestige points of configuration c on stat k (0 aim .. 8 ammo).
@@ -5353,6 +5447,12 @@ function OnTakeDamage(out int ActualDamage, Pawn Victim, Pawn InstigatedBy, name
 		ActualDamage = PrRound(ActualDamage * (1.0 + 0.03 * PrPts(ci, 5)));
 	if (cv >= 0 && PrPts(cv, 4) > 0)
 		ActualDamage = Max(1, PrRound(ActualDamage * (1.0 - 0.03 * PrPts(cv, 4))));
+	// Mod 0.21.0: signatures (decision 272) - the attacker's timed or weapon damage, the
+	// victim's toughness below 40 health.
+	if (ci >= 0 && CfgSig[ci] != 0)
+		ActualDamage = PrRound(ActualDamage * SigDealt(ci, InstigatedBy));
+	if (cv >= 0 && CfgSig[cv] == 5 && Victim.Health < 40)
+		ActualDamage = Max(1, PrRound(ActualDamage * (1.0 - SigEffect(cv))));
 	if (ci >= 0 && (CfgBody[ci] & 16) != 0 && InstigatedBy.Health > 0 && InstigatedBy.Health < 100)
 	{
 		Heal = int(Min(ActualDamage, Max(Victim.Health, 0)) * 0.11 + 0.5);
@@ -5390,6 +5490,7 @@ function OnModifyPlayer(Pawn P)
 	if (c < 0)
 		return;
 	CfgAdrUntil[c] = 0;
+	CfgSpawnAt[c] = Level.TimeSeconds; // mod 0.21.0: the opener signature
 	TraitSpawn(P, c);
 	// Starter armour 25 and mod 0.20.0 prestige armour (+5 a point) as one pair of thigh pads.
 	Arm = 5 * PrPts(c, 6);
@@ -5953,7 +6054,7 @@ function TraitTelemetryTick()
 	local bool bOn;
 	for (c = 0; c < CfgCount; c++)
 	{
-		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0)
+		if (CfgBeh[c] == 0 && CfgBody[c] == 0 && (CfgVal[c] & 768) == 0 && CfgPrSum[c] == 0 && CfgSig[c] == 0)
 			continue;
 		B = FindBotPawn(CfgName[c]);
 		if (B == None || B.Health <= 0 || B.PlayerReplicationInfo == None)
@@ -6049,6 +6150,9 @@ function TraitBodyTick(Bot B, int c)
 			TrCount(c, 35, 1, 0); // seconds with it
 		}
 	}
+	// Mod 0.21.0: the marksman signature with the sniper rifle or the enforcer in hand.
+	if (CfgSig[c] == 2 && B.Weapon != None && (B.Weapon.IsA('SniperRifle') || B.Weapon.IsA('enforcer')))
+		F *= 1.0 - SigEffect(c);
 	CfgRunAim[c] = F;
 	if (Curve != None)
 		Curve.SetRunAim(B, F);

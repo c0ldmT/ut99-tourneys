@@ -514,6 +514,18 @@ export const BridgeToModSchema = z.discriminatedUnion('t', [
     p: z.string().regex(/^[0-3]{9}$/),
   }),
   /**
+   * Mod 0.21.0, a library bot's signature (decision 272, after `bprs`): `s` code letter and
+   * level (w weapon, m marksman, s streak, k multi, t tough, o opener, h home; 1 or 2), `w` the
+   * weapon's class name (weapon), `m` the map (home). Without the line the bot has none.
+   */
+  z.object({
+    t: z.literal('bsig'),
+    name: str(MAX_NAME_CHARS),
+    s: z.string().regex(/^[wmsktoh][12]$/),
+    w: str(32).optional(),
+    m: str(64).optional(),
+  }),
+  /**
    * A bot's personality (sent with its config): `tk` chance in percent to say something on an
    * occasion; then up to BOT_MAX_LINES `bsay` lines (`k` occasion, `x` text with placeholders
    * {me} {victim} {killer} {map}) and `brv` lines (`r` rival's name in the game, `lv` 1 rival,

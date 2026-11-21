@@ -111,6 +111,17 @@ export const BotSpecSchema = z.object({
     .string()
     .regex(/^[0-3]{9}$/)
     .optional(),
+  /**
+   * A library bot's signature (mod 0.21.0, `bsig`, decision 272): code letter and level, the
+   * weapon's class name or the map.
+   */
+  signature: z
+    .object({
+      s: z.string().regex(/^[wmsktoh][12]$/),
+      w: z.string().min(1).max(32).optional(),
+      m: z.string().min(1).max(64).optional(),
+    })
+    .optional(),
 });
 export type BotSpec = z.infer<typeof BotSpecSchema>;
 

@@ -237,7 +237,7 @@ function TraitValues(Bot B)
 // skill 0..7, -1 = as before (a new bot: from its game skill). Edges: the Dream Team values
 // traits of the bot (bits, TourneyCore.ParseValueTraits). Pres (mod 0.20.0): its prestige
 // points on the curve, base 4 (TourneyCore.PrestigeEdges).
-function Setup(Bot B, int Lv, int Edges, optional int Pres)
+function Setup(Bot B, int Lv, int Edges, optional int Pres, optional float Home)
 {
 	local int s;
 	local bool bNew;
@@ -261,6 +261,12 @@ function Setup(Bot B, int Lv, int Edges, optional int Pres)
 	CTraitStrafe[s] = FClamp(B.StrafingAbility, -1, 1);
 	SetEdges(s, Edges);
 	PrestigeOn(s, Pres);
+	// Mod 0.21.0: the home signature (decision 272) on its map: aim error and reaction x Home.
+	if (Home > 0.0 && Home < 1.0)
+	{
+		CEAim[s] *= Home;
+		CEReact[s] *= Home;
+	}
 	if (bNew)
 	{
 		CLastEnemy[s] = None;

@@ -172,6 +172,15 @@ UnrealScript package for UT99 469f. It turns a dedicated server into a tournamen
 > ammo hoarder). Bots with prestige only count as bots with game traits. No trait log lines for prestige (the website
 > keeps the points per game).
 
+> Mod 0.21.0: signatures of library bots (decision 272, plan Season 3 P4). New line `bsig` after `bprs` (`s`: code
+> letter and level, `w` weapon class name, `m` map). Weapon: damage +15 % / +25 % with that weapon in hand; marksman:
+> aim error -20 % / -30 % with the sniper rifle or the enforcer (run-time aim edge); streak: damage +35 % / +50 % from
+> 3 kills without dying; multi: damage +50 % / +75 % less than 3 s after a kill; tough: damage taken -10 % / -20 %
+> below 40 health; opener: damage +35 % / +50 % for 8 s after a spawn; home: aim error and reaction -10 % / -15 % on
+> its map (curve edges). Marksman and home act on the skill curve (only with the curve on, like prestige); the
+> weapon one counts the weapon in hand when the damage lands. Bots with a signature only count as bots with game traits.
+> No trait log lines yet.
+
 ## Classes
 
 | Class | Role |
@@ -373,6 +382,7 @@ the test quicker. "You + bot" against a bot team is enough.
 | 71 | **Base AI by level** (mod 0.19.1) | Skill curve on, mod 0.19.1 built. 1) Bot-only 1v1s Godlike vs Godlike with rocket launcher and flak on DM-Deck16][ (10 min): fewer suicides than before (Settings → Dream Team → Trait report → "Suicides per map", `RocketDeath`/`FlakDeath`); in close fights a bot now and then fires flak primary or takes another weapon instead of the rocket. 2) Same on DM-Morpheus or DM-SpaceNoxx: fewer `Fell` deaths after rocket hits at the edge. 3) Inhuman/Godlike bots in a 2on2 on a map with a belt/amp: server log `item timing heads for … back in n s` (n ≤ 8) for bots without the item controller. 4) "Bot measures per skill": fewer fight switches per minute at Masterful+ than at Novice, `enemySwitches` filled. No `Accessed None` in `BotSwitch`/`PitPush`. |
 | 72 | **Trait rework** (mod 0.19.2) | Mod 0.19.2 built, website updated. Dream Team DM with roster bots carrying the reworked traits. 1) Light feet: spectate - faster only while it runs to items or flees, normal speed in a fight; match page → "Traits in this game": light feet with a count (seconds of sprint). 2) Sniper's nest on DM-Deck16][ or DM-Morpheus: server log `heads for the sniper's nest …` only while it holds the sniper rifle, shock rifle or minigun, it camps 5-9 s; shoot it on the way or in the nest → `given up after a hit` / `leaves the sniper's nest …`, no new nest for 30 s. 3) Overload: `game trait overload: <bot> amplified` on every 6th kill of a life. 4) Thick skin/vampire/weapon master/regeneration: counters on the match page in line with the new numbers. Trait texts on the website (packs, bot details) show the new numbers. No `Accessed None` |
 | 73 | **Prestige** (mod 0.20.0) | Mod 0.20.0 built, bridge updated. Test instance: a Dream Team bot with prestige points (test mode: set them on the bot, or in the database `prestige_json`), e.g. armour 3 and sprint 3, in a 1v1 against a bot without. 1) Bridge log: `bprs` line after `btrt` with nine digits. 2) Spectate: the bot spawns with 15 armour (HUD of the bot view; 40 with starter armour), it runs visibly faster to items and when it flees, not in a fight. 3) Aim/firepower/toughness: no visible check, `pnpm --filter @tourney/api bot:sim` shows their sizes. 4) A bot without points and a normal tournament behave as in 0.19.2. No `Accessed None` |
+| 74 | **Signatures** (mod 0.21.0) | Mod 0.21.0 built, bridge updated. Test instance: a bought library bot with a signature (test mode / database `bots.signature_json`, e.g. `{"code":"tough","level":2,"since":1}` or `home` with the map of the game) in a Dream Team 1v1. 1) Bridge log: `bsig` line after `bprs` (`s=t2`, `m=` for home). 2) Server log without `Accessed None` in `OnTakeDamage`/`SigDealt`. 3) Effects are not visible by eye; `pnpm --filter @tourney/api bot:sim` shows their sizes (section Signaturen). 4) A bot without a signature and a normal tournament behave as in 0.20.0 |
 
 ## SmartStockBots (optional)
 

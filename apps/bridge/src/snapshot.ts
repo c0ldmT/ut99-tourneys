@@ -124,7 +124,7 @@ const SAY_KIND = {
  * the class defaults).
  */
 export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMod[] {
-  if (!b.id && !b.traits && !b.gameTraits?.length && !b.prestige) return [];
+  if (!b.id && !b.traits && !b.gameTraits?.length && !b.prestige && !b.signature) return [];
   const name = wireName(b.name);
   const t = b.traits ?? {};
   const lines: BridgeToMod[] = [
@@ -149,6 +149,8 @@ export function botConfigLines(b: BotSpec, personas?: Personalities): BridgeToMo
       ...(b.mhFocus ? { mf: b.mhFocus } : {}),
     });
   if (b.prestige && /[1-3]/.test(b.prestige)) lines.push({ t: 'bprs', name, p: b.prestige });
+  // Mod 0.21.0: a library bot's signature (decision 272).
+  if (b.signature) lines.push({ t: 'bsig', name, ...b.signature });
   const p = personas?.get(b.name.toLowerCase());
   if (p) {
     lines.push({ t: 'bpers', name, tk: p.talk });
