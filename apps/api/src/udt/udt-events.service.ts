@@ -18,6 +18,7 @@ import {
   roundNeuro,
   type Career,
   prestigeCode,
+  signatureSpec,
   clubEffects,
   type ClubEffects,
 } from '@tourney/udt';
@@ -501,6 +502,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const codes = modCodes(r.udtTraits);
     // Prestige (mod 0.20.0, decision 262): the points set on the menu.
     const prestige = prestigeCode(r.prestige?.alloc);
+    // A signature (mod 0.21.0, decision 273).
+    const signature = signatureSpec(r.signature);
     return {
       ...base,
       skill: eff.skill,
@@ -508,6 +511,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       traits,
       ...(codes.length ? { gameTraits: codes } : {}),
       ...(prestige ? { prestige } : {}),
+      ...(signature ? { signature } : {}),
     };
   }
 

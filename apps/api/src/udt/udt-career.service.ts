@@ -1,7 +1,14 @@
 import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { udtManagerOf } from '@tourney/protocol';
-import { career, levelOf, roundNeuro, type Career } from '@tourney/udt';
+import {
+  career,
+  drawSignatures,
+  levelOf,
+  roundNeuro,
+  type Career,
+  type SignatureProfile,
+} from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
 import { UsersService } from '../auth/users.service.js';
@@ -17,6 +24,8 @@ import {
   udtHall,
   udtKeepers,
   udtRoster,
+  udtSignatureRuns,
+  udtSignatures,
   udtTeams,
 } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
@@ -447,6 +456,8 @@ export class UdtCareerService implements OnModuleInit {
         : null,
       roster,
       career: this.careerOf(b.id),
+      /** A library bot's signature (decision 273). */
+      signature: this.udt.signatures().get(b.id) ?? null,
       /** Made by a manager (talent, apprentice, blueprint, starter): origin, season, breeder. */
       made: made
         ? {
@@ -512,6 +523,101 @@ export class UdtCareerService implements OnModuleInit {
         }),
       );
     return out;
+  }
+
+  // ---------- signatures (plan P4, decision 273) ----------
+
+  /**
+   * Draws the signatures of a season once (the market day calls it; `force` for the test mode):
+   * library bots of career age 2 and level 10 get the mark of their lifetime statistics that
+   * stands out most against their skill; held ones stay and rise to level 2 from career level 20.
+   * Returns how many were drawn or raised.
+   */
+  drawSignatures(season: number, force = false): number {
+    if (
+      !force &&
+      this.db.select().from(udtSignatureRuns).where(eq(udtSignatureRuns.season, season)).get()
+    )
+      return 0;
+    const held = this.udt.signatures();
+    const got = drawSignatures(this.signatureProfiles(), held, season);
+    const now = new Date(this.clock.now()).toISOString();
+    this.db.transaction((tx) => {
+      for (const [botId, s] of got)
+        tx.insert(udtSignatures)
+          .values({ botId, signatureJson: JSON.stringify(s), updatedAt: now })
+          .onConflictDoUpdate({
+            target: udtSignatures.botId,
+            set: { signatureJson: JSON.stringify(s), updatedAt: now },
+          })
+          .run();
+      tx.insert(udtSignatureRuns)
+        .values({ season, doneAt: now, drawn: got.size })
+        .onConflictDoUpdate({
+          target: udtSignatureRuns.season,
+          set: { doneAt: now, drawn: got.size },
+        })
+        .run();
+    });
+    if (got.size) this.log.info(`udt signatures of season ${season}: ${got.size} drawn or raised`);
+    return got.size;
+  }
+
+  /** Lifetime numbers of the library bots (not made by managers) for their signatures. */
+  private signatureProfiles(): SignatureProfile[] {
+    const careers = this.careers();
+    const rows = new Map(
+      this.stats
+        .players('lifetime', undefined, true)
+        .filter((p) => p.key.startsWith('b:'))
+        .map((p) => [p.key, p]),
+    );
+    // Deathmatch games per map and bot (Monster Hunt runs have their own rules).
+    const maps = new Map<string, Map<string, { games: number; won: number }>>();
+    for (const t of this.stats.facts('lifetime')) {
+      if (t.mode === 'mh') continue;
+      for (const g of t.players) {
+        if (!g.bot) continue;
+        const m = maps.get(g.key) ?? new Map<string, { games: number; won: number }>();
+        const e = m.get(g.map) ?? { games: 0, won: 0 };
+        e.games++;
+        if (g.won) e.won++;
+        m.set(g.map, e);
+        maps.set(g.key, m);
+      }
+    }
+    return this.bots
+      .list()
+      .filter((b) => !b.udtOwner)
+      .flatMap((b) => {
+        const p = rows.get(botKey(b.id));
+        const c = careers.get(b.id);
+        if (!p || !c) return [];
+        return [
+          {
+            botId: b.id,
+            skill: b.skill,
+            age: c.age,
+            careerLevel: c.level,
+            statGames: p.statGames,
+            kills: p.kills,
+            deaths: p.deaths,
+            headshots: p.headshots,
+            sprees: p.sprees,
+            multiKills: p.multiKills,
+            firstBloods: p.firstBloods,
+            damageGames: p.damageGames,
+            damageTaken: p.damageTaken,
+            ...(p.favoriteWeapon ? { favoriteWeapon: p.favoriteWeapon } : {}),
+            maps: [...(maps.get(botKey(b.id)) ?? new Map()).entries()].map(([map, e]) => ({
+              map,
+              ...e,
+            })),
+            games: p.games,
+            gamesWon: p.gamesWon,
+          },
+        ];
+      });
   }
 
   careerOf(botId: string): Career | null {

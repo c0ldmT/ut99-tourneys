@@ -24,6 +24,7 @@ import { TournamentsService } from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { UdtLeagueService } from './udt-league.service.js';
 import { UdtMarketService } from './udt-market.service.js';
+import { UdtCareerService } from './udt-career.service.js';
 import { UdtAiService } from './udt-ai.service.js';
 import { UdtTradesService } from './udt-trades.service.js';
 import { UdtService } from './udt.service.js';
@@ -62,7 +63,16 @@ export class UdtTestService {
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
     @Inject(UdtAiService) private readonly ai: UdtAiService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
+    @Inject(UdtCareerService) private readonly career: UdtCareerService,
   ) {}
+
+  /** Draws the signatures of the running season now (again; decision 273). */
+  signatures() {
+    this.assertTestMode();
+    const season = this.seasons.current();
+    if (!season) throw conflict('no season is running');
+    return { drawn: this.career.drawSignatures(season.number, true) };
+  }
 
   /** 404 outside the test mode (the endpoints do not exist then). */
   assertTestMode(): void {

@@ -224,3 +224,35 @@ export const SIGNATURE_MOD: Readonly<Record<SignatureCode, string>> = {
 /** "w2" style code of a signature for the game (null: none). */
 export const signatureModCode = (s: Signature | null | undefined): string | null =>
   s ? `${SIGNATURE_MOD[s.code]}${s.level}` : null;
+
+/** The market value × of a bot with a signature (level 1, 2). */
+export const SIGNATURE_VALUE: readonly [number, number] = [1.1, 1.2];
+export const signatureValue = (s: Pick<Signature, 'level'> | null | undefined): number =>
+  s ? (SIGNATURE_VALUE[s.level - 1] ?? 1) : 1;
+
+/** A mentor with a signature passes it on (level 1, this season) with this chance (plan P4). */
+export const SIGNATURE_INHERIT = 0.25;
+
+/** The bot's `bsig` line for the game (`BotSpec.signature`). */
+export function signatureSpec(
+  s: Signature | null | undefined,
+): { s: string; w?: string; m?: string } | undefined {
+  const code = signatureModCode(s);
+  if (!s || !code) return undefined;
+  return {
+    s: code,
+    ...(s.code === 'weapon' && s.weapon ? { w: s.weapon } : {}),
+    ...(s.code === 'home' && s.map ? { m: s.map } : {}),
+  };
+}
+
+/** A stored signature (JSON) or null when it does not parse. */
+export function parseSignature(json: string | null | undefined): Signature | null {
+  if (!json) return null;
+  try {
+    const s = JSON.parse(json) as Signature;
+    return SIGNATURES.includes(s.code) && (s.level === 1 || s.level === 2) ? s : null;
+  } catch {
+    return null;
+  }
+}

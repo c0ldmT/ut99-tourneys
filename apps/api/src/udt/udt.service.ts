@@ -45,6 +45,7 @@ import {
   FANSHOP_PAYS,
   ROSTER_PLACES,
   PRESTIGE_CAP,
+  parseSignature,
   prestigeCapValue,
   SETTLE_GAMES,
   CREST_COLORS,
@@ -55,6 +56,7 @@ import {
   type Crest,
   type PrestigeAlloc,
   type PrestigeStage,
+  type Signature,
   type TraitCode,
   type TraitOnBot,
 } from '@tourney/udt';
@@ -66,6 +68,7 @@ import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import {
   bots,
+  udtSignatures,
   udtAi,
   udtBids,
   udtBlueprints,
@@ -223,6 +226,8 @@ export interface RosterBot {
   prestige: OwnPrestige | null;
   /** A loan (decision 270): the market day it goes back, the fee paid. */
   loan: { until: string; fee: number } | null;
+  /** Its signature (decision 273): a library bot's for good, an apprentice's for the season. */
+  signature: Signature | null;
 }
 
 /** An own bot's prestige as the roster shows it (decision 262). */
@@ -786,6 +791,7 @@ export class UdtService {
     const lib = new Map(this.bots.list().map((b) => [b.id, b]));
     const onBots = this.traitsOnBots(season);
     const own = this.ownBots(season, userId);
+    const sigs = this.signatures();
     const index = this.index(season);
     const club = this.clubFx(season, userId);
     const plainValue = (skill: number, traits: LibraryBot['traits'] = {}) =>
@@ -821,6 +827,10 @@ export class UdtService {
         const settle =
           own.has(b.id) || r.loanUntil ? null : settleView(r.settleGames, r.prestigeJson);
         const prestige = ov?.prestige ?? settle?.prestige ?? null;
+        // A library bot's signature, or an apprentice's inherited one (decision 273).
+        const signature = own.has(b.id)
+          ? parseSignature(own.get(b.id)!.signatureJson)
+          : (sigs.get(b.id) ?? null);
         return [
           {
             botId: b.id,
@@ -862,6 +872,7 @@ export class UdtService {
             settle,
             prestige,
             loan: r.loanUntil ? { until: r.loanUntil, fee: r.loanFee } : null,
+            signature,
           },
         ];
       })
@@ -986,6 +997,16 @@ export class UdtService {
       starterBudget: this.settings.get().udt.starterBudget,
       starterExtra: this.settings.get().udt.starterExtra,
     };
+  }
+
+  /** Library bots' signatures for good (decision 273). */
+  signatures(): Map<string, Signature> {
+    const out = new Map<string, Signature>();
+    for (const r of this.db.select().from(udtSignatures).all()) {
+      const s = parseSignature(r.signatureJson);
+      if (s) out.set(r.botId, s);
+    }
+    return out;
   }
 
   /** Neuro a manager paid for club buildings in a season. */

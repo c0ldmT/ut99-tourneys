@@ -31,7 +31,9 @@ import {
   drawAnlage,
   TALENT_LICENCE,
   SETTLE_GAMES,
+  SIGNATURE_INHERIT,
   type PrestigeAlloc,
+  type Signature,
   type DevelopStat,
   type PrestigeStat,
   type Rarity,
@@ -194,6 +196,8 @@ export class UdtAcademyService {
           /** Traits that can be passed on and the chance that one is. */
           traits: r.udtTraits.filter((x) => x.code !== 'mentor').map((x) => x.code),
           inheritChance: apprenticeTraitChance(mentorTrait),
+          /** Its signature passes on with `SIGNATURE_INHERIT` instead of a trait (decision 273). */
+          signature: r.signature,
           /** Its apprentice of this season (also one in another team now). */
           apprentice: mentorships.find((x) => x.mentor.botId === r.botId)?.apprentice ?? null,
           /** The other roster bots and why they cannot learn from it. */
@@ -462,17 +466,27 @@ export class UdtAcademyService {
     if (p.skill >= m.skill) throw conflict('the apprentice needs a lower skill than its mentor');
     const mentorTrait = m.udtTraits.some((x) => x.code === 'mentor');
     const lesson = mentorLesson(m.traits, p.traits, mentorTrait);
-    const inherited = inheritedTrait(
-      m.udtTraits.map((x) => x.code),
-      p.udtTraits.map((x) => x.code),
-      mentorTrait,
-      rng,
-    );
+    // A mentor's signature passes on with 25 % (level 1, this season), instead of a trait
+    // (plan P4, decision 273).
+    const signature: Signature | null =
+      m.signature && rng() < SIGNATURE_INHERIT ? { ...m.signature, level: 1, since: season } : null;
+    const inherited = signature
+      ? null
+      : inheritedTrait(
+          m.udtTraits.map((x) => x.code),
+          p.udtTraits.map((x) => x.code),
+          mentorTrait,
+          rng,
+        );
     this.db.transaction(() => {
       this.bots.update(p.botId, { traits: { ...p.traits, ...lesson } });
       this.db
         .update(udtBots)
-        .set({ mentorId: m.botId, mentorSeason: season })
+        .set({
+          mentorId: m.botId,
+          mentorSeason: season,
+          ...(signature ? { signatureJson: JSON.stringify(signature) } : {}),
+        })
         .where(eq(udtBots.botId, p.botId))
         .run();
       if (inherited)
@@ -490,7 +504,7 @@ export class UdtAcademyService {
           })
           .run();
     });
-    return { ...this.view(user), apprentice: { botId: p.botId, inherited } };
+    return { ...this.view(user), apprentice: { botId: p.botId, inherited, signature } };
   }
 
   private blueprintsOf(season: number, userId: string) {

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
 import { eq } from 'drizzle-orm';
-import { bots, udtBots, udtRoster, udtTraits } from '../src/db/schema.js';
+import { bots, udtBots, udtRoster, udtSignatures, udtTraits } from '../src/db/schema.js';
 import { StatsService } from '../src/stats/stats.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
@@ -386,6 +386,14 @@ describe('Unreal Dream Team: events', () => {
       .where(eq(udtBots.botId, mira))
       .run();
     db.update(udtRoster).set({ xp: 260 }).where(eq(udtRoster.botId, mira)).run();
+    // A library bot's signature (decision 273) plays as its bsig line.
+    db.insert(udtSignatures)
+      .values({
+        botId: lib.id,
+        signatureJson: '{"code":"weapon","level":2,"weapon":"ShockRifle","since":1}',
+        updatedAt: 'x',
+      })
+      .run();
     const body = udtCup(2) as any;
     body.settings.game = {
       adapter: 'ut99-mh',
@@ -402,6 +410,10 @@ describe('Unreal Dream Team: events', () => {
     const nexus = entrants.find((e) => e.displayName === 'Nexus');
     expect(nexus.bots.map((b: any) => b.mhFocus).sort()).toEqual([-2, 2]);
     expect(nexus.bots.map((b: any) => b.prestige ?? null).sort()).toEqual(['100000000', null]);
+    expect(nexus.bots.map((b: any) => b.signature ?? null)).toContainEqual({
+      s: 'w2',
+      w: 'ShockRifle',
+    });
     // Bots of other teams play as Monster Hunt sets them.
     for (const e of entrants.filter((x) => x !== nexus))
       expect(e.bots.every((b: any) => b.mhFocus === undefined)).toBe(true);

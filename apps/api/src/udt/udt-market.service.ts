@@ -8,6 +8,8 @@ import {
   demandFactor,
   economyIndex,
   formFactor,
+  MENTOR_SKILL,
+  signatureValue,
   LOAN_DAYS,
   loanFee,
   madeSalaryShare,
@@ -266,13 +268,19 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const values = new Map<string, number>();
     const demands = new Map<string, number>();
     const careers = this.career.careers();
+    // Signatures of the season first (once; decision 273): the values below count them.
+    this.career.drawSignatures(s);
+    const sigs = this.udt.signatures();
     for (const b of library) {
       if (b.udtOwner && !owned.has(b.id)) continue;
       const p = players.get(botKey(b.id));
       const phase = careers.get(b.id)?.phase;
       const demand = demandFactor(sales.get(bracketOf(b.skill)) ?? 0, unsoldDays.get(b.id) ?? 0);
+      // A signature raises the value (decision 273).
       const v = marketValue(
-        baseValue(b.skill, valueScore(b.traits)) * (phase ? PHASE_EFFECT[phase].value : 1),
+        baseValue(b.skill, valueScore(b.traits)) *
+          (phase ? PHASE_EFFECT[phase].value : 1) *
+          signatureValue(sigs.get(b.id)),
         formFactor({ games: p?.games ?? 0, wins: p?.gamesWon ?? 0 }),
         demand,
         index,
@@ -525,6 +533,7 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
     const myLoan = [...loaned.values()].find((l) => l.userId === user.id) ?? null;
     const homegrown = this.career.homegrown();
     const careers = this.career.careers();
+    const sigs = this.udt.signatures();
     const history = this.history(
       offers.map((o) => o.botId),
       14,
@@ -562,6 +571,9 @@ export class UdtMarketService implements OnModuleInit, OnModuleDestroy {
             mine: owner === user.id,
             homegrown: homegrown.get(b.id) ?? null,
             career: careers.get(b.id) ?? null,
+            /** Its signature (decision 273) and whether it can be a mentor (skill 6+). */
+            signature: sigs.get(b.id) ?? null,
+            mentor: Math.round(b.skill) >= MENTOR_SKILL,
             /** A loan for `LOAN_DAYS` market days (decision 270): its fee; on loan to a team. */
             loanFee: loanFee(h.at(-1)?.value ?? o.minPrice),
             onLoan: loaned.has(b.id),

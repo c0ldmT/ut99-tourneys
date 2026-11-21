@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Signatures in the API: drawn on the market day from the bots' lifetime statistics, in market values, the league model and the games; mentors pass them on (decision 273, migration 56).
 - Mod 0.21.0: signatures of library bots in the game, new line `bsig` (decision 272, README test 74).
 - Signature rules for library bots: seven career marks with two levels, sized with bot:sim (decision 271).
 - Loans: an offer of the day plays 7 market days for 15 % of its value without salary, one per team; buying it then costs the price less the fee (decision 270, migration 55).

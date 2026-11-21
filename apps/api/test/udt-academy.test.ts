@@ -10,6 +10,7 @@ import {
   udtClub,
   udtRoster,
   udtScouts,
+  udtSignatures,
   udtTeams,
   udtTraits,
 } from '../src/db/schema.js';
@@ -183,6 +184,41 @@ describe('Unreal Dream Team: academy', () => {
     // A scouted talent keeps its skill as a keeper.
     const c = udt.keeperCandidates(marioId, 1).find((x) => x.botId === kid.botId)!;
     expect(c.nextSkill).toBe(c.skill);
+  });
+
+  it('signatures: library bots draw one at the market day, mentors pass it on (decision 273)', async () => {
+    const { admin, mario, marioId, db } = await setup();
+    const lib = (await admin.post('/bots', { name: 'Sensei', skill: 6 })).body.id as string;
+    db.insert(udtRoster)
+      .values({ season: 1, botId: lib, userId: marioId, price: 9000, acquiredAt: 'x', xp: 70 })
+      .run();
+    db.insert(udtSignatures)
+      .values({
+        botId: lib,
+        signatureJson: '{"code":"tough","level":2,"since":1}',
+        updatedAt: 'x',
+      })
+      .run();
+    const sensei = (await mario.get('/udt')).body.roster.find(
+      (r: { botId: string }) => r.botId === lib,
+    );
+    expect(sensei.signature).toEqual({ code: 'tough', level: 2, since: 1 });
+    const v = (await mario.get('/udt/academy')).body;
+    const m = v.mentors.find((x: { botId: string }) => x.botId === lib);
+    expect(m.signature).toEqual({ code: 'tough', level: 2, since: 1 });
+    // The apprentice gets it (level 1, this season) or a trait as before, never both.
+    const mira = v.mentors.find((x: { name: string }) => x.name === 'Mira').botId as string;
+    const ok = await mario.post('/udt/academy/mentor', { mentorId: lib, apprenticeId: mira });
+    expect(ok.status, JSON.stringify(ok.body)).toBe(200);
+    const got = ok.body.apprentice as { inherited: string | null; signature: unknown };
+    const row = db.select().from(udtBots).where(eq(udtBots.botId, mira)).get()!;
+    if (got.signature) {
+      expect(got.signature).toEqual({ code: 'tough', level: 1, since: 1 });
+      expect(JSON.parse(row.signatureJson!)).toEqual(got.signature);
+      expect(got.inherited).toBeNull();
+    } else expect(row.signatureJson).toBeNull();
+    // The test mode draws the season's signatures (none here: no statistics yet).
+    expect((await admin.post('/udt/test/signatures')).status).toBe(404); // not in test mode
   });
 
   it('a mentor of level 3 teaches a bot the team made, once per season', async () => {

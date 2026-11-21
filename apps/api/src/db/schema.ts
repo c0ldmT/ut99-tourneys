@@ -578,6 +578,22 @@ export const udtBots = sqliteTable('udt_bots', {
   anlageAt: text('anlage_at'),
   /** Came free, not told yet (migration 53, decision 268): 1 inventory, 2 scrap. */
   anlageNews: integer('anlage_news').notNull().default(0),
+  /** An apprentice's signature inherited from its mentor for this season (migration 56, 273). */
+  signatureJson: text('signature_json'),
+});
+
+/** A library bot's signature for good (migration 56, decision 273; `Signature` as JSON). */
+export const udtSignatures = sqliteTable('udt_signatures', {
+  botId: text('bot_id').primaryKey(),
+  signatureJson: text('signature_json').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
+/** Seasons whose signatures were drawn (once, on its first market day after the update). */
+export const udtSignatureRuns = sqliteTable('udt_signature_runs', {
+  season: integer('season').primaryKey(),
+  doneAt: text('done_at').notNull(),
+  drawn: integer('drawn').notNull(),
 });
 
 /** Club upgrades of a manager per season (migration 50, decision 264). */

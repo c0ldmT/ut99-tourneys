@@ -837,4 +837,19 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE udt_roster ADD COLUMN loan_until TEXT;
   ALTER TABLE udt_roster ADD COLUMN loan_fee INTEGER NOT NULL DEFAULT 0;
   `,
+  // 56: signatures (decision 273): a library bot's for good, the seasons they were drawn in, an
+  // apprentice's inherited one for its season.
+  `
+  CREATE TABLE udt_signatures (
+    bot_id TEXT PRIMARY KEY,
+    signature_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE TABLE udt_signature_runs (
+    season INTEGER PRIMARY KEY,
+    done_at TEXT NOT NULL,
+    drawn INTEGER NOT NULL
+  );
+  ALTER TABLE udt_bots ADD COLUMN signature_json TEXT;
+  `,
 ];

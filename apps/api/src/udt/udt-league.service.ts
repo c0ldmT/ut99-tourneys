@@ -35,6 +35,7 @@ import {
   type LeagueResult,
   type TableRow,
   prestigeEffect,
+  signatureStrength,
   CLUB_PRESTIGE_MAX,
   clubPrestige,
   prestigeCode,
@@ -1499,7 +1500,9 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           botStrength(
             r.effective.skill,
             valueScore(r.effective.traits),
-            traitsEffect(r.udtTraits.map((t) => t.code)) + prestigeEffect(r.prestige?.spent ?? 0),
+            traitsEffect(r.udtTraits.map((t) => t.code)) +
+              prestigeEffect(r.prestige?.spent ?? 0) +
+              signatureStrength(r.signature),
           ),
         0,
       );

@@ -57,6 +57,12 @@ export class UdtTestController {
     return this.test.createManagers(body.count);
   }
 
+  @Post('signatures')
+  @HttpCode(200)
+  signatures() {
+    return this.test.signatures();
+  }
+
   @Post('managers/act')
   @HttpCode(200)
   act() {
