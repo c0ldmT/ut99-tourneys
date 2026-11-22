@@ -22,6 +22,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 279,
+    date: '2026-11-22',
+    en: {
+      title: 'Prestige in the yearbook',
+      items: [
+        'The yearbook shows the prestige stage a bot reached in its season (Mature, Godlike, Godlike+ with stars), the hall of fame the highest one of its seasons.',
+      ],
+    },
+    de: {
+      title: 'Prestige im Jahrbuch',
+      items: [
+        'Das Jahrbuch zeigt die Prestige-Endstufe, die ein Bot in seiner Season erreicht hat (Ausgereift, Godlike, Godlike+ mit Sternen), die Ruhmeshalle die höchste seiner Seasons.',
+      ],
+    },
+  },
+  {
     id: 278,
     date: '2026-11-22',
     mod: '0.23.0',

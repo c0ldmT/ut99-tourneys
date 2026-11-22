@@ -2,12 +2,15 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { udtManagerOf } from '@tourney/protocol';
 import {
+  bestStage,
   career,
   drawSignatures,
   levelOf,
+  prestigeStage,
   roundNeuro,
   type Career,
   type SignatureProfile,
+  type StageMark,
 } from '@tourney/udt';
 import { z } from 'zod';
 import type { User } from '../auth/users.service.js';
@@ -33,7 +36,7 @@ import { SeasonsService } from '../seasons/seasons.service.js';
 import { botKey } from '../stats/facts.js';
 import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
-import { UdtService } from './udt.service.js';
+import { marksOf, UdtService } from './udt.service.js';
 
 /** Graduation: this many Dream Team games in the season and this level. */
 export const GRADUATE_GAMES = 15;
@@ -302,6 +305,14 @@ export class UdtCareerService implements OnModuleInit {
       (row.season !== this.seasons.current()?.number &&
         !(row.season === newest && this.keptLater(row.botId, row.season)));
     const shown = level >= 5 || over;
+    // Decision 279: its stage of that season - a keeper's from its mark, else from the row (only
+    // when the potential is shown, the stage would tell it).
+    const stage: StageMark | null =
+      keptTo !== null
+        ? bestStage(marksOf(row?.marksJson).filter((m) => m.season === b.season))
+        : shown
+          ? bestStage([this.stageOf(b, lib?.skill ?? 0, level)])
+          : null;
     return {
       botId: b.botId,
       season: b.season,
@@ -320,7 +331,18 @@ export class UdtCareerService implements OnModuleInit {
       tag: team?.tag ?? '',
       active: lib?.active ?? false,
       keptTo,
+      stage,
     };
+  }
+
+  /** The stage a bot's row reached (with its stars when ascended); null: none. */
+  private stageOf(
+    b: Pick<typeof udtBots.$inferSelect, 'potential' | 'ascended' | 'stars'>,
+    skill: number,
+    level?: number,
+  ): StageMark | null {
+    const stage = prestigeStage({ skill, potential: b.potential, ascended: b.ascended, level });
+    return stage ? { stage, stars: b.stars } : null;
   }
 
   /**
@@ -660,6 +682,7 @@ export class UdtCareerService implements OnModuleInit {
       .sort((a, b) => b.retiredAt.localeCompare(a.retiredAt))
       .map((h) => {
         const lib = this.bots.list().find((x) => x.id === h.botId);
+        const own = this.db.select().from(udtBots).where(eq(udtBots.botId, h.botId)).get();
         return {
           botId: h.botId,
           name: lib?.name ?? h.name,
@@ -669,6 +692,10 @@ export class UdtCareerService implements OnModuleInit {
           retiredAt: h.retiredAt,
           career: JSON.parse(h.careerJson) as Career | null,
           homegrown: grads.get(h.botId) ?? null,
+          // Decision 279: the highest stage of its seasons as a manager's own bot.
+          stage: own
+            ? bestStage([...marksOf(own.marksJson), this.stageOf(own, lib?.skill ?? 0)])
+            : null,
         };
       });
   }

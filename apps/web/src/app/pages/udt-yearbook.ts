@@ -94,6 +94,11 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
               @if (b.keptTo; as kt) {
                 <span class="udt-mark own">{{ 'udt.keep.keptTo' | t: { n: kt } }}</span>
               }
+              @if (b.stage; as st) {
+                <span class="udt-mark pres st-{{ st.stage }}" [title]="'udt.yearbook.stage' | t"
+                  >{{ 'udt.pres.stage.' + st.stage | t }}{{ st.stars ? ' ★' + st.stars : '' }}</span
+                >
+              }
               <div class="small">{{ b.tag }} {{ b.team }}</div>
               <div class="muted small">
                 {{ 'udt.yearbook.breeder' | t }} {{ b.breeder }} ·
@@ -123,6 +128,14 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
               <figcaption>
                 @if (r.homegrown) {
                   <span class="udt-mark star">{{ 'udt.market.homegrown' | t }}</span>
+                }
+                @if (r.stage; as st) {
+                  <div>
+                    <span class="udt-mark pres st-{{ st.stage }}" [title]="'udt.hall.stage' | t"
+                      >{{ 'udt.pres.stage.' + st.stage | t
+                      }}{{ st.stars ? ' ★' + st.stars : '' }}</span
+                    >
+                  </div>
                 }
                 @if (r.career; as c) {
                   <div class="muted small">
@@ -195,6 +208,10 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
     </section>
   `,
   styles: `
+    /* The breeders table scrolls on small screens instead of widening the page. */
+    .tablepanel {
+      overflow-x: auto;
+    }
     .class {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

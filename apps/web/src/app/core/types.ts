@@ -2094,6 +2094,8 @@ export interface UdtYearbookEntry {
   active: boolean;
   /** Kept for that season (keeper). */
   keptTo?: number | null;
+  /** Decision 279: the prestige stage it reached that season (stars when ascended). */
+  stage?: { stage: 'mature' | 'godlike' | 'ascended' | 'settled'; stars: number } | null;
 }
 
 export interface UdtYearbook {
@@ -2149,6 +2151,8 @@ export interface UdtHallEntry {
   retiredAt: string;
   career: UdtCareer | null;
   homegrown: { breeder: string; honours: boolean } | null;
+  /** Decision 279: the highest prestige stage of its seasons as an own bot. */
+  stage?: { stage: 'mature' | 'godlike' | 'ascended' | 'settled'; stars: number } | null;
 }
 
 export interface UdtHall {

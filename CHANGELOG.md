@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Yearbook and hall of fame show the prestige stage a bot reached (decision 279, patch note 279).
 - Mod 0.23.0: the seven traits of wave 2 in the game, with their trait log (decision 278, README test 76, patch note 278).
 - Seven Dream Team traits of wave 2 (belt runner, escape artist, close quarters, Hitscan Sniper, power surge, focus fire, last stand) in the catalogue, the duel simulator, the texts and the trait log (decision 277; in the game with mod 0.23.0).
 - Mod 0.22.0: the nine traits of wave 1 in the game, with their trait log (decision 276, README test 75, patch note 276).

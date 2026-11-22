@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bestStage,
   ascendPrice,
   bankedPrestige,
   botStrength,
@@ -168,5 +169,21 @@ describe('prestige (plan P3)', () => {
       o,
     ).winDecided;
     expect(pres).toBeGreaterThan(plain);
+  });
+});
+
+describe('stage marks (decision 279)', () => {
+  it('takes the highest stage, then the most stars', () => {
+    expect(bestStage([])).toBeNull();
+    expect(bestStage([null, { stage: 'mature', stars: 0 }])).toEqual({ stage: 'mature', stars: 0 });
+    expect(
+      bestStage([
+        { stage: 'ascended', stars: 2 },
+        { stage: 'godlike', stars: 0 },
+        { stage: 'ascended', stars: 4 },
+      ]),
+    ).toEqual({ stage: 'ascended', stars: 4 });
+    // Stars only count for ascended bots.
+    expect(bestStage([{ stage: 'godlike', stars: 3 }])).toEqual({ stage: 'godlike', stars: 0 });
   });
 });

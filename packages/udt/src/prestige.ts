@@ -104,6 +104,33 @@ export function prestigeStage(b: {
   return s >= b.potential ? 'mature' : null;
 }
 
+/** A stage as a mark (yearbook, hall of fame; decision 279). */
+export interface StageMark {
+  stage: PrestigeStage;
+  stars: number;
+}
+
+const STAGE_RANK: Readonly<Record<PrestigeStage, number>> = {
+  settled: 0,
+  mature: 1,
+  godlike: 2,
+  ascended: 3,
+};
+
+/** The highest of a bot's stage marks (ascended above Godlike above mature, then stars). */
+export function bestStage(marks: readonly (StageMark | null | undefined)[]): StageMark | null {
+  let best: StageMark | null = null;
+  for (const m of marks)
+    if (
+      m &&
+      (!best ||
+        STAGE_RANK[m.stage] > STAGE_RANK[best.stage] ||
+        (m.stage === best.stage && m.stars > best.stars))
+    )
+      best = { stage: m.stage, stars: m.stage === 'ascended' ? m.stars : 0 };
+  return best;
+}
+
 /** How many points a bot can hold: its stage's cap plus its stars. */
 export function prestigeCap(stage: PrestigeStage | null, stars = 0): number {
   if (!stage) return 0;

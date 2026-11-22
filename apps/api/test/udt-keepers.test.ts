@@ -176,6 +176,17 @@ describe('Dream Team keepers', () => {
     expect(book.bots.find((b: { botId: string }) => b.botId === lib.Blue)).toMatchObject({
       keptTo: 2,
       season: 1,
+      stage: null, // skill 5 below its potential 6: no stage reached
+    });
+    // Decision 279: a keeper's stage of that season comes from its mark.
+    db.update(udtBots)
+      .set({ marksJson: '[{"season":1,"stage":"mature","stars":0}]' })
+      .where(eq(udtBots.botId, lib.Blue!))
+      .run();
+    const marked = (await mario.get('/udt/yearbook?season=1')).body;
+    expect(marked.bots.find((b: { botId: string }) => b.botId === lib.Blue).stage).toEqual({
+      stage: 'mature',
+      stars: 0,
     });
     // The keeper rows are applied; the second season keeps nothing yet.
     expect(
