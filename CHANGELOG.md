@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Backups and moving to another server: deploy/linux/backup.sh and restore.sh, a nightly backup timer, a VPS section in the Linux guide and docs/move-server.md; the website refuses a database of a newer release (decision 281).
 - Prestige stars on Dream Team cards as ★N, the chip fits small cards with many stars (decision 280, patch note 280).
 - Yearbook and hall of fame show the prestige stage a bot reached (decision 279, patch note 279).
 - Mod 0.23.0: the seven traits of wave 2 in the game, with their trait log (decision 278, README test 76, patch note 278).

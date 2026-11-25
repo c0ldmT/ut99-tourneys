@@ -9,7 +9,8 @@
 # With a third argument, a folder with files from your PC, it does not build but installs what is there:
 #    - UTTourney_v1.u / UTTourneyMH_v1.u built on the PC (the packages are the same on every platform),
 #    - SmartStockBots (SmartStockBots.u/.int/.ini, or the SmartStockBots*.zip download),
-#    - User.ini: its bots ([Botpack.ChallengeBotInfo]) replace the server's (backup kept).
+#    - User.ini: its bots ([Botpack.ChallengeBotInfo]) replace the server's (backup kept),
+#    - MonsterHunt.u/.int (only if the server has none yet).
 # Run it again after copying more content (maps, Monster Hunt) or to rebuild the mod.
 #   sudo bash install-ut.sh "" /opt/ut99 ~/ut-import
 set -euo pipefail
@@ -96,6 +97,13 @@ TXT
 }
 if [ -n "$PREBUILT" ]; then
   [ -d "$PREBUILT" ] || die "$PREBUILT is not a folder"
+  # Monster Hunt from the PC (or from a backup, restore.sh): before the mod, which looks for it.
+  for f in MonsterHunt.u MonsterHunt.int; do
+    if [ -f "$PREBUILT/$f" ] && [ ! -f "$SYSDIR/$f" ]; then
+      install -m 644 "$PREBUILT/$f" "$SYSDIR/$f"
+      echo "installed $f"
+    fi
+  done
   # A folder with files from your PC: whatever of the mod, SmartStockBots and User.ini (bots) is there.
   if [ -f "$PREBUILT/UTTourney_v1.u" ]; then
     say "Installing the tournament mod from $PREBUILT"

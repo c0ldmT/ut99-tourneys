@@ -93,7 +93,9 @@ outbound to the website.
   (`/api/tournaments/*/stream`) through without extra settings. With nginx, disable buffering for the stream
   and forward the `Upgrade` header for `/api/agent`.
 - **Backup:** the whole state is `DATA_DIR/tourney.db` (SQLite in WAL mode; copy it with
-  `sqlite3 tourney.db ".backup backup.db"` while the API runs).
+  `sqlite3 tourney.db ".backup backup.db"` while the API runs). Linux installations back up every night
+  (`deploy/linux/backup.sh`, restore and moving: [docs/move-server.md](../../docs/move-server.md)). A database
+  of a newer release does not start on an older one.
 - **Analysis export:** `node dist/export-cli.js DATA_DIR/tourney.db <new folder>` writes an anonymised
   copy of the database (with the replays; `--no-replays` leaves them out) and the feedback texts;
   `--bot-logs <bridge dataDir>/bot-logs` adds the bot logs. All files share the same neutral names. In the

@@ -29,6 +29,7 @@ Download a release bundle (or build one with `pnpm release`) and follow the guid
 - [Raspberry Pi](docs/install-raspberry-pi.md) (website, bridge and UT server on one Pi)
 - [Linux server](docs/install-linux.md) (Debian/Ubuntu, x86_64 or ARM64, systemd, HTTPS with Caddy)
 - [Windows server](docs/install-windows.md) (scheduled tasks, firewall)
+- [Backups and moving to another server](docs/move-server.md) (e.g. Raspberry Pi → VPS, all players and data)
 
 ## Development
 

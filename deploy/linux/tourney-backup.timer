@@ -1,0 +1,11 @@
+# Runs tourney-backup.service every night (list: systemctl list-timers tourney-backup.timer).
+[Unit]
+Description=Daily Tourney backup
+
+[Timer]
+OnCalendar=*-*-* 05:17:00
+RandomizedDelaySec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

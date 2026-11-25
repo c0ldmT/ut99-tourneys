@@ -1,0 +1,10 @@
+# Daily backup of Tourney (database, settings, bridge data, mod files) to /var/backups/tourney,
+# the newest 14 are kept. Started by tourney-backup.timer. Installed by deploy/linux/install.sh.
+[Unit]
+Description=Tourney backup
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/tourney/deploy/linux/backup.sh --out /var/backups/tourney --keep 14
+Nice=10
+IOSchedulingClass=idle

@@ -20,6 +20,12 @@ export function openDatabase(file: string): Db {
 
 export function migrate(sqlite: Database.Database): void {
   const current = sqlite.pragma('user_version', { simple: true }) as number;
+  // A database from a newer program (a backup restored onto an older installation) would be
+  // read with the wrong tables: stop with a clear message instead.
+  if (current > MIGRATIONS.length)
+    throw new Error(
+      `the database has ${current} migrations, this program knows ${MIGRATIONS.length}: install the same or a newer release`,
+    );
   for (let i = current; i < MIGRATIONS.length; i++) {
     sqlite.transaction(() => {
       sqlite.exec(MIGRATIONS[i] as string);

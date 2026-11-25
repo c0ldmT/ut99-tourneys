@@ -143,7 +143,12 @@ say "systemd services"
 for s in tourney-website tourney-bridge; do
   sed "s|/usr/bin/node|$NODE_BIN|" "$APP_DIR/deploy/linux/$s.service" > "/etc/systemd/system/$s.service"
 done
+# Daily backup (backup.sh) of the database, settings and bridge data, the newest 14 are kept.
+for u in tourney-backup.service tourney-backup.timer; do
+  cp "$APP_DIR/deploy/linux/$u" "/etc/systemd/system/$u"
+done
 systemctl daemon-reload
+systemctl enable --now tourney-backup.timer >/dev/null 2>&1 && echo "daily backup: /var/backups/tourney (tourney-backup.timer)"
 if [ "$WITH_WEBSITE" = 1 ]; then
   systemctl enable --now tourney-website >/dev/null 2>&1
   echo "tourney-website: $(systemctl is-active tourney-website)"

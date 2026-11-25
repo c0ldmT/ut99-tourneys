@@ -28,6 +28,28 @@ website, so only the website needs to be reachable from the bridge.
   Hunt `MonsterHunt.u`, `MonsterHunt.int` and its maps,
 - a domain pointing to the server if the website should be reachable from the internet (HTTPS, Discord login).
 
+Moving an existing installation (e.g. from a Raspberry Pi) with all players and data: install as below, then
+follow [move-server.md](move-server.md).
+
+## 0. A fresh VPS
+
+Size: 4 vCores and 8 GB RAM (e.g. netcup VPS Lite 2) run the website and the UT server with lots of
+room; 2 vCores and 2 GB are enough for one game server. A UT server uses one core while a tournament runs. Pick
+**Debian 13** (or 12, Ubuntu 24.04) as image, with IPv4. As root, once:
+
+```sh
+apt update && apt full-upgrade -y
+apt install -y sudo ufw unattended-upgrades
+timedatectl set-timezone Europe/Berlin       # logs and the nightly backup in local time
+adduser <name> && usermod -aG sudo <name>    # your own user, then on your PC: ssh-copy-id <name>@<server-ip>
+ufw allow OpenSSH                            # FIRST, or the next line locks you out
+ufw allow 7777:7779/udp && ufw allow 80,443/tcp && ufw enable
+dpkg-reconfigure -f noninteractive unattended-upgrades   # security updates by themselves
+```
+
+When the key login works: in `/etc/ssh/sshd_config` set `PasswordAuthentication no` and `PermitRootLogin no`,
+then `systemctl restart ssh`. Everything below runs as that user with `sudo`.
+
 ## 1. Install Tourney
 
 ```sh
@@ -45,7 +67,8 @@ server). The script:
 3. copies the program to `/opt/tourney` and runs `npm ci --omit=dev`,
 4. creates `/etc/tourney/website.env` and `/etc/tourney/bridge.json` (only if they do not exist; random shared
    key for the mod),
-5. installs the systemd units from `deploy/linux` and starts the website.
+5. installs the systemd units from `deploy/linux`, starts the website and the nightly backup
+   (`tourney-backup.timer`, see [move-server.md](move-server.md)).
 
 ## 2. Install the UT server
 
@@ -96,9 +119,11 @@ sudo nano /etc/caddy/Caddyfile        # replace cup.example.com with your domain
 sudo systemctl reload caddy
 ```
 
-Ports 80 and 443 must reach the server. Set `PUBLIC_URL=https://<your domain>` and restart the website. Caddy
-passes the bridge WebSocket and the live updates through; the website itself can then listen on localhost only
-(`HOST=127.0.0.1` in `website.env`).
+Ports 80 and 443 must reach the server and the domain must already point to it (Caddy asks Let's Encrypt for the
+certificate on the first request). Set `PUBLIC_URL=https://<your domain>` and restart the website. Caddy passes
+the bridge WebSocket and the live updates through; the website itself should then listen on localhost only
+(`HOST=127.0.0.1` in `website.env`), so port 8080 is not reachable from outside without HTTPS. Add the redirect
+`https://<your domain>/api/auth/discord/callback` in the Discord developer portal.
 
 ## Firewall
 
@@ -113,13 +138,13 @@ With ufw: `sudo ufw allow 7777:7779/udp && sudo ufw allow 80,443/tcp`.
 
 ## Operation
 
-| Task   | Command                                                                                                                                                                                 |
-| ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status | `systemctl status tourney-website tourney-bridge --no-pager`                                                                                                                            |
-| Logs   | `journalctl -u tourney-website -f`, `journalctl -u tourney-bridge -f`, UT: `/opt/ut99/System/Tourney.log`                                                                               |
-| Update | unpack the new bundle and run `sudo bash deploy/linux/install.sh` again (settings and data are kept)                                                                                    |
-| Backup | `/etc/tourney` and `/var/lib/tourney`; the database alone while running: `sudo apt install sqlite3`, then `sudo sqlite3 /var/lib/tourney/website/tourney.db ".backup /root/tourney.db"` |
-| Remove | `sudo systemctl disable --now tourney-bridge tourney-website`, delete `/opt/tourney`, `/etc/tourney`, `/var/lib/tourney`, the units in `/etc/systemd/system` and the user `tourney`     |
+| Task   | Command                                                                                                                                                                                                  |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status | `systemctl status tourney-website tourney-bridge --no-pager`                                                                                                                                             |
+| Logs   | `journalctl -u tourney-website -f`, `journalctl -u tourney-bridge -f`, UT: `/opt/ut99/System/Tourney.log`                                                                                                |
+| Update | unpack the new bundle and run `sudo bash deploy/linux/install.sh` again (settings and data are kept)                                                                                                     |
+| Backup | nightly to `/var/backups/tourney` (timer `tourney-backup.timer`, 14 kept); now: `sudo bash /opt/tourney/deploy/linux/backup.sh`; restore and moving: [move-server.md](move-server.md)                    |
+| Remove | `sudo systemctl disable --now tourney-bridge tourney-website tourney-backup.timer`, delete `/opt/tourney`, `/etc/tourney`, `/var/lib/tourney`, the units in `/etc/systemd/system` and the user `tourney` |
 
 ## Without the script
 
