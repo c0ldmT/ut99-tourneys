@@ -115,11 +115,19 @@ function listPackages(installDir: string): string[] {
   }
 }
 
+/** A folder of `root` by name, any case; a link to a folder counts (shared Maps, Textures). */
 export function findDir(root: string, name: string): string | undefined {
   try {
-    const hit = fs
-      .readdirSync(root, { withFileTypes: true })
-      .find((d) => d.isDirectory() && d.name.toLowerCase() === name.toLowerCase());
+    const hit = fs.readdirSync(root, { withFileTypes: true }).find((d) => {
+      if (d.name.toLowerCase() !== name.toLowerCase()) return false;
+      if (d.isDirectory()) return true;
+      if (!d.isSymbolicLink()) return false;
+      try {
+        return fs.statSync(path.join(root, d.name)).isDirectory();
+      } catch {
+        return false;
+      }
+    });
     return hit ? path.join(root, hit.name) : undefined;
   } catch {
     return undefined;

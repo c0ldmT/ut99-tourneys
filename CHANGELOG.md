@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Further game servers play from the one UT folder (own Tourney-<n>.ini/log only); older instances are moved onto it by install.sh; the bridge finds maps behind folder links (decision 284).
 - Moderation: word filter for player texts (names, team names and tags, bot names, chat lines, trade messages), reports, moderator role, queue with reset, warnings, text and login bans, log, check of all texts (decision 283, migration 58, patch note 283).
 - Several game servers: add-instance.sh, server pool with automatic server choice for tournaments, series, cups and the league (games of an evening side by side), no overlapping sign-ups, live tiles per server and a live counter in the header (decision 282, migration 57, patch note 282).
 - Backups and moving to another server: deploy/linux/backup.sh and restore.sh, a nightly backup timer, a VPS section in the Linux guide and docs/move-server.md; the website refuses a database of a newer release (decision 281).

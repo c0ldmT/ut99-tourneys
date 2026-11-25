@@ -111,9 +111,11 @@ rate). Network settings for players: [client-settings.md](client-settings.md).
 ## 5. More game servers (optional)
 
 With more than one game server several tournaments run at the same time: league games of an evening side by
-side, a cup next to a bot series. Every further server is a bridge of its own with a UT folder of its own
-(`/opt/ut99-<n>`: its own `System`, the maps and textures shared with `/opt/ut99`). A UT server uses one core
-while it plays, so 4 vCores carry the website and about three servers.
+side, a cup next to a bot series. Every further server is a bridge of its own that starts a second UT server
+process from the **same** UT folder `/opt/ut99`: maps, textures, sounds, music, the mod and the bots exist once and
+count for all servers; each server only has its own `Tourney-<n>.ini`, `TourneyUser-<n>.ini` and
+`Tourney-<n>.log` in `System`. A UT server uses one core while it plays, so 4 vCores carry the website and about
+three servers.
 
 1. Website: **Servers → Add a game server**, e.g. id `vps-2` → copy the token.
 2. On the server (instance 2, game port 7787, mod port 7791):
@@ -128,8 +130,9 @@ while it plays, so 4 vCores carry the website and about three servers.
 Ports of instance n: game `7777 + 10·(n−1)` (UDP, three ports), mod `7790 + n − 1` (local). Tournaments,
 series and the league take a free server of the pool when they start ("Server: automatic" in the tournament
 form, on by default); nobody can sign up for two tournaments that overlap in time, and a tournament waits while
-one of its players still plays elsewhere. `install-ut.sh` copies mod updates, maps and bots into every instance
-(`add-instance.sh --sync`); `install.sh` restarts them with an update. Remove one with
+one of its players still plays elsewhere. New maps, mod updates and bots go into `/opt/ut99` once
+and count for every server; `install.sh` restarts them with an update (and moves servers made with an older
+version, which had a copy in `/opt/ut99-<n>`, onto the shared folder). Remove one with
 `sudo bash /opt/tourney/deploy/linux/add-instance.sh --remove 2` (and the server on the website). Logs:
 `journalctl -u tourney-bridge@2 -f`; the analysis export takes `--bot-logs` once per bridge
 (`/var/lib/tourney/bridge-2/bot-logs`).

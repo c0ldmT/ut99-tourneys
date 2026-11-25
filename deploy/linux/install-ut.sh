@@ -193,7 +193,8 @@ if id "$SVC_USER" >/dev/null 2>&1; then
   chown -R "$SVC_USER":"$SVC_USER" "$UT_DIR"
 fi
 
-# Further game servers (add-instance.sh) get the same files.
+# Further game servers (add-instance.sh) play from this folder too; older ones with an own copy
+# are moved onto it.
 if ls /etc/tourney/bridge-*.json >/dev/null 2>&1 && [ -f "$HERE/add-instance.sh" ]; then
   say "Further game servers"
   bash "$HERE/add-instance.sh" --sync --ut "$UT_DIR" || echo "Warning: add-instance.sh --sync failed (see above)"

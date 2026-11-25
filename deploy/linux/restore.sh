@@ -121,7 +121,9 @@ for f in "$BRIDGE_JSON" "$CONF_DIR"/bridge-*.json; do
     const c = JSON.parse(fs.readFileSync(f, "utf8"));
     c.dataDir = e.DATA + "/bridge" + (e.N ? "-" + e.N : "");
     c.server = c.server || {};
-    c.server.installDir = e.N ? e.UT_DIR + "-" + e.N : e.UT_DIR;
+    // Every server plays from the one UT folder; further ones with their own files (decision 284).
+    c.server.installDir = e.UT_DIR;
+    if (e.N) c.server.instance = e.N;
     if (e.GAME) {
       // The main server takes the address as it is; the others keep their own port.
       const host = e.GAME.replace(/:\d+$/, "");
@@ -155,8 +157,6 @@ if [ -d "$B/ut-import" ] && [ -n "$(ls -A "$B/ut-import")" ]; then
   else
     UT_PENDING=1
   fi
-elif [ -n "$INST_NUMBERS" ] && [ -d "$UT_DIR/System" ]; then
-  bash "$APP_DIR/deploy/linux/add-instance.sh" --sync --ut "$UT_DIR" || true
 fi
 [ -d "$UT_DIR" ] && chown -R "$SVC_USER":"$SVC_USER" "$UT_DIR"
 
@@ -179,11 +179,11 @@ else
   echo "tourney-bridge: not started (no UT server in $UT_DIR yet, or no token in $BRIDGE_JSON)"
 fi
 for n in $INST_NUMBERS; do
-  if [ -d "$UT_DIR-$n/System" ] && [ -f /etc/systemd/system/tourney-bridge@.service ]; then
+  if [ -d "$UT_DIR/System" ] && [ -f /etc/systemd/system/tourney-bridge@.service ]; then
     systemctl enable --now "tourney-bridge@$n" >/dev/null 2>&1 || true
     echo "tourney-bridge@$n: $(systemctl is-active "tourney-bridge@$n" || true)"
   else
-    echo "tourney-bridge@$n: not started (UT folder $UT_DIR-$n missing: add-instance.sh --sync after install-ut.sh)"
+    echo "tourney-bridge@$n: not started (no UT server in $UT_DIR yet)"
   fi
 done
 

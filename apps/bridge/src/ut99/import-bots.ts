@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { IniFile } from './ini.js';
+import { findDir } from './inventory.js';
 
 /** Where UT keeps the bot setup (Bots menu): names, classes, skins, faces, skills, voices. */
 export const BOT_SECTION = 'Botpack.ChallengeBotInfo';
@@ -63,11 +64,9 @@ function installedPackages(installDir: string): Set<string> {
     ['System', '.u'],
     ['Textures', '.utx'],
   ] as const) {
-    const real = fs
-      .readdirSync(installDir, { withFileTypes: true })
-      .find((d) => d.isDirectory() && d.name.toLowerCase() === dir.toLowerCase());
+    const real = findDir(installDir, dir);
     if (!real) continue;
-    for (const f of fs.readdirSync(path.join(installDir, real.name))) {
+    for (const f of fs.readdirSync(real)) {
       if (f.toLowerCase().endsWith(ext)) out.add(f.slice(0, -ext.length).toLowerCase());
     }
   }
@@ -83,11 +82,9 @@ export function importBotsIntoInstallation(
   installDir: string,
   now = new Date(),
 ): string[] {
-  const system = fs
-    .readdirSync(installDir, { withFileTypes: true })
-    .find((d) => d.isDirectory() && d.name.toLowerCase() === 'system');
+  const system = findDir(installDir, 'System');
   if (!system) throw new Error(`no System folder in ${installDir}`);
-  const targetFile = path.join(installDir, system.name, 'User.ini');
+  const targetFile = path.join(system, 'User.ini');
   if (path.resolve(sourceFile) === path.resolve(targetFile)) {
     throw new Error('source and target are the same User.ini');
   }

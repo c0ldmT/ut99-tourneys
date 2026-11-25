@@ -633,3 +633,15 @@ describe('ServerProcess', () => {
     expect(clock.pendingTimers).toBe(0);
   });
 });
+
+describe('linked game folders (decision 284)', () => {
+  it('finds maps and packages behind folder links', () => {
+    const shared = fs.mkdtempSync(path.join(os.tmpdir(), 'ut-shared-'));
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ut-inst-'));
+    fs.mkdirSync(path.join(shared, 'Maps'));
+    fs.writeFileSync(path.join(shared, 'Maps', 'DM-Deck16][.unr'), 'x');
+    fs.mkdirSync(path.join(root, 'System'));
+    fs.symlinkSync(path.join(shared, 'Maps'), path.join(root, 'Maps'), 'dir');
+    expect(scanInventory({ installDir: root }).maps.map((m) => m.id)).toEqual(['DM-Deck16][']);
+  });
+});

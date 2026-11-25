@@ -487,7 +487,7 @@ const en = {
   'agents.poolHint':
     'In the server pool: tournaments with "Server: automatic" and the league may take it. Off: only tournaments that name it.',
   'agents.instanceHint':
-    'A further game server on the same machine (Linux): this command makes its UT folder, settings and service.',
+    'A further game server on the same machine (Linux): this command makes its settings and service. It plays from the same UT folder as the first server (maps, mod and bots exist once).',
   'agents.online': 'online',
   'agents.offline': 'offline',
   'agents.lastSeen': 'last seen',
@@ -3569,7 +3569,7 @@ const de: Record<TKey, string> = {
   'agents.poolHint':
     'Im Server-Pool: Turniere mit „Server: automatisch“ und die Liga dürfen ihn nehmen. Aus: nur Turniere, die ihn fest wählen.',
   'agents.instanceHint':
-    'Weiterer Gameserver auf derselben Maschine (Linux): dieser Befehl legt UT-Ordner, Einstellungen und Dienst an.',
+    'Weiterer Gameserver auf derselben Maschine (Linux): dieser Befehl legt Einstellungen und Dienst an. Er spielt aus demselben UT-Ordner wie der erste Server (Maps, Mod und Bots gibt es nur einmal).',
   'agents.online': 'online',
   'agents.offline': 'offline',
   'agents.lastSeen': 'zuletzt gesehen',

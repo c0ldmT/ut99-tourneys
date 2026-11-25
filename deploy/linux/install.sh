@@ -168,6 +168,10 @@ if [ "$WITH_BRIDGE" = 1 ]; then
   fi
 fi
 
+# Further game servers share the UT folder (decision 284; older ones had an own copy).
+if ls "$CONF_DIR"/bridge-*.json >/dev/null 2>&1 && [ -d "$UT_DIR/System" ]; then
+  bash "$APP_DIR/deploy/linux/add-instance.sh" --sync --ut "$UT_DIR" || echo "Warning: add-instance.sh --sync failed"
+fi
 for s in $INSTANCES; do
   systemctl start "$s" && echo "$s: $(systemctl is-active "$s")"
 done

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { ServerProfile } from '@tourney/protocol';
 import {
   type GameMode,
-  GENERATED_FILES,
+  generatedFiles,
   iniChanges,
   serverArgs,
   serverBinaryCandidates,
@@ -12,6 +12,7 @@ import {
   type Ut99DmRules,
 } from '@tourney/adapter-ut99';
 import { IniFile } from './ini.js';
+import { findDir } from './inventory.js';
 
 export interface PreparedServer {
   binary: string;
@@ -91,12 +92,10 @@ export function botPackages(
 ): string[] {
   const out = new Map<string, string>();
   const has = (dir: string, ext: string, pkg: string) => {
-    const d = fs
-      .readdirSync(installDir, { withFileTypes: true })
-      .find((x) => x.isDirectory() && x.name.toLowerCase() === dir);
+    const d = findDir(installDir, dir);
     if (!d) return false;
     const target = `${pkg}${ext}`.toLowerCase();
-    return fs.readdirSync(path.join(installDir, d.name)).some((f) => f.toLowerCase() === target);
+    return fs.readdirSync(d).some((f) => f.toLowerCase() === target);
   };
   for (const r of refs) {
     const pkg = r?.split('.')[0]?.trim();
@@ -147,8 +146,9 @@ export function prepareServer(
   ini.apply(iniChanges(rules, profile, mod, mode, teamSize));
   // Custom models and skins of the tournament's bots: clients download them like the map.
   for (const pkg of extraPackages) ini.ensure('Engine.GameEngine', 'ServerPackages', pkg);
-  const iniPath = path.join(systemDir, GENERATED_FILES.ini);
-  const userIniPath = path.join(systemDir, GENERATED_FILES.userIni);
+  const files = generatedFiles(profile.instance);
+  const iniPath = path.join(systemDir, files.ini);
+  const userIniPath = path.join(systemDir, files.userIni);
   try {
     fs.writeFileSync(iniPath, ini.serialize(), 'latin1');
     fs.writeFileSync(userIniPath, userIni ? fs.readFileSync(userIni) : '');

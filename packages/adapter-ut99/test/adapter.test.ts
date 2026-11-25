@@ -224,6 +224,17 @@ describe('server launch', () => {
     ]);
   });
 
+  it('gives every server of one installation its own files (decision 284)', () => {
+    const second = ServerProfileSchema.parse({ ...profile, port: 7787, instance: '2' });
+    expect(serverArgs(rules, second).slice(2)).toEqual([
+      'port=7787',
+      'ini=Tourney-2.ini',
+      'userini=TourneyUser-2.ini',
+      'log=Tourney-2.log',
+    ]);
+    expect(ServerProfileSchema.safeParse({ ...profile, instance: '../x' }).success).toBe(false);
+  });
+
   it('runs the team game class with room for both teams', () => {
     expect(serverArgs(rules, profile, 'tdm')[1]).toBe(
       'DM-Deck16][?game=UTTourney_v1.TournamentTDM?mutator=BotPack.InstaGibDM?MaxSpectators=32',

@@ -76,6 +76,9 @@ website's analysis export (`website/dist/export-cli.js --bot-logs …`) packs th
   `LanServerMaxTickRate` in `Tourney.ini`; `maxClientRate` (default 20000) sets `MaxClientRate`. Both are written
   on every start, whatever the installation's `UnrealTournament.ini` says. See
   [docs/server-extras.md](../../docs/server-extras.md#tick-rate-and-client-rate).
+- **Several servers from one installation:** `"instance": "2"` (letters, digits, `-`, `_`) gives this bridge's
+  server its own `Tourney-2.ini`, `TourneyUser-2.ini` and `Tourney-2.log`, so further bridges with other
+  `port`/`mod.port` can start servers from the same `installDir` (made by `deploy/linux/add-instance.sh`).
 - `"manage": false` keeps the old behaviour: you start the server yourself.
 - The bridge needs write access to the UT `System` folder (not the case under `C:\Program Files` without
   admin rights).

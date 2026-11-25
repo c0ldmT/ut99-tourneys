@@ -57,6 +57,20 @@ export const GENERATED_FILES = {
   log: 'Tourney.log',
 } as const;
 
+/**
+ * The generated files of a server: with an instance tag (several servers from one installation,
+ * decision 284) each server has its own ini, user ini and log; the mod's settings and caches live
+ * in the ini, so the servers never share them.
+ */
+export function generatedFiles(instance?: string): { ini: string; userIni: string; log: string } {
+  if (!instance) return { ...GENERATED_FILES };
+  return {
+    ini: `Tourney-${instance}.ini`,
+    userIni: `TourneyUser-${instance}.ini`,
+    log: `Tourney-${instance}.log`,
+  };
+}
+
 /** URL options appended to every map URL (start and travel). */
 export function urlOptions(
   rules: Ut99DmRules,
@@ -84,9 +98,9 @@ export function serverArgs(
     'server',
     `${profile.lobbyMap}${urlOptions(rules, profile, mode)}`,
     `port=${profile.port}`,
-    `ini=${GENERATED_FILES.ini}`,
-    `userini=${GENERATED_FILES.userIni}`,
-    `log=${GENERATED_FILES.log}`,
+    `ini=${generatedFiles(profile.instance).ini}`,
+    `userini=${generatedFiles(profile.instance).userIni}`,
+    `log=${generatedFiles(profile.instance).log}`,
   ];
   if (profile.extraArgs) args.push(...profile.extraArgs.split(/\s+/).filter(Boolean));
   return args;

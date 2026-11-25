@@ -71,6 +71,14 @@ export const ServerProfileSchema = z.object({
   maxClientRate: z.number().int().min(5_000).max(1_000_000).default(20_000),
   /** Server ticks per second (internet and LAN). Default as in the 469f patch. */
   tickRate: z.number().int().min(10).max(200).default(50),
+  /**
+   * Several servers from one UT installation (decision 284): the instance's own generated files
+   * (`Tourney-<instance>.ini`, `TourneyUser-<instance>.ini`, `Tourney-<instance>.log`).
+   */
+  instance: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,16}$/)
+    .optional(),
 });
 export type ServerProfile = z.infer<typeof ServerProfileSchema>;
 
