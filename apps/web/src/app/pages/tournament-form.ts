@@ -103,6 +103,8 @@ interface Model {
   when: When;
   agentId: string;
   profileId: string;
+  /** A free server of the pool at the start (decision 282). */
+  serverAuto: boolean;
   connectAddress: string;
   scheduledAt: string;
   registrationOpen: boolean;
@@ -169,6 +171,7 @@ interface Model {
 interface Parts {
   agentId: string;
   profileId: string;
+  serverAuto: boolean;
   connectAddress: string | null;
   settings: TournamentSettings;
   notifyMode: 'default' | 'custom' | 'off';
@@ -981,9 +984,23 @@ function toLocalInput(iso: string | null): string {
               </p>
             }
             <fieldset class="plain" [disabled]="locked()">
+              <label class="switch optrow"
+                ><span class="ot"
+                  ><b>{{ 'form.serverAuto' | t }}</b
+                  ><span class="muted small">{{
+                    'form.serverAutoHint' | t: { n: poolSize() }
+                  }}</span></span
+                ><input
+                  type="checkbox"
+                  name="serverAuto"
+                  [(ngModel)]="f.serverAuto"
+                  (ngModelChange)="touch()" /><span class="tr"></span
+              ></label>
               <div class="fields">
                 <div class="field">
-                  <label for="fagent">{{ 'form.agent' | t }}</label>
+                  <label for="fagent">{{
+                    (f.serverAuto ? 'form.agentPreferred' : 'form.agent') | t
+                  }}</label>
                   <div class="withdot">
                     <span class="dot" [class.on]="agent()?.online"></span>
                     <select
@@ -1196,10 +1213,14 @@ function toLocalInput(iso: string | null): string {
               <dd>{{ rulesText() }}</dd>
               <dt>{{ 'form.server' | t }}</dt>
               <dd>
-                <span class="dot" [class.on]="agent()?.online"></span>
-                {{ agent()?.name ?? '–' }}
-                @if (profile(); as p) {
-                  · {{ p.name }}
+                @if (serverAuto()) {
+                  {{ 'form.serverAutoShort' | t: { name: agent()?.name ?? '–' } }}
+                } @else {
+                  <span class="dot" [class.on]="agent()?.online"></span>
+                  {{ agent()?.name ?? '–' }}
+                  @if (profile(); as p) {
+                    · {{ p.name }}
+                  }
                 }
               </dd>
               <dt>{{ 'form.secBots' | t }}</dt>
@@ -1730,6 +1751,11 @@ export class TournamentFormPage {
     this.agents().find((a) => a.id === this.model()?.agentId),
   );
   protected readonly profiles = computed(() => this.agent()?.profiles ?? []);
+  protected readonly serverAuto = computed(() => !!this.model()?.serverAuto);
+  /** Servers in the pool (decision 282). */
+  protected readonly poolSize = computed(
+    () => this.agents().filter((a) => a.inPool && a.profiles.length).length,
+  );
   protected readonly profile = computed(() =>
     this.profiles().find((p) => p.id === this.model()?.profileId),
   );
@@ -1979,6 +2005,7 @@ export class TournamentFormPage {
       when: 'once',
       agentId: a?.id ?? '',
       profileId: a?.profiles[0]?.id ?? '',
+      serverAuto: true,
       connectAddress: '',
       scheduledAt: '',
       registrationOpen: true,
@@ -2044,6 +2071,7 @@ export class TournamentFormPage {
       name,
       agentId: p.agentId,
       profileId: p.profileId,
+      serverAuto: p.serverAuto,
       connectAddress: p.connectAddress ?? '',
       scheduledAt: toLocalInput(scheduledAt),
       registrationOpen: p.registrationOpen,
@@ -2096,6 +2124,7 @@ export class TournamentFormPage {
       {
         agentId: d.agentId,
         profileId: d.profileId,
+        serverAuto: d.serverAuto,
         connectAddress: d.connectAddressOverride,
         settings: d.settings,
         notifyMode: d.notify?.mode ?? 'default',
@@ -2117,6 +2146,7 @@ export class TournamentFormPage {
       {
         agentId: t.agentId,
         profileId: t.profileId,
+        serverAuto: !!t.serverAuto,
         connectAddress: t.connectAddress ?? null,
         settings: t.settings,
         notifyMode: t.notifyMode ?? 'default',
@@ -2388,6 +2418,7 @@ export class TournamentFormPage {
     return {
       agentId: f.agentId,
       profileId: f.profileId,
+      serverAuto: f.serverAuto,
       connectAddress: f.connectAddress.trim() || null,
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
@@ -2442,6 +2473,7 @@ export class TournamentFormPage {
             Object.assign(patch, {
               agentId: t.agentId,
               profileId: t.profileId,
+              serverAuto: t.serverAuto,
               settings: t.settings,
               ...udt,
             });
@@ -2454,6 +2486,7 @@ export class TournamentFormPage {
             ...common,
             agentId: t.agentId,
             profileId: t.profileId,
+            serverAuto: t.serverAuto,
             settings: t.settings,
             ...udt,
           });

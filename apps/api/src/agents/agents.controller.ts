@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Inject, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Inject,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { z } from 'zod';
 import { conflict, ZodPipe } from '../common/http.js';
 import { AdminOnly } from '../auth/guard.js';
@@ -9,6 +19,8 @@ const CreateAgentBody = z.object({
   id: z.string().min(1).max(64),
   name: z.string().trim().min(1).max(64),
 });
+
+const UpdateAgentBody = z.object({ inPool: z.boolean() });
 
 @AdminOnly()
 @Controller('agents')
@@ -28,6 +40,12 @@ export class AgentsController {
   create(@Body(new ZodPipe(CreateAgentBody)) body: z.infer<typeof CreateAgentBody>) {
     const { agent, token } = this.agents.create(body.id, body.name);
     return { agent: this.agents.view(agent), token };
+  }
+
+  /** In or out of the server pool (decision 282). */
+  @Patch(':id')
+  update(@Param('id') id: string, @Body(new ZodPipe(UpdateAgentBody)) body: { inPool: boolean }) {
+    return this.agents.view(this.agents.setPool(id, body.inPool));
   }
 
   @Post(':id/token')

@@ -216,6 +216,14 @@ interface StatusView {
         <section class="card">
           <h2>{{ 'lgs.server' | t }}</h2>
           <p class="muted small">{{ 'lgs.rulesNow' | t }}</p>
+          <label class="switch optrow"
+            ><span class="ot"
+              ><b>{{ 'lgs.serverAuto' | t }}</b
+              ><span class="muted small">{{ 'lgs.serverAutoHint' | t }}</span></span
+            ><input type="checkbox" name="lgServerAuto" [(ngModel)]="f.serverAuto" /><span
+              class="tr"
+            ></span
+          ></label>
           <div class="lgs-fields">
             <label
               >{{ 'lgs.agent' | t }}
@@ -1371,6 +1379,7 @@ function defaults(): LeagueSettings {
     aiGames: 'simulate',
     agentId: null,
     profileId: null,
+    serverAuto: true,
     mapPool: [],
     fragLimit: 50,
     timeLimitMin: 15,

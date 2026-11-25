@@ -3,6 +3,7 @@ export type Lang = 'en' | 'de';
 
 const en = {
   'nav.tournaments': 'Matches',
+  'nav.liveCount': '{n} tournaments live now',
   'nav.new': 'New tournament',
   'nav.agents': 'Servers',
   'nav.users': 'Users',
@@ -482,6 +483,11 @@ const en = {
   'agents.tokenTitle': 'Token for {id}',
   'agents.tokenOnce': 'Copy it now into bridge.json on the server machine; it is shown only once.',
   'agents.newToken': 'New token',
+  'agents.pool': 'Pool',
+  'agents.poolHint':
+    'In the server pool: tournaments with "Server: automatic" and the league may take it. Off: only tournaments that name it.',
+  'agents.instanceHint':
+    'A further game server on the same machine (Linux): this command makes its UT folder, settings and service.',
   'agents.online': 'online',
   'agents.offline': 'offline',
   'agents.lastSeen': 'last seen',
@@ -571,6 +577,11 @@ const en = {
   'form.server': 'Game server',
   'form.noAgents': 'No game server yet:',
   'form.agent': 'Bridge',
+  'form.agentPreferred': 'Preferred server',
+  'form.serverAuto': 'Server: automatic',
+  'form.serverAutoShort': 'automatic (preferred: {name})',
+  'form.serverAutoHint':
+    'At the start it takes a free server of the pool ({n} servers), the preferred one first. Off: always the server below.',
   'form.profile': 'Server profile',
   'form.connectAddress': 'Address for players (optional)',
   'form.localAddress':
@@ -2119,6 +2130,7 @@ const en = {
   'ok.override': 'Result set.',
   'ok.agent.created': 'Server created.',
   'ok.agent.deleted': 'Server deleted.',
+  'ok.agent.pool': 'Server pool changed.',
   'ok.rescan': 'Scan started.',
   'udt.market.intro':
     'First come, first served: buy a bot at its price and it joins your roster at once. Prices are fixed for the market day; every market day brings new offers.',
@@ -2762,6 +2774,9 @@ const en = {
     'Estimated server time per league evening ({m} managers, {t} tiers, 5v5 with {frags} frags / {min} min ≈ 4 min per game)',
   'lgs.estNote': 'about {n} real games per matchday',
   'lgs.server': 'Server and rules',
+  'lgs.serverAuto': 'Server: automatic (server pool)',
+  'lgs.serverAutoHint':
+    'The games of an evening run side by side on every free server of the pool; a club still plays its games one after another. Below: the preferred server.',
   'lgs.agent': 'Server',
   'lgs.agentAuto': 'the server of the newest Dream Team tournament',
   'lgs.fragLimit': 'Frag limit (team)',
@@ -2976,6 +2991,7 @@ export type TKey = keyof typeof en;
 
 const de: Record<TKey, string> = {
   'nav.tournaments': 'Matches',
+  'nav.liveCount': '{n} Turniere laufen gerade',
   'nav.new': 'Neues Turnier',
   'nav.agents': 'Server',
   'nav.users': 'Benutzer',
@@ -3459,6 +3475,11 @@ const de: Record<TKey, string> = {
   'agents.tokenOnce':
     'Jetzt in die bridge.json auf dem Server-Rechner kopieren; er wird nur einmal angezeigt.',
   'agents.newToken': 'Neuer Token',
+  'agents.pool': 'Pool',
+  'agents.poolHint':
+    'Im Server-Pool: Turniere mit „Server: automatisch“ und die Liga dürfen ihn nehmen. Aus: nur Turniere, die ihn fest wählen.',
+  'agents.instanceHint':
+    'Weiterer Gameserver auf derselben Maschine (Linux): dieser Befehl legt UT-Ordner, Einstellungen und Dienst an.',
   'agents.online': 'online',
   'agents.offline': 'offline',
   'agents.lastSeen': 'zuletzt gesehen',
@@ -3548,6 +3569,11 @@ const de: Record<TKey, string> = {
   'form.server': 'Gameserver',
   'form.noAgents': 'Noch kein Gameserver:',
   'form.agent': 'Bridge',
+  'form.agentPreferred': 'Bevorzugter Server',
+  'form.serverAuto': 'Server: automatisch',
+  'form.serverAutoShort': 'automatisch (bevorzugt: {name})',
+  'form.serverAutoHint':
+    'Nimmt beim Start einen freien Server aus dem Pool ({n} Server), den bevorzugten zuerst. Aus: immer der Server unten.',
   'form.profile': 'Serverprofil',
   'form.connectAddress': 'Adresse für Spieler (optional)',
   'form.localAddress':
@@ -5112,6 +5138,7 @@ const de: Record<TKey, string> = {
   'ok.override': 'Ergebnis gesetzt.',
   'ok.agent.created': 'Server angelegt.',
   'ok.agent.deleted': 'Server gelöscht.',
+  'ok.agent.pool': 'Server-Pool geändert.',
   'ok.rescan': 'Scan gestartet.',
   'udt.market.intro':
     'Wer zuerst kommt: Kauf einen Bot zu seinem Preis, und er ist sofort in deinem Kader. Die Preise gelten für den ganzen Markttag; jeder Markttag bringt neue Angebote.',
@@ -5760,6 +5787,9 @@ const de: Record<TKey, string> = {
     'Geschätzte Serverzeit pro Ligaabend ({m} Manager, {t} Ligen, 5v5 mit {frags} Frags / {min} min ≈ 4 min pro Partie)',
   'lgs.estNote': 'etwa {n} echte Partien pro Spieltag',
   'lgs.server': 'Server und Regeln',
+  'lgs.serverAuto': 'Server: automatisch (Server-Pool)',
+  'lgs.serverAutoHint':
+    'Die Spiele eines Abends laufen gleichzeitig auf allen freien Servern des Pools; ein Club spielt seine Spiele weiter nacheinander. Unten: der bevorzugte Server.',
   'lgs.agent': 'Server',
   'lgs.agentAuto': 'der Server des neuesten Dream-Team-Turniers',
   'lgs.fragLimit': 'Fraglimit (Team)',

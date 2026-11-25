@@ -852,4 +852,10 @@ export const MIGRATIONS: string[] = [
   );
   ALTER TABLE udt_bots ADD COLUMN signature_json TEXT;
   `,
+  // 57: server pool (decision 282): a tournament takes a free server of the pool when it starts;
+  // a server can leave the pool (no automatic games, fixed ones still run).
+  `
+  ALTER TABLE tournaments ADD COLUMN server_auto INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE agents ADD COLUMN in_pool INTEGER NOT NULL DEFAULT 1;
+  `,
 ];

@@ -201,6 +201,8 @@ export interface TournamentSummary {
   registrationOpen: boolean;
   scheduledAt: string | null;
   createdAt: string;
+  /** The server it runs on (check-in and running tournaments). */
+  server?: string;
   champion?: string;
   seasonal?: boolean;
   /** "udt": a Dream Team tournament. */
@@ -314,6 +316,10 @@ export interface TournamentDetail {
   headSeq: number;
   agentId: string;
   profileId: string;
+  /** Takes a free server of the pool when it starts (decision 282). */
+  serverAuto: boolean;
+  /** The server's name (the preferred one until the start). */
+  serverName: string;
   connectAddress: string | null;
   connectAddressOverride: string | null;
   /** The bots are the control center's active ones (fixed at the seeding). */
@@ -398,6 +404,8 @@ export interface Inventory {
 export interface AgentView {
   id: string;
   name: string;
+  /** In the server pool (decision 282): automatic tournaments may take it. */
+  inPool: boolean;
   createdAt: string;
   lastSeenAt: string | null;
   online: boolean;
@@ -998,6 +1006,7 @@ export interface SeriesView extends SeriesFields {
 export interface SeriesTemplate {
   agentId: string;
   profileId: string;
+  serverAuto?: boolean;
   connectAddress?: string | null;
   settings: TournamentSettings;
   botPool?: BotSpec[];
@@ -1665,6 +1674,8 @@ export interface LeagueSettings {
   aiGames: LeagueAiGames;
   agentId: string | null;
   profileId: string | null;
+  /** League games take any free server of the pool (decision 282). */
+  serverAuto: boolean;
   mapPool: string[];
   fragLimit: number;
   timeLimitMin: number;

@@ -1,0 +1,20 @@
+# A further game server (instance %i, decision 282): its own bridge with /etc/tourney/bridge-%i.json
+# and its own UT folder (/opt/ut99-%i). Made by deploy/linux/add-instance.sh.
+[Unit]
+Description=Tourney bridge, game server %i
+After=network-online.target tourney-website.service
+Wants=network-online.target
+
+[Service]
+User=tourney
+Group=tourney
+WorkingDirectory=/opt/tourney/bridge
+ExecStart=/usr/bin/node dist/cli.js run -c /etc/tourney/bridge-%i.json
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+TimeoutStopSec=20
+KillMode=mixed
+
+[Install]
+WantedBy=multi-user.target

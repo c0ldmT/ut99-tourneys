@@ -155,6 +155,15 @@ export class NeuroStore {
       this.backoff = Math.min(this.backoff * 2, 60_000);
     };
     es.addEventListener('neuro', () => this.refresh());
+    // Running tournaments (decision 282): the header's live counter.
+    es.addEventListener('live', (e) => {
+      try {
+        const n = (JSON.parse((e as MessageEvent<string>).data) as { n?: unknown }).n;
+        this.activity.live.set(typeof n === 'number' ? n : 0);
+      } catch {
+        // a broken line: keep the last count
+      }
+    });
     // What the server works on (activity bar, decision 227): the state at the start, then changes.
     es.addEventListener('activity', (e) => {
       try {

@@ -45,6 +45,11 @@ export const ERRORS_DE: Record<string, string> = {
   '3D preview of {name} not found': '3D-Vorschau für {name} nicht gefunden.',
   'agent {agentId} is offline': 'Server {agentId} ist offline.',
   'agent {agentId} is busy with {name}': 'Server {agentId} ist mit {name} beschäftigt.',
+  'no free server in the pool': 'Kein freier Server im Pool.',
+  'players of this tournament still play in {name}':
+    'Spieler dieses Turniers spielen gerade noch in {name}.',
+  'you are signed up for {name} at the same time':
+    'Du bist zur gleichen Zeit schon für {name} angemeldet.',
   'agent {agentId} has no server profile {profileId}':
     'Server {agentId} hat kein Serverprofil {profileId}.',
 

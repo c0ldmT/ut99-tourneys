@@ -112,6 +112,11 @@ export const LeagueSettingsSchema = z.object({
   /** The server of the league games (null: the server of the newest Dream Team tournament). */
   agentId: z.string().max(64).nullable().default(null),
   profileId: z.string().max(64).nullable().default(null),
+  /**
+   * Server pool (decision 282): the games take any free server of the pool, so the games of an
+   * evening run side by side (a club still plays its games one after another).
+   */
+  serverAuto: z.boolean().default(true),
   /** Maps of the league (empty: the pool of the newest Dream Team deathmatch tournament). */
   mapPool: z.array(z.string().min(1).max(64)).max(40).default([]),
   /** League rules (L-E16): team frag limit and time limit. */

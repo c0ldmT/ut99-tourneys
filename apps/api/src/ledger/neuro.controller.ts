@@ -7,6 +7,7 @@ import { BetsService } from '../bets/bets.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { ServerActivity, type ActivityState } from '../common/activity.js';
 import { NeuroHub } from './neuro-hub.js';
+import { EventLogService } from '../tournaments/event-log.service.js';
 
 /** The own Neuro: one snapshot for every display (navbar, bets, shop, Dream Team) and a push. */
 @Controller('me')
@@ -16,6 +17,7 @@ export class NeuroController {
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(NeuroHub) private readonly hub: NeuroHub,
     @Inject(ServerActivity) private readonly activity: ServerActivity,
+    @Inject(EventLogService) private readonly log: EventLogService,
   ) {}
 
   /**
@@ -54,7 +56,8 @@ export class NeuroController {
 
   /**
    * Server-sent events: `neuro` whenever the own Neuro may have changed (fetch `me/neuro`);
-   * `activity` with what the server works on (at the start and on every change, decision 227).
+   * `activity` with what the server works on (at the start and on every change, decision 227);
+   * `live` with the number of running tournaments (at the start and on every change, 282).
    */
   @Get('stream')
   stream(@CurrentUser() user: User, @Req() req: Request, @Res() res: Response) {
@@ -70,11 +73,15 @@ export class NeuroController {
       res.write(`event: activity\ndata: ${JSON.stringify(s)}\n\n`);
     activity(this.activity.state());
     const unsubscribeActivity = this.activity.subscribe(activity);
+    const live = (n: number) => res.write(`event: live\ndata: ${JSON.stringify({ n })}\n\n`);
+    live(this.log.liveCount());
+    const unsubscribeLive = this.log.onLiveCount(live);
     const heartbeat = setInterval(() => res.write(': ping\n\n'), 25_000);
     req.on('close', () => {
       clearInterval(heartbeat);
       unsubscribe();
       unsubscribeActivity();
+      unsubscribeLive();
     });
   }
 }

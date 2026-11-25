@@ -85,7 +85,9 @@ install -d -m 755 "$APP_DIR"
 
 # --- program files ---------------------------------------------------------------------------
 say "Program files -> $APP_DIR"
-for s in tourney-bridge tourney-website; do
+# Further game servers (add-instance.sh) stop and start with the update as well.
+INSTANCES="$(systemctl list-units --plain --no-legend 'tourney-bridge@*.service' 2>/dev/null | awk '{print $1}' || true)"
+for s in tourney-bridge $INSTANCES tourney-website; do
   systemctl is-active --quiet "$s" 2>/dev/null && systemctl stop "$s" && echo "stopped $s"
 done
 for d in website bridge mod deploy docs; do
@@ -140,7 +142,7 @@ fi
 
 # --- services --------------------------------------------------------------------------------
 say "systemd services"
-for s in tourney-website tourney-bridge; do
+for s in tourney-website tourney-bridge tourney-bridge@; do
   sed "s|/usr/bin/node|$NODE_BIN|" "$APP_DIR/deploy/linux/$s.service" > "/etc/systemd/system/$s.service"
 done
 # Daily backup (backup.sh) of the database, settings and bridge data, the newest 14 are kept.
@@ -165,6 +167,10 @@ if [ "$WITH_BRIDGE" = 1 ]; then
     echo "tourney-bridge: $(systemctl is-active tourney-bridge)"
   fi
 fi
+
+for s in $INSTANCES; do
+  systemctl start "$s" && echo "$s: $(systemctl is-active "$s")"
+done
 
 say "Done: Tourney $VERSION"
 if [ "$WITH_WEBSITE" = 1 ]; then

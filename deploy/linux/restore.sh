@@ -57,7 +57,8 @@ sed 's/^/  /' "$B/backup.json"
 echo "installed here: Tourney $(cat "$APP_DIR/VERSION" 2>/dev/null || echo '?')"
 
 say "Stopping bridge and website"
-for s in tourney-bridge tourney-website; do
+INSTANCES="$(systemctl list-units --plain --no-legend 'tourney-bridge@*.service' 2>/dev/null | awk '{print $1}' || true)"
+for s in tourney-bridge $INSTANCES tourney-website; do
   systemctl is-active --quiet "$s" 2>/dev/null && systemctl stop "$s" && echo "stopped $s"
 done
 
@@ -106,22 +107,31 @@ fi
 PORT="$(sed -n 's/^PORT=//p' "$ENV" 2>/dev/null | tail -n1)"
 
 BRIDGE_JSON="$CONF_DIR/bridge.json"
-if [ -f "$BRIDGE_JSON" ]; then
-  UT_DIR="$UT_DIR" GAME="$GAME_ADDRESS" DATA="$DATA_DIR/bridge" PORT="${PORT:-8080}" node -e '
+# The main bridge and further game servers (bridge-<n>.json, add-instance.sh).
+for f in "$BRIDGE_JSON" "$CONF_DIR"/bridge-*.json; do
+  [ -f "$f" ] || continue
+  N="$(basename "$f" .json | sed -n 's/^bridge-\([0-9]*\)$/\1/p')"
+  UT_DIR="$UT_DIR" N="$N" GAME="$GAME_ADDRESS" DATA="$DATA_DIR" PORT="${PORT:-8080}" node -e '
     const fs = require("fs");
+    const e = process.env;
     const f = process.argv[1];
     const c = JSON.parse(fs.readFileSync(f, "utf8"));
-    c.dataDir = process.env.DATA;
+    c.dataDir = e.DATA + "/bridge" + (e.N ? "-" + e.N : "");
     c.server = c.server || {};
-    c.server.installDir = process.env.UT_DIR;
-    if (process.env.GAME) c.server.publicAddress = process.env.GAME;
+    c.server.installDir = e.N ? e.UT_DIR + "-" + e.N : e.UT_DIR;
+    if (e.GAME) {
+      // The main server takes the address as it is; the others keep their own port.
+      const host = e.GAME.replace(/:\d+$/, "");
+      c.server.publicAddress = e.N ? host + ":" + (c.server.port || 7777) : e.GAME;
+    }
     // Website and bridge on one machine: the bridge talks to the website locally.
     if (c.website && /^wss?:\/\/(127\.0\.0\.1|localhost)[:/]/.test(c.website.url || ""))
-      c.website.url = "ws://127.0.0.1:" + process.env.PORT + "/api/agent";
+      c.website.url = "ws://127.0.0.1:" + e.PORT + "/api/agent";
     fs.writeFileSync(f, JSON.stringify(c, null, 2) + "\n");
-  ' "$BRIDGE_JSON"
-  chown root:"$SVC_USER" "$BRIDGE_JSON" && chmod 640 "$BRIDGE_JSON"
-fi
+  ' "$f"
+  chown root:"$SVC_USER" "$f" && chmod 640 "$f"
+done
+INST_NUMBERS="$(find "$CONF_DIR" -maxdepth 1 -name 'bridge-*.json' -printf '%f\n' 2>/dev/null | sed -n 's/^bridge-\([0-9]*\)\.json$/\1/p' | sort -n)"
 
 # --- UT server -------------------------------------------------------------------------------------
 UT_PENDING=0
@@ -142,6 +152,8 @@ if [ -d "$B/ut-import" ] && [ -n "$(ls -A "$B/ut-import")" ]; then
   else
     UT_PENDING=1
   fi
+elif [ -n "$INST_NUMBERS" ] && [ -d "$UT_DIR/System" ]; then
+  bash "$APP_DIR/deploy/linux/add-instance.sh" --sync --ut "$UT_DIR" || true
 fi
 [ -d "$UT_DIR" ] && chown -R "$SVC_USER":"$SVC_USER" "$UT_DIR"
 
@@ -163,6 +175,14 @@ if [ -f "$BRIDGE_JSON" ] && [ -d "$UT_DIR/System" ] && ! grep -q 'PASTE-THE-TOKE
 else
   echo "tourney-bridge: not started (no UT server in $UT_DIR yet, or no token in $BRIDGE_JSON)"
 fi
+for n in $INST_NUMBERS; do
+  if [ -d "$UT_DIR-$n/System" ] && [ -f /etc/systemd/system/tourney-bridge@.service ]; then
+    systemctl enable --now "tourney-bridge@$n" >/dev/null 2>&1 || true
+    echo "tourney-bridge@$n: $(systemctl is-active "tourney-bridge@$n" || true)"
+  else
+    echo "tourney-bridge@$n: not started (UT folder $UT_DIR-$n missing: add-instance.sh --sync after install-ut.sh)"
+  fi
+done
 
 say "Restored"
 URL_NOW="$(sed -n 's/^PUBLIC_URL=//p' "$ENV" 2>/dev/null | tail -n1)"

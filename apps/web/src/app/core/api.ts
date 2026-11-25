@@ -856,6 +856,8 @@ export class Api {
     );
   rotateAgentToken = (id: string) =>
     this.call<{ token: string }>('POST', `/agents/${id}/token`, undefined, { ok: 'ok.token' });
+  setAgentPool = (id: string, inPool: boolean) =>
+    this.call<AgentView>('PATCH', `/agents/${id}`, { inPool }, { ok: 'ok.agent.pool' });
   deleteAgent = (id: string) =>
     this.call<void>('DELETE', `/agents/${id}`, undefined, { ok: 'ok.agent.deleted' });
   rescan = (id: string, profileId: string) =>

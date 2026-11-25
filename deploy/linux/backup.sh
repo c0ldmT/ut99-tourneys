@@ -54,7 +54,8 @@ B="$WORK/$NAME"
 
 if [ "$FINAL" = 1 ]; then
   say "Stopping bridge and website (they stay off, also after a reboot)"
-  for s in tourney-bridge tourney-website; do
+  INSTANCES="$(systemctl list-units --all --plain --no-legend 'tourney-bridge@*.service' 2>/dev/null | awk '{print $1}' || true)"
+  for s in tourney-bridge $INSTANCES tourney-website; do
     systemctl disable --now "$s" >/dev/null 2>&1 && echo "stopped and disabled $s"
   done
 fi

@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray, sql } from 'drizzle-orm';
 import {
   projectTournament,
   TournamentEventSchema,
@@ -118,6 +118,7 @@ export class EventLogService {
     });
     // Results settle bets: everybody's Neuro may have changed.
     if (stored.some((e) => SETTLES.has(e.type))) this.neuro.changedAll();
+    this.countLive();
     const before = () => (log.length ? projectTournament(log) : undefined);
     for (const l of this.listeners) {
       try {
@@ -148,6 +149,40 @@ export class EventLogService {
     }
     this.hub.publish(tournamentId, { type: 'change', headSeq: 0, phase: 'draft' });
     this.neuro.changedAll();
+    this.countLive();
+  }
+
+  /** Running (and paused) tournaments: the live counter in the header (decision 282). */
+  liveCount(): number {
+    return (
+      this.db
+        .select({ n: sql<number>`count(*)` })
+        .from(tournaments)
+        .where(inArray(tournaments.phase, ['running', 'paused']))
+        .get()?.n ?? 0
+    );
+  }
+
+  private lastLive = -1;
+  private readonly liveListeners = new Set<(n: number) => void>();
+
+  /** Called with the number of live tournaments whenever it changes. */
+  onLiveCount(fn: (n: number) => void): () => void {
+    this.liveListeners.add(fn);
+    return () => this.liveListeners.delete(fn);
+  }
+
+  private countLive(): void {
+    const n = this.liveCount();
+    if (n === this.lastLive) return;
+    this.lastLive = n;
+    for (const fn of this.liveListeners) {
+      try {
+        fn(n);
+      } catch {
+        // a broken stream must not affect the others
+      }
+    }
   }
 
   forget(tournamentId: string): void {

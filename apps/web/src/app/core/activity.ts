@@ -32,6 +32,8 @@ const NONE: ServerActivityState = { jobs: [], busy: false };
 export class ServerActivity {
   /** From the server's stream (NeuroStore listens; empty without a stream). */
   readonly server = signal<ServerActivityState>(NONE);
+  /** Running tournaments (event `live`, decision 282): the counter next to "Tournaments". */
+  readonly live = signal(0);
   /** A call of this browser takes long right now (or did a moment ago). */
   readonly slow = signal(false);
   readonly job = computed(() => this.server().jobs[0] ?? null);
@@ -60,6 +62,7 @@ export class ServerActivity {
   /** The stream ended or another user logged in: nothing known about the server. */
   reset(): void {
     this.server.set(NONE);
+    this.live.set(0);
   }
 
   /** Looks at the calls running (also used by tests). */

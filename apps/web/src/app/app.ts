@@ -20,6 +20,7 @@ import type { Lang } from './core/i18n-dict';
 import { ToastHost } from './core/toast';
 import { Loading } from './core/loading';
 import { ActivityBar } from './components/activity-bar';
+import { ServerActivity } from './core/activity';
 import { Loader } from './components/loader';
 import { NoticeModal } from './components/notice-modal';
 import { PatchNotes } from './components/patch-notes';
@@ -68,12 +69,14 @@ import { Feedback } from './components/feedback';
               >
               <span class="udt-sep" aria-hidden="true"></span>
             }
-            <a
-              routerLink="/"
-              routerLinkActive="active"
-              [routerLinkActiveOptions]="{ exact: true }"
-              >{{ 'nav.tournaments' | t }}</a
-            >
+            <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }"
+              >{{ 'nav.tournaments' | t }}
+              @if (activity.live() > 0) {
+                <span class="navlive" [title]="'nav.liveCount' | t: { n: activity.live() }"
+                  ><span class="dot on"></span>{{ activity.live() }}</span
+                >
+              }
+            </a>
             <a routerLink="/calendar" routerLinkActive="active">{{ 'nav.calendar' | t }}</a>
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
             @if (me.isAdmin) {
@@ -287,6 +290,15 @@ import { Feedback } from './components/feedback';
       border-radius: 6px;
       white-space: nowrap;
     }
+    .navlive {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--live);
+    }
     nav a:hover {
       color: var(--text);
       background: var(--panel-2);
@@ -475,6 +487,8 @@ export class App {
 
   /** Page loads and calls: the loader, the thin bar, the content fading in. */
   protected readonly loading = inject(Loading);
+  /** Running tournaments for the counter next to "Tournaments" (decision 282). */
+  protected readonly activity = inject(ServerActivity);
   private readonly outlet = viewChild.required('outlet', { read: ElementRef });
   /** The page component in place, hidden until its loading is done. */
   private page: Element | null = null;

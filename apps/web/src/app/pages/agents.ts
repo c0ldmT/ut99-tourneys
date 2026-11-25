@@ -26,6 +26,8 @@ import type { AgentView, Inventory } from '../core/types';
         <h2>{{ 'agents.tokenTitle' | t: { id: tk.id } }}</h2>
         <p class="notice">{{ 'agents.tokenOnce' | t }}</p>
         <pre #snip class="mono snippet">{{ snippet(tk.id, tk.token) }}</pre>
+        <p class="small muted">{{ 'agents.instanceHint' | t }}</p>
+        <pre class="mono snippet">{{ instanceCmd(tk.id, tk.token) }}</pre>
         <button
           class="icon"
           (click)="copy(snippet(tk.id, tk.token), snip)"
@@ -46,6 +48,14 @@ import type { AgentView, Inventory } from '../core/types';
             <span class="muted small">({{ a.id }})</span>
           </h2>
           <div class="row">
+            <label class="switch pool" [title]="'agents.poolHint' | t"
+              ><span class="small">{{ 'agents.pool' | t }}</span
+              ><input
+                type="checkbox"
+                [checked]="a.inPool"
+                [disabled]="busy()"
+                (change)="setPool(a, $any($event.target).checked)" /><span class="tr"></span
+            ></label>
             <button
               class="icon"
               (click)="rotate(a)"
@@ -171,6 +181,12 @@ import type { AgentView, Inventory } from '../core/types';
     </form>
   `,
   styles: `
+    .pool {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 6px;
+    }
     .profile {
       border-top: 1px solid var(--border);
       padding-top: 10px;
@@ -210,6 +226,18 @@ export class AgentsPage {
   protected snippet(id: string, token: string): string {
     const ws = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/agent`;
     return JSON.stringify({ agentId: id, website: { url: ws, token } }, null, 2);
+  }
+
+  /** A further game server on the same machine (deploy/linux/add-instance.sh, decision 282). */
+  protected instanceCmd(id: string, token: string): string {
+    const n = Math.max(2, this.agents().length + 1);
+    return `sudo bash /opt/tourney/deploy/linux/add-instance.sh ${n} --agent-id ${id} --token ${token}`;
+  }
+
+  protected setPool(a: AgentView, inPool: boolean) {
+    return this.act(async () => {
+      await this.api.setAgentPool(a.id, inPool);
+    });
   }
 
   protected readonly isLocal = isLocalAddress;

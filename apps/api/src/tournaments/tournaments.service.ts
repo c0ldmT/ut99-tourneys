@@ -52,7 +52,13 @@ import { BetsService } from '../bets/bets.service.js';
 import { EventLogService } from './event-log.service.js';
 import { matchDetail, type MatchDetail } from './match-detail.js';
 import { LiveHub } from './hub.js';
-import { ServerCalendar, localTime, type CalendarTournament } from './server-calendar.js';
+import {
+  ServerCalendar,
+  estimateMs,
+  localTime,
+  type CalendarTournament,
+  type Reservation,
+} from './server-calendar.js';
 import {
   balanceBots,
   pickBotsNear,
@@ -220,6 +226,11 @@ const TournamentFields = z.object({
   agentId: z.string().min(1).max(64),
   profileId: z.string().min(1).max(64),
   connectAddress: z.string().trim().max(128).nullable().optional(),
+  /**
+   * Server pool (decision 282): the tournament takes a free server of the pool when it starts
+   * (`agentId`/`profileId` are the preferred one until then).
+   */
+  serverAuto: z.boolean().optional(),
   settings: TournamentSettingsSchema,
   /** Missing or empty: the active bots of the control center (fixed at the seeding). */
   botPool: z.array(BotSpecSchema).max(64).optional(),
@@ -349,10 +360,49 @@ export class TournamentsService {
     };
   }
 
+  /**
+   * The servers a tournament may run on (decision 282): the pool for an automatic one (its own
+   * server while the pool is empty), else its own.
+   */
+  private serversFor(agentId: string, auto: boolean): string[] {
+    if (!auto) return [agentId];
+    const pool = this.agents.pool().map((p) => p.agentId);
+    return pool.length ? pool : [agentId];
+  }
+
+  /**
+   * The reservation a start at `at` runs into on every server the tournament may take (the one
+   * that ends first); null: a server is free then.
+   */
+  blockingAt(t: CalendarTournament, auto: boolean, at: number): Reservation | null {
+    let first: Reservation | null = null;
+    for (const agentId of this.serversFor(t.agentId, auto)) {
+      const r = this.calendar.blocking({ ...t, agentId }, at);
+      if (!r) return null;
+      if (!first || r.to < first.to) first = r;
+    }
+    return first;
+  }
+
+  /** The earliest start from `start` on with a free server (a few tries). */
+  nextFreeAt(t: CalendarTournament, auto: boolean, start: number): number {
+    let at = start;
+    for (let i = 0; i < 20; i++) {
+      const r = this.blockingAt(t, auto, at);
+      if (!r) return at;
+      at = r.to;
+    }
+    return at;
+  }
+
   /** A start that runs into a reservation of its server (the league evening) is refused. */
-  private assertFree(t: CalendarTournament, scheduledAt: string | null | undefined): void {
+  private assertFree(
+    t: CalendarTournament,
+    scheduledAt: string | null | undefined,
+    auto = false,
+  ): void {
     if (!scheduledAt) return;
-    const r = this.calendar.blocking(t, Date.parse(scheduledAt));
+    const r = this.blockingAt(t, auto, Date.parse(scheduledAt));
     if (r)
       throw conflict('the server is reserved for {label} from {from} to {to}', {
         label: r.label,
@@ -545,6 +595,7 @@ export class TournamentsService {
         settings: body.settings,
       }),
       body.scheduledAt,
+      body.serverAuto ?? false,
     );
     let id = body.id ?? slugify(body.name);
     if (this.get(id)) {
@@ -559,6 +610,7 @@ export class TournamentsService {
         agentId: body.agentId,
         profileId: body.profileId,
         connectAddress: body.connectAddress || null,
+        serverAuto: body.serverAuto ?? false,
         settingsJson: JSON.stringify(body.settings),
         botPoolJson: JSON.stringify(body.botPool),
         botsFromLibrary: fromLibrary,
@@ -596,7 +648,10 @@ export class TournamentsService {
         }
       : input;
     const structural =
-      body.settings !== undefined || body.agentId !== undefined || body.profileId !== undefined;
+      body.settings !== undefined ||
+      body.agentId !== undefined ||
+      body.profileId !== undefined ||
+      (body.serverAuto !== undefined && body.serverAuto !== t.serverAuto);
     if (structural && t.phase !== 'draft') {
       throw conflict(
         'settings, agent and profile can only be changed in draft (reset the seeding first)',
@@ -616,6 +671,7 @@ export class TournamentsService {
     if (body.agentId !== undefined) set.agentId = body.agentId;
     if (body.profileId !== undefined) set.profileId = body.profileId;
     if (body.connectAddress !== undefined) set.connectAddress = body.connectAddress || null;
+    if (body.serverAuto !== undefined) set.serverAuto = body.serverAuto;
     if (body.settings !== undefined) set.settingsJson = JSON.stringify(body.settings);
     if (body.botPool !== undefined) set.botPoolJson = JSON.stringify(body.botPool);
     if (fromLibrary !== undefined) set.botsFromLibrary = fromLibrary;
@@ -663,7 +719,10 @@ export class TournamentsService {
     // A new start, server or size must not run into a reservation (draft only, see above).
     if (
       t.phase === 'draft' &&
-      (set.scheduledAt !== undefined || body.agentId !== undefined || body.settings !== undefined)
+      (set.scheduledAt !== undefined ||
+        body.agentId !== undefined ||
+        body.settings !== undefined ||
+        set.serverAuto !== undefined)
     )
       this.assertFree(
         this.calendarView({
@@ -674,6 +733,7 @@ export class TournamentsService {
           settings: body.settings ?? this.settings(t),
         }),
         set.scheduledAt !== undefined ? set.scheduledAt : t.scheduledAt,
+        set.serverAuto ?? t.serverAuto,
       );
     const udtNow = (body.kind ?? t.kind) === 'udt';
     if (!udtNow && body.seasonal !== undefined && body.seasonal !== t.seasonal) {
@@ -862,6 +922,7 @@ export class TournamentsService {
       throw conflict('registration is closed: the bracket is already seeded');
     if (!t.registrationOpen) throw conflict('registration is closed');
     if (this.teams.registration(id, user.id)) return;
+    this.assertNoOverlap(t, user.id);
     const settings = this.settings(t);
     const teams = this.teams.list(id);
     const solos = this.teams.solos(id).length + 1;
@@ -871,6 +932,29 @@ export class TournamentsService {
       throw conflict('the tournament is full');
     this.teams.setMembership(id, user.id, null, false);
     this.notifyDraft(id);
+  }
+
+  /**
+   * Nobody signs up for two tournaments that overlap in time (decision 282): with several
+   * servers both could start at once. Tournaments without a start time do not count.
+   */
+  private assertNoOverlap(t: TournamentRow, userId: string): void {
+    if (!t.scheduledAt) return;
+    const from = Date.parse(t.scheduledAt);
+    const to = from + estimateMs(this.settings(t));
+    const others = this.db
+      .select({ t: tournaments })
+      .from(registrations)
+      .innerJoin(tournaments, eq(tournaments.id, registrations.tournamentId))
+      .where(and(eq(registrations.userId, userId), notInArray(tournaments.phase, DONE_PHASES)))
+      .all()
+      .map((r) => r.t)
+      .filter((x) => x.id !== t.id && x.scheduledAt);
+    for (const o of others) {
+      const f2 = Date.parse(o.scheduledAt!);
+      if (f2 < to && f2 + estimateMs(this.settings(o)) > from)
+        throw conflict('you are signed up for {name} at the same time', { name: o.name });
+    }
   }
 
   unregister(id: string, userId: string): void {
@@ -922,6 +1006,7 @@ export class TournamentsService {
     const { settings } = this.requireTeamDraft(id, { open: true });
     const reg = this.teams.registration(id, user.id);
     if (reg?.teamId) throw conflict('leave your team first');
+    if (!reg) this.assertNoOverlap(this.require(id), user.id);
     const teams = this.teams.list(id).map(shapeOf);
     const solos = this.teams.solos(id).length - (reg ? 1 : 0);
     this.ensureFits(
@@ -952,6 +1037,7 @@ export class TournamentsService {
     const reg = this.teams.registration(id, user.id);
     if (reg?.teamId === team.id) return;
     if (reg?.teamId) throw conflict('leave your team first');
+    if (!reg) this.assertNoOverlap(this.require(id), user.id);
     const role = joinRole(shapeOf(team), settings.teamSize);
     if (!role) throw conflict('the team is full');
     const teams = this.teams.list(id).map((t) =>
@@ -1803,27 +1889,130 @@ export class TournamentsService {
   }
 
   async run(id: string): Promise<void> {
-    const t = this.require(id);
+    let t = this.require(id);
     if (t.phase !== 'seeded' && !ACTIVE_PHASES.includes(t.phase)) {
       throw conflict('cannot run a tournament in phase {phase}', { phase: t.phase });
     }
+    if (t.phase === 'seeded') {
+      // Several servers (decision 282): nobody plays in two tournaments at once.
+      this.assertPlayersFree(t);
+      if (t.serverAuto) t = this.assignServer(t);
+    }
     if (!this.connections.isOnline(t.agentId))
       throw conflict('agent {agentId} is offline', { agentId: t.agentId });
-    const other = this.byAgent(t.agentId).find(
-      (x) => x.id !== id && ACTIVE_PHASES.includes(x.phase),
-    );
+    const other = this.busyWith(t.agentId, id);
     if (other)
       throw conflict('agent {agentId} is busy with {name}', {
         agentId: t.agentId,
         name: other.name,
       });
-    this.syncToAgent(t, 0);
-    await this.connections.command(t.agentId, {
-      kind: 'tournament.run',
-      tournamentId: id,
-      profileId: t.profileId,
-      botPool: this.botPool(t),
-    });
+    if (t.phase === 'seeded') this.claims.set(t.agentId, { id, at: this.clock.now() });
+    try {
+      this.syncToAgent(t, 0);
+      await this.connections.command(t.agentId, {
+        kind: 'tournament.run',
+        tournamentId: id,
+        profileId: t.profileId,
+        botPool: this.botPool(t),
+      });
+    } catch (err) {
+      if (this.claims.get(t.agentId)?.id === id) this.claims.delete(t.agentId);
+      throw err;
+    }
+  }
+
+  /**
+   * Servers a tournament was just sent to (decision 282): until the bridge opens the check-in
+   * the tournament is still "seeded", so a second start in the same moment would pick the
+   * same server. A claim counts for two minutes.
+   */
+  private readonly claims = new Map<string, { id: string; at: number }>();
+
+  /** The tournament a server is busy with (running, or just sent to it), if any. */
+  private busyWith(agentId: string, exceptId: string): TournamentRow | undefined {
+    const running = this.byAgent(agentId).find(
+      (x) => x.id !== exceptId && ACTIVE_PHASES.includes(x.phase),
+    );
+    if (running) return running;
+    const claim = this.claims.get(agentId);
+    if (!claim || claim.id === exceptId || this.clock.now() - claim.at > 120_000) return undefined;
+    const t = this.get(claim.id);
+    return t?.phase === 'seeded' && t.agentId === agentId ? t : undefined;
+  }
+
+  /**
+   * An automatic tournament takes a free server of the pool (decision 282): online, not busy,
+   * not reserved for something else now, with the tournament's maps (if it was scanned). Its
+   * preferred server first, then the pool in order.
+   */
+  private assignServer(t: TournamentRow): TournamentRow {
+    const settings = this.settings(t);
+    const view = this.calendarView({ ...t, settings });
+    const now = this.clock.now();
+    const maps = (settings.game.rules as { mapPool?: string[] }).mapPool ?? [];
+    const pool = this.agents.pool();
+    const candidates = [
+      ...pool.filter((p) => p.agentId === t.agentId),
+      ...pool.filter((p) => p.agentId !== t.agentId),
+    ];
+    if (!candidates.length) return t; // no pool: its own server, as before
+    const hasMaps = (agentId: string, profileId: string) => {
+      const inv = z
+        .object({ maps: z.array(z.object({ id: z.string() })) })
+        .safeParse(this.agents.inventory(agentId, profileId));
+      if (!inv.success) return true;
+      const ids = new Set(inv.data.maps.map((m) => m.id.toLowerCase()));
+      return maps.every((m) => ids.has(m.toLowerCase()));
+    };
+    const free = candidates.find(
+      (c) =>
+        this.connections.isOnline(c.agentId) &&
+        !this.busyWith(c.agentId, t.id) &&
+        !this.calendar.blocking({ ...view, agentId: c.agentId }, now) &&
+        hasMaps(c.agentId, c.profileId),
+    );
+    if (!free) throw conflict('no free server in the pool');
+    if (free.agentId !== t.agentId || free.profileId !== t.profileId) {
+      this.db
+        .update(tournaments)
+        .set({ agentId: free.agentId, profileId: free.profileId })
+        .where(eq(tournaments.id, t.id))
+        .run();
+      this.logger.info(`tournament ${t.id} plays on server ${free.agentId}`);
+    }
+    return this.require(t.id);
+  }
+
+  /**
+   * Who plays in a tournament (decision 282): its players (user ids), Dream Team managers and
+   * league clubs. Bots of the control center may play on two servers at once.
+   */
+  private participants(id: string): Set<string> {
+    const p = this.log.projection(id);
+    const out = new Set<string>();
+    for (const e of Object.values(p?.entrants ?? {})) {
+      for (const u of entrantUserIds(e)) out.add(`u:${u}`);
+      const manager = udtManagerOf(e.id);
+      if (manager) out.add(`m:${manager}`);
+      if (e.id.startsWith('lg-')) out.add(`c:${e.id}`);
+    }
+    return out;
+  }
+
+  /** A start waits while one of its players, managers or clubs plays in another tournament. */
+  private assertPlayersFree(t: TournamentRow): void {
+    const mine = this.participants(t.id);
+    if (!mine.size) return;
+    const active = this.db
+      .select()
+      .from(tournaments)
+      .where(inArray(tournaments.phase, ACTIVE_PHASES))
+      .all()
+      .filter((x) => x.id !== t.id);
+    for (const other of active) {
+      if ([...this.participants(other.id)].some((k) => mine.has(k)))
+        throw conflict('players of this tournament still play in {name}', { name: other.name });
+    }
   }
 
   /** Calls off a seeded tournament that never ran (autostart: no free server). */
@@ -2108,6 +2297,8 @@ export class TournamentsService {
       autoStart: t.autoStart,
       scheduledAt: t.scheduledAt,
       createdAt: t.createdAt,
+      /** The server it runs on (live tiles, decision 282). */
+      ...(live || t.phase === 'checkIn' ? { server: this.serverName(t) } : {}),
       champion: t.phase === 'finished' ? this.championName(t) : undefined,
       seriesId: t.seriesId,
       seasonal: t.seasonal,
@@ -2134,6 +2325,11 @@ export class TournamentsService {
           }
         : {}),
     };
+  }
+
+  /** The name of the server a tournament runs on (the agent's name). */
+  private serverName(t: TournamentRow): string {
+    return this.agents.get(t.agentId)?.name ?? t.agentId;
   }
 
   connectAddress(t: TournamentRow): string | null {
@@ -2170,6 +2366,8 @@ export class TournamentsService {
       headSeq: t.headSeq,
       agentId: t.agentId,
       profileId: t.profileId,
+      serverAuto: t.serverAuto,
+      serverName: this.serverName(t),
       connectAddress: this.connectAddress(t),
       connectAddressOverride: t.connectAddress,
       // Once seeded, as the game plays them (SmartStockBots is set then, decision 225).

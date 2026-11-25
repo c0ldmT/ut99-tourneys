@@ -299,6 +299,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       agentId: t.agentId,
       profileId: t.profileId,
       connectAddress: t.connectAddress,
+      serverAuto: t.serverAuto,
       settings: TournamentSettingsSchema.parse(JSON.parse(t.settingsJson)),
       // A control-center tournament: the series follows the control center too.
       botPool: t.botsFromLibrary ? [] : JSON.parse(t.botPoolJson),
@@ -467,13 +468,14 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
     // that passes meanwhile is left behind like a missed one.
     if (!this.tournaments.canMake(t.kind, start)) return;
     // A start in a reservation of the server (the league evening) moves behind it.
-    const at = this.tournaments.calendar.nextFree(
+    const at = this.tournaments.nextFreeAt(
       this.tournaments.calendarView({
         agentId: t.agentId,
         kind: t.kind ?? 'standard',
         udtJson: null,
         settings: t.settings,
       }),
+      t.serverAuto ?? false,
       start,
     );
     if (at !== start)

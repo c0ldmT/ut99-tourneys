@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 282,
+    date: '2026-11-25',
+    en: {
+      title: 'More game servers',
+      items: [
+        'Several tournaments can run at the same time now: the overview shows a tile per running tournament with its server, the header how many run right now.',
+        'League evenings are shorter: the games run side by side on all free servers (your club still plays its games one after another).',
+        'You cannot sign up for two tournaments that take place at the same time.',
+      ],
+    },
+    de: {
+      title: 'Mehr Gameserver',
+      items: [
+        'Mehrere Turniere können jetzt gleichzeitig laufen: die Übersicht zeigt eine Kachel je laufendem Turnier mit seinem Server, der Kopf, wie viele gerade laufen.',
+        'Liga-Abende werden kürzer: die Spiele laufen gleichzeitig auf allen freien Servern (dein Club spielt seine Spiele weiter nacheinander).',
+        'Du kannst dich nicht mehr für zwei Turniere anmelden, die zur selben Zeit stattfinden.',
+      ],
+    },
+  },
+  {
     id: 280,
     date: '2026-11-25',
     en: {

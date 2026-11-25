@@ -108,6 +108,32 @@ rate). Network settings for players: [client-settings.md](client-settings.md).
    [apps/bridge/README.md](../apps/bridge/README.md#server-section-bridgejson)).
 4. `sudo systemctl enable --now tourney-bridge`, then **Scan** on the website.
 
+## 5. More game servers (optional)
+
+With more than one game server several tournaments run at the same time: league games of an evening side by
+side, a cup next to a bot series. Every further server is a bridge of its own with a UT folder of its own
+(`/opt/ut99-<n>`: its own `System`, the maps and textures shared with `/opt/ut99`). A UT server uses one core
+while it plays, so 4 vCores carry the website and about three servers.
+
+1. Website: **Servers → Add a game server**, e.g. id `vps-2` → copy the token.
+2. On the server (instance 2, game port 7787, mod port 7791):
+
+   ```sh
+   sudo bash /opt/tourney/deploy/linux/add-instance.sh 2 --agent-id vps-2 --token <token>
+   sudo ufw allow 7787:7789/udp
+   ```
+
+3. Website: the server is online → **Scan**. It is in the **server pool** (switch on the Servers page).
+
+Ports of instance n: game `7777 + 10·(n−1)` (UDP, three ports), mod `7790 + n − 1` (local). Tournaments,
+series and the league take a free server of the pool when they start ("Server: automatic" in the tournament
+form, on by default); nobody can sign up for two tournaments that overlap in time, and a tournament waits while
+one of its players still plays elsewhere. `install-ut.sh` copies mod updates, maps and bots into every instance
+(`add-instance.sh --sync`); `install.sh` restarts them with an update. Remove one with
+`sudo bash /opt/tourney/deploy/linux/add-instance.sh --remove 2` (and the server on the website). Logs:
+`journalctl -u tourney-bridge@2 -f`; the analysis export takes `--bot-logs` once per bridge
+(`/var/lib/tourney/bridge-2/bot-logs`).
+
 ## HTTPS
 
 Discord needs an HTTPS address for logins from outside. Caddy gets certificates automatically:
@@ -127,12 +153,13 @@ the bridge WebSocket and the live updates through; the website itself should the
 
 ## Firewall
 
-| Port          | Who                    | Open?                       |
-| ------------- | ---------------------- | --------------------------- |
-| UDP 7777–7779 | UT players             | yes (game and server query) |
-| TCP 443 (+80) | browsers (Caddy)       | yes, with HTTPS             |
-| TCP 8080      | browsers without Caddy | only in a LAN               |
-| TCP 7790      | mod → bridge           | **no**, localhost only      |
+| Port          | Who                          | Open?                       |
+| ------------- | ---------------------------- | --------------------------- |
+| UDP 7777–7779 | UT players                   | yes (game and server query) |
+| UDP 7787–7789 | game server 2 (3: 7797–7799) | yes, per extra game server  |
+| TCP 443 (+80) | browsers (Caddy)             | yes, with HTTPS             |
+| TCP 8080      | browsers without Caddy       | only in a LAN               |
+| TCP 7790(+n)  | mod → bridge                 | **no**, localhost only      |
 
 With ufw: `sudo ufw allow 7777:7779/udp && sudo ufw allow 80,443/tcp`.
 

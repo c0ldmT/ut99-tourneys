@@ -64,6 +64,7 @@ import {
 } from '../db/schema.js';
 import { BetsService } from '../bets/bets.service.js';
 import { BotsService } from '../bots/bots.service.js';
+import { AgentsService } from '../agents/agents.service.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { isoWeekday } from '../series/series-time.js';
 import { nextDay, zonedMs } from '../seasons/season-time.js';
@@ -373,6 +374,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     @Inject(LedgerService) private readonly ledger: LedgerService,
     @Inject(BetsService) private readonly bets: BetsService,
     @Inject(BotsService) private readonly bots: BotsService,
+    @Inject(AgentsService) private readonly agents: AgentsService,
   ) {}
 
   onModuleInit(): void {
@@ -551,10 +553,27 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   // Server calendar: the league evenings
   // ------------------------------------------------------------------------------------------
 
-  /** The server of the league: the setting, else the newest Dream Team tournament's. */
+  /**
+   * The server of the league: the setting, else the newest Dream Team tournament's; with the
+   * pool on (decision 282) and none of these, the first server of the pool.
+   */
   server(): { agentId: string; profileId: string } | null {
     const cfg = this.cfg();
     if (cfg.agentId && cfg.profileId) return { agentId: cfg.agentId, profileId: cfg.profileId };
+    const own = this.newestUdtServer();
+    if (own || !cfg.serverAuto) return own;
+    return this.agents.pool()[0] ?? null;
+  }
+
+  /** The servers the league evening keeps free: the pool (automatic games), else its server. */
+  private servers(): string[] {
+    const own = this.server();
+    if (!this.cfg().serverAuto) return own ? [own.agentId] : [];
+    const pool = this.agents.pool().map((p) => p.agentId);
+    return pool.length ? pool : own ? [own.agentId] : [];
+  }
+
+  private newestUdtServer(): { agentId: string; profileId: string } | null {
     const t = this.db
       .select({
         kind: tournaments.kind,
@@ -573,7 +592,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   private reservations(agentId: string, from: number, to: number) {
     const season = this.seasons.current();
     const run = season ? this.run(season.number) : undefined;
-    if (!run || run.status !== 'running' || this.server()?.agentId !== agentId) return [];
+    if (!run || run.status !== 'running' || !this.servers().includes(agentId)) return [];
     const plan = this.plan(run);
     // Asked for every tournament that could start (autostart, every tick): only what it needs.
     const real = this.db
@@ -1703,6 +1722,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
           name: `Liga S${run.season} · ${label} · ${name(f.home)} – ${name(f.away)}`.slice(0, 100),
           agentId: server.agentId,
           profileId: server.profileId,
+          serverAuto: this.cfg().serverAuto,
           settings: this.leagueSettings(kind, map),
           // Not used (the two clubs play), but a team tournament needs two teams of bots.
           botPool: Array.from({ length: 10 }, (_, i) => ({ name: `League${i + 1}`, skill: 3 })),

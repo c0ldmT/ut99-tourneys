@@ -66,6 +66,8 @@ export const agents = sqliteTable('agents', {
   lastSeenAt: text('last_seen_at'),
   /** Last agent.hello payload (version, profiles, ...). */
   infoJson: text('info_json'),
+  /** In the server pool (decision 282): automatic tournaments may take it. */
+  inPool: integer('in_pool', { mode: 'boolean' }).notNull().default(true),
 });
 
 export const inventories = sqliteTable(
@@ -86,6 +88,11 @@ export const tournaments = sqliteTable('tournaments', {
   profileId: text('profile_id').notNull(),
   /** Overrides the profile's public address on the website. */
   connectAddress: text('connect_address'),
+  /**
+   * Server pool (decision 282): at its start the tournament takes a free server of the pool;
+   * until then `agentId`/`profileId` are the preferred one, afterwards the one it runs on.
+   */
+  serverAuto: integer('server_auto', { mode: 'boolean' }).notNull().default(false),
   settingsJson: text('settings_json').notNull(),
   botPoolJson: text('bot_pool_json').notNull(),
   /**

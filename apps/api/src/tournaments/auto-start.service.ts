@@ -60,7 +60,7 @@ export class AutoStartService implements OnModuleInit, OnModuleDestroy {
     const view = this.tournaments.calendarView({ ...t, settings: this.tournaments.settings(t) });
     // A reservation of the server (the league evening) comes first: the start waits behind it
     // and the hour of waiting counts from its end.
-    const r = this.tournaments.calendar.blocking(view, now);
+    const r = this.tournaments.blockingAt(view, t.serverAuto, now);
     if (r) {
       const why = `the server is reserved for ${r.label} until ${new Date(r.to).toISOString()}`;
       if (this.waiting.get(t.id) !== why) {

@@ -193,6 +193,12 @@ if id "$SVC_USER" >/dev/null 2>&1; then
   chown -R "$SVC_USER":"$SVC_USER" "$UT_DIR"
 fi
 
+# Further game servers (add-instance.sh) get the same files.
+if ls /etc/tourney/bridge-*.json >/dev/null 2>&1 && [ -f "$HERE/add-instance.sh" ]; then
+  say "Further game servers"
+  bash "$HERE/add-instance.sh" --sync --ut "$UT_DIR" || echo "Warning: add-instance.sh --sync failed (see above)"
+fi
+
 say "UT server folder: $UT_DIR"
 cat <<TXT
 Ports to open/forward for players: UDP 7777-7779 (game, query). TCP 7790 (mod <-> bridge) stays local.

@@ -1,7 +1,9 @@
 /**
  * Export for a season analysis (decision 247), shipped as `website/dist/export-cli.js`:
  *
- *   node dist/export-cli.js <tourney.db> <out-folder> [--bot-logs <bridge data>/bot-logs] [--no-replays]
+ *   node dist/export-cli.js <tourney.db> <out-folder> [--bot-logs <bridge data>/bot-logs]... [--no-replays]
+ *
+ * `--bot-logs` can be given once per bridge (several game servers).
  *
  * Writes the anonymised database copy (with snapshots, survey answers and the replays), the
  * feedback texts and the bot logs into a new folder (see db/export.ts). The website may keep running (the
@@ -12,14 +14,16 @@ import { exportForAnalysis } from './db/export.js';
 
 const args = process.argv.slice(2);
 const positional: string[] = [];
-let botLogs: string | undefined;
+const botLogs: string[] = [];
 let replays = true;
 let bad = false;
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--no-replays') replays = false;
   else if (args[i] === '--bot-logs') {
-    botLogs = args[++i];
-    if (!botLogs) bad = true;
+    // Repeatable: one folder per bridge (several game servers, decision 282).
+    const dir = args[++i];
+    if (dir) botLogs.push(dir);
+    else bad = true;
   } else positional.push(args[i]!);
 }
 const [src, out] = positional;
@@ -29,13 +33,13 @@ if (bad || !src || !out || positional.length > 2) {
 }
 try {
   const r = await exportForAnalysis(path.resolve(src), path.resolve(out), {
-    ...(botLogs ? { botLogs: path.resolve(botLogs) } : {}),
+    ...(botLogs.length ? { botLogs: botLogs.map((d) => path.resolve(d)) } : {}),
     replays,
   });
   for (const [k, n] of Object.entries(r.db.mapped)) console.log(`  ${k}: ${n}`);
   console.log(`  replays: ${r.db.replays}`);
   console.log(`  feedback: ${r.feedback.survey} survey answers, ${r.feedback.notes} messages`);
-  if (botLogs)
+  if (botLogs.length)
     console.log(
       `  bot logs: ${r.botLogs.files} days, ${r.botLogs.lines} lines (${r.botLogs.skipped} skipped)`,
     );

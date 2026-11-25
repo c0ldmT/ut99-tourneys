@@ -76,6 +76,26 @@ export class AgentsService {
     return token;
   }
 
+  /** Puts a server into the pool or takes it out (decision 282). */
+  setPool(id: string, inPool: boolean): AgentRow {
+    this.require(id);
+    this.db.update(agents).set({ inPool }).where(eq(agents.id, id)).run();
+    return this.require(id);
+  }
+
+  /**
+   * The server pool (decision 282): servers in the pool with a profile, as (agent, its first
+   * profile), by id. A bridge has one game server; automatic tournaments pick from these.
+   */
+  pool(): { agentId: string; profileId: string }[] {
+    return this.list()
+      .filter((a) => a.inPool)
+      .flatMap((a) => {
+        const p = this.info(a).profiles?.[0];
+        return p ? [{ agentId: a.id, profileId: p.id }] : [];
+      });
+  }
+
   remove(id: string): void {
     this.require(id);
     this.db.delete(agents).where(eq(agents.id, id)).run();
@@ -161,6 +181,7 @@ export class AgentsService {
     return {
       id: agent.id,
       name: agent.name,
+      inPool: agent.inPool,
       createdAt: agent.createdAt,
       lastSeenAt: agent.lastSeenAt,
       online: this.connections.isOnline(agent.id),

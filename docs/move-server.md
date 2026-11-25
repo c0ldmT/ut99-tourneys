@@ -77,6 +77,10 @@ bots from the old server (`install-ut.sh` with the backup's files: clients that 
 package, no "package mismatch") and starts everything. The bridge keeps its id and token, so the website knows it
 as the same server; league, series and Dream Team settings that point to it stay valid.
 
+Further game servers ([install-linux.md](install-linux.md#5-more-game-servers-optional)) move along: their
+settings keep their ports and get the new host, `restore.sh` fills their UT folders from the main one and starts
+them (open their UDP ports on the new server too).
+
 If the UT server was not set up yet, the script prints the `install-ut.sh` command with the patch and the folder
 of the old server's files (`/root/tourney-ut-import-<time>`).
 

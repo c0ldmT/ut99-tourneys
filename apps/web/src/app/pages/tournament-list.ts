@@ -280,31 +280,8 @@ function storedFilter(): TournamentFilter {
       @if (live().length) {
         <section>
           <h2 class="sec"><span class="badge running">Live</span> {{ 'list.liveTitle' | t }}</h2>
-          @for (t of live(); track t.id; let first = $first) {
-            @if (!first) {
-              <a class="liverow" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
-                <span class="badge running">{{ 'phase.running' | t }}</span>
-                <span class="lt"
-                  >{{ t.name }}
-                  @if (t.now; as n) {
-                    <span class="muted small">· {{ n.names[0] }} – {{ n.names[1] }}</span>
-                  }
-                </span>
-                @if (t.now; as n) {
-                  @if (t.game === 'mh') {
-                    <span class="ls"
-                      ><b class="sa">{{ runText(n, 0) }}</b> <i>:</i>
-                      <b class="sb">{{ runText(n, 1) }}</b></span
-                    >
-                  } @else {
-                    <span class="ls"
-                      ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b> <i>:</i>
-                      <b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
-                    >
-                  }
-                }
-              </a>
-            } @else {
+          <div class="lgrid" [class.multi]="live().length > 1">
+            @for (t of live(); track t.id) {
               <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
                 <div class="hero-l">
                   <div class="row">
@@ -319,7 +296,12 @@ function storedFilter(): TournamentFilter {
                     }
                   </div>
                   <div class="hero-name">{{ t.name }}</div>
-                  <div class="muted small">{{ meta(t) }}</div>
+                  <div class="muted small">
+                    {{ meta(t) }}
+                    @if (t.server) {
+                      · <span class="srv">{{ t.server }}</span>
+                    }
+                  </div>
                 </div>
                 @if (t.now; as n) {
                   <div class="hero-r">
@@ -367,7 +349,7 @@ function storedFilter(): TournamentFilter {
                 }
               </a>
             }
-          }
+          </div>
         </section>
       }
 
@@ -813,41 +795,35 @@ function storedFilter(): TournamentFilter {
       color: var(--side-b);
     }
 
-    .liverow {
-      margin-top: 10px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 16px;
-      border: 1px solid #1f4a55;
-      border-radius: var(--radius);
-      background: #0c1219;
-      color: var(--text);
+    /* Several servers (decision 282): one tile per live tournament, side by side. */
+    .lgrid.multi {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
     }
-    .liverow.udt {
-      border-color: rgba(178, 107, 255, 0.45);
+    .lgrid.multi .hero {
+      flex-direction: column;
+      margin-bottom: 0;
     }
-    .liverow:hover {
-      color: var(--text);
-      border-color: var(--accent-dim);
+    .lgrid.multi .hero-l,
+    .lgrid.multi .hero-r {
+      flex: none;
+      padding: 16px 18px;
     }
-    .lt {
-      font-weight: 700;
+    .lgrid.multi .hero-r {
       flex: 1;
-      min-width: 0;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      border-left: 0;
+      border-top: 1px solid var(--border);
     }
-    .ls {
-      font-family: var(--font-display);
-      font-weight: 800;
-      font-size: 1.3rem;
-      white-space: nowrap;
+    .lgrid.multi .hero-name {
+      font-size: 1.6rem;
     }
-    .ls i {
-      color: var(--muted);
-      font-style: normal;
+    .lgrid.multi .sc {
+      font-size: 2rem;
+    }
+    .srv {
+      color: var(--accent);
     }
     .empty {
       margin: 0;

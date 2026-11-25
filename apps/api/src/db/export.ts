@@ -39,10 +39,12 @@ type Leftovers = AnonymizeReport['leftovers'];
 export async function exportForAnalysis(
   src: string,
   outDir: string,
-  o: { botLogs?: string; replays?: boolean } = {},
+  o: { botLogs?: string | string[]; replays?: boolean } = {},
 ): Promise<ExportReport> {
   if (existsSync(outDir)) throw new Error(`${outDir} exists already`);
-  if (o.botLogs && !existsSync(o.botLogs)) throw new Error(`no bot logs at ${o.botLogs}`);
+  // Several game servers (decision 282): one bot log folder per bridge.
+  const logDirs = o.botLogs === undefined ? [] : [o.botLogs].flat();
+  for (const d of logDirs) if (!existsSync(d)) throw new Error(`no bot logs at ${d}`);
   const part = `${outDir}.part`;
   await rm(part, { recursive: true, force: true });
   await mkdir(part, { recursive: true });
@@ -57,8 +59,12 @@ export async function exportForAnalysis(
       extra: async (m) => {
         const left: Leftovers = [];
         result.feedback = await writeFeedback(src, path.join(part, 'feedback.json'), m, left);
-        if (o.botLogs)
-          result.botLogs = await writeBotLogs(o.botLogs, path.join(part, 'bot-logs'), m, left);
+        for (const [i, d] of logDirs.entries()) {
+          const r = await writeBotLogs(d, path.join(part, 'bot-logs'), m, left, i);
+          result.botLogs.files += r.files;
+          result.botLogs.lines += r.lines;
+          result.botLogs.skipped += r.skipped;
+        }
         return left;
       },
     });
@@ -169,12 +175,16 @@ async function writeFeedback(
   return { survey: survey.length, notes: notes.length };
 }
 
-/** Every day of the bot logs, names and tournaments mapped, gzipped. */
+/**
+ * Every day of the bot logs, names and tournaments mapped, gzipped. The folders of further
+ * bridges (`n` > 0) get their number in the file name: `bot-thoughts-<day>-<n>.jsonl.gz`.
+ */
 async function writeBotLogs(
   dir: string,
   outDir: string,
   m: NameMapper,
   left: Leftovers,
+  n = 0,
 ): Promise<ExportReport['botLogs']> {
   await mkdir(outDir, { recursive: true });
   const out = { files: 0, lines: 0, skipped: 0 };
@@ -185,7 +195,9 @@ async function writeBotLogs(
       ? createReadStream(path.join(dir, f)).pipe(zlib.createGunzip())
       : createReadStream(path.join(dir, f));
     const gzip = zlib.createGzip();
-    const sink = createWriteStream(path.join(outDir, `bot-thoughts-${match[1]}.jsonl.gz`));
+    const sink = createWriteStream(
+      path.join(outDir, `bot-thoughts-${match[1]}${n ? `-${n}` : ''}.jsonl.gz`),
+    );
     gzip.pipe(sink);
     for await (const line of readline.createInterface({ input, crlfDelay: Infinity })) {
       if (!line.trim()) continue;
