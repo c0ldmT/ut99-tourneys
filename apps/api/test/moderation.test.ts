@@ -143,10 +143,38 @@ describe('moderation (decision 283)', () => {
       const nazi = await Client.login(api, 'Hitler');
       expect((await nazi.get('/me')).body.displayName).toMatch(/^Player\d{4}$/);
 
+      // An admin corrects a text by hand (decision 287); a moderator may not.
+      expect((await luigi.patch('/me', { displayName: 'Shit Lord' })).status).toBe(200);
+      const item = (
+        (await admin.get('/moderation/queue')).body as {
+          id: string;
+          kind: string;
+          ref: string;
+          fields?: { text?: string };
+        }[]
+      ).find((i) => i.kind === 'name' && i.ref === luigiId)!;
+      expect(item.fields).toEqual({ text: 'Shit Lord' });
+      expect((await luigi.post(`/moderation/items/${item.id}/edit`, { text: 'x' })).status).toBe(
+        403,
+      );
+      const bad = await admin.post(`/moderation/items/${item.id}/edit`, { text: 'Hitler' });
+      expect(bad.status).toBe(400);
+      expect(
+        (await admin.post(`/moderation/items/${item.id}/edit`, { text: 'Lord Luigi' })).status,
+      ).toBe(204);
+      const luigiMe = (await luigi.get('/me')).body as {
+        displayName: string;
+        notices: { kind: string }[];
+      };
+      expect(luigiMe.displayName).toBe('Lord Luigi');
+      expect(luigiMe.notices.map((n) => n.kind)).toContain('mod-edit');
+      const done = (await admin.get('/moderation/queue?status=done')).body as { status: string }[];
+      expect(done.map((d) => d.status)).toContain('edited');
+
       // The log has every step.
       const log = (await admin.get('/moderation/log')).body as { action: string }[];
       expect(log.map((l) => l.action)).toEqual(
-        expect.arrayContaining(['reset', 'moderator', 'text-ban', 'ban', 'unban']),
+        expect.arrayContaining(['reset', 'moderator', 'text-ban', 'ban', 'unban', 'edit']),
       );
     } finally {
       await api.close();

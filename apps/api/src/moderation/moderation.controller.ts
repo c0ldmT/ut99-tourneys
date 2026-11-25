@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, Inject, Param, Post, Put, Query } from '@nestjs/common';
 import { z } from 'zod';
 import { ZodPipe } from '../common/http.js';
-import { CurrentUser, ModOnly } from '../auth/guard.js';
+import { AdminOnly, CurrentUser, ModOnly } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ModerationSettingsSchema } from '../settings/settings.service.js';
 import { MOD_KINDS, ModerationService } from './moderation.service.js';
@@ -12,6 +12,12 @@ const ReportBody = z.object({
   reason: z.string().trim().min(1).max(300),
 });
 const DecideBody = z.object({ action: z.enum(['ok', 'reset']) });
+const EditBody = z.object({
+  text: z.string().max(300).optional(),
+  name: z.string().max(60).optional(),
+  tag: z.string().max(30).optional(),
+  lines: z.array(z.string().max(300)).max(64).optional(),
+});
 const SanctionBody = z.object({
   action: z.enum(['warn', 'text-ban', 'ban', 'unban']),
   /** Text ban: days (needed); login ban: days, 0 = for good. */
@@ -52,6 +58,18 @@ export class ModerationController {
     @Body(new ZodPipe(DecideBody)) b: z.infer<typeof DecideBody>,
   ) {
     this.mod.decide(user, id, b.action);
+  }
+
+  /** Admins correct a text by hand (decision 287). */
+  @AdminOnly()
+  @Post('items/:id/edit')
+  @HttpCode(204)
+  edit(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(EditBody)) b: z.infer<typeof EditBody>,
+  ) {
+    this.mod.edit(user, id, b);
   }
 
   @ModOnly()

@@ -257,6 +257,10 @@ export class Api {
     });
   modDecide = (id: string, action: 'ok' | 'reset') =>
     this.call<void>('POST', `/moderation/items/${id}`, { action }, { ok: `ok.mod.${action}` });
+  modEdit = (
+    id: string,
+    fields: { text?: string; name?: string; tag?: string; lines?: string[] },
+  ) => this.call<void>('POST', `/moderation/items/${id}/edit`, fields, { ok: 'ok.mod.edit' });
   modSanction = (
     userId: string,
     action: 'warn' | 'text-ban' | 'ban' | 'unban',

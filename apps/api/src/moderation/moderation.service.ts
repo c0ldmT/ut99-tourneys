@@ -20,6 +20,7 @@ import { isModerator } from '../auth/guard.js';
 import { UsersService, type User } from '../auth/users.service.js';
 import { BotsService } from '../bots/bots.service.js';
 import { SettingsService, type ModerationSettings } from '../settings/settings.service.js';
+import { TeamsService } from '../tournaments/teams.service.js';
 import { checkText, cleanList, type FilterHit, type FilterLists } from './filter.js';
 import { BUILTIN_BLOCK, BUILTIN_FLAG } from './word-lists.js';
 
@@ -35,6 +36,14 @@ const DAY = 86_400_000;
 
 type Item = typeof moderationItems.$inferSelect;
 
+/** The editable fields of a text (decision 287): one text, name + tag, or the chat lines. */
+export interface ModFields {
+  text?: string;
+  name?: string;
+  tag?: string;
+  lines?: string[];
+}
+
 /**
  * Moderation (decision 283): the word filter for what players type, the queue of flagged and
  * reported texts, resets, sanctions and the log. Post-moderation: a blocked word is refused when
@@ -49,6 +58,7 @@ export class ModerationService {
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(BotsService) private readonly bots: BotsService,
+    @Inject(TeamsService) private readonly teamsSvc: TeamsService,
   ) {}
 
   private now() {
@@ -272,6 +282,171 @@ export class ModerationService {
   }
 
   // ------------------------------------------------------------------------------------------
+  // Editing by hand (decision 287)
+  // ------------------------------------------------------------------------------------------
+
+  /** The fields of a text as an admin edits them (prefilled in the queue). */
+  fields(kind: string, ref: string): ModFields | null {
+    switch (kind) {
+      case 'name': {
+        const u = this.users.byId(ref);
+        return u ? { text: u.displayName } : null;
+      }
+      case 'udt-team': {
+        const t = this.udtTeam(ref);
+        return t ? { name: t.name, tag: t.tag } : null;
+      }
+      case 'udt-bot': {
+        const b = this.bots.get(ref);
+        return b ? { text: b.name } : null;
+      }
+      case 'bot-lines': {
+        const b = this.bots.get(ref);
+        return b ? { lines: b.personality.lines.map((l) => l.text) } : null;
+      }
+      case 'team': {
+        const t = this.db.select().from(teams).where(eq(teams.id, ref)).get();
+        return t ? { name: t.name, tag: t.tag ?? '' } : null;
+      }
+      case 'trade': {
+        const t = this.db.select().from(udtTrades).where(eq(udtTrades.id, ref)).get();
+        return t ? { text: t.message ?? '' } : null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  private udtTeam(ref: string) {
+    const [season, userId] = ref.split('/');
+    return this.db
+      .select()
+      .from(udtTeams)
+      .where(and(eq(udtTeams.season, Number(season)), eq(udtTeams.userId, userId ?? '')))
+      .get();
+  }
+
+  /**
+   * An admin corrects a text by hand (decision 287): the same rules as for the player (length,
+   * ASCII where the game shows it, unique names), and the new text must pass the filter. The
+   * item is closed as "edited", the writer gets a notice.
+   */
+  edit(admin: User, itemId: string, f: ModFields): void {
+    const item = this.db.select().from(moderationItems).where(eq(moderationItems.id, itemId)).get();
+    if (!item) throw notFound('moderation item');
+    if (item.status !== 'open') throw conflict('already decided');
+    const before = this.currentText(item.kind, item.ref)?.text ?? null;
+    const ascii = /^[\x20-\x7e]+$/;
+    const need = (v: string | undefined, min: number, max: number, onlyAscii: boolean) => {
+      const t = (v ?? '').trim();
+      if (t.length < min || t.length > max || (t && onlyAscii && !ascii.test(t)))
+        throw badRequest('the text must have {min} to {max} characters{ascii}', {
+          min,
+          max,
+          ascii: onlyAscii ? ' (ASCII)' : '',
+        });
+      return t;
+    };
+    const blocked = (texts: string[]) => {
+      if (this.check(texts)?.level === 'block') throw badRequest('this text is not allowed here');
+    };
+    switch (item.kind) {
+      case 'name': {
+        const text = need(f.text, 2, 20, true);
+        blocked([text]);
+        this.users.setDisplayName(item.ref, text);
+        break;
+      }
+      case 'udt-team': {
+        const t = this.udtTeam(item.ref);
+        if (!t) throw notFound('moderation item');
+        const name = need(f.name, 2, 32, true);
+        const tag = need(f.tag, 1, 8, true);
+        blocked([name, tag]);
+        const others = this.db
+          .select()
+          .from(udtTeams)
+          .where(eq(udtTeams.season, t.season))
+          .all()
+          .filter((x) => x.userId !== t.userId);
+        if (others.some((x) => x.name.toLowerCase() === name.toLowerCase()))
+          throw conflict('the team name {name} is taken', { name });
+        if (others.some((x) => x.tag.toLowerCase() === tag.toLowerCase()))
+          throw conflict('the tag {tag} is taken', { tag });
+        this.db
+          .update(udtTeams)
+          .set({ name, nameKey: name.toLowerCase(), tag, tagKey: tag.toLowerCase() })
+          .where(and(eq(udtTeams.season, t.season), eq(udtTeams.userId, t.userId)))
+          .run();
+        break;
+      }
+      case 'udt-bot': {
+        const text = need(f.text, 2, 20, true);
+        blocked([text]);
+        this.bots.update(item.ref, { name: text });
+        break;
+      }
+      case 'bot-lines': {
+        const b = this.bots.get(item.ref);
+        if (!b) throw notFound('moderation item');
+        const lines = f.lines ?? [];
+        if (lines.length !== b.personality.lines.length)
+          throw badRequest('the lines changed meanwhile: reload');
+        const kept = b.personality.lines
+          .map((l, i) => ({ kind: l.kind, text: (lines[i] ?? '').trim() }))
+          .filter((l) => l.text);
+        for (const l of kept) need(l.text, 1, 120, false);
+        blocked(kept.map((l) => l.text));
+        this.bots.update(item.ref, { personality: { lines: kept } });
+        break;
+      }
+      case 'team': {
+        const t = this.db.select().from(teams).where(eq(teams.id, item.ref)).get();
+        if (!t) throw notFound('moderation item');
+        const name = need(f.name, 1, 40, false);
+        const tag = (f.tag ?? '').trim();
+        if (tag.length > 20)
+          throw badRequest('the text must have {min} to {max} characters{ascii}', {
+            min: 0,
+            max: 20,
+            ascii: '',
+          });
+        blocked([name, tag]);
+        this.teamsSvc.update(t.tournamentId, t.id, { name, tag: tag || null });
+        break;
+      }
+      case 'trade': {
+        const text = (f.text ?? '').trim();
+        if (text.length > 200)
+          throw badRequest('the text must have {min} to {max} characters{ascii}', {
+            min: 0,
+            max: 200,
+            ascii: '',
+          });
+        blocked([text]);
+        this.db
+          .update(udtTrades)
+          .set({ message: text || null })
+          .where(eq(udtTrades.id, item.ref))
+          .run();
+        break;
+      }
+      default:
+        throw badRequest('unknown kind {kind}', { kind: item.kind });
+    }
+    if (item.userId) this.users.notify(item.userId, 'mod-edit', { kind: item.kind });
+    this.db
+      .update(moderationItems)
+      .set({ status: 'edited', decidedBy: admin.id, decidedAt: this.now() })
+      .where(eq(moderationItems.id, itemId))
+      .run();
+    this.audit(admin, 'edit', item.userId, item.kind, item.ref, {
+      text: before,
+      to: this.currentText(item.kind, item.ref)?.text ?? '',
+    });
+  }
+
+  // ------------------------------------------------------------------------------------------
   // Reports
   // ------------------------------------------------------------------------------------------
 
@@ -306,7 +481,7 @@ export class ModerationService {
       .where(
         status === 'open'
           ? eq(moderationItems.status, 'open')
-          : inArray(moderationItems.status, ['ok', 'reset']),
+          : inArray(moderationItems.status, ['ok', 'reset', 'edited']),
       )
       .orderBy(status === 'open' ? desc(moderationItems.reports) : desc(moderationItems.decidedAt))
       .limit(200)
@@ -337,6 +512,8 @@ export class ModerationService {
         current: this.currentText(r.kind, r.ref)?.text ?? null,
         source: r.source,
         term: r.term,
+        // What an admin edits by hand (decision 287), open items only.
+        ...(r.status === 'open' ? { fields: this.fields(r.kind, r.ref) } : {}),
         reports: r.reports,
         reasons: reasons
           .filter((x) => x.itemId === r.id)

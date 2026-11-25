@@ -15,7 +15,7 @@ import { I18n, TPipe } from '../core/i18n';
 import type { UserNotice } from '../core/types';
 
 /** Kinds with a text; other kinds are marked seen without showing anything. */
-const KNOWN = new Set(['blueprint-apology', 'mod-reset', 'mod-warn', 'mod-textban']);
+const KNOWN = new Set(['blueprint-apology', 'mod-reset', 'mod-edit', 'mod-warn', 'mod-textban']);
 
 /**
  * Messages the website shows once after login (e.g. the apology for blueprints a full inventory

@@ -62,6 +62,10 @@ export const ERRORS_DE: Record<string, string> = {
   'a text ban needs days': 'Eine Textsperre braucht eine Anzahl Tage.',
   'unknown kind {kind}': 'Unbekannte Art {kind}.',
   'no free name': 'Kein freier Name gefunden.',
+  'the text must have {min} to {max} characters{ascii}':
+    'Der Text braucht {min} bis {max} Zeichen{ascii}.',
+  'the lines changed meanwhile: reload':
+    'Die Zeilen haben sich inzwischen geändert: bitte neu laden.',
   'players of this tournament still play in {name}':
     'Spieler dieses Turniers spielen gerade noch in {name}.',
   'you are signed up for {name} at the same time':

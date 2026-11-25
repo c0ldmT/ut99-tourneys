@@ -78,6 +78,38 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
               }
             </p>
           }
+          @if (editing()?.id === it.id) {
+            @let e = editing()!;
+            <form class="editf" (ngSubmit)="saveEdit()">
+              @if (e.lines) {
+                @for (l of e.lines; track $index; let i = $index) {
+                  <input
+                    [name]="'line' + i"
+                    maxlength="120"
+                    [(ngModel)]="e.lines[i]"
+                    [placeholder]="'mod.lineEmpty' | t"
+                  />
+                }
+              } @else if (e.name !== undefined) {
+                <label
+                  >{{ 'mod.f.tag' | t }}
+                  <input name="tag" maxlength="20" [(ngModel)]="e.tag" />
+                </label>
+                <label
+                  >{{ 'mod.f.name' | t }}
+                  <input name="name" maxlength="40" [(ngModel)]="e.name" />
+                </label>
+              } @else {
+                <input name="text" maxlength="200" [(ngModel)]="e.text" />
+              }
+              <div class="acts">
+                <button type="submit" class="primary" [disabled]="busy()">
+                  {{ 'common.save' | t }}
+                </button>
+                <button type="button" (click)="editing.set(null)">{{ 'common.cancel' | t }}</button>
+              </div>
+            </form>
+          }
           @if (it.status === 'open') {
             <div class="acts">
               <button type="button" (click)="decide(it, 'ok')" [disabled]="busy()">
@@ -91,6 +123,11 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
               >
                 {{ 'mod.reset' | t }}
               </button>
+              @if (auth.me()?.isAdmin && it.fields) {
+                <button type="button" (click)="startEdit(it)" [disabled]="busy()">
+                  {{ 'mod.edit' | t }}
+                </button>
+              }
               @if (it.author; as a) {
                 @if (!a.moderator || auth.me()?.isAdmin) {
                   <span class="sep"></span>
@@ -271,6 +308,16 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
       align-items: center;
       margin-top: 10px;
     }
+    .editf {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .editf label {
+      display: grid;
+      gap: 4px;
+      font-weight: 600;
+    }
     .acts select {
       width: auto;
     }
@@ -311,6 +358,29 @@ export class ModerationPage {
   protected readonly lists = signal<ModSettings | null>(null);
   protected readonly log = signal<ModLogEntry[]>([]);
   protected readonly busy = signal(false);
+  /** The item an admin edits by hand (decision 287): a copy of its fields. */
+  protected readonly editing = signal<{
+    id: string;
+    text?: string;
+    name?: string;
+    tag?: string;
+    lines?: string[];
+  } | null>(null);
+
+  protected startEdit(it: ModItem) {
+    const f = it.fields ?? {};
+    this.editing.set({ id: it.id, ...f, ...(f.lines ? { lines: [...f.lines] } : {}) });
+  }
+
+  protected saveEdit() {
+    const e = this.editing();
+    if (!e) return;
+    const { id, ...fields } = e;
+    return this.act(async () => {
+      await this.api.modEdit(id, fields);
+      this.editing.set(null);
+    });
+  }
   protected readonly scanned = signal<{ checked: number; queued: number } | null>(null);
   protected textDays = 7;
   protected banDays = 7;

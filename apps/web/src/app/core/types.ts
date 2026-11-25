@@ -124,7 +124,9 @@ export interface ModItem {
   term: string | null;
   reports: number;
   reasons: { by: string | null; reason: string; at: string }[];
-  status: 'open' | 'ok' | 'reset';
+  status: 'open' | 'ok' | 'reset' | 'edited';
+  /** What an admin edits by hand (open items, decision 287). */
+  fields?: { text?: string; name?: string; tag?: string; lines?: string[] } | null;
   createdAt: string;
   decidedAt: string | null;
   decidedBy: string | null;
