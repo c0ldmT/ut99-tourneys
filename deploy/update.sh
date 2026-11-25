@@ -19,7 +19,11 @@
 #   SSH_OPTS    extra options for ssh/scp, e.g. "-p 2222"
 # Options: --target, --bundle, --mod-dir, --ut, --remote-dir, --no-backup, --force, --dry-run,
 #          --env FILE, -h
+# Started with sh (dash): continue in bash, the script needs it.
+if [ -z "${BASH_VERSION:-}" ]; then exec bash "$0" "$@"; fi
 set -euo pipefail
+# Never end silently: name the line of a failed command.
+trap 'rc=$?; printf "\033[1;31mError: line %s failed (exit %s): %s\033[0m\n" "$LINENO" "$rc" "$BASH_COMMAND" >&2' ERR
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/.." && pwd)"
@@ -39,7 +43,7 @@ while [ $# -gt 0 ]; do
     --force) O_FORCE=1; shift ;;
     --dry-run) DRY=1; shift ;;
     --env) ENV_FILE="$2"; shift 2 ;;
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,21p' "$0"; exit 0 ;;
     *) echo "unknown option $1 (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -69,11 +73,13 @@ SSH_OPTS="${SSH_OPTS:-}"
 
 [ -n "$TARGET" ] || die "no TARGET: --target vps, or TARGET=... in $ENV_FILE"
 if [ -z "$BUNDLE" ]; then
-  BUNDLE="$(ls -1t "$ROOT"/release/tourney-*.tar.gz 2>/dev/null | head -n1 || true)"
+  BUNDLE="$(ls -1t "$ROOT"/release/tourney-*.tar.gz 2>/dev/null | sed -n 1p || true)"
   [ -n "$BUNDLE" ] || die "no release/tourney-*.tar.gz: run pnpm release first (or --bundle FILE)"
 fi
 [ -f "$BUNDLE" ] || die "bundle $BUNDLE not found"
-TOP="$(tar -tzf "$BUNDLE" | head -n1 | cut -d/ -f1)"
+# sed reads the whole list: "| head -n1" closes the pipe early, tar dies of SIGPIPE and pipefail ends the
+# script without a word (large bundles).
+TOP="$(tar -tzf "$BUNDLE" | sed -n '1s|/.*||p')"
 case "$TOP" in tourney-*) ;; *) die "$BUNDLE is not a release bundle (pnpm release)" ;; esac
 case "$REMOTE_DIR" in /*|*..*|*\'*|'') die "REMOTE_DIR is a folder name in the home folder, e.g. tourney-update" ;; esac
 VERSION="$(tar -xzOf "$BUNDLE" "$TOP/VERSION" 2>/dev/null | tr -d '\r\n' || echo '?')"

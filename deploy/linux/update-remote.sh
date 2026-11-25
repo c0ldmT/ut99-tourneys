@@ -6,6 +6,7 @@
 # 3. install.sh of the new bundle (program, npm packages, services; settings and data stay),
 # 4. the mod from <folder>/mod (install-ut.sh: every game server uses it), 5. checks.
 set -euo pipefail
+trap 'rc=$?; printf "\033[1;31mError: line %s failed (exit %s): %s\033[0m\n" "$LINENO" "$rc" "$BASH_COMMAND" >&2' ERR
 
 DIR="$1"
 BUNDLE="$2"
@@ -50,7 +51,8 @@ fi
 
 # --- 2. unpack, backup -------------------------------------------------------------------------
 say "Unpacking $BUNDLE"
-TOP="$(tar -tzf "$DIR/$BUNDLE" | head -n1 | cut -d/ -f1)"
+# sed reads the whole list (head would let tar die of SIGPIPE, see update.sh).
+TOP="$(tar -tzf "$DIR/$BUNDLE" | sed -n '1s|/.*||p')"
 rm -rf "${DIR:?}/$TOP"
 tar -xzf "$DIR/$BUNDLE" -C "$DIR"
 NEW="$DIR/$TOP"

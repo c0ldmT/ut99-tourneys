@@ -104,7 +104,7 @@ for d in website bridge; do
 done
 
 # --- settings --------------------------------------------------------------------------------
-random() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32; }
+random() { head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-32; }
 
 if [ "$WITH_WEBSITE" = 1 ] && [ ! -f "$CONF_DIR/website.env" ]; then
   say "Settings $CONF_DIR/website.env"
