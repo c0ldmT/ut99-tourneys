@@ -13,3 +13,5 @@ mods/**/System/*.u
 mods/**/build/
 out-tsc/
 release/
+# Settings of deploy/update.sh (server address)
+deploy/update.env

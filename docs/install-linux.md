@@ -172,9 +172,27 @@ With ufw: `sudo ufw allow 7777:7779/udp && sudo ufw allow 80,443/tcp`.
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Status | `systemctl status tourney-website tourney-bridge --no-pager`                                                                                                                                             |
 | Logs   | `journalctl -u tourney-website -f`, `journalctl -u tourney-bridge -f`, UT: `/opt/ut99/System/Tourney.log`                                                                                                |
-| Update | unpack the new bundle and run `sudo bash deploy/linux/install.sh` again (settings and data are kept)                                                                                                     |
+| Update | from your PC: `bash deploy/update.sh` ([below](#updates-from-your-pc)); on the server: unpack the new bundle and run `sudo bash deploy/linux/install.sh` again (settings and data are kept)              |
 | Backup | nightly to `/var/backups/tourney` (timer `tourney-backup.timer`, 14 kept); now: `sudo bash /opt/tourney/deploy/linux/backup.sh`; restore and moving: [move-server.md](move-server.md)                    |
 | Remove | `sudo systemctl disable --now tourney-bridge tourney-website tourney-backup.timer`, delete `/opt/tourney`, `/etc/tourney`, `/var/lib/tourney`, the units in `/etc/systemd/system` and the user `tourney` |
+
+## Updates from your PC
+
+`deploy/update.sh` updates a running installation from your PC (Linux, WSL or macOS with ssh): it copies the
+release bundle (and the mod if you give it), refuses while tournaments run, makes a backup, runs `install.sh`
+of the new bundle (settings and data stay), installs the mod for every game server and checks that the website
+answers.
+
+```sh
+pnpm release
+cp deploy/update.env.example deploy/update.env     # once: TARGET (ssh host), MOD_DIR, ...
+bash deploy/update.sh                              # website and bridges
+bash deploy/update.sh --mod-dir /mnt/c/UnrealTournament/System   # also the mod (built on the PC)
+```
+
+Options: `--target`, `--bundle`, `--mod-dir`, `--ut`, `--no-backup`, `--force` (update while tournaments run),
+`--dry-run`, `--env FILE`; see `bash deploy/update.sh --help`. The mod must come from the same checkout as the
+bundle (its version is checked). `sudo` asks for your password on the server once.
 
 ## Without the script
 

@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- deploy/update.sh: updates a running installation from the PC (bundle, optionally the mod, backup first, checks) (decision 288).
 - Moderation: admins correct a text by hand (name, team name and tag, bot name, single chat lines, trade message) (decision 287).
 - Premium and elite packs: higher base prices, a much flatter rise with the index (index^0.4 above 1; elite at index 5: 26,650 instead of 50,000) (decision 286, patch note 286).
 - Header: administration in one dropdown, account (profile, language, logout) behind the avatar, the bar keeps one line (decision 285).
