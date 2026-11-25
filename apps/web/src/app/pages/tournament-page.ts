@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -46,6 +47,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
   selector: 'app-tournament-page',
   imports: [
     FormsModule,
+    NgTemplateOutlet,
     RouterLink,
     TPipe,
     BracketView,
@@ -167,319 +169,349 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         </div>
       }
 
-      <div class="grid two">
-        <!-- Taking part -->
-        @if (
-          t.phase !== 'finished' &&
-          t.phase !== 'aborted' &&
-          !(teamMode() && !udtMode() && t.phase === 'draft')
-        ) {
-          <div class="card" [class.udt-signup]="udtMode() && t.phase === 'draft'">
-            @if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
-              <!-- League games: the league sets both clubs, draws and starts (decision 234). -->
-              <h2><na-udt-mark [size]="24" /> {{ 'tp.league.title' | t }}</h2>
-              @if (t.league; as lg) {
-                <p class="lg-vs">
-                  <b>{{ lg.home }}</b> <span class="muted">vs</span> <b>{{ lg.away }}</b>
-                </p>
-                <p class="muted small">
-                  @if (lg.matchday) {
-                    {{ 'league.matchday' | t: { n: lg.matchday } }} ·
-                  }
-                  {{ 'league.kind.' + lg.kind | t }}
-                  @if (t.scheduledAt) {
-                    · {{ i18n.date(t.scheduledAt) }}
-                  }
-                </p>
-                <p class="small">
-                  {{ (lg.mine ? 'tp.league.mine' : 'tp.league.text') | t }}
-                </p>
-              } @else {
-                <p class="small">{{ 'tp.league.text' | t }}</p>
-              }
-              <div class="row">
-                @if (t.league?.mine) {
-                  <a class="btn primary udt" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
-                }
-                <a class="btn" routerLink="/udt/league/day">{{ 'tp.league.toDay' | t }}</a>
-              </div>
-            } @else if (t.phase === 'draft' && udtMode()) {
-              <h2><na-udt-mark [size]="24" /> {{ 'tp.udtSignup' | t }}</h2>
-              <p class="muted small">{{ 'tp.udtHint' | t }}</p>
-              @if (t.udt?.finale) {
-                <p>{{ 'tp.udtFinale' | t }}</p>
-              } @else {
-                <p class="muted small">
-                  {{ 'tp.udtRegistered' | t: { n: t.registrations.length, size: t.settings.size } }}
-                </p>
-                @if (
-                  !t.me.registered && t.registrations.length >= t.settings.size && aiTeams(t) > 0
-                ) {
-                  <p class="small">{{ 'tp.udtAiFull' | t }}</p>
-                }
-                @if (t.udt?.ticket) {
-                  <p class="small">{{ 'tp.udtTicket' | t }}</p>
-                }
-                @if (t.signup?.busyIn?.length) {
-                  <p class="small" style="color: var(--hot-text)">
-                    {{ 'udt.events.busyIn' | t: { list: t.signup!.busyIn!.join(', ') } }}
-                  </p>
-                }
-                @if (t.me.registered) {
-                  <p>{{ 'tp.udtIn' | t }}</p>
-                  <div class="row">
-                    <button (click)="act(api.unregister(t.id))" [disabled]="busy()">
-                      {{ 'tp.udtWithdraw' | t }}
-                    </button>
-                    <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
-                  </div>
-                } @else if (
-                  t.registrationOpen && (t.registrations.length < t.settings.size || aiTeams(t) > 0)
-                ) {
-                  <div class="row">
-                    <button
-                      class="primary udt"
-                      (click)="act(api.register(t.id))"
-                      [disabled]="busy()"
-                    >
-                      {{ 'tp.udtEnter' | t }}
-                    </button>
-                    <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
-                  </div>
-                } @else {
-                  <p class="muted">{{ 'tp.registrationClosed' | t }}</p>
-                }
-              }
-            } @else if (t.phase === 'draft') {
-              <h2>{{ 'tp.registration' | t }}</h2>
-              <p class="muted small">
-                {{ 'tp.registered' | t: { n: t.registrations.length, size: t.settings.size } }}
+      <!-- The taking-part card: in the grid before the start, in the side column while live. -->
+      <ng-template #partCard>
+        <div class="card" [class.udt-signup]="udtMode() && t.phase === 'draft'">
+          @if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
+            <!-- League games: the league sets both clubs, draws and starts (decision 234). -->
+            <h2><na-udt-mark [size]="24" /> {{ 'tp.league.title' | t }}</h2>
+            @if (t.league; as lg) {
+              <p class="lg-vs">
+                <b>{{ lg.home }}</b> <span class="muted">vs</span> <b>{{ lg.away }}</b>
               </p>
+              <p class="muted small">
+                @if (lg.matchday) {
+                  {{ 'league.matchday' | t: { n: lg.matchday } }} ·
+                }
+                {{ 'league.kind.' + lg.kind | t }}
+                @if (t.scheduledAt) {
+                  · {{ i18n.date(t.scheduledAt) }}
+                }
+              </p>
+              <p class="small">
+                {{ (lg.mine ? 'tp.league.mine' : 'tp.league.text') | t }}
+              </p>
+            } @else {
+              <p class="small">{{ 'tp.league.text' | t }}</p>
+            }
+            <div class="row">
+              @if (t.league?.mine) {
+                <a class="btn primary udt" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
+              }
+              <a class="btn" routerLink="/udt/league/day">{{ 'tp.league.toDay' | t }}</a>
+            </div>
+          } @else if (t.phase === 'draft' && udtMode()) {
+            <h2><na-udt-mark [size]="24" /> {{ 'tp.udtSignup' | t }}</h2>
+            <p class="muted small">{{ 'tp.udtHint' | t }}</p>
+            @if (t.udt?.finale) {
+              <p>{{ 'tp.udtFinale' | t }}</p>
+            } @else {
+              <p class="muted small">
+                {{ 'tp.udtRegistered' | t: { n: t.registrations.length, size: t.settings.size } }}
+              </p>
+              @if (
+                !t.me.registered && t.registrations.length >= t.settings.size && aiTeams(t) > 0
+              ) {
+                <p class="small">{{ 'tp.udtAiFull' | t }}</p>
+              }
+              @if (t.udt?.ticket) {
+                <p class="small">{{ 'tp.udtTicket' | t }}</p>
+              }
+              @if (t.signup?.busyIn?.length) {
+                <p class="small" style="color: var(--hot-text)">
+                  {{ 'udt.events.busyIn' | t: { list: t.signup!.busyIn!.join(', ') } }}
+                </p>
+              }
               @if (t.me.registered) {
-                <p>{{ 'tp.youAreIn' | t }}</p>
-                <button (click)="act(api.unregister(t.id))" [disabled]="busy()">
-                  {{ 'tp.withdraw' | t }}
-                </button>
-              } @else if (t.registrationOpen && t.registrations.length < t.settings.size) {
-                <button class="primary" (click)="act(api.register(t.id))" [disabled]="busy()">
-                  {{ 'tp.register' | t }}
-                </button>
+                <p>{{ 'tp.udtIn' | t }}</p>
+                <div class="row">
+                  <button (click)="act(api.unregister(t.id))" [disabled]="busy()">
+                    {{ 'tp.udtWithdraw' | t }}
+                  </button>
+                  <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
+                </div>
+              } @else if (
+                t.registrationOpen && (t.registrations.length < t.settings.size || aiTeams(t) > 0)
+              ) {
+                <div class="row">
+                  <button class="primary udt" (click)="act(api.register(t.id))" [disabled]="busy()">
+                    {{ 'tp.udtEnter' | t }}
+                  </button>
+                  <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
+                </div>
               } @else {
                 <p class="muted">{{ 'tp.registrationClosed' | t }}</p>
               }
+            }
+          } @else if (t.phase === 'draft') {
+            <h2>{{ 'tp.registration' | t }}</h2>
+            <p class="muted small">
+              {{ 'tp.registered' | t: { n: t.registrations.length, size: t.settings.size } }}
+            </p>
+            @if (t.me.registered) {
+              <p>{{ 'tp.youAreIn' | t }}</p>
+              <button (click)="act(api.unregister(t.id))" [disabled]="busy()">
+                {{ 'tp.withdraw' | t }}
+              </button>
+            } @else if (t.registrationOpen && t.registrations.length < t.settings.size) {
+              <button class="primary" (click)="act(api.register(t.id))" [disabled]="busy()">
+                {{ 'tp.register' | t }}
+              </button>
             } @else {
-              <h2>{{ 'tp.join' | t }}</h2>
-              @if (t.me.hasAccess) {
-                @if (t.connectAddress) {
-                  @if (localAddress(t)) {
-                    <p class="error small">
-                      {{ 'tp.localAddress' | t: { addr: t.connectAddress } }}
-                    </p>
-                  }
-                  <p class="muted small">{{ 'tp.connectHint' | t }}</p>
+              <p class="muted">{{ 'tp.registrationClosed' | t }}</p>
+            }
+          } @else {
+            <h2>{{ 'tp.join' | t }}</h2>
+            @if (t.me.hasAccess) {
+              @if (t.connectAddress) {
+                @if (localAddress(t)) {
+                  <p class="error small">
+                    {{ 'tp.localAddress' | t: { addr: t.connectAddress } }}
+                  </p>
+                }
+                <p class="muted small">{{ 'tp.connectHint' | t }}</p>
+                <div class="connect">
+                  <code #cmd>{{ connectCommand(t) }}</code>
+                  <button
+                    class="icon"
+                    (click)="copy('cmd', connectCommand(t), cmd)"
+                    [title]="copyLabel('cmd') | t"
+                    [attr.aria-label]="copyLabel('cmd') | t"
+                  >
+                    <na-icon [name]="copyLabel('cmd') === 'common.copied' ? 'check' : 'copy'" />
+                  </button>
+                </div>
+                @if (longToken()) {
+                  <p class="muted small">
+                    {{ 'tp.longToken' | t }} <a routerLink="/profile">{{ 'tp.toProfile' | t }}</a>
+                  </p>
+                }
+                <details class="linux">
+                  <summary>{{ 'tp.linuxTitle' | t }}</summary>
+                  <p class="muted small">{{ 'tp.linuxHint' | t }}</p>
+                  <label class="small"
+                    >{{ 'tp.linuxDir' | t }}
+                    <input
+                      class="mono"
+                      [value]="utDir()"
+                      (input)="setUtDir($any($event.target).value)"
+                      placeholder="~/Games/UT99/System"
+                  /></label>
                   <div class="connect">
-                    <code #cmd>{{ connectCommand(t) }}</code>
+                    <code #lin>{{ linuxCommand(t) }}</code>
                     <button
                       class="icon"
-                      (click)="copy('cmd', connectCommand(t), cmd)"
-                      [title]="copyLabel('cmd') | t"
-                      [attr.aria-label]="copyLabel('cmd') | t"
+                      (click)="copy('linux', linuxCommand(t), lin)"
+                      [title]="copyLabel('linux') | t"
+                      [attr.aria-label]="copyLabel('linux') | t"
                     >
-                      <na-icon [name]="copyLabel('cmd') === 'common.copied' ? 'check' : 'copy'" />
+                      <na-icon [name]="copyLabel('linux') === 'common.copied' ? 'check' : 'copy'" />
                     </button>
                   </div>
-                  @if (longToken()) {
-                    <p class="muted small">
-                      {{ 'tp.longToken' | t }} <a routerLink="/profile">{{ 'tp.toProfile' | t }}</a>
-                    </p>
-                  }
+                  <p class="muted small">{{ 'tp.linuxNote' | t }}</p>
+                </details>
+                @if (t.lanes?.length) {
+                  <!-- Parallel matches (decision 291): spectators join the extra servers too. -->
                   <details class="linux">
-                    <summary>{{ 'tp.linuxTitle' | t }}</summary>
-                    <p class="muted small">{{ 'tp.linuxHint' | t }}</p>
-                    <label class="small"
-                      >{{ 'tp.linuxDir' | t }}
-                      <input
-                        class="mono"
-                        [value]="utDir()"
-                        (input)="setUtDir($any($event.target).value)"
-                        placeholder="~/Games/UT99/System"
-                    /></label>
-                    <div class="connect">
-                      <code #lin>{{ linuxCommand(t) }}</code>
-                      <button
-                        class="icon"
-                        (click)="copy('linux', linuxCommand(t), lin)"
-                        [title]="copyLabel('linux') | t"
-                        [attr.aria-label]="copyLabel('linux') | t"
-                      >
-                        <na-icon
-                          [name]="copyLabel('linux') === 'common.copied' ? 'check' : 'copy'"
-                        />
-                      </button>
-                    </div>
-                    <p class="muted small">{{ 'tp.linuxNote' | t }}</p>
-                  </details>
-                  @if (t.lanes?.length) {
-                    <!-- Parallel matches (decision 291): spectators join the extra servers too. -->
-                    <details class="linux">
-                      <summary>{{ 'tp.lanesTitle' | t: { n: t.lanes!.length } }}</summary>
-                      <p class="muted small">{{ 'tp.lanesHint' | t }}</p>
-                      @for (l of t.lanes!; track l.agentId) {
-                        <p class="small">
-                          <span class="dot" [class.on]="l.online"></span> <b>{{ l.name }}</b>
-                          @if (laneMatch(l.agentId); as m) {
-                            · {{ m }}
-                          }
-                        </p>
-                        @if (l.connectAddress) {
-                          <div class="connect">
-                            <code #lc>{{ laneCommand(l.connectAddress) }}</code>
-                            <button
-                              class="icon"
-                              (click)="copy('lane-' + l.agentId, laneCommand(l.connectAddress), lc)"
-                              [title]="copyLabel('lane-' + l.agentId) | t"
-                              [attr.aria-label]="copyLabel('lane-' + l.agentId) | t"
-                            >
-                              <na-icon
-                                [name]="
-                                  copyLabel('lane-' + l.agentId) === 'common.copied'
-                                    ? 'check'
-                                    : 'copy'
-                                "
-                              />
-                            </button>
-                          </div>
+                    <summary>{{ 'tp.lanesTitle' | t: { n: t.lanes!.length } }}</summary>
+                    <p class="muted small">{{ 'tp.lanesHint' | t }}</p>
+                    @for (l of t.lanes!; track l.agentId) {
+                      <p class="small">
+                        <span class="dot" [class.on]="l.online"></span> <b>{{ l.name }}</b>
+                        @if (laneMatch(l.agentId); as m) {
+                          · {{ m }}
                         }
+                      </p>
+                      @if (l.connectAddress) {
+                        <div class="connect">
+                          <code #lc>{{ laneCommand(l.connectAddress) }}</code>
+                          <button
+                            class="icon"
+                            (click)="copy('lane-' + l.agentId, laneCommand(l.connectAddress), lc)"
+                            [title]="copyLabel('lane-' + l.agentId) | t"
+                            [attr.aria-label]="copyLabel('lane-' + l.agentId) | t"
+                          >
+                            <na-icon
+                              [name]="
+                                copyLabel('lane-' + l.agentId) === 'common.copied'
+                                  ? 'check'
+                                  : 'copy'
+                              "
+                            />
+                          </button>
+                        </div>
                       }
-                    </details>
-                  }
-                  <p class="muted small">
-                    {{ (t.me.entrantId ? 'tp.asPlayer' : 'tp.asSpectator') | t }}
-                  </p>
-                } @else {
-                  <p class="muted">{{ 'tp.noAddress' | t }}</p>
+                    }
+                  </details>
                 }
-                @if (t.me.watching) {
-                  <button class="link small" (click)="act(api.unwatch(t.id))">
-                    {{ 'tp.unwatch' | t }}
-                  </button>
-                }
+                <p class="muted small">
+                  {{ (t.me.entrantId ? 'tp.asPlayer' : 'tp.asSpectator') | t }}
+                </p>
               } @else {
-                <p class="muted small">{{ 'tp.watchHint' | t }}</p>
-                <button class="primary" (click)="act(api.watch(t.id))" [disabled]="busy()">
-                  {{ 'tp.watch' | t }}
+                <p class="muted">{{ 'tp.noAddress' | t }}</p>
+              }
+              @if (t.me.watching) {
+                <button class="link small" (click)="act(api.unwatch(t.id))">
+                  {{ 'tp.unwatch' | t }}
                 </button>
               }
+            } @else {
+              <p class="muted small">{{ 'tp.watchHint' | t }}</p>
+              <button class="primary" (click)="act(api.watch(t.id))" [disabled]="busy()">
+                {{ 'tp.watch' | t }}
+              </button>
             }
-          </div>
-        }
+          }
+        </div>
+      </ng-template>
 
-        <!-- Live -->
+      @if (liveLayout()) {
         @if (current(); as cm) {
-          <div class="livewrap">
+          <!-- Live: the matches being played (a list with parallel matches, decision 291) and
+               the chosen one with its bets and its server. -->
+          <section class="lhub" [class.multi]="playing().length > 1">
             @if (playing().length > 1) {
-              <!-- Parallel matches (decision 291): one tab per match being played. -->
-              <div class="ltabs" role="tablist" [attr.aria-label]="'tp.parallelTabs' | t">
-                @for (m of playing(); track m.matchId) {
-                  <button
-                    type="button"
-                    role="tab"
-                    [class.on]="m.matchId === cm.matchId"
-                    [attr.aria-selected]="m.matchId === cm.matchId"
-                    (click)="selected.set(m.matchId)"
-                  >
-                    <span class="lt1"
-                      >{{ m.matchId }} · {{ name(m.entrants[0]) }} – {{ name(m.entrants[1]) }}</span
+              <div class="card lh-list">
+                <div class="lh-title">
+                  <span class="badge running">Live</span>
+                  {{ 'tp.liveCount' | t: { n: playing().length } }}
+                </div>
+                <div class="lh-rows" role="tablist" [attr.aria-label]="'tp.parallelTabs' | t">
+                  @for (m of playing(); track m.matchId) {
+                    <button
+                      type="button"
+                      role="tab"
+                      class="lh-row"
+                      [class.on]="m.matchId === cm.matchId"
+                      [attr.aria-selected]="m.matchId === cm.matchId"
+                      (click)="selected.set(m.matchId)"
                     >
-                    <span class="lt2 muted"
-                      >{{ serverOf(m) }}
-                      @if (tabScore(m); as sc) {
-                        · {{ sc }}
-                      }
-                    </span>
-                  </button>
-                }
+                      <span class="lr-top">
+                        <span class="mono">{{ m.matchId }}</span>
+                        <span class="lr-srv"
+                          ><span class="dot" [class.on]="isLive(m.matchId)"></span
+                          >{{ serverOf(m) }}</span
+                        >
+                      </span>
+                      <span class="lr-vs">
+                        <span class="lr-n">{{ name(m.entrants[0]) }}</span>
+                        <b class="mono">{{ tabScore(m) || 'vs' }}</b>
+                        <span class="lr-n r">{{ name(m.entrants[1]) }}</span>
+                      </span>
+                    </button>
+                  }
+                </div>
               </div>
             }
-            <app-live-mini
-              [link]="['/t', t.id, 'm', cm.matchId]"
-              [matchId]="cm.matchId"
-              [gameText]="
-                bestOfCurrent() > 1 ? ('tp.game' | t: { n: cm.game, of: bestOfCurrent() }) : ''
-              "
-              [sides]="miniSides()"
-              [status]="liveStatus()"
-              [clock]="liveClock()"
-              [limits]="race() ? '' : liveLimits()"
-              [players]="liveState()?.players ?? null"
-              [race]="race()"
-              [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
-              [delayed]="liveDelay()"
-            />
-          </div>
-        } @else if (t.phase === 'checkIn') {
-          <div class="card">
-            <h2>{{ 'tp.checkIn' | t }}</h2>
-            @if (teamMode()) {
-              <p class="small">
-                {{
-                  'tp.checkedInTeams'
-                    | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
-                }}
-              </p>
-            } @else {
-              <p class="small">
-                {{
-                  'tp.checkedIn'
-                    | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
-                }}
-              </p>
-            }
-            <ul class="small">
-              @for (h of humans(); track h.id) {
-                <li>
-                  {{ h.displayName }}
-                  @if (t.projection?.checkedIn?.includes(h.id)) {
-                    ✓
-                  }
-                </li>
+            <div class="lh-main" [class.duo]="playing().length === 1 && !!betsOf(cm.matchId)">
+              <app-live-mini
+                [link]="['/t', t.id, 'm', cm.matchId]"
+                [matchId]="cm.matchId"
+                [gameText]="
+                  bestOfCurrent() > 1 ? ('tp.game' | t: { n: cm.game, of: bestOfCurrent() }) : ''
+                "
+                [sides]="miniSides()"
+                [status]="liveStatus()"
+                [clock]="liveClock()"
+                [limits]="race() ? '' : liveLimits()"
+                [players]="liveState()?.players ?? null"
+                [race]="race()"
+                [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
+                [delayed]="liveDelay()"
+              />
+              @if (betsOf(cm.matchId); as m) {
+                <div class="card lh-bets">
+                  <div class="spread">
+                    <h3>{{ 'bets.title' | t }} · {{ m.matchId }}</h3>
+                    <a class="small" [routerLink]="['/t', t.id, 'm', m.matchId]">{{
+                      'bets.closedNow' | t
+                    }}</a>
+                  </div>
+                  <app-bet-columns [match]="m" [names]="entrantNames()" />
+                </div>
               }
-            </ul>
-          </div>
+              @if (cm.server && t.me.hasAccess && addressOf(cm); as addr) {
+                <!-- A match on an extra server: its own connect command (the side has the main one). -->
+                <div class="card lh-watch small">
+                  <span class="muted">{{ 'tp.watchOn' | t: { server: serverOf(cm) } }}</span>
+                  <div class="connect">
+                    <code #lw>{{ laneCommand(addr) }}</code>
+                    <button
+                      class="icon"
+                      (click)="copy('watch', laneCommand(addr), lw)"
+                      [title]="copyLabel('watch') | t"
+                      [attr.aria-label]="copyLabel('watch') | t"
+                    >
+                      <na-icon [name]="copyLabel('watch') === 'common.copied' ? 'check' : 'copy'" />
+                    </button>
+                  </div>
+                </div>
+              }
+            </div>
+          </section>
         }
-      </div>
+      } @else {
+        <div class="grid two">
+          @if (
+            t.phase !== 'finished' &&
+            t.phase !== 'aborted' &&
+            !(teamMode() && !udtMode() && t.phase === 'draft')
+          ) {
+            <ng-container *ngTemplateOutlet="partCard" />
+          }
+          @if (t.phase === 'checkIn') {
+            <div class="card">
+              <h2>{{ 'tp.checkIn' | t }}</h2>
+              @if (teamMode()) {
+                <p class="small">
+                  {{
+                    'tp.checkedInTeams'
+                      | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
+                  }}
+                </p>
+              } @else {
+                <p class="small">
+                  {{
+                    'tp.checkedIn'
+                      | t: { n: t.projection?.checkedIn?.length ?? 0, total: humans().length }
+                  }}
+                </p>
+              }
+              <ul class="small">
+                @for (h of humans(); track h.id) {
+                  <li>
+                    {{ h.displayName }}
+                    @if (t.projection?.checkedIn?.includes(h.id)) {
+                      ✓
+                    }
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
 
       @if (t.projection?.bracket; as b) {
-        <div class="card">
-          <app-bracket
-            [bracket]="b"
-            [entrants]="t.projection!.entrants"
-            [games]="t.projection!.games"
-            [currentMatchId]="current()?.matchId"
-            [liveMatchIds]="liveMatchIds()"
-            [live]="liveNow()"
-            [lives]="livesById()"
-            [myEntrantId]="t.me.entrantId"
-            [race]="race()"
-            [currentRuns]="current()?.runs ?? []"
-            [ratings]="t.projection!.seedRatings"
-            [betOpen]="betOpen()"
-            (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
-          />
-        </div>
-        <div class="cols" [class.solo]="!sideActive()">
+        <div class="cols" [class.solo]="!sideActive() && !liveLayout()">
           <div class="main">
-            @for (m of runningBets(); track m.matchId) {
-              <div class="card">
-                <div class="spread">
-                  <h2>{{ 'bets.title' | t }} · {{ m.matchId }}</h2>
-                  <a class="small" [routerLink]="['/t', t.id, 'm', m.matchId]">{{
-                    'bets.closedNow' | t
-                  }}</a>
-                </div>
-                <app-bet-columns [match]="m" [names]="entrantNames()" />
-              </div>
-            }
+            <div class="card">
+              <app-bracket
+                [bracket]="b"
+                [entrants]="t.projection!.entrants"
+                [games]="t.projection!.games"
+                [currentMatchId]="current()?.matchId"
+                [liveMatchIds]="liveMatchIds()"
+                [live]="liveNow()"
+                [lives]="livesById()"
+                [myEntrantId]="t.me.entrantId"
+                [race]="race()"
+                [currentRuns]="current()?.runs ?? []"
+                [ratings]="t.projection!.seedRatings"
+                [betOpen]="betOpen()"
+                (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
+              />
+            </div>
             @if (race() && raceRows().length) {
               <div class="card">
                 <h2>{{ 'race.results' | t }}</h2>
@@ -610,7 +642,10 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
               </div>
             }
           </div>
-          <aside class="sidecol">
+          <aside class="sidecol" [class.tall]="liveLayout()">
+            @if (liveLayout()) {
+              <ng-container *ngTemplateOutlet="partCard" />
+            }
             <app-bet-panel
               [tournament]="t"
               (openIds)="betOpen.set($event)"
@@ -915,41 +950,109 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
-    .livewrap {
+    /* Live: list of the matches being played and the chosen one (decision 291/293). */
+    .lhub {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+      margin-bottom: 18px;
+      align-items: start;
+    }
+    .lhub.multi {
+      grid-template-columns: 300px minmax(0, 1fr);
+    }
+    .lh-main {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 12px;
       min-width: 0;
-      display: flex;
-      flex-direction: column;
     }
-    .ltabs {
+    .lh-main > .card {
+      margin: 0;
+    }
+    /* One match: live and its bets side by side on wide screens. */
+    @media (min-width: 1100px) {
+      .lh-main.duo {
+        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+        align-items: stretch;
+      }
+    }
+    .lh-list {
+      margin: 0;
+      padding: 14px;
+    }
+    .lh-title {
       display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .lh-rows {
+      display: grid;
       gap: 6px;
-      overflow-x: auto;
-      margin-bottom: 8px;
     }
-    .ltabs button {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 2px;
-      flex: 0 0 auto;
-      max-width: 260px;
-      padding: 6px 10px;
+    .lh-row {
+      display: grid;
+      justify-content: stretch;
+      gap: 4px;
+      width: 100%;
+      min-height: 0;
+      padding: 8px 10px;
       border-radius: 10px;
       text-align: left;
+      font-weight: 400;
     }
-    .ltabs button.on {
+    .lh-row.on {
       border-color: var(--accent);
       box-shadow: inset 0 0 0 1px var(--accent);
     }
-    .lt1 {
-      font-weight: 600;
-      white-space: nowrap;
+    .lr-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 0.78rem;
+      color: var(--text-2);
+    }
+    .lr-srv {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 100%;
+      white-space: nowrap;
     }
-    .lt2 {
-      font-size: 0.78rem;
+    .lr-vs {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+      gap: 8px;
+      align-items: baseline;
+    }
+    .lr-n {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .lr-n.r {
+      text-align: right;
+    }
+    .lh-bets h3 {
+      margin: 0;
+      font-size: 1rem;
+    }
+    .lh-watch {
+      padding: 12px 16px;
+    }
+    .lh-watch .connect {
+      margin-bottom: 0;
+    }
+    @media (max-width: 860px) {
+      .lhub.multi {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .lh-rows {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
     .lg-vs {
       font-size: 1.15rem;
@@ -1009,6 +1112,10 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     .sidecol {
       position: sticky;
       top: 84px;
+    }
+    /* With the taking-part card it can be taller than the window: no sticking. */
+    .sidecol.tall {
+      position: static;
     }
     @media (max-width: 960px) {
       .cols {
@@ -1078,11 +1185,17 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       border-radius: 8px;
       padding: 8px 10px;
       margin: 8px 0;
-      overflow-x: auto;
     }
+    /* Long commands end in "…" (no scrollbar); the button copies all of it. */
     .connect code {
       flex: 1;
+      min-width: 0;
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .connect button {
+      flex: none;
     }
     .linux {
       margin: 8px 0;
@@ -1188,6 +1301,26 @@ export class TournamentPage {
     return list.find((m) => m.matchId === this.selected()) ?? list[0] ?? null;
   });
   protected readonly liveMatchIds = computed(() => this.playing().map((m) => m.matchId));
+  /** Running (or paused) with a bracket: the live layout (live at the top, joining at the side). */
+  protected readonly liveLayout = computed(() => {
+    const t = this.t();
+    return !!t?.projection?.bracket && (t.phase === 'running' || t.phase === 'paused');
+  });
+  /** The closed bets of a match being played (from the bet panel). */
+  protected betsOf(matchId: string): BetMatchView | null {
+    return this.runningBets().find((m) => m.matchId === matchId) ?? null;
+  }
+  /** A game of the match is live right now (its dot in the list). */
+  protected isLive(matchId: string): boolean {
+    const p = this.liveOf(matchId)?.phase;
+    return p === 'live' || p === 'overtime';
+  }
+  /** Where a match is played: an extra server's address, else the tournament's. */
+  protected addressOf(m: { server?: string }): string | null {
+    const t = this.t();
+    if (!m.server) return t?.connectAddress ?? null;
+    return t?.lanes?.find((l) => l.agentId === m.server)?.connectAddress ?? null;
+  }
   protected readonly livesById = computed(() => {
     const out: Record<string, LiveInfo> = {};
     for (const m of this.playing()) {
@@ -1699,7 +1832,7 @@ export class TournamentPage {
         this.i18n.t('admin.forfeitRunConfirm', { team: this.name(runner), match: cm.matchId }),
       )
     )
-      void this.command({ kind: 'forfeitRun' });
+      void this.command({ kind: 'forfeitRun', matchId: cm.matchId });
   }
 
   protected restart() {
@@ -1707,7 +1840,7 @@ export class TournamentPage {
     if (!cm) return;
     const key = this.race() ? 'admin.restartRunConfirm' : 'admin.restartGameConfirm';
     if (confirm(this.i18n.t(key, { match: cm.matchId, map: cm.map ?? '' })))
-      void this.command({ kind: 'restart' });
+      void this.command({ kind: 'restart', matchId: cm.matchId });
   }
 
   protected overrideWinner(matchId: string, winnerId: string) {

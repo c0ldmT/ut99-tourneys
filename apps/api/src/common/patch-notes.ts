@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 293,
+    date: '2026-11-26',
+    en: {
+      title: 'Tournament page tidied up',
+      items: [
+        'While a tournament runs, everything about the matches being played is at the top: with several at once a list on the left, the chosen match with its bets on the right.',
+        'Joining the server, open bets and next matches are in the side column next to the bracket.',
+      ],
+    },
+    de: {
+      title: 'Turnierseite aufgeräumt',
+      items: [
+        'Während ein Turnier läuft, steht alles zu den laufenden Matches oben: bei mehreren gleichzeitig links eine Liste, rechts das gewählte Match mit seinen Wetten.',
+        'Auf den Server, offene Wetten und nächste Matches stehen in der Seitenspalte neben dem Turnierbaum.',
+      ],
+    },
+  },
+  {
     id: 291,
     date: '2026-11-26',
     en: {

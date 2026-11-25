@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Tournament page: live section with the list of running matches and the chosen one with its bets; joining in the side column, no more scrollbars (decision 293, patch note 293).
 - User list: AI managers without login columns, not counted as inactive (decision 292).
 - Parallel matches: tournaments and series may use up to 8 servers at once; extra pool servers play the bot matches at the same time, matches with players stay on the main server; tabs per running match, extra servers with their connect command (decision 291, patch note 291).
 - User list (admin): last activity and last login per player, inactive players (30 days) marked and sorted first (decision 290).
