@@ -1,15 +1,26 @@
 import {
   ChangeDetectionStrategy,
   Component,
+  computed,
   DestroyRef,
   effect,
   ElementRef,
+  HostListener,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { Avatar, NameTag } from './core/looks';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet, Scroll } from '@angular/router';
+import {
+  NavigationEnd,
+  Router,
+  RouterLink,
+  RouterLinkActive,
+  RouterOutlet,
+  Scroll,
+} from '@angular/router';
+import { Api } from './core/api';
 import { ViewportScroller } from '@angular/common';
 import { NeuroPipe, NeuroStore } from './core/neuro';
 import { Coin, Icon, Logo, UdtMark, Wordmark } from './core/brand';
@@ -79,14 +90,52 @@ import { Feedback } from './components/feedback';
             </a>
             <a routerLink="/calendar" routerLinkActive="active">{{ 'nav.calendar' | t }}</a>
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
-            @if (me.isAdmin || me.isModerator) {
-              <a routerLink="/moderation" routerLinkActive="active">{{ 'nav.moderation' | t }}</a>
-            }
+            <!-- Administration in one menu (decision 285): the bar keeps its line. -->
             @if (me.isAdmin) {
-              <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
-              <a routerLink="/admin/bots" routerLinkActive="active">{{ 'nav.bots' | t }}</a>
-              <a routerLink="/admin/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
-              <a routerLink="/admin/settings" routerLinkActive="active">{{ 'nav.settings' | t }}</a>
+              <div class="navmore" [class.open]="adminOpen()" (click)="$event.stopPropagation()">
+                <button
+                  type="button"
+                  class="navbtn"
+                  [class.active]="adminActive()"
+                  aria-haspopup="true"
+                  [attr.aria-expanded]="adminOpen()"
+                  (click)="adminOpen.set(!adminOpen()); userOpen.set(false)"
+                >
+                  {{ 'nav.admin' | t }}
+                  @if (modOpen() > 0) {
+                    <span class="navbadge" [title]="'nav.modOpen' | t: { n: modOpen() }">{{
+                      modOpen()
+                    }}</span>
+                  }
+                  <svg class="chev" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+                <div class="menu" (click)="closeMenus()">
+                  <a routerLink="/moderation" routerLinkActive="active"
+                    >{{ 'nav.moderation' | t }}
+                    @if (modOpen() > 0) {
+                      <span class="navbadge">{{ modOpen() }}</span>
+                    }
+                  </a>
+                  <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
+                  <a routerLink="/admin/series" routerLinkActive="active">{{
+                    'series.title' | t
+                  }}</a>
+                  <a routerLink="/admin/bots" routerLinkActive="active">{{ 'nav.bots' | t }}</a>
+                  <a routerLink="/admin/users" routerLinkActive="active">{{ 'nav.users' | t }}</a>
+                  <a routerLink="/admin/settings" routerLinkActive="active">{{
+                    'nav.settings' | t
+                  }}</a>
+                </div>
+              </div>
+            } @else if (me.isModerator) {
+              <a routerLink="/moderation" routerLinkActive="active"
+                >{{ 'nav.moderation' | t }}
+                @if (modOpen() > 0) {
+                  <span class="navbadge">{{ modOpen() }}</span>
+                }
+              </a>
             }
             <div class="nav-foot">
               <select class="lang" (change)="setLang($event)" aria-label="Language">
@@ -118,24 +167,41 @@ import { Feedback } from './components/feedback';
             (click)="menu.set(false)"
             ><na-icon name="shop" [size]="19"
           /></a>
-          <a routerLink="/profile" class="user" (click)="menu.set(false)">
-            <na-avatar [name]="me.displayName" [id]="me.id" [src]="me.avatar" [size]="28" />
-            <span class="uname"><na-name [name]="me.displayName" [id]="me.id" /></span>
-          </a>
-          <div class="desk">
-            <select class="lang" (change)="setLang($event)" aria-label="Language">
-              @for (l of i18n.languages; track l) {
-                <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
-              }
-            </select>
+          <!-- Profile, language and logout behind the avatar (decision 285). -->
+          <div class="usermenu" [class.open]="userOpen()" (click)="$event.stopPropagation()">
             <button
-              class="icon"
-              (click)="logout()"
-              [title]="'nav.logout' | t"
-              [attr.aria-label]="'nav.logout' | t"
+              type="button"
+              class="user"
+              aria-haspopup="true"
+              [attr.aria-expanded]="userOpen()"
+              [attr.aria-label]="'nav.account' | t"
+              (click)="userOpen.set(!userOpen()); adminOpen.set(false); menu.set(false)"
             >
-              <na-icon name="logout" />
+              <na-avatar [name]="me.displayName" [id]="me.id" [src]="me.avatar" [size]="28" />
+              <span class="uname"><na-name [name]="me.displayName" [id]="me.id" /></span>
+              <svg class="chev" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
             </button>
+            <div class="menu right">
+              <a routerLink="/profile" (click)="closeMenus()">{{ 'nav.profile' | t }}</a>
+              <a routerLink="/stats/p/u:{{ me.id }}" (click)="closeMenus()">{{
+                'nav.myStats' | t
+              }}</a>
+              <label class="langrow"
+                >{{ 'nav.language' | t }}
+                <select class="lang" (change)="setLang($event)" aria-label="Language">
+                  @for (l of i18n.languages; track l) {
+                    <option [value]="l" [selected]="l === i18n.lang()">
+                      {{ l.toUpperCase() }}
+                    </option>
+                  }
+                </select>
+              </label>
+              <button type="button" class="mi" (click)="closeMenus(); logout()">
+                <na-icon name="logout" [size]="15" /> {{ 'nav.logout' | t }}
+              </button>
+            </div>
           </div>
           <button
             class="burger"
@@ -282,8 +348,9 @@ import { Feedback } from './components/feedback';
     }
     nav {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 2px;
+      min-width: 0;
     }
     nav a {
       color: var(--text-2);
@@ -340,6 +407,110 @@ import { Feedback } from './components/feedback';
     .nav-foot {
       display: none;
     }
+    /* Dropdowns (decision 285): administration in the bar, account behind the avatar. */
+    .navmore,
+    .usermenu {
+      position: relative;
+    }
+    .navbtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: 0;
+      min-height: 0;
+      color: var(--text-2);
+      font-weight: 500;
+      font-size: 0.95rem;
+      padding: 8px 7px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+    .navbtn:hover,
+    .navmore.open .navbtn {
+      color: var(--text);
+      background: var(--panel-2);
+    }
+    .navbtn.active {
+      color: var(--text);
+      box-shadow: inset 0 -2px 0 var(--accent);
+    }
+    .chev {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      transition: transform 0.15s ease;
+    }
+    .open > button .chev {
+      transform: rotate(180deg);
+    }
+    .menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 200px;
+      padding: 6px;
+      flex-direction: column;
+      gap: 2px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      box-shadow: 0 16px 32px rgba(0, 0, 0, 0.55);
+      z-index: 30;
+    }
+    .menu.right {
+      left: auto;
+      right: 0;
+    }
+    .open > .menu {
+      display: flex;
+    }
+    .menu a,
+    .menu .mi {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border-radius: 6px;
+      color: var(--text-2);
+      font-weight: 500;
+      white-space: nowrap;
+      background: none;
+      border: 0;
+      min-height: 0;
+      text-align: left;
+      justify-content: flex-start;
+      width: 100%;
+      font-size: 0.95rem;
+    }
+    .menu a:hover,
+    .menu .mi:hover,
+    .menu a.active {
+      color: var(--text);
+      background: var(--panel-2);
+      box-shadow: none;
+    }
+    .langrow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 6px 10px;
+      color: var(--text-2);
+      font-weight: 500;
+    }
+    .navbadge {
+      margin-left: auto;
+      padding: 0 6px;
+      border-radius: 999px;
+      background: var(--danger, #ff6b6b);
+      color: #fff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      line-height: 1.5;
+    }
     .grow {
       flex: 1;
     }
@@ -347,11 +518,6 @@ import { Feedback } from './components/feedback';
       width: auto;
       min-height: 32px;
       padding: 3px 6px;
-    }
-    .desk {
-      display: flex;
-      align-items: center;
-      gap: 6px;
     }
     .wallet {
       display: inline-flex;
@@ -376,6 +542,15 @@ import { Feedback } from './components/feedback';
       gap: 8px;
       color: var(--text);
       font-weight: 600;
+      background: none;
+      border: 0;
+      min-height: 0;
+      padding: 4px 6px;
+      border-radius: 8px;
+    }
+    .user:hover,
+    .usermenu.open .user {
+      background: var(--panel-2);
     }
     .user img {
       width: 26px;
@@ -426,10 +601,6 @@ import { Feedback } from './components/feedback';
       .burger {
         display: inline-flex;
       }
-      .desk,
-      .uname {
-        display: none;
-      }
       nav {
         display: none;
         position: absolute;
@@ -465,6 +636,29 @@ import { Feedback } from './components/feedback';
       .udt-sep {
         display: none;
       }
+      /* In the burger menu the administration is a plain list. */
+      .navmore .navbtn {
+        display: none;
+      }
+      .navmore .menu {
+        display: flex;
+        position: static;
+        box-shadow: none;
+        border: 0;
+        border-top: 1px solid var(--border);
+        border-radius: 0;
+        margin-top: 6px;
+        padding: 6px 0 0;
+        background: none;
+      }
+      .navmore .menu a {
+        padding: 12px 10px;
+        font-size: 1.05rem;
+      }
+      .uname,
+      .user .chev {
+        display: none;
+      }
       .nav-foot {
         display: flex;
         align-items: center;
@@ -485,6 +679,56 @@ export class App {
   protected readonly neuro = inject(NeuroStore).balance;
   /** Mobile menu open. */
   protected readonly menu = signal(false);
+  /** The administration and account dropdowns (decision 285). */
+  protected readonly adminOpen = signal(false);
+  protected readonly userOpen = signal(false);
+  /** Open items of the moderation queue (moderators and admins). */
+  protected readonly modOpen = signal(0);
+  private readonly url = signal('');
+  /** An administration page is shown (the dropdown's button is marked). */
+  protected readonly adminActive = computed(
+    () => this.url().startsWith('/admin') || this.url().startsWith('/moderation'),
+  );
+  private readonly api = inject(Api);
+
+  protected closeMenus() {
+    this.adminOpen.set(false);
+    this.userOpen.set(false);
+    this.menu.set(false);
+  }
+
+  @HostListener('document:click')
+  @HostListener('document:keydown.escape')
+  protected outside() {
+    this.adminOpen.set(false);
+    this.userOpen.set(false);
+  }
+
+  /** The moderation counter: after login, on every page change and every two minutes. */
+  private watchModeration() {
+    const load = () => {
+      const me = this.auth.me();
+      if (!me || !(me.isAdmin || me.isModerator)) return this.modOpen.set(0);
+      this.api.modCount().then(
+        (r) => this.modOpen.set(r.open),
+        () => undefined,
+      );
+    };
+    const sub = this.router.events.subscribe((e) => {
+      if (e instanceof NavigationEnd) {
+        this.url.set(e.urlAfterRedirects);
+        load();
+      }
+    });
+    const timer = setInterval(load, 120_000);
+    inject(DestroyRef).onDestroy(() => {
+      sub.unsubscribe();
+      clearInterval(timer);
+    });
+    effect(() => {
+      if (this.auth.me()) untracked(load);
+    });
+  }
   /** Platform version (root package.json). */
   protected readonly version = version;
 
@@ -499,6 +743,7 @@ export class App {
   constructor() {
     this.loading.watch(this.router);
     this.scrolling();
+    this.watchModeration();
     void this.auth.ready();
     // The page shows (rising and fading in) once its loading is done.
     effect(() => {
