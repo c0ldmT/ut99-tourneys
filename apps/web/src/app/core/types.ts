@@ -234,6 +234,8 @@ export interface PublicUser {
   /** Admin list only (decision 290). */
   createdAt?: string;
   lastLoginAt?: string;
+  /** Dream Team AI manager: never logs in (decision 292). */
+  ai?: boolean;
   lastSeenAt?: string | null;
 }
 

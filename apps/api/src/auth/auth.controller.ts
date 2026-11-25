@@ -252,17 +252,25 @@ export class AuthController {
   @AdminOnly()
   @Get('users')
   listUsers() {
-    return this.users.list().map((u) => ({
-      ...publicUser(u),
-      isModerator: u.isModerator,
-      warnings: u.warnings,
-      textBanUntil: u.textBanUntil,
-      bannedUntil: u.bannedUntil,
-      // Inactive players (decision 290): last login and last request.
-      createdAt: u.createdAt,
-      lastLoginAt: u.lastLoginAt,
-      lastSeenAt: u.lastSeenAt ?? u.lastLoginAt,
-    }));
+    return this.users.list().map((u) => {
+      // Dream Team AI managers (discord id "ai:<n>") never log in (decision 292).
+      const ai = u.discordId.startsWith('ai:');
+      return {
+        ...publicUser(u),
+        isModerator: u.isModerator,
+        warnings: u.warnings,
+        textBanUntil: u.textBanUntil,
+        bannedUntil: u.bannedUntil,
+        createdAt: u.createdAt,
+        ...(ai
+          ? { ai: true }
+          : {
+              // Inactive players (decision 290): last login and last request.
+              lastLoginAt: u.lastLoginAt,
+              lastSeenAt: u.lastSeenAt ?? u.lastLoginAt,
+            }),
+      };
+    });
   }
 
   @AdminOnly()

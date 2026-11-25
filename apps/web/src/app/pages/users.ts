@@ -45,15 +45,22 @@ import type { PublicUser } from '../core/types';
                 >
               </td>
               <td class="muted">{{ u.username }}</td>
-              <td class="nowrap" [title]="u.lastSeenAt ? i18n.date(u.lastSeenAt) : ''">
-                {{ ago(u.lastSeenAt) }}
-                @if (isInactive(u)) {
-                  <span class="chip">{{ 'users.inactive' | t }}</span>
-                }
-              </td>
-              <td class="muted small nowrap">
-                {{ u.lastLoginAt ? i18n.date(u.lastLoginAt, { dateOnly: true }) : '–' }}
-              </td>
+              @if (u.ai) {
+                <!-- Dream Team AI managers never log in (decision 292). -->
+                <td colspan="2">
+                  <span class="chip" [title]="'users.aiHint' | t">{{ 'users.ai' | t }}</span>
+                </td>
+              } @else {
+                <td class="nowrap" [title]="u.lastSeenAt ? i18n.date(u.lastSeenAt) : ''">
+                  {{ ago(u.lastSeenAt) }}
+                  @if (isInactive(u)) {
+                    <span class="chip">{{ 'users.inactive' | t }}</span>
+                  }
+                </td>
+                <td class="muted small nowrap">
+                  {{ u.lastLoginAt ? i18n.date(u.lastLoginAt, { dateOnly: true }) : '–' }}
+                </td>
+              }
               <td>
                 <input
                   type="checkbox"
@@ -104,6 +111,9 @@ import type { PublicUser } from '../core/types';
     tr.idle td:first-child a {
       opacity: 0.65;
     }
+    td[colspan] .chip {
+      margin-left: 0;
+    }
     .chip {
       margin-left: 6px;
       padding: 0 7px;
@@ -126,16 +136,17 @@ export class UsersPage {
   /** Inactive: no request for this many days (decision 290). */
   protected readonly INACTIVE_DAYS = 30;
   protected readonly sort = signal<'name' | 'seen'>('seen');
-  /** Longest inactive first, or by name. */
+  /** Longest inactive first (AI managers last), or by name. */
   protected readonly sorted = computed(() => {
     const list = [...this.users()];
     if (this.sort() === 'name') return list;
     const at = (u: PublicUser) => (u.lastSeenAt ? Date.parse(u.lastSeenAt) : 0);
-    return list.sort((a, b) => at(a) - at(b));
+    return list.sort((a, b) => Number(!!a.ai) - Number(!!b.ai) || at(a) - at(b));
   });
   protected readonly inactive = computed(() => this.users().filter((u) => this.isInactive(u)));
 
   protected isInactive(u: PublicUser): boolean {
+    if (u.ai) return false;
     return !u.lastSeenAt || Date.now() - Date.parse(u.lastSeenAt) > this.INACTIVE_DAYS * 86_400_000;
   }
 

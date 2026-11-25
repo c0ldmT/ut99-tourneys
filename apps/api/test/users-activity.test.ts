@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FakeClock } from '@tourney/bridge';
+import { UsersService } from '../src/auth/users.service.js';
 import { Client, startApi } from './helpers.js';
 
 describe('last activity (decision 290)', () => {
@@ -30,6 +31,14 @@ describe('last activity (decision 290)', () => {
         lastLoginAt: '2026-11-26T10:00:00.000Z',
         lastSeenAt: '2026-11-29T10:05:00.000Z',
       });
+      // Dream Team AI managers never log in: no login data, marked as AI (decision 292).
+      api.app.get(UsersService).login({ discordId: 'ai:1', username: 'AI 1', displayName: 'AI 1' });
+      const ai = ((await admin.get('/users')).body as Record<string, unknown>[]).find(
+        (u) => u['displayName'] === 'AI 1',
+      )!;
+      expect(ai['ai']).toBe(true);
+      expect(ai).not.toHaveProperty('lastLoginAt');
+      expect(ai).not.toHaveProperty('lastSeenAt');
     } finally {
       await api.close();
     }
