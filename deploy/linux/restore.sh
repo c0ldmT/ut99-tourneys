@@ -10,6 +10,9 @@
 #                    new token from the website: Servers -> rotate token)
 # What is replaced is kept next to it (/var/lib/tourney.before-restore-<time>, /etc/tourney.before-...).
 set -euo pipefail
+# Work files on disk, not in /tmp: that is a small RAM disk on newer systems (Pi 3: ~0.5 GB),
+# and the game content alone is several hundred MB.
+export TMPDIR="${TMPDIR:-/var/tmp}"
 
 ARCHIVE=""
 PUBLIC_URL=""

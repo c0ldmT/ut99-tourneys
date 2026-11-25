@@ -10,6 +10,9 @@
 #   --keep N        keeps the newest N backups in --out (default 14, 0 = all)
 # Daily backups: the timer tourney-backup.timer (installed by install.sh) runs this script.
 set -euo pipefail
+# Work files on disk, not in /tmp: that is a small RAM disk on newer systems (Pi 3: ~0.5 GB),
+# and the game content alone is several hundred MB.
+export TMPDIR="${TMPDIR:-/var/tmp}"
 
 OUT=/var/backups/tourney
 KEEP=14
