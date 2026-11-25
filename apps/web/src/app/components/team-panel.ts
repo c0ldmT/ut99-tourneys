@@ -15,6 +15,7 @@ import { Api } from '../core/api';
 import { copyText } from '../core/clipboard';
 import { I18n, TPipe } from '../core/i18n';
 import type { InvitePreview, TeamView, TournamentDetail } from '../core/types';
+import { ReportButton } from './report-button';
 
 const MAX_SUBS = 2;
 
@@ -31,7 +32,7 @@ export function inviteCodeFrom(text: string): string {
  */
 @Component({
   selector: 'app-team-panel',
-  imports: [FormsModule, TPipe, Icon],
+  imports: [FormsModule, TPipe, Icon, ReportButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let t = tournament();
@@ -154,7 +155,12 @@ export function inviteCodeFrom(text: string): string {
         @let manage = canManage(team);
         <div class="team" [class.mine]="team.id === t.me.teamId">
           <div class="spread">
-            <b>{{ teamLabel(team.name, team.tag) }}</b>
+            <b
+              >{{ teamLabel(team.name, team.tag) }}
+              @if (team.id !== t.me.teamId) {
+                <na-report kind="team" [ref]="team.id" [label]="teamLabel(team.name, team.tag)" />
+              }
+            </b>
             <span class="muted small">{{ count(team) }}</span>
           </div>
           <ul>

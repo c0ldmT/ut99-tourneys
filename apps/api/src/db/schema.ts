@@ -19,6 +19,13 @@ export const users = sqliteTable('users', {
   lookJson: text('look_json'),
   /** The last patch note the user saw (decision 243): newer ones show once after login. */
   patchSeen: integer('patch_seen').notNull().default(0),
+  /** Moderation (decision 283): may work the moderation queue. */
+  isModerator: integer('is_moderator', { mode: 'boolean' }).notNull().default(false),
+  /** No login until then (ISO; far in the future = for good). */
+  bannedUntil: text('banned_until'),
+  /** No new names, team names or chat lines until then (ISO). */
+  textBanUntil: text('text_ban_until'),
+  warnings: integer('warnings').notNull().default(0),
 });
 
 /** Neuro shop purchases: paid with the Neuro of a season, owned for good. */
@@ -811,4 +818,53 @@ export const feedbackSurveys = sqliteTable('feedback_surveys', {
   season: integer('season').primaryKey(),
   openedAt: text('opened_at').notNull(),
   closedAt: text('closed_at'),
+});
+
+/**
+ * Moderation queue (decision 283): a player's text the filter flagged or players reported. One
+ * open item per text (kind + ref); `kind`: name, udt-team, udt-bot, bot-lines, team, trade.
+ */
+export const moderationItems = sqliteTable('moderation_items', {
+  id: text('id').primaryKey(),
+  kind: text('kind').notNull(),
+  /** What the text belongs to: user id, bot id, "<tournament>/<team>", trade id. */
+  ref: text('ref').notNull(),
+  /** Who wrote it. */
+  userId: text('user_id'),
+  text: text('text').notNull(),
+  /** filter (flagged when saved), report, scan (existing texts checked). */
+  source: text('source').notNull(),
+  /** The list entry that matched. */
+  term: text('term'),
+  reports: integer('reports').notNull().default(0),
+  /** open, ok (left as it is), reset (replaced). */
+  status: text('status').notNull().default('open'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  decidedBy: text('decided_by'),
+  decidedAt: text('decided_at'),
+});
+
+export const moderationReports = sqliteTable(
+  'moderation_reports',
+  {
+    itemId: text('item_id').notNull(),
+    userId: text('user_id').notNull(),
+    reason: text('reason').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.itemId, t.userId] })],
+);
+
+/** What moderators did (audit log). */
+export const moderationLog = sqliteTable('moderation_log', {
+  id: text('id').primaryKey(),
+  at: text('at').notNull(),
+  byUser: text('by_user'),
+  /** ok, reset, warn, text-ban, ban, unban, report-ok, lists, scan, moderator. */
+  action: text('action').notNull(),
+  targetUser: text('target_user'),
+  kind: text('kind'),
+  ref: text('ref'),
+  detailJson: text('detail_json'),
 });

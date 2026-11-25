@@ -113,6 +113,7 @@ const ICONS: Record<string, string> = {
   play: 'M8 5l11 7-11 7z',
   copy: 'M9 9h10v11H9zM5 15V4h10',
   check: 'M5 12l5 5 9-10',
+  flag: 'M5 21V4M5 4h12l-2.5 4 2.5 4H5',
   close: 'M6 6l12 12M18 6 6 18',
   key: 'M14 10a4 4 0 1 0-1 2.7L21 21M17 17l2-2M19 19l2-2',
   plus: 'M12 5v14M5 12h14',

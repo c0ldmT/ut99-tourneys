@@ -200,6 +200,15 @@ export const LiveSettingsSchema = z.object({
 });
 export type LiveSettings = z.infer<typeof LiveSettingsSchema>;
 
+/** Word filter (decision 283): own entries and the allow list; the built-in lists on or off. */
+export const ModerationSettingsSchema = z.object({
+  builtin: z.boolean().default(true),
+  block: z.array(z.string().trim().min(1).max(40)).max(500).default([]),
+  flag: z.array(z.string().trim().min(1).max(40)).max(500).default([]),
+  allow: z.array(z.string().trim().min(1).max(40)).max(500).default([]),
+});
+export type ModerationSettings = z.infer<typeof ModerationSettingsSchema>;
+
 export const WebsiteSettingsSchema = z.object({
   rating: RatingSettingsSchema.default(RatingSettingsSchema.parse({})),
   teamNames: TeamNamesSchema.default([...BOT_TEAM_NAMES]),
@@ -208,6 +217,7 @@ export const WebsiteSettingsSchema = z.object({
   botAi: BotAiSettingsSchema.default(BotAiSettingsSchema.parse({})),
   udt: UdtSettingsSchema.default(UdtSettingsSchema.parse({})),
   live: LiveSettingsSchema.default(LiveSettingsSchema.parse({})),
+  moderation: ModerationSettingsSchema.default(ModerationSettingsSchema.parse({})),
 });
 export type WebsiteSettings = z.infer<typeof WebsiteSettingsSchema>;
 
@@ -248,7 +258,9 @@ export class SettingsService {
     const botAi = BotAiSettingsSchema.safeParse(raw['botAi'] ?? {});
     const udt = UdtSettingsSchema.safeParse(raw['udt'] ?? {});
     const live = LiveSettingsSchema.safeParse(raw['live'] ?? {});
+    const moderation = ModerationSettingsSchema.safeParse(raw['moderation'] ?? {});
     return {
+      moderation: moderation.success ? moderation.data : ModerationSettingsSchema.parse({}),
       live: live.success ? live.data : LiveSettingsSchema.parse({}),
       udt: udt.success ? udt.data : UdtSettingsSchema.parse({}),
       botAi: botAi.success ? botAi.data : BotAiSettingsSchema.parse({}),
@@ -275,6 +287,13 @@ export class SettingsService {
     const next = ShopSettingsSchema.safeParse({ ...this.get().shop, ...value });
     if (!next.success) throw invalidInput(next.error);
     this.put('shop', next.data);
+    return this.get();
+  }
+
+  setModeration(value: Partial<ModerationSettings>): WebsiteSettings {
+    const next = ModerationSettingsSchema.safeParse({ ...this.get().moderation, ...value });
+    if (!next.success) throw invalidInput(next.error);
+    this.put('moderation', next.data);
     return this.get();
   }
 

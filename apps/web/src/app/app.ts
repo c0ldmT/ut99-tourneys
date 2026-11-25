@@ -79,6 +79,9 @@ import { Feedback } from './components/feedback';
             </a>
             <a routerLink="/calendar" routerLinkActive="active">{{ 'nav.calendar' | t }}</a>
             <a routerLink="/stats" routerLinkActive="active">{{ 'nav.stats' | t }}</a>
+            @if (me.isAdmin || me.isModerator) {
+              <a routerLink="/moderation" routerLinkActive="active">{{ 'nav.moderation' | t }}</a>
+            }
             @if (me.isAdmin) {
               <a routerLink="/admin/agents" routerLinkActive="active">{{ 'nav.agents' | t }}</a>
               <a routerLink="/admin/bots" routerLinkActive="active">{{ 'nav.bots' | t }}</a>

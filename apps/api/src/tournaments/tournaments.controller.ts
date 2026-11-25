@@ -21,6 +21,7 @@ import type { User } from '../auth/users.service.js';
 import { LiveHub, type HubMessage } from './hub.js';
 import { LiveRecorder } from './live-recorder.js';
 import { SettingsService } from '../settings/settings.service.js';
+import { ModerationService } from '../moderation/moderation.service.js';
 import {
   ArchiveQuerySchema,
   CommandBody,
@@ -55,6 +56,7 @@ export class TournamentsController {
     @Inject(LiveHub) private readonly hub: LiveHub,
     @Inject(LiveRecorder) private readonly recorder: LiveRecorder,
     @Inject(SettingsService) private readonly settings: SettingsService,
+    @Inject(ModerationService) private readonly moderation: ModerationService,
   ) {}
 
   /**
@@ -157,7 +159,10 @@ export class TournamentsController {
     @Param('id') id: string,
     @Body(new ZodPipe(CreateTeamBody)) body: CreateTeam,
   ) {
-    this.svc.createTeam(id, user, body);
+    // Team names and tags go through the word filter (decision 283).
+    this.moderation.screen(user, [body.name, body.tag]);
+    const row = this.svc.createTeam(id, user, body);
+    this.moderation.review('team', row.id);
     return this.svc.detail(id, user);
   }
 
@@ -193,7 +198,9 @@ export class TournamentsController {
     @Param('teamId') teamId: string,
     @Body(new ZodPipe(UpdateTeamBody)) body: UpdateTeam,
   ) {
+    if (body.name !== undefined || body.tag) this.moderation.screen(user, [body.name, body.tag]);
     this.svc.updateTeam(id, teamId, user, body);
+    if (body.name !== undefined || body.tag) this.moderation.review('team', teamId);
     return this.svc.detail(id, user);
   }
 

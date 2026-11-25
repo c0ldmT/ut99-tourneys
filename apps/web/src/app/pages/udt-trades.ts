@@ -13,6 +13,7 @@ import type {
   UdtTrades,
 } from '../core/types';
 import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
+import { ReportButton } from '../components/report-button';
 
 /**
  * Dream Team trades between managers: offers waiting for the manager and its own, a builder
@@ -20,7 +21,7 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
  */
 @Component({
   selector: 'app-udt-trades',
-  imports: [FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav],
+  imports: [FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, ReportButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -98,7 +99,12 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
               </div>
             </div>
             @if (t.message) {
-              <p class="msg">“{{ t.message }}”</p>
+              <p class="msg">
+                “{{ t.message }}”
+                @if (t.incoming) {
+                  <na-report kind="trade" [ref]="t.id" [label]="'mod.kind.trade' | t" />
+                }
+              </p>
             }
             <div class="row">
               <span class="muted small grow"

@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 283,
+    date: '2026-11-25',
+    en: {
+      title: 'Fair play for names and chat lines',
+      items: [
+        'Names, team names, bot names and chat lines go through a word filter: insults, hate and sexual words are not allowed.',
+        'See something that does not belong here? The small flag next to a player name, a bot or a team reports it to the moderators.',
+        'Moderators can reset names and lines and warn or block players who break the rules.',
+      ],
+    },
+    de: {
+      title: 'Fair Play für Namen und Chatzeilen',
+      items: [
+        'Namen, Teamnamen, Botnamen und Chatzeilen laufen durch einen Wortfilter: Beleidigungen, Hetze und sexuelle Begriffe sind nicht erlaubt.',
+        'Etwas gesehen, das hier nicht hingehört? Die kleine Fahne neben einem Spielernamen, einem Bot oder einem Team meldet es den Moderatoren.',
+        'Moderatoren können Namen und Zeilen zurücksetzen und Spieler verwarnen oder sperren, die gegen die Regeln verstoßen.',
+      ],
+    },
+  },
+  {
     id: 282,
     date: '2026-11-25',
     en: {

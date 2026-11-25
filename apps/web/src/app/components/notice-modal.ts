@@ -11,11 +11,11 @@ import {
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { TPipe } from '../core/i18n';
+import { I18n, TPipe } from '../core/i18n';
 import type { UserNotice } from '../core/types';
 
 /** Kinds with a text; other kinds are marked seen without showing anything. */
-const KNOWN = new Set(['blueprint-apology']);
+const KNOWN = new Set(['blueprint-apology', 'mod-reset', 'mod-warn', 'mod-textban']);
 
 /**
  * Messages the website shows once after login (e.g. the apology for blueprints a full inventory
@@ -29,7 +29,10 @@ const KNOWN = new Set(['blueprint-apology']);
     <dialog #dlg class="nm" aria-labelledby="nm-title" (close)="closed()">
       @if (current(); as n) {
         <h2 id="nm-title" class="disp">{{ 'notice.' + n.kind + '.title' | t }}</h2>
-        <p>{{ 'notice.' + n.kind + '.text' | t }}</p>
+        <p>{{ 'notice.' + n.kind + '.text' | t: noticeParams(n) }}</p>
+        @if (n.data['reason']) {
+          <p class="muted">{{ n.data['reason'] }}</p>
+        }
         @if (n.kind === 'blueprint-apology') {
           <p class="gift">
             <span class="udt-trait r-legendary">{{ 'udt.bp.legendary' | t }}</span>
@@ -81,8 +84,15 @@ const KNOWN = new Set(['blueprint-apology']);
   `,
 })
 export class NoticeModal {
+  /** Moderation notices (decision 283): what was reset, until when a text ban runs. */
+  protected noticeParams(n: UserNotice): Record<string, string> {
+    const kind = typeof n.data['kind'] === 'string' ? n.data['kind'] : '';
+    const until = typeof n.data['until'] === 'string' ? n.data['until'].slice(0, 10) : '';
+    return { what: kind ? this.i18n.t(`mod.kind.${kind}`) : '', until };
+  }
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
+  private readonly i18n = inject(I18n);
   private readonly dlg = viewChild<ElementRef<HTMLDialogElement>>('dlg');
   /** Seen in this browser session (the server list only refreshes with the next /me). */
   private readonly done = signal<ReadonlySet<string>>(new Set());

@@ -858,4 +858,45 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE tournaments ADD COLUMN server_auto INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE agents ADD COLUMN in_pool INTEGER NOT NULL DEFAULT 1;
   `,
+  // 58: moderation (decision 283): moderators, bans and warnings; the queue of flagged and
+  // reported texts, the reports and what moderators did.
+  `
+  ALTER TABLE users ADD COLUMN is_moderator INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE users ADD COLUMN banned_until TEXT;
+  ALTER TABLE users ADD COLUMN text_ban_until TEXT;
+  ALTER TABLE users ADD COLUMN warnings INTEGER NOT NULL DEFAULT 0;
+  CREATE TABLE moderation_items (
+    id TEXT PRIMARY KEY,
+    kind TEXT NOT NULL,
+    ref TEXT NOT NULL,
+    user_id TEXT,
+    text TEXT NOT NULL,
+    source TEXT NOT NULL,
+    term TEXT,
+    reports INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    decided_by TEXT,
+    decided_at TEXT
+  );
+  CREATE INDEX moderation_items_open ON moderation_items (status, kind, ref);
+  CREATE TABLE moderation_reports (
+    item_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (item_id, user_id)
+  );
+  CREATE TABLE moderation_log (
+    id TEXT PRIMARY KEY,
+    at TEXT NOT NULL,
+    by_user TEXT,
+    action TEXT NOT NULL,
+    target_user TEXT,
+    kind TEXT,
+    ref TEXT,
+    detail_json TEXT
+  );
+  `,
 ];

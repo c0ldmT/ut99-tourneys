@@ -18,6 +18,8 @@ import type { PublicUser } from '../core/types';
             <th>{{ 'users.name' | t }}</th>
             <th>Discord</th>
             <th>{{ 'users.admin' | t }}</th>
+            <th>{{ 'users.moderator' | t }}</th>
+            <th>{{ 'users.status' | t }}</th>
           </tr>
         </thead>
         <tbody>
@@ -38,11 +40,37 @@ import type { PublicUser } from '../core/types';
                   (change)="toggle(u, $event)"
                 />
               </td>
+              <td>
+                <input
+                  type="checkbox"
+                  [checked]="u.isModerator || u.isAdmin"
+                  [disabled]="u.isAdmin"
+                  [attr.aria-label]="'users.moderator' | t"
+                  (change)="toggleMod(u, $event)"
+                />
+              </td>
+              <td class="small">
+                @if (u.warnings) {
+                  {{ 'mod.warnings' | t: { n: u.warnings } }}
+                }
+                @if (active(u.textBanUntil)) {
+                  <span class="bad">{{ 'mod.textBanned' | t: { d: day(u.textBanUntil!) } }}</span>
+                }
+                @if (active(u.bannedUntil)) {
+                  <span class="bad">{{ 'mod.banned' | t: { d: day(u.bannedUntil!) } }}</span>
+                }
+              </td>
             </tr>
           }
         </tbody>
       </table>
     </div>
+  `,
+  styles: `
+    .bad {
+      color: #ff8a8a;
+      margin-left: 6px;
+    }
   `,
 })
 export class UsersPage {
@@ -60,6 +88,24 @@ export class UsersPage {
     } catch {
       // the Api shows the error as a toast
     }
+  }
+
+  protected async toggleMod(u: PublicUser, ev: Event) {
+    const on = (ev.target as HTMLInputElement).checked;
+    try {
+      await this.api.setModerator(u.id, on);
+      await this.load();
+    } catch {
+      // the Api shows the error as a toast
+    }
+  }
+
+  protected active(until: string | null | undefined): boolean {
+    return !!until && Date.parse(until) > Date.now();
+  }
+
+  protected day(iso: string): string {
+    return iso.startsWith('9999') ? '∞' : iso.slice(0, 10);
   }
 
   protected async toggle(u: PublicUser, ev: Event) {

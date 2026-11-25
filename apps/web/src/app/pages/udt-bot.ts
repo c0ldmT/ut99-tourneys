@@ -17,6 +17,7 @@ import { NeuroPipe } from '../core/neuro';
 import { PageTitle } from '../core/page-title';
 import type { StatsPlayerRow, UdtBotPage } from '../core/types';
 import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
+import { ReportButton } from '../components/report-button';
 
 /**
  * A bot as Dream Team sees it: its card with team, level, traits and potential, its career and
@@ -25,7 +26,16 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
  */
 @Component({
   selector: 'app-udt-bot',
-  imports: [RouterLink, TPipe, NeuroPipe, UdtNav, UdtCard, UdtPotential, UdtSignatureBox],
+  imports: [
+    RouterLink,
+    TPipe,
+    NeuroPipe,
+    UdtNav,
+    UdtCard,
+    UdtPotential,
+    UdtSignatureBox,
+    ReportButton,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -41,7 +51,12 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
       </p>
       <div class="udt-head">
         <div>
-          <h1 class="disp">{{ p.bot.gameName }}</h1>
+          <h1 class="disp">
+            {{ p.bot.gameName }}
+            @if (!p.team?.mine && !p.team?.ai) {
+              <na-report [options]="reportOptions(p)" />
+            }
+          </h1>
           <p class="muted ub-sub">
             @if (p.team; as tm) {
               <span>{{ 'udt.squads.managedBy' | t: { name: tm.manager } }}</span>
@@ -280,6 +295,31 @@ import { botRarity, rosterCard, UdtCard, UdtNav, type CardBot } from '../core/ud
   `,
 })
 export class UdtBotProfilePage {
+  /** What a player can report on another manager's bot (decision 283). */
+  protected reportOptions(p: {
+    bot: { id: string; gameName: string };
+    season: number | null;
+    team?: { userId?: string; name?: string; tag?: string } | null;
+  }) {
+    const out: { kind: 'udt-bot' | 'bot-lines' | 'udt-team'; ref: string; label: string }[] = [
+      {
+        kind: 'udt-bot',
+        ref: p.bot.id,
+        label: this.i18n.t('mod.what.botName', { n: p.bot.gameName }),
+      },
+      { kind: 'bot-lines', ref: p.bot.id, label: this.i18n.t('mod.what.lines') },
+    ];
+    if (p.team?.userId && p.season !== null)
+      out.push({
+        kind: 'udt-team',
+        ref: `${p.season}/${p.team.userId}`,
+        label: this.i18n.t('mod.what.team', {
+          n: `${p.team.tag ?? ''} ${p.team.name ?? ''}`.trim(),
+        }),
+      });
+    return out;
+  }
+
   private readonly api = inject(Api);
   private readonly title = inject(PageTitle);
   readonly id = input.required<string>();

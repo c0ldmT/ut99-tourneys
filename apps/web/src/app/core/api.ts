@@ -49,6 +49,10 @@ import type {
   UdtAnalysis,
   UdtWorkshopResult,
   AgentView,
+  ModItem,
+  ModKind,
+  ModLogEntry,
+  ModSettings,
   BetBoard,
   BetRecordView,
   BotAssets,
@@ -233,6 +237,44 @@ export class Api {
   users = () => this.call<PublicUser[]>('GET', '/users');
   setAdmin = (id: string, isAdmin: boolean) =>
     this.call<PublicUser>('PATCH', `/users/${id}`, { isAdmin }, { ok: 'ok.saved' });
+  setModerator = (id: string, isModerator: boolean) =>
+    this.call<PublicUser>('PATCH', `/users/${id}`, { isModerator }, { ok: 'ok.saved' });
+
+  // --- moderation (decision 283)
+  report = (kind: ModKind, ref: string, reason: string) =>
+    this.call<void>(
+      'POST',
+      '/moderation/reports',
+      { kind, ref, reason },
+      { ok: 'ok.mod.reported' },
+    );
+  modQueue = (status: 'open' | 'done') =>
+    this.call<ModItem[]>('GET', `/moderation/queue?status=${status}`);
+  modCount = () =>
+    this.call<{ open: number }>('GET', '/moderation/count', undefined, {
+      quiet: true,
+      background: true,
+    });
+  modDecide = (id: string, action: 'ok' | 'reset') =>
+    this.call<void>('POST', `/moderation/items/${id}`, { action }, { ok: `ok.mod.${action}` });
+  modSanction = (
+    userId: string,
+    action: 'warn' | 'text-ban' | 'ban' | 'unban',
+    days: number,
+    reason: string,
+  ) =>
+    this.call<unknown>(
+      'POST',
+      `/moderation/users/${userId}`,
+      { action, days, reason },
+      { ok: `ok.mod.${action}` },
+    );
+  modSettings = () => this.call<ModSettings>('GET', '/moderation/settings');
+  setModSettings = (body: Partial<Pick<ModSettings, 'builtin' | 'block' | 'flag' | 'allow'>>) =>
+    this.call<ModSettings>('PUT', '/moderation/settings', body, { ok: 'ok.saved' });
+  modScan = () =>
+    this.call<{ checked: number; queued: number }>('POST', '/moderation/scan', undefined);
+  modLog = () => this.call<ModLogEntry[]>('GET', '/moderation/log');
 
   statsPlayers = (scope: StatScope, mode: StatMode | '', bots: boolean) =>
     this.call<StatsPlayerRow[]>(

@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, type ActivatedRouteSnapshot } from '@angular/router';
 import type { Routes } from '@angular/router';
-import { adminOnly, loggedIn } from './core/auth';
+import { adminOnly, modOnly, loggedIn } from './core/auth';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login').then((m) => m.LoginPage) },
@@ -175,6 +175,12 @@ export const routes: Routes = [
         title: 'series.title',
         canActivate: [adminOnly],
         loadComponent: () => import('./pages/series').then((m) => m.SeriesPage),
+      },
+      {
+        path: 'moderation',
+        title: 'mod.title',
+        canActivate: [modOnly],
+        loadComponent: () => import('./pages/moderation').then((m) => m.ModerationPage),
       },
       {
         path: 'admin/users',

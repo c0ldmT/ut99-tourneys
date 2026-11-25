@@ -46,6 +46,22 @@ export const ERRORS_DE: Record<string, string> = {
   'agent {agentId} is offline': 'Server {agentId} ist offline.',
   'agent {agentId} is busy with {name}': 'Server {agentId} ist mit {name} beschäftigt.',
   'no free server in the pool': 'Kein freier Server im Pool.',
+  // --- moderation (decision 283)
+  'moderators only': 'Nur für Moderatoren.',
+  'this text is not allowed here': 'Dieser Text ist hier nicht erlaubt.',
+  'you cannot change names and texts until {until}':
+    'Du kannst Namen und Texte bis {until} nicht ändern.',
+  'your account is blocked until {until}': 'Dein Konto ist bis {until} gesperrt.',
+  'nothing to report': 'Hier gibt es nichts zu melden.',
+  'you cannot report your own text': 'Eigene Texte kannst du nicht melden.',
+  'moderation item not found': 'Eintrag nicht gefunden.',
+  'already decided': 'Darüber wurde schon entschieden.',
+  'not yourself': 'Nicht bei dir selbst.',
+  'only admins can do this to moderators': 'Das dürfen bei Moderatoren nur Admins.',
+  'admins cannot be banned': 'Admins können nicht gesperrt werden.',
+  'a text ban needs days': 'Eine Textsperre braucht eine Anzahl Tage.',
+  'unknown kind {kind}': 'Unbekannte Art {kind}.',
+  'no free name': 'Kein freier Name gefunden.',
   'players of this tournament still play in {name}':
     'Spieler dieses Turniers spielen gerade noch in {name}.',
   'you are signed up for {name} at the same time':

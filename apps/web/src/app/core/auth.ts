@@ -51,6 +51,14 @@ export const loggedIn: CanActivateFn = async (_route, state) => {
   return router.createUrlTree(['/login'], { queryParams: { next: state.url } });
 };
 
+/** Moderators and admins (decision 283). */
+export const modOnly: CanActivateFn = async () => {
+  const auth = inject(Auth);
+  const router = inject(Router);
+  await auth.ready();
+  return auth.me()?.isModerator || auth.me()?.isAdmin ? true : router.createUrlTree(['/']);
+};
+
 export const adminOnly: CanActivateFn = async () => {
   const auth = inject(Auth);
   const router = inject(Router);

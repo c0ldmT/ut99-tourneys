@@ -614,7 +614,15 @@ function run(
   // --- Rewrite.
   const discordIds: string[] = [];
   const update = db.transaction(() => {
-    for (const t of ['sessions', 'inventories', ...(o.replays ? [] : ['game_replays'])])
+    // The moderation queue, reports and log hold players' texts and names (decision 283).
+    for (const t of [
+      'sessions',
+      'inventories',
+      'moderation_items',
+      'moderation_reports',
+      'moderation_log',
+      ...(o.replays ? [] : ['game_replays']),
+    ])
       if (has(t)) removed[t] = db.prepare(`DELETE FROM "${t}"`).run().changes;
     if (o.replays && has('game_replays'))
       for (const r of rows<{ rowid: number; data: Buffer }>(

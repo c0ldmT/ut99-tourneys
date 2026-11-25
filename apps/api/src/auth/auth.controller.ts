@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { z } from 'zod';
-import { CONFIG, type ApiConfig } from '../config.js';
+import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { cookie, forbidden, parseCookies, ZodPipe } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { LATEST_PATCH, PATCH_NOTES } from '../common/patch-notes.js';
@@ -24,7 +24,15 @@ import { DISCORD, type DiscordApi } from './discord.js';
 import { isWebhookUrl } from '../notify/discord-out.js';
 import { UdtLeagueService } from '../udt/udt-league.service.js';
 import { SettingsService } from '../settings/settings.service.js';
-import { AdminOnly, CurrentUser, Public, type AuthedRequest } from './guard.js';
+import {
+  AdminOnly,
+  bannedNow,
+  CurrentUser,
+  isModerator,
+  Public,
+  type AuthedRequest,
+} from './guard.js';
+import { ModerationService } from '../moderation/moderation.service.js';
 import { SESSION_COOKIE, SessionsService } from './sessions.service.js';
 import { publicUser, UsersService, type User } from './users.service.js';
 
@@ -39,7 +47,10 @@ const MeBody = z.object({
   /** Discord direct messages from the bot. */
   notifyDm: z.boolean().optional(),
 });
-const AdminBody = z.object({ isAdmin: z.boolean() });
+const AdminBody = z.object({
+  isAdmin: z.boolean().optional(),
+  isModerator: z.boolean().optional(),
+});
 const PatchSeenBody = z.object({ id: z.number().int().min(0) });
 
 @Controller()
@@ -53,7 +64,14 @@ export class AuthController {
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
     @Inject(FeedbackService) private readonly feedback: FeedbackService,
+    @Inject(CLOCK) private readonly clock: ApiClock,
+    @Inject(ModerationService) private readonly moderation: ModerationService,
   ) {}
+
+  /** Login: a new player's name goes through the word filter (decision 283). */
+  private loggedIn(user: User): User {
+    return user.createdAt === user.lastLoginAt ? this.moderation.newPlayer(user) : user;
+  }
 
   /** What the frontend needs before login. */
   @Public()
@@ -129,7 +147,8 @@ export class AuthController {
       const identity = await this.discord.identify(code);
       const guild = this.config.discord.guildId;
       if (guild && !identity.guildIds?.includes(guild)) return fail('guild');
-      const user = this.users.login(identity);
+      const user = this.loggedIn(this.users.login(identity));
+      if (bannedNow(user, this.clock.now())) return fail('banned');
       this.log.info(`login ${user.displayName} (discord ${identity.discordId})`);
       this.startSession(res, user);
       return res.redirect(next);
@@ -147,10 +166,20 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!this.config.devLogin) throw forbidden('dev login is disabled');
-    const user = this.users.login(
-      { discordId: `dev:${body.name.toLowerCase()}`, username: body.name, displayName: body.name },
-      { admin: body.admin },
+    const user = this.loggedIn(
+      this.users.login(
+        {
+          discordId: `dev:${body.name.toLowerCase()}`,
+          username: body.name,
+          displayName: body.name,
+        },
+        { admin: body.admin },
+      ),
     );
+    if (bannedNow(user, this.clock.now()))
+      throw forbidden('your account is blocked until {until}', {
+        until: user.bannedUntil!.slice(0, 10),
+      });
     this.startSession(res, user);
     return this.me(user);
   }
@@ -179,6 +208,9 @@ export class AuthController {
       patchSeen: user.patchSeen,
       /** A season survey waiting for the user (decision 245). */
       survey: this.feedback.pending(user.id),
+      /** Moderation (decision 283): the queue for moderators, a running text ban. */
+      isModerator: isModerator(user),
+      textBanUntil: user.textBanUntil,
     };
   }
 
@@ -202,7 +234,11 @@ export class AuthController {
   @Patch('me')
   updateMe(@CurrentUser() user: User, @Body(new ZodPipe(MeBody)) body: z.infer<typeof MeBody>) {
     let u = user;
-    if (body.displayName !== undefined) u = this.users.setDisplayName(u.id, body.displayName);
+    if (body.displayName !== undefined && body.displayName !== u.displayName) {
+      this.moderation.screen(u, [body.displayName]);
+      u = this.users.setDisplayName(u.id, body.displayName);
+      this.moderation.review('name', u.id);
+    }
     if (body.notifyDm !== undefined) u = this.users.setNotifyDm(u.id, body.notifyDm);
     return this.me(u);
   }
@@ -216,7 +252,13 @@ export class AuthController {
   @AdminOnly()
   @Get('users')
   listUsers() {
-    return this.users.list().map(publicUser);
+    return this.users.list().map((u) => ({
+      ...publicUser(u),
+      isModerator: u.isModerator,
+      warnings: u.warnings,
+      textBanUntil: u.textBanUntil,
+      bannedUntil: u.bannedUntil,
+    }));
   }
 
   @AdminOnly()
@@ -226,8 +268,13 @@ export class AuthController {
     @Param('id') id: string,
     @Body(new ZodPipe(AdminBody)) body: z.infer<typeof AdminBody>,
   ) {
-    if (id === me.id && !body.isAdmin) throw forbidden('you cannot remove your own admin rights');
-    return publicUser(this.users.setAdmin(id, body.isAdmin));
+    if (body.isAdmin !== undefined) {
+      if (id === me.id && !body.isAdmin) throw forbidden('you cannot remove your own admin rights');
+      this.users.setAdmin(id, body.isAdmin);
+    }
+    if (body.isModerator !== undefined) this.moderation.setModerator(me, id, body.isModerator);
+    const u = this.users.require(id);
+    return { ...publicUser(u), isModerator: u.isModerator };
   }
 
   private startSession(res: Response, user: User) {

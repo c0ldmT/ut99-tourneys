@@ -616,6 +616,14 @@ export class UdtService {
     };
   }
 
+  /** Library ids of a manager's own bots (starter, academy, blueprints; moderation, 283). */
+  ownBotIds(userId: string): string[] {
+    return this.bots
+      .list()
+      .filter((b) => b.udtOwner === userId)
+      .map((b) => b.id);
+  }
+
   team(userId: string, season: number): UdtTeam | null {
     const t = this.db
       .select()

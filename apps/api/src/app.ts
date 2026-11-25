@@ -8,6 +8,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import express from 'express';
 import { AgentsController } from './agents/agents.controller.js';
 import { AgentsService } from './agents/agents.service.js';
+import { ModerationController } from './moderation/moderation.controller.js';
+import { ModerationService } from './moderation/moderation.service.js';
 import { AgentConnections } from './agents/connections.js';
 import { AgentGateway } from './agents/gateway.js';
 import { AuthController } from './auth/auth.controller.js';
@@ -112,6 +114,7 @@ class AppModule {
         UdtTestController,
         NeuroController,
         FeedbackController,
+        ModerationController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },
@@ -144,6 +147,7 @@ class AppModule {
         EventLogService,
         AgentConnections,
         AgentsService,
+        ModerationService,
         TeamsService,
         NotificationsService,
         TournamentsService,

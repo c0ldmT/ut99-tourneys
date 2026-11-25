@@ -60,6 +60,7 @@ import {
   type OpenInput,
 } from './udt-packs.service.js';
 import { BuyBody, UdtMarketService, type BuyInput } from './udt-market.service.js';
+import { ModerationService } from '../moderation/moderation.service.js';
 import {
   BotLookBody,
   LineupBody,
@@ -86,6 +87,7 @@ export class UdtController {
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(UdtKeepersService) private readonly keepers: UdtKeepersService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
+    @Inject(ModerationService) private readonly moderation: ModerationService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(StatsService) private readonly stats: StatsService,
   ) {}
@@ -190,7 +192,15 @@ export class UdtController {
     @Param('id') id: string,
     @Body(new ZodPipe(BotLookBody)) body: BotLook,
   ) {
-    return this.udt.editBot(user, id, body);
+    // Chat lines go through the word filter (decision 283).
+    if (body.personality?.lines)
+      this.moderation.screen(
+        user,
+        body.personality.lines.map((l) => l.text),
+      );
+    const out = this.udt.editBot(user, id, body);
+    if (body.personality?.lines) this.moderation.review('bot-lines', id);
+    return out;
   }
 
   /** Renames an own bot once (free). */
@@ -201,13 +211,28 @@ export class UdtController {
     @Param('id') id: string,
     @Body(new ZodPipe(z.object({ name: BotName }))) body: { name: string },
   ) {
-    return this.udt.rename(user, id, body.name);
+    this.moderation.screen(user, [body.name]);
+    const out = this.udt.rename(user, id, body.name);
+    this.moderation.review('udt-bot', id);
+    return out;
   }
 
   @Post('team')
   createTeam(@CurrentUser() user: User, @Body(new ZodPipe(TeamBody)) body: TeamInput) {
+    this.moderation.screen(user, [
+      body.name,
+      body.tag,
+      body.starter.name,
+      ...(body.starter.personality?.lines ?? []).map((l) => l.text),
+    ]);
     this.udt.createTeam(user, body);
-    return this.udt.view(user);
+    const view = this.udt.view(user);
+    if (view.season !== null) this.moderation.review('udt-team', `${view.season}/${user.id}`);
+    for (const b of this.udt.ownBotIds(user.id)) {
+      this.moderation.review('udt-bot', b);
+      this.moderation.review('bot-lines', b);
+    }
+    return view;
   }
 
   @Put('lineup')
@@ -427,7 +452,14 @@ export class UdtController {
 
   @Post('trades')
   propose(@CurrentUser() user: User, @Body(new ZodPipe(TradeBody)) body: TradeInput) {
-    return this.trades.propose(user, body);
+    if (body.message) this.moderation.screen(user, [body.message]);
+    const out = this.trades.propose(user, body);
+    // The new offer: the newest open one of the user with this message.
+    const made = out.open
+      .filter((t) => !t.incoming && t.message === body.message)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (body.message && made) this.moderation.review('trade', made.id);
+    return out;
   }
 
   @Post('trades/:id/accept')

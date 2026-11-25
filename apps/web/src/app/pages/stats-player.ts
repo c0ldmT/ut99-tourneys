@@ -22,6 +22,8 @@ import { Coin } from '../core/brand';
 import { raceTime } from '../core/race';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
 import { defaultScope, parseScope, startedSeasons } from '../core/season';
+import { ReportButton } from '../components/report-button';
+import { Auth } from '../core/auth';
 import type {
   PlayerRatings,
   SeasonsOverview,
@@ -34,7 +36,17 @@ import type {
 
 @Component({
   selector: 'app-stats-player',
-  imports: [TPipe, RouterLink, DatePipe, NeuroPipe, Coin, RatingChart, Avatar, NameTag],
+  imports: [
+    TPipe,
+    RouterLink,
+    DatePipe,
+    NeuroPipe,
+    Coin,
+    RatingChart,
+    Avatar,
+    NameTag,
+    ReportButton,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="top">
@@ -62,6 +74,11 @@ import type {
         <div>
           <h1>
             <na-name [name]="d.row.name" [id]="userId()" [withTitle]="true" [badgeSize]="22" />
+            @if (userId(); as uid) {
+              @if (uid !== auth.me()?.id) {
+                <na-report kind="name" [ref]="uid" [label]="d.row.name" />
+              }
+            }
             @if (d.row.bot) {
               <span class="badge bot">{{ 'stats.bot' | t }}</span>
             }
@@ -316,7 +333,14 @@ import type {
     }
     @if (neuro(); as n) {
       @if (!d() && n.name) {
-        <h1>{{ n.name }}</h1>
+        <h1>
+          {{ n.name }}
+          @if (userId(); as uid) {
+            @if (uid !== auth.me()?.id) {
+              <na-report kind="name" [ref]="uid" [label]="n.name" />
+            }
+          }
+        </h1>
         <p class="muted">{{ 'stats.noGamesYet' | t }}</p>
       }
       @if (n.wallet && n.season) {
@@ -536,6 +560,7 @@ export class StatsPlayerPage {
   private readonly toasts = inject(Toasts);
   /** Only the newest load may set the page (season or route changed meanwhile). */
   private loadSeq = 0;
+  protected readonly auth = inject(Auth);
   readonly key = input.required<string>();
   private readonly looks = inject(Looks);
   /** The website user of the page (players only). */

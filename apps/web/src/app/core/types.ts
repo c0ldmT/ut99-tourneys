@@ -104,6 +104,58 @@ export interface Me {
   patchSeen?: number;
   /** A season survey waiting for the user (decision 245). */
   survey?: { season: number } | null;
+  /** May work the moderation queue (decision 283; admins too). */
+  isModerator?: boolean;
+  /** No name or text changes until then. */
+  textBanUntil?: string | null;
+}
+
+/** What a moderated text belongs to (decision 283). */
+export type ModKind = 'name' | 'udt-team' | 'udt-bot' | 'bot-lines' | 'team' | 'trade';
+
+/** An item of the moderation queue. */
+export interface ModItem {
+  id: string;
+  kind: ModKind;
+  ref: string;
+  text: string;
+  current: string | null;
+  source: 'filter' | 'report' | 'scan';
+  term: string | null;
+  reports: number;
+  reasons: { by: string | null; reason: string; at: string }[];
+  status: 'open' | 'ok' | 'reset';
+  createdAt: string;
+  decidedAt: string | null;
+  decidedBy: string | null;
+  author: {
+    id: string;
+    displayName: string;
+    warnings: number;
+    textBanUntil: string | null;
+    bannedUntil: string | null;
+    moderator: boolean;
+  } | null;
+}
+
+export interface ModSettings {
+  builtin: boolean;
+  block: string[];
+  flag: string[];
+  allow: string[];
+  builtinBlock: number;
+  builtinFlag: number;
+}
+
+export interface ModLogEntry {
+  id: string;
+  at: string;
+  by: string | null;
+  action: string;
+  target: string | null;
+  kind: string | null;
+  ref: string | null;
+  detail: Record<string, unknown>;
 }
 
 /** A question of the season survey (decision 245): texts `fb.q.<id>`, `fb.o.<id>.<option>`. */
@@ -172,6 +224,11 @@ export interface PublicUser {
   username: string;
   avatar: string | null;
   isAdmin: boolean;
+  /** Admin list only (decision 283). */
+  isModerator?: boolean;
+  warnings?: number;
+  textBanUntil?: string | null;
+  bannedUntil?: string | null;
 }
 
 export type Phase = 'draft' | 'seeded' | 'checkIn' | 'running' | 'paused' | 'finished' | 'aborted';
