@@ -1,12 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
-import { buildSlots, createRng, fillEmptySlots, shuffle, type Rng } from '@tourney/bracket';
+import {
+  buildSlots,
+  createRng,
+  fillEmptySlots,
+  playableMatches,
+  shuffle,
+  type Rng,
+} from '@tourney/bracket';
 import {
   BotSpecSchema,
   MAX_SUBS,
   TournamentSettingsSchema,
   botEntrant,
   botTeamName,
+  isBotEntrant,
   entrantUserIds,
   settingsProblems,
   teamStarters,
@@ -88,6 +96,8 @@ const STOCK_BOTS: BotSpec[] = [
 export const ACTIVE_PHASES = ['checkIn', 'running', 'paused'];
 /** The mod's access list holds 64 entries. */
 export const MAX_ACCESS = 64;
+/** Parallel matches: servers a tournament may use at once (decision 291). */
+export const MAX_PARALLEL = 8;
 
 /** Phases of a tournament that is over (the archive). */
 export const DONE_PHASES = ['finished', 'aborted'];
@@ -231,6 +241,11 @@ const TournamentFields = z.object({
    * (`agentId`/`profileId` are the preferred one until then).
    */
   serverAuto: z.boolean().optional(),
+  /**
+   * Parallel matches (decision 291): servers the tournament may use at once. Extra servers come
+   * from the pool at the start and play the matches without players.
+   */
+  parallel: z.number().int().min(1).max(MAX_PARALLEL).optional(),
   settings: TournamentSettingsSchema,
   /** Missing or empty: the active bots of the control center (fixed at the seeding). */
   botPool: z.array(BotSpecSchema).max(64).optional(),
@@ -285,10 +300,13 @@ export const CommandBody = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('resume') }),
   z.object({ kind: z.literal('abort'), reason: z.string().trim().min(1).max(200) }),
   z.object({ kind: z.literal('announce'), message: z.string().trim().min(1).max(200) }),
-  /** Plays the current game (Monster Hunt: run) of the current match again. */
-  z.object({ kind: z.literal('restart') }),
+  /**
+   * Plays the current game (Monster Hunt: run) of a match being played again: `matchId` (parallel
+   * matches, decision 291), else the match on the tournament's own server.
+   */
+  z.object({ kind: z.literal('restart'), matchId: z.string().max(64).optional() }),
   /** Monster Hunt: the running team gives up its run, the other team runs next. */
-  z.object({ kind: z.literal('forfeitRun') }),
+  z.object({ kind: z.literal('forfeitRun'), matchId: z.string().max(64).optional() }),
 ]);
 export type Command = z.infer<typeof CommandBody>;
 
@@ -611,6 +629,7 @@ export class TournamentsService {
         profileId: body.profileId,
         connectAddress: body.connectAddress || null,
         serverAuto: body.serverAuto ?? false,
+        parallel: body.parallel ?? 1,
         settingsJson: JSON.stringify(body.settings),
         botPoolJson: JSON.stringify(body.botPool),
         botsFromLibrary: fromLibrary,
@@ -672,6 +691,12 @@ export class TournamentsService {
     if (body.profileId !== undefined) set.profileId = body.profileId;
     if (body.connectAddress !== undefined) set.connectAddress = body.connectAddress || null;
     if (body.serverAuto !== undefined) set.serverAuto = body.serverAuto;
+    // Applies at the start: extra servers are taken then (decision 291).
+    if (body.parallel !== undefined && body.parallel !== t.parallel) {
+      if (ACTIVE_PHASES.includes(t.phase) || DONE_PHASES.includes(t.phase))
+        throw conflict('parallel matches can only be changed before the start');
+      set.parallel = body.parallel;
+    }
     if (body.settings !== undefined) set.settingsJson = JSON.stringify(body.settings);
     if (body.botPool !== undefined) set.botPoolJson = JSON.stringify(body.botPool);
     if (fromLibrary !== undefined) set.botsFromLibrary = fromLibrary;
@@ -1154,7 +1179,7 @@ export class TournamentsService {
       },
     ]);
     if (!res.accepted) throw conflict(res.reason);
-    this.syncToAgent(this.require(id), head);
+    this.syncServers(this.require(id), head);
   }
 
   /** Admin: puts every solo player into a team (see formTeams). */
@@ -1243,7 +1268,7 @@ export class TournamentsService {
       seen.add(e.userId);
       out.push(e);
     };
-    const playing = new Set(proj?.currentMatch?.entrants ?? []);
+    const playing = new Set(Object.values(proj?.liveMatches ?? {}).flatMap((m) => m.entrants));
     const players = this.registered(t.id);
     const inMatch = (u: User) => playing.has(byUser.get(u.id)?.id ?? '');
     for (const u of [...players.filter(inMatch), ...players.filter((u) => !inMatch(u))]) {
@@ -1266,10 +1291,15 @@ export class TournamentsService {
 
   /** Re-sends the access list to the bridge while the tournament runs (token changes, watchers). */
   async pushAccess(t: TournamentRow): Promise<void> {
-    if (!ACTIVE_PHASES.includes(t.phase) || !this.connections.isOnline(t.agentId)) return;
-    await this.connections
-      .command(t.agentId, { kind: 'access.upsert', tournamentId: t.id, entries: this.access(t) })
-      .catch((e: Error) => this.logger.warn(`access.upsert for ${t.id}: ${e.message}`));
+    if (!ACTIVE_PHASES.includes(t.phase)) return;
+    const entries = this.access(t);
+    // Every server of the tournament (parallel matches: spectators join the extra ones too).
+    for (const agentId of this.serversOf(t)) {
+      if (!this.connections.isOnline(agentId)) continue;
+      await this.connections
+        .command(agentId, { kind: 'access.upsert', tournamentId: t.id, entries })
+        .catch((e: Error) => this.logger.warn(`access.upsert for ${t.id}: ${e.message}`));
+    }
   }
 
   /**
@@ -1491,7 +1521,7 @@ export class TournamentsService {
     });
     const res = this.log.append(id, head, batch);
     if (!res.accepted) throw conflict(res.reason);
-    this.syncToAgent(t, head);
+    this.syncServers(t, head);
     return res.projection;
   }
 
@@ -1560,7 +1590,7 @@ export class TournamentsService {
     const res = this.log.append(t.id, head, batch);
     if (!res.accepted) throw conflict(res.reason);
     this.drawDrops.set(t.id, dropped);
-    this.syncToAgent(t, head);
+    this.syncServers(t, head);
     return res.projection;
   }
 
@@ -1787,26 +1817,293 @@ export class TournamentsService {
   // Running (through the bridge agent)
   // ------------------------------------------------------------------------------------------
 
-  /** Sends the log (from `fromSeq`) and the access list to the agent if it is connected. */
-  syncToAgent(t: TournamentRow, fromSeq: number): void {
-    if (!this.connections.isOnline(t.agentId)) return;
+  /**
+   * Sends the log (from `fromSeq`) and the access list to a server of the tournament (its own by
+   * default) if it is connected. `eventsOnly`: only the new events (parallel matches: what another
+   * server wrote, decision 291), the rest is unchanged.
+   */
+  syncToAgent(
+    t: TournamentRow,
+    fromSeq: number,
+    agentId = t.agentId,
+    opts: { eventsOnly?: boolean } = {},
+  ): void {
+    if (!this.connections.isOnline(agentId)) return;
     const log = this.log.load(t.id);
-    const from = fromSeq > log.length ? 0 : fromSeq;
-    this.connections.send(t.agentId, {
+    const key = `${t.id} ${agentId}`;
+    let from = fromSeq > log.length ? 0 : fromSeq;
+    // A server that missed a sync gets what it is missing too.
+    const known = this.synced.get(key);
+    if (known !== undefined && known < from) from = known;
+    const lanes = this.lanesOf(t).length;
+    this.connections.send(agentId, {
       type: 'tournament.sync',
-      payload: {
-        tournamentId: t.id,
-        fromSeq: from,
-        events: log.slice(from),
-        access: this.access(t),
-        records: this.mapRecordsFor(t),
-        bots: this.botPersonalities(t),
-        dedications: this.dedications(t),
-        betWindowSec: this.betWindowSec(t),
-        antiIdle: this.settingsSvc.get().botAi.level,
-        skillCurve: this.settingsSvc.get().botAi.skillCurve,
-      },
+      payload: opts.eventsOnly
+        ? {
+            tournamentId: t.id,
+            fromSeq: from,
+            events: log.slice(from),
+            access: [],
+            eventsOnly: true,
+            lanes,
+          }
+        : {
+            tournamentId: t.id,
+            fromSeq: from,
+            events: log.slice(from),
+            access: this.access(t),
+            records: this.mapRecordsFor(t),
+            bots: this.botPersonalities(t),
+            dedications: this.dedications(t),
+            betWindowSec: this.betWindowSec(t),
+            antiIdle: this.settingsSvc.get().botAi.level,
+            skillCurve: this.settingsSvc.get().botAi.skillCurve,
+            lanes,
+          },
     });
+    this.synced.set(key, log.length);
+  }
+
+  /** How far each server's copy of a log is known to reach (`tournamentId agentId`). */
+  private readonly synced = new Map<string, number>();
+
+  /** A server stored events itself (its copy reaches `seq`). */
+  markSynced(tournamentId: string, agentId: string, seq: number): void {
+    this.synced.set(`${tournamentId} ${agentId}`, seq);
+  }
+
+  /** A server connected: what it has comes with its hello. */
+  forgetSynced(agentId: string): void {
+    for (const k of [...this.synced.keys()]) if (k.endsWith(` ${agentId}`)) this.synced.delete(k);
+  }
+
+  /**
+   * The log changed: every server of the tournament gets it (parallel matches, decision 291),
+   * except the one that wrote the events (it has them with the answer).
+   */
+  syncServers(t: TournamentRow, fromSeq: number, except?: string): void {
+    for (const agentId of this.serversOf(t)) {
+      if (agentId === except) continue;
+      // The others only need the events; the main server gets everything it always got.
+      this.syncToAgent(t, fromSeq, agentId, { eventsOnly: agentId !== t.agentId || !!except });
+    }
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Parallel matches (decision 291): extra servers (lanes) play matches without players
+  // ------------------------------------------------------------------------------------------
+
+  /** The extra servers a tournament plays on now. */
+  lanesOf(t: TournamentRow): { agentId: string; profileId: string }[] {
+    try {
+      return z
+        .array(z.object({ agentId: z.string(), profileId: z.string() }))
+        .parse(JSON.parse(t.lanesJson));
+    } catch {
+      return [];
+    }
+  }
+
+  /** Every server of a tournament: its own first, then the extra ones. */
+  serversOf(t: TournamentRow): string[] {
+    return [t.agentId, ...this.lanesOf(t).map((l) => l.agentId)];
+  }
+
+  /** Whether a server takes part in a tournament (its own or an extra one). */
+  servesTournament(t: TournamentRow, agentId: string): boolean {
+    return this.serversOf(t).includes(agentId);
+  }
+
+  /** The server playing a match (an extra server, or the tournament's own). */
+  serverOfMatch(t: TournamentRow, matchId: string): string {
+    return this.log.projection(t.id)?.liveMatches[matchId]?.server ?? t.agentId;
+  }
+
+  /** Started or running tournaments that use a server as an extra server. */
+  laneTournaments(agentId: string): TournamentRow[] {
+    return this.db
+      .select()
+      .from(tournaments)
+      .where(inArray(tournaments.phase, ['seeded', ...ACTIVE_PHASES]))
+      .all()
+      .filter((t) => t.lanesJson !== '[]' && this.lanesOf(t).some((l) => l.agentId === agentId));
+  }
+
+  private setLanes(id: string, lanes: { agentId: string; profileId: string }[]): TournamentRow {
+    this.db
+      .update(tournaments)
+      .set({ lanesJson: JSON.stringify(lanes) })
+      .where(eq(tournaments.id, id))
+      .run();
+    return this.require(id);
+  }
+
+  /** Bridges from 0.4.0 on know extra servers (both the tournament's own and the extra ones). */
+  private lanesCapable(agentId: string): boolean {
+    const v = this.agents.get(agentId)
+      ? this.agents.info(this.agents.get(agentId)!).agentVersion
+      : undefined;
+    const [maj = 0, min = 0] = (v ?? '0.0').split('.').map((x) => Number(x) || 0);
+    return maj > 0 || min >= 4;
+  }
+
+  /** A pairing an extra server may play: bots against bots, not simulated. */
+  private laneCanPlay(p: TournamentProjection, entrants: readonly (string | null)[]): boolean {
+    if (p.settings.botMatchMode === 'simulate') return false;
+    return entrants.every((e) => e !== null && isBotEntrant(p.entrants[e]));
+  }
+
+  /**
+   * At the start: free servers of the pool for the matches without players, up to `parallel`
+   * servers in all and no more than there are bot pairings (they start after the main server).
+   */
+  private pickLanes(t: TournamentRow): TournamentRow {
+    const p = this.log.projection(t.id);
+    if (t.parallel <= 1 || !p || p.settings.botMatchMode === 'simulate') return t;
+    if (!this.lanesCapable(t.agentId)) {
+      this.logger.warn(`tournament ${t.id}: its server's bridge is too old for parallel matches`);
+      return t;
+    }
+    const bots = Object.values(p.entrants).filter((e) => isBotEntrant(e)).length;
+    const want = Math.min(t.parallel - 1, Math.floor(bots / 2));
+    if (want <= 0) return t;
+    const picked = this.freeServers(t, new Set([t.agentId]))
+      .filter((c) => this.lanesCapable(c.agentId))
+      .slice(0, want);
+    if (!picked.length) {
+      this.logger.info(`tournament ${t.id}: no free extra server, it plays on one server`);
+      return t;
+    }
+    for (const l of picked) this.claims.set(l.agentId, { id: t.id, at: this.clock.now() });
+    this.logger.info(`tournament ${t.id} also plays on ${picked.map((l) => l.agentId).join(', ')}`);
+    return this.setLanes(t.id, picked);
+  }
+
+  /** Starts (or resumes) an extra server; one that fails is dropped. */
+  private async runLane(t: TournamentRow, lane: { agentId: string; profileId: string }) {
+    try {
+      this.syncToAgent(t, 0, lane.agentId);
+      await this.connections.command(lane.agentId, {
+        kind: 'tournament.run',
+        tournamentId: t.id,
+        profileId: lane.profileId,
+        botPool: this.botPool(t),
+        lane: true,
+      });
+    } catch (err) {
+      this.logger.warn(`extra server ${lane.agentId} of ${t.id} failed: ${String(err)}`);
+      this.dropLanes(t.id, [lane.agentId], false);
+    }
+  }
+
+  /** An extra server connected again: it goes on with its tournament. */
+  resumeLanesOn(agentId: string, knownSeq: Record<string, number>): void {
+    for (const t of this.laneTournaments(agentId)) {
+      if (!ACTIVE_PHASES.includes(t.phase)) continue;
+      const lane = this.lanesOf(t).find((l) => l.agentId === agentId)!;
+      this.syncToAgent(t, knownSeq[t.id] ?? 0, agentId);
+      void this.connections
+        .command(agentId, {
+          kind: 'tournament.run',
+          tournamentId: t.id,
+          profileId: lane.profileId,
+          botPool: this.botPool(t),
+          lane: true,
+        })
+        .catch((e: Error) => this.logger.warn(`resume ${t.id} on ${agentId}: ${e.message}`));
+    }
+  }
+
+  /** Removes extra servers from a tournament; `leave`: tell them (their game server stops). */
+  private dropLanes(id: string, agentIds: string[], leave = true): void {
+    const t = this.get(id);
+    if (!t || !agentIds.length) return;
+    const row = this.setLanes(
+      id,
+      this.lanesOf(t).filter((l) => !agentIds.includes(l.agentId)),
+    );
+    for (const a of agentIds) {
+      if (this.claims.get(a)?.id === id) this.claims.delete(a);
+      if (leave && this.connections.isOnline(a))
+        void this.connections
+          .command(a, { kind: 'tournament.leave', tournamentId: id })
+          .catch((e: Error) => this.logger.warn(`release ${a} from ${id}: ${e.message}`));
+    }
+    this.logger.info(`tournament ${id}: extra servers ${agentIds.join(', ')} released`);
+    if (ACTIVE_PHASES.includes(row.phase)) this.syncToAgent(row, row.headSeq);
+  }
+
+  /**
+   * After every change of the log: extra servers that are no longer needed are released. All of
+   * them when the tournament is over; an idle one when no match without players is ready for it
+   * and there are more servers than matches without players left to play.
+   */
+  releaseLanes(id: string): void {
+    const t = this.get(id);
+    if (!t || t.lanesJson === '[]') return;
+    const lanes = this.lanesOf(t);
+    if (!ACTIVE_PHASES.includes(t.phase)) {
+      this.dropLanes(
+        id,
+        lanes.map((l) => l.agentId),
+      );
+      return;
+    }
+    const p = this.log.projection(id);
+    const bracket = p?.bracket;
+    if (!p || !bracket || p.phase === 'checkIn') return;
+    const live = Object.values(p.liveMatches);
+    const open = playableMatches(bracket).filter(
+      (m) => !p.liveMatches[m.id] && this.laneCanPlay(p, m.entrants),
+    );
+    if (open.length) return;
+    // Matches still to come that an extra server could play (players' matches stay on the main).
+    const left = bracket.matches.filter(
+      (m) =>
+        (m.status === 'waiting' || m.status === 'ready') &&
+        !p.liveMatches[m.id] &&
+        m.entrants.every((e) => e === null || isBotEntrant(p.entrants[e])),
+    ).length;
+    const idle = lanes.filter((l) => !live.some((m) => m.server === l.agentId));
+    const release: string[] = [];
+    let servers = 1 + lanes.length;
+    for (const l of idle) {
+      if (servers <= left) break;
+      release.push(l.agentId);
+      servers--;
+    }
+    if (release.length) this.dropLanes(id, release);
+  }
+
+  /** Free servers of the pool for a tournament: its own first (online, not busy, not reserved, with its maps). */
+  private freeServers(
+    t: TournamentRow,
+    exclude: Set<string> = new Set(),
+  ): { agentId: string; profileId: string }[] {
+    const settings = this.settings(t);
+    const view = this.calendarView({ ...t, settings });
+    const now = this.clock.now();
+    const maps = (settings.game.rules as { mapPool?: string[] }).mapPool ?? [];
+    const pool = this.agents.pool();
+    const candidates = [
+      ...pool.filter((p) => p.agentId === t.agentId),
+      ...pool.filter((p) => p.agentId !== t.agentId),
+    ].filter((c) => !exclude.has(c.agentId));
+    const hasMaps = (agentId: string, profileId: string) => {
+      const inv = z
+        .object({ maps: z.array(z.object({ id: z.string() })) })
+        .safeParse(this.agents.inventory(agentId, profileId));
+      if (!inv.success) return true;
+      const ids = new Set(inv.data.maps.map((m) => m.id.toLowerCase()));
+      return maps.every((m) => ids.has(m.toLowerCase()));
+    };
+    return candidates.filter(
+      (c) =>
+        this.connections.isOnline(c.agentId) &&
+        !this.busyWith(c.agentId, t.id) &&
+        !this.calendar.blocking({ ...view, agentId: c.agentId }, now) &&
+        hasMaps(c.agentId, c.profileId),
+    );
   }
 
   /** Betting phase length for the bridge: only season tournaments in season take bets. */
@@ -1906,7 +2203,11 @@ export class TournamentsService {
         agentId: t.agentId,
         name: other.name,
       });
-    if (t.phase === 'seeded') this.claims.set(t.agentId, { id, at: this.clock.now() });
+    const starting = t.phase === 'seeded';
+    if (starting) this.claims.set(t.agentId, { id, at: this.clock.now() });
+    // Parallel matches (decision 291): extra servers are picked first, so the tournament's own
+    // server knows about them before its first match (it leaves bot matches to them).
+    if (starting) t = this.pickLanes(t);
     try {
       this.syncToAgent(t, 0);
       await this.connections.command(t.agentId, {
@@ -1917,8 +2218,15 @@ export class TournamentsService {
       });
     } catch (err) {
       if (this.claims.get(t.agentId)?.id === id) this.claims.delete(t.agentId);
+      if (starting)
+        this.dropLanes(
+          id,
+          this.lanesOf(t).map((l) => l.agentId),
+          false,
+        );
       throw err;
     }
+    if (starting) for (const l of this.lanesOf(t)) await this.runLane(this.require(id), l);
   }
 
   /**
@@ -1934,6 +2242,9 @@ export class TournamentsService {
       (x) => x.id !== exceptId && ACTIVE_PHASES.includes(x.phase),
     );
     if (running) return running;
+    // An extra server of another tournament (decision 291).
+    const lane = this.laneTournaments(agentId).find((x) => x.id !== exceptId);
+    if (lane) return lane;
     const claim = this.claims.get(agentId);
     if (!claim || claim.id === exceptId || this.clock.now() - claim.at > 120_000) return undefined;
     const t = this.get(claim.id);
@@ -1946,31 +2257,8 @@ export class TournamentsService {
    * preferred server first, then the pool in order.
    */
   private assignServer(t: TournamentRow): TournamentRow {
-    const settings = this.settings(t);
-    const view = this.calendarView({ ...t, settings });
-    const now = this.clock.now();
-    const maps = (settings.game.rules as { mapPool?: string[] }).mapPool ?? [];
-    const pool = this.agents.pool();
-    const candidates = [
-      ...pool.filter((p) => p.agentId === t.agentId),
-      ...pool.filter((p) => p.agentId !== t.agentId),
-    ];
-    if (!candidates.length) return t; // no pool: its own server, as before
-    const hasMaps = (agentId: string, profileId: string) => {
-      const inv = z
-        .object({ maps: z.array(z.object({ id: z.string() })) })
-        .safeParse(this.agents.inventory(agentId, profileId));
-      if (!inv.success) return true;
-      const ids = new Set(inv.data.maps.map((m) => m.id.toLowerCase()));
-      return maps.every((m) => ids.has(m.toLowerCase()));
-    };
-    const free = candidates.find(
-      (c) =>
-        this.connections.isOnline(c.agentId) &&
-        !this.busyWith(c.agentId, t.id) &&
-        !this.calendar.blocking({ ...view, agentId: c.agentId }, now) &&
-        hasMaps(c.agentId, c.profileId),
-    );
+    if (!this.agents.pool().length) return t; // no pool: its own server, as before
+    const free = this.freeServers(t)[0];
     if (!free) throw conflict('no free server in the pool');
     if (free.agentId !== t.agentId || free.profileId !== t.profileId) {
       this.db
@@ -2057,6 +2345,7 @@ export class TournamentsService {
         },
       ]);
       if (!res.accepted) throw conflict(res.reason);
+      this.releaseLanes(id);
       return;
     }
     if (!online) throw conflict('agent {agentId} is offline', { agentId: t.agentId });
@@ -2085,25 +2374,31 @@ export class TournamentsService {
       case 'announce':
         return this.connections.command(t.agentId, { kind: 'announce', message: cmd.message });
       case 'restart': {
-        const cm = this.log.projection(id)?.currentMatch;
+        const cm = this.playedMatch(id, cmd.matchId);
         if (!cm) throw conflict('no match is being played right now');
         if (!cm.map) throw conflict('{matchId} has no map yet (map vote)', { matchId: cm.matchId });
-        return this.connections.command(t.agentId, {
+        return this.connections.command(cm.server ?? t.agentId, {
           kind: 'match.restart',
           tournamentId: id,
           matchId: cm.matchId,
         });
       }
       case 'forfeitRun': {
-        const cm = this.log.projection(id)?.currentMatch;
+        const cm = this.playedMatch(id, cmd.matchId);
         if (!cm?.runOrder) throw conflict('no Monster Hunt run is being played right now');
-        return this.connections.command(t.agentId, {
+        return this.connections.command(cm.server ?? t.agentId, {
           kind: 'match.forfeitRun',
           tournamentId: id,
           matchId: cm.matchId,
         });
       }
     }
+  }
+
+  /** A match being played: the given one (parallel matches), else the main server's. */
+  private playedMatch(id: string, matchId?: string) {
+    const p = this.log.projection(id);
+    return matchId ? p?.liveMatches[matchId] : p?.currentMatch;
   }
 
   /**
@@ -2147,7 +2442,8 @@ export class TournamentsService {
       },
     ]);
     if (!res.accepted) throw conflict(res.reason);
-    this.syncToAgent(this.require(id), head);
+    this.syncServers(this.require(id), head);
+    this.releaseLanes(id);
   }
 
   // ------------------------------------------------------------------------------------------
@@ -2276,12 +2572,31 @@ export class TournamentsService {
     const live = t.phase === 'running' || t.phase === 'paused';
     const loaded = live ? this.log.projection(t.id) : undefined;
     const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
-    const cm = live ? proj?.currentMatch : undefined;
+    // The main server's match, else one of the extra servers' (parallel matches, decision 291).
+    const playing = live ? Object.values(proj?.liveMatches ?? {}) : [];
+    const cm = live ? (proj?.currentMatch ?? playing[0]) : undefined;
     const name = (id: string) => proj?.entrants[id]?.displayName ?? id;
-    const tele = cm ? (this.hub.latestLive(t.id) as { matchId?: string } | undefined) : undefined;
-    const liveNow = tele && tele.matchId === cm?.matchId ? tele : undefined;
-    const wins = (id: string) =>
-      (cm ? (proj?.games[cm.matchId] ?? []) : []).filter((g) => g.winnerId === id).length;
+    const nowOf = (m: NonNullable<typeof cm>) => {
+      const tele = this.hub.latestLive(t.id, m.matchId);
+      const wins = (id: string) =>
+        (proj?.games[m.matchId] ?? []).filter((g) => g.winnerId === id).length;
+      return {
+        matchId: m.matchId,
+        game: m.game,
+        ...(m.map ? { map: m.map } : {}),
+        status: m.status,
+        entrants: m.entrants,
+        names: [name(m.entrants[0]), name(m.entrants[1])],
+        wins: [wins(m.entrants[0]), wins(m.entrants[1])],
+        bestOf: proj?.bracket?.byId[m.matchId]?.bestOf ?? 1,
+        /** Monster Hunt: finished runs of the game. */
+        ...(m.runs?.length ? { runs: m.runs } : {}),
+        /** Telemetry of the game in progress (frags, run clock), if any. */
+        ...(tele ? { live: tele } : {}),
+        /** The server playing it (parallel matches). */
+        server: m.server ? (this.agents.get(m.server)?.name ?? m.server) : this.serverName(t),
+      };
+    };
     return {
       id: t.id,
       name: t.name,
@@ -2306,23 +2621,10 @@ export class TournamentsService {
       /** A game of the Dream Team league: its evening, matchday and clubs. */
       ...(league ? { league } : {}),
       /** The match being played now (running tournaments): names and series score. */
-      ...(cm
-        ? {
-            now: {
-              matchId: cm.matchId,
-              game: cm.game,
-              ...(cm.map ? { map: cm.map } : {}),
-              status: cm.status,
-              entrants: cm.entrants,
-              names: [name(cm.entrants[0]), name(cm.entrants[1])],
-              wins: [wins(cm.entrants[0]), wins(cm.entrants[1])],
-              bestOf: proj?.bracket?.byId[cm.matchId]?.bestOf ?? 1,
-              /** Monster Hunt: finished runs of the game. */
-              ...(cm.runs?.length ? { runs: cm.runs } : {}),
-              /** Telemetry of the game in progress (frags, run clock), if any. */
-              ...(liveNow ? { live: liveNow } : {}),
-            },
-          }
+      ...(cm ? { now: nowOf(cm) } : {}),
+      /** Parallel matches (decision 291): the other matches being played at the same time. */
+      ...(playing.length > 1
+        ? { alsoNow: playing.filter((m) => m.matchId !== cm?.matchId).map(nowOf) }
         : {}),
     };
   }
@@ -2367,7 +2669,15 @@ export class TournamentsService {
       agentId: t.agentId,
       profileId: t.profileId,
       serverAuto: t.serverAuto,
+      parallel: t.parallel,
       serverName: this.serverName(t),
+      /** Parallel matches (decision 291): the extra servers it plays on now. */
+      lanes: this.lanesOf(t).map((l) => ({
+        agentId: l.agentId,
+        name: this.agents.get(l.agentId)?.name ?? l.agentId,
+        connectAddress: this.agents.profile(l.agentId, l.profileId)?.publicAddress ?? null,
+        online: this.connections.isOnline(l.agentId),
+      })),
       connectAddress: this.connectAddress(t),
       connectAddressOverride: t.connectAddress,
       // Once seeded, as the game plays them (SmartStockBots is set then, decision 225).
@@ -2428,7 +2738,9 @@ export class TournamentsService {
         hasAccess: inAccess,
       },
       projection: proj ? this.withCurrentBotNames(proj) : null,
-      live: this.hub.latestLive(id) ?? null,
+      live: this.hub.latestLive(id, proj?.currentMatch?.matchId) ?? this.hub.latestLive(id) ?? null,
+      /** Telemetry of every match being played (parallel matches). */
+      lives: this.hub.allLive(id),
       agent: { online: this.connections.isOnline(t.agentId) },
     };
   }

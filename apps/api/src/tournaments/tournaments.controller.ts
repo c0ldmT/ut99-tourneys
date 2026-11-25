@@ -314,11 +314,14 @@ export class TournamentsController {
     this.svc.override(id, body, user);
   }
 
-  /** Kill feed of the game in progress (the last kills; then the "feed" events of the stream). */
+  /**
+   * Kill feed of the game in progress (the last kills; then the "feed" events of the stream).
+   * `match`: of that match (parallel matches, decision 291), else of the latest.
+   */
   @Get(':id/feed')
-  feed(@Param('id') id: string) {
+  feed(@Param('id') id: string, @Query('match') match?: string) {
     this.svc.require(id);
-    return this.hub.latestFeed(id);
+    return this.hub.latestFeed(id, match || undefined);
   }
 
   /**
@@ -326,13 +329,15 @@ export class TournamentsController {
    * and its timeline so far (scores; a race: points, deaths, monsters).
    */
   @Get(':id/live-state')
-  liveState(@Param('id') id: string) {
+  liveState(@Param('id') id: string, @Query('match') match?: string) {
     this.svc.require(id);
+    const matchId = match || undefined;
     // The timeline of the game on the server only (not of a game an organizer ended).
-    const live = this.hub.latestLive(id) as { matchId?: string; game?: number } | undefined;
-    const timeline = this.recorder.progress(id);
+    const live = this.hub.latestLive(id, matchId) as
+      { matchId?: string; game?: number } | undefined;
+    const timeline = this.recorder.progress(id, live?.matchId ?? matchId);
     return {
-      state: this.hub.latestState(id) ?? null,
+      state: this.hub.latestState(id, live?.matchId ?? matchId) ?? null,
       timeline:
         timeline && live?.matchId === timeline.matchId && live.game === timeline.game
           ? timeline

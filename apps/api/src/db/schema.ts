@@ -105,6 +105,13 @@ export const tournaments = sqliteTable('tournaments', {
    * until then `agentId`/`profileId` are the preferred one, afterwards the one it runs on.
    */
   serverAuto: integer('server_auto', { mode: 'boolean' }).notNull().default(false),
+  /**
+   * Parallel matches (decision 291): how many servers the tournament may use at once (1 = its
+   * own only). Extra servers come from the pool when it starts and play matches without players.
+   */
+  parallel: integer('parallel').notNull().default(1),
+  /** The extra servers it plays on now: JSON `{ agentId, profileId }[]`. */
+  lanesJson: text('lanes_json').notNull().default('[]'),
   settingsJson: text('settings_json').notNull(),
   botPoolJson: text('bot_pool_json').notNull(),
   /**

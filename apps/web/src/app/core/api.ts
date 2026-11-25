@@ -141,6 +141,9 @@ export interface CallOptions<T> {
   background?: boolean;
 }
 
+/** `?match=…` for the live endpoints (empty without a match). */
+const matchQuery = (matchId?: string) => (matchId ? `?match=${encodeURIComponent(matchId)}` : '');
+
 @Injectable({ providedIn: 'root' })
 export class Api {
   private http = inject(HttpClient);
@@ -744,13 +747,20 @@ export class Api {
   };
   seriesOverview = () => this.call<SeriesOverview[]>('GET', '/series/overview');
   tournament = (id: string) => this.call<TournamentDetail>('GET', `/tournaments/${id}`);
-  killFeed = (id: string) => this.call<KillFeedEntry[]>('GET', `/tournaments/${id}/feed`);
+  /** `matchId`: of that match (parallel matches, decision 291), else of the latest. */
+  killFeed = (id: string, matchId?: string) =>
+    this.call<KillFeedEntry[]>('GET', `/tournaments/${id}/feed${matchQuery(matchId)}`);
   /** Live state of the game in progress (decoration of the match page: quiet). */
-  liveState = (id: string) =>
-    this.call<LiveSnapshot>('GET', `/tournaments/${id}/live-state`, undefined, {
-      quiet: true,
-      background: true,
-    });
+  liveState = (id: string, matchId?: string) =>
+    this.call<LiveSnapshot>(
+      'GET',
+      `/tournaments/${id}/live-state${matchQuery(matchId)}`,
+      undefined,
+      {
+        quiet: true,
+        background: true,
+      },
+    );
   matchReplays = (id: string, matchId: string) =>
     this.call<ReplayView[]>(
       'GET',

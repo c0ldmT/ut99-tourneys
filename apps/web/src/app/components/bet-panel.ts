@@ -438,16 +438,18 @@ export class BetPanel {
     if (!mine.length) return null;
     return mine.reduce((s, b) => s + (b!.status === 'won' ? b!.payout - b!.amount : -b!.amount), 0);
   });
-  /** The next five matches of the bracket (not the one being played), ready ones first. */
+  /** The next five matches of the bracket (not those being played), ready ones first. */
   protected readonly nextMatches = computed(() => {
     const p = this.tournament().projection;
     const b = p?.bracket;
     if (!b || ['finished', 'aborted'].includes(this.tournament().phase)) return [];
     const open = new Set(this.view()?.open ? this.openMatches().map((m) => m.matchId) : []);
-    const cur = p.currentMatch?.matchId;
+    // Parallel matches (decision 291): every match being played is out.
+    const playing = new Set(Object.keys(p.liveMatches ?? {}));
+    if (p.currentMatch) playing.add(p.currentMatch.matchId);
     const tbd = this.i18n.t('bracket.tbd');
     return b.matches
-      .filter((m) => (m.status === 'ready' || m.status === 'waiting') && m.id !== cur)
+      .filter((m) => (m.status === 'ready' || m.status === 'waiting') && !playing.has(m.id))
       .sort(
         (x, y) =>
           (x.status === 'ready' ? 0 : 1) - (y.status === 'ready' ? 0 : 1) ||

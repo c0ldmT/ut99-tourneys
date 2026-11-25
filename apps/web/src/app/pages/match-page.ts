@@ -30,6 +30,7 @@ import { BetColumns } from '../components/bet-columns';
 import type {
   BetMatchView,
   KillFeedEntry,
+  LiveInfo,
   LiveSnapshot,
   MatchDetailView,
   MatchGameView,
@@ -708,9 +709,20 @@ export class MatchPage {
   private readonly stream = inject(TournamentStream);
   /** Kills of the game in progress (live only). */
   protected readonly feed = signal<KillFeedEntry[]>([]);
+
+  /** Telemetry of a match: from the stream, else from the detail (parallel matches: per match). */
+  private liveOf(matchId: string | undefined): LiveInfo | null {
+    if (!matchId) return null;
+    const t = this.t();
+    return (
+      this.stream.lives()[matchId] ??
+      t?.lives?.find((l) => l.matchId === matchId) ??
+      (t?.live?.matchId === matchId ? t.live : null)
+    );
+  }
   /** Frags of the game in progress (telemetry). */
   protected readonly liveScore = computed(() => {
-    const l = this.stream.live() ?? this.t()?.live ?? null;
+    const l = this.liveOf(this.d()?.matchId);
     const d = this.d();
     if (!l || !d || l.matchId !== d.matchId || !l.scores) return null;
     return [l.scores[d.entrants[0]!.id] ?? 0, l.scores[d.entrants[1]!.id] ?? 0] as const;
@@ -736,7 +748,7 @@ export class MatchPage {
   });
   /** Monster Hunt: the run on the server (telemetry). */
   protected readonly liveRace = computed(() => {
-    const l = this.stream.live() ?? this.t()?.live ?? null;
+    const l = this.liveOf(this.d()?.matchId);
     const d = this.d();
     return l?.race && d && l.matchId === d.matchId ? l.race : null;
   });
@@ -745,7 +757,7 @@ export class MatchPage {
     const g = this.liveGame();
     const d = this.d();
     if (!g || !d) return null;
-    const a = this.stream.state();
+    const a = this.stream.states()[d.matchId] ?? null;
     const b = this.snapshot()?.state ?? null;
     const s = !a ? b : !b ? a : a.at >= b.at ? a : b;
     if (!s || s.matchId !== d.matchId || s.game !== g.game) return null;
@@ -979,7 +991,7 @@ export class MatchPage {
       });
       this.replayKey = '';
       this.liveKey = '';
-      this.api.killFeed(id).then(
+      this.api.killFeed(id, m).then(
         (l) => this.feed.set(l.filter((e) => e.matchId === m)),
         () => undefined,
       );
@@ -1013,7 +1025,7 @@ export class MatchPage {
       this.racePts.set([]);
       if (!key) return;
       const id = this.id();
-      this.api.liveState(id).then(
+      this.api.liveState(id, this.matchId()).then(
         (s) => {
           if (this.liveKey === key) this.snapshot.set(s);
         },

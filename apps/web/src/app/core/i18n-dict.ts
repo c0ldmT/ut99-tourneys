@@ -586,6 +586,13 @@ const en = {
   'form.agentPreferred': 'Preferred server',
   'form.serverAuto': 'Server: automatic',
   'form.serverAutoShort': 'automatic (preferred: {name})',
+  'form.parallel': 'Parallel matches',
+  'form.parallelOne': '1 (one match at a time)',
+  'form.parallelN': 'up to {n} at once',
+  'form.parallelHint':
+    'At the start up to {n} more free servers of the pool join. They play bot matches at the same time; matches with players stay on the main server. Extra servers become free once fewer matches are left.',
+  'form.parallelSimulate': 'Bot matches are simulated: nothing to play in parallel.',
+  'form.parallelPool': 'The pool has {n} servers right now.',
   'form.serverAutoHint':
     'At the start it takes a free server of the pool ({n} servers), the preferred one first. Off: always the server below.',
   'form.profile': 'Server profile',
@@ -707,6 +714,10 @@ const en = {
     'UT already running? Then quit it first, or type the command from above into the UT console.',
   'tp.asPlayer':
     'You play in this tournament. Connect for the check-in; the server tells you when your match starts.',
+  'tp.parallelTabs': 'Matches being played',
+  'tp.lanesTitle': 'More servers ({n}): parallel bot matches',
+  'tp.lanesHint':
+    'Bot matches run at the same time on these servers. To watch one, connect to its server with this command.',
   'tp.asSpectator': 'You join as a spectator.',
   'tp.noAddress': 'The server address is not set yet.',
   'tp.unwatch': 'Do not watch any more',
@@ -3690,6 +3701,13 @@ const de: Record<TKey, string> = {
   'form.agentPreferred': 'Bevorzugter Server',
   'form.serverAuto': 'Server: automatisch',
   'form.serverAutoShort': 'automatisch (bevorzugt: {name})',
+  'form.parallel': 'Parallele Matches',
+  'form.parallelOne': '1 (ein Match nach dem anderen)',
+  'form.parallelN': 'bis zu {n} gleichzeitig',
+  'form.parallelHint':
+    'Beim Start kommen bis zu {n} weitere freie Pool-Server dazu. Sie spielen Bot-Matches gleichzeitig; Matches mit Spielern bleiben auf dem Hauptserver. Zusatz-Server werden frei, sobald weniger Matches übrig sind.',
+  'form.parallelSimulate': 'Bot-Matches werden simuliert: Es gibt nichts parallel zu spielen.',
+  'form.parallelPool': 'Im Pool sind gerade {n} Server.',
   'form.serverAutoHint':
     'Nimmt beim Start einen freien Server aus dem Pool ({n} Server), den bevorzugten zuerst. Aus: immer der Server unten.',
   'form.profile': 'Serverprofil',
@@ -3812,6 +3830,10 @@ const de: Record<TKey, string> = {
     'Läuft UT schon? Dann vorher beenden oder den Befehl von oben in die UT-Konsole tippen.',
   'tp.asPlayer':
     'Du spielst mit. Verbinde dich zum Check-in; der Server sagt dir, wann dein Match beginnt.',
+  'tp.parallelTabs': 'Laufende Matches',
+  'tp.lanesTitle': 'Weitere Server ({n}): parallele Bot-Matches',
+  'tp.lanesHint':
+    'Auf diesen Servern laufen Bot-Matches gleichzeitig. Zum Zuschauen verbindest du dich mit diesem Befehl zum jeweiligen Server.',
   'tp.asSpectator': 'Du kommst als Zuschauer auf den Server.',
   'tp.noAddress': 'Die Serveradresse ist noch nicht eingetragen.',
   'tp.unwatch': 'Nicht mehr zuschauen',

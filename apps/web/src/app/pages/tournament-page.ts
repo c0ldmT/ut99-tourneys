@@ -33,6 +33,7 @@ import { botRoute } from '../core/bots';
 import { mmss } from '../core/live';
 import type {
   BetMatchView,
+  LiveInfo,
   LiveSnapshot,
   RatedGame,
   TournamentDetail,
@@ -113,6 +114,12 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             <div class="srv">
               <span class="dot" [class.on]="t.agent.online"></span> {{ t.agentId }}
             </div>
+            @for (l of t.lanes ?? []; track l.agentId) {
+              <!-- Parallel matches (decision 291): its extra servers. -->
+              <div class="srv small">
+                <span class="dot" [class.on]="l.online"></span> + {{ l.agentId }}
+              </div>
+            }
           </div>
         }
       </div>
@@ -312,6 +319,40 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                     </div>
                     <p class="muted small">{{ 'tp.linuxNote' | t }}</p>
                   </details>
+                  @if (t.lanes?.length) {
+                    <!-- Parallel matches (decision 291): spectators join the extra servers too. -->
+                    <details class="linux">
+                      <summary>{{ 'tp.lanesTitle' | t: { n: t.lanes!.length } }}</summary>
+                      <p class="muted small">{{ 'tp.lanesHint' | t }}</p>
+                      @for (l of t.lanes!; track l.agentId) {
+                        <p class="small">
+                          <span class="dot" [class.on]="l.online"></span> <b>{{ l.name }}</b>
+                          @if (laneMatch(l.agentId); as m) {
+                            · {{ m }}
+                          }
+                        </p>
+                        @if (l.connectAddress) {
+                          <div class="connect">
+                            <code #lc>{{ laneCommand(l.connectAddress) }}</code>
+                            <button
+                              class="icon"
+                              (click)="copy('lane-' + l.agentId, laneCommand(l.connectAddress), lc)"
+                              [title]="copyLabel('lane-' + l.agentId) | t"
+                              [attr.aria-label]="copyLabel('lane-' + l.agentId) | t"
+                            >
+                              <na-icon
+                                [name]="
+                                  copyLabel('lane-' + l.agentId) === 'common.copied'
+                                    ? 'check'
+                                    : 'copy'
+                                "
+                              />
+                            </button>
+                          </div>
+                        }
+                      }
+                    </details>
+                  }
                   <p class="muted small">
                     {{ (t.me.entrantId ? 'tp.asPlayer' : 'tp.asSpectator') | t }}
                   </p>
@@ -335,21 +376,47 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
 
         <!-- Live -->
         @if (current(); as cm) {
-          <app-live-mini
-            [link]="['/t', t.id, 'm', cm.matchId]"
-            [matchId]="cm.matchId"
-            [gameText]="
-              bestOfCurrent() > 1 ? ('tp.game' | t: { n: cm.game, of: bestOfCurrent() }) : ''
-            "
-            [sides]="miniSides()"
-            [status]="liveStatus()"
-            [clock]="liveClock()"
-            [limits]="race() ? '' : liveLimits()"
-            [players]="liveState()?.players ?? null"
-            [race]="race()"
-            [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
-            [delayed]="liveDelay()"
-          />
+          <div class="livewrap">
+            @if (playing().length > 1) {
+              <!-- Parallel matches (decision 291): one tab per match being played. -->
+              <div class="ltabs" role="tablist" [attr.aria-label]="'tp.parallelTabs' | t">
+                @for (m of playing(); track m.matchId) {
+                  <button
+                    type="button"
+                    role="tab"
+                    [class.on]="m.matchId === cm.matchId"
+                    [attr.aria-selected]="m.matchId === cm.matchId"
+                    (click)="selected.set(m.matchId)"
+                  >
+                    <span class="lt1"
+                      >{{ m.matchId }} · {{ name(m.entrants[0]) }} – {{ name(m.entrants[1]) }}</span
+                    >
+                    <span class="lt2 muted"
+                      >{{ serverOf(m) }}
+                      @if (tabScore(m); as sc) {
+                        · {{ sc }}
+                      }
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+            <app-live-mini
+              [link]="['/t', t.id, 'm', cm.matchId]"
+              [matchId]="cm.matchId"
+              [gameText]="
+                bestOfCurrent() > 1 ? ('tp.game' | t: { n: cm.game, of: bestOfCurrent() }) : ''
+              "
+              [sides]="miniSides()"
+              [status]="liveStatus()"
+              [clock]="liveClock()"
+              [limits]="race() ? '' : liveLimits()"
+              [players]="liveState()?.players ?? null"
+              [race]="race()"
+              [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
+              [delayed]="liveDelay()"
+            />
+          </div>
         } @else if (t.phase === 'checkIn') {
           <div class="card">
             <h2>{{ 'tp.checkIn' | t }}</h2>
@@ -388,11 +455,13 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             [bracket]="b"
             [entrants]="t.projection!.entrants"
             [games]="t.projection!.games"
-            [currentMatchId]="t.projection!.currentMatch?.matchId"
+            [currentMatchId]="current()?.matchId"
+            [liveMatchIds]="liveMatchIds()"
             [live]="liveNow()"
+            [lives]="livesById()"
             [myEntrantId]="t.me.entrantId"
             [race]="race()"
-            [currentRuns]="t.projection!.currentMatch?.runs ?? []"
+            [currentRuns]="current()?.runs ?? []"
             [ratings]="t.projection!.seedRatings"
             [betOpen]="betOpen()"
             (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
@@ -846,6 +915,42 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
+    .livewrap {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+    }
+    .ltabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      margin-bottom: 8px;
+    }
+    .ltabs button {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      flex: 0 0 auto;
+      max-width: 260px;
+      padding: 6px 10px;
+      border-radius: 10px;
+      text-align: left;
+    }
+    .ltabs button.on {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .lt1 {
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .lt2 {
+      font-size: 0.78rem;
+    }
     .lg-vs {
       font-size: 1.15rem;
       margin: 6px 0 2px;
@@ -1063,11 +1168,56 @@ export class TournamentPage {
 
   protected readonly isAdmin = computed(() => !!this.auth.me()?.isAdmin);
   protected readonly isActive = computed(() => ACTIVE.includes(this.t()?.phase ?? ''));
-  protected readonly current = computed(() => this.t()?.projection?.currentMatch ?? null);
-  protected readonly liveNow = computed(() => {
-    const l = this.stream.live() ?? this.t()?.live ?? null;
-    return l && l.matchId === this.current()?.matchId ? l : null;
+  /**
+   * The matches being played: the main server's first, then those on extra servers (parallel
+   * matches, decision 291).
+   */
+  protected readonly playing = computed(() => {
+    const p = this.t()?.projection;
+    if (!p) return [];
+    const all = Object.values(p.liveMatches ?? {});
+    if (!all.length && p.currentMatch) return [p.currentMatch];
+    return all.sort(
+      (a, b) => Number(!!a.server) - Number(!!b.server) || a.matchId.localeCompare(b.matchId),
+    );
   });
+  /** The match shown in the live panel (tabs with parallel matches). */
+  protected readonly selected = signal<string | null>(null);
+  protected readonly current = computed(() => {
+    const list = this.playing();
+    return list.find((m) => m.matchId === this.selected()) ?? list[0] ?? null;
+  });
+  protected readonly liveMatchIds = computed(() => this.playing().map((m) => m.matchId));
+  protected readonly livesById = computed(() => {
+    const out: Record<string, LiveInfo> = {};
+    for (const m of this.playing()) {
+      const l = this.liveOf(m.matchId);
+      if (l) out[m.matchId] = l;
+    }
+    return out;
+  });
+  /** Telemetry of a match: from the stream, else from the detail. */
+  protected liveOf(matchId: string | undefined): LiveInfo | null {
+    if (!matchId) return null;
+    const t = this.t();
+    return (
+      this.stream.lives()[matchId] ??
+      t?.lives?.find((l) => l.matchId === matchId) ??
+      (t?.live?.matchId === matchId ? t.live : null)
+    );
+  }
+  protected readonly liveNow = computed(() => this.liveOf(this.current()?.matchId));
+  /** The server playing a match (parallel matches): its name; the tournament's own: ''. */
+  protected serverOf(m: { server?: string }): string {
+    if (!m.server) return this.t()?.serverName ?? '';
+    return this.t()?.lanes?.find((l) => l.agentId === m.server)?.name ?? m.server;
+  }
+  /** Tab label of a match being played: its pairing and frags. */
+  protected tabScore(m: { matchId: string; entrants: [string, string] }): string {
+    const l = this.liveOf(m.matchId);
+    if (!l?.scores || this.race()) return '';
+    return `${l.scores[m.entrants[0]] ?? 0}:${l.scores[m.entrants[1]] ?? 0}`;
+  }
   protected readonly secondsLeft = computed(() => {
     const d = this.liveNow()?.deadline;
     return d ? Math.max(0, Math.round((d - this.now()) / 1000)) : null;
@@ -1080,7 +1230,7 @@ export class TournamentPage {
     const cm = this.current();
     const l = this.liveNow();
     if (!cm || !l) return null;
-    const a = this.stream.state();
+    const a = this.stream.states()[cm.matchId] ?? null;
     const b = this.snapshot()?.state ?? null;
     const s = !a ? b : !b ? a : a.at >= b.at ? a : b;
     if (!s || s.tournamentId !== this.id() || s.matchId !== cm.matchId || s.game !== l.game)
@@ -1202,8 +1352,9 @@ export class TournamentPage {
         );
       }
     }
-    const cm = p.currentMatch;
-    if (cm?.runs?.length) {
+    // The matches being played (parallel matches: all of them).
+    for (const cm of this.playing()) {
+      if (!cm.runs?.length) continue;
       groups.push(
         cm.runs.map((run, i) => ({
           matchId: cm.matchId,
@@ -1285,7 +1436,7 @@ export class TournamentPage {
       this.snapKey = key;
       this.snapshot.set(null);
       if (!key) return;
-      this.api.liveState(id).then(
+      this.api.liveState(id, l?.matchId).then(
         (s) => {
           if (this.snapKey === key) this.snapshot.set(s);
         },
@@ -1448,6 +1599,17 @@ export class TournamentPage {
     }
     const text = this.i18n.t('tp.rules', { frags: r.fragLimit ?? 20, min: r.timeLimitMin ?? 10 });
     return r.smartStockBots ? `${text} · SmartStockBots` : text;
+  }
+
+  /** Parallel matches: the console command for an extra server. */
+  protected laneCommand(address: string): string {
+    return `open ${joinUrl(address, this.auth.me()?.joinToken ?? '')}`;
+  }
+
+  /** The match an extra server plays now ("M5 · A – B"), or ''. */
+  protected laneMatch(agentId: string): string {
+    const m = this.playing().find((x) => x.server === agentId);
+    return m ? `${m.matchId} · ${this.name(m.entrants[0])} – ${this.name(m.entrants[1])}` : '';
   }
 
   protected connectCommand(t: TournamentDetail): string {

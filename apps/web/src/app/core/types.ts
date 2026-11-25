@@ -275,24 +275,31 @@ export interface TournamentSummary {
   /** A game of the Dream Team league: its evening (server day), matchday and clubs. */
   league?: LeagueTag;
   /** The match being played now (running tournaments). */
-  now?: {
-    matchId: string;
-    game: number;
-    map?: string;
-    status: 'called' | 'mapSelected' | 'live';
-    entrants: [string, string];
-    names: [string, string];
-    wins: [number, number];
-    bestOf: number;
-    runs?: {
-      entrantId: string;
-      timeMs: number;
-      penaltyMs: number;
-      finished: boolean;
-      forfeit?: boolean;
-    }[];
-    live?: LiveInfo;
-  };
+  now?: NowMatch;
+  /** Parallel matches (decision 291): the other matches being played at the same time. */
+  alsoNow?: NowMatch[];
+}
+
+/** A match being played (overview tiles). */
+export interface NowMatch {
+  matchId: string;
+  game: number;
+  map?: string;
+  status: 'called' | 'mapSelected' | 'live';
+  entrants: [string, string];
+  names: [string, string];
+  wins: [number, number];
+  bestOf: number;
+  runs?: {
+    entrantId: string;
+    timeMs: number;
+    penaltyMs: number;
+    finished: boolean;
+    forfeit?: boolean;
+  }[];
+  live?: LiveInfo;
+  /** The server playing it. */
+  server?: string;
 }
 
 /** A page of the archive (finished and aborted tournaments), see `Api.archive`. */
@@ -381,6 +388,10 @@ export interface TournamentDetail {
   profileId: string;
   /** Takes a free server of the pool when it starts (decision 282). */
   serverAuto: boolean;
+  /** Servers it may use at once (decision 291); 1 = its own only. */
+  parallel?: number;
+  /** The extra servers it plays on now (parallel matches). */
+  lanes?: LaneServer[];
   /** The server's name (the preferred one until the start). */
   serverName: string;
   connectAddress: string | null;
@@ -429,6 +440,8 @@ export interface TournamentDetail {
   };
   projection: (TournamentProjection & { bracket?: BracketState }) | null;
   live: LiveInfo | null;
+  /** Telemetry of every match being played (parallel matches). */
+  lives?: LiveInfo[];
   agent: { online: boolean };
 }
 
@@ -1066,10 +1079,19 @@ export interface SeriesView extends SeriesFields {
   timeZone: string;
 }
 
+/** An extra server of a tournament (parallel matches, decision 291). */
+export interface LaneServer {
+  agentId: string;
+  name: string;
+  connectAddress: string | null;
+  online: boolean;
+}
+
 export interface SeriesTemplate {
   agentId: string;
   profileId: string;
   serverAuto?: boolean;
+  parallel?: number;
   connectAddress?: string | null;
   settings: TournamentSettings;
   botPool?: BotSpec[];

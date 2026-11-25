@@ -105,6 +105,8 @@ interface Model {
   profileId: string;
   /** A free server of the pool at the start (decision 282). */
   serverAuto: boolean;
+  /** Servers it may use at once (decision 291). */
+  parallel: number;
   connectAddress: string;
   scheduledAt: string;
   registrationOpen: boolean;
@@ -172,6 +174,7 @@ interface Parts {
   agentId: string;
   profileId: string;
   serverAuto: boolean;
+  parallel?: number;
   connectAddress: string | null;
   settings: TournamentSettings;
   notifyMode: 'default' | 'custom' | 'off';
@@ -184,6 +187,9 @@ interface Parts {
 }
 
 const UNIT_MIN = { min: 1, h: 60, d: 1440 } as const;
+
+/** Servers a tournament may use at once (decision 291, as the API). */
+const MAX_PARALLEL = 8;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -1031,7 +1037,30 @@ function toLocalInput(iso: string | null): string {
                     }
                   </select>
                 </div>
+                <div class="field">
+                  <label for="fpar">{{ 'form.parallel' | t }}</label>
+                  <select
+                    id="fpar"
+                    name="parallel"
+                    [(ngModel)]="f.parallel"
+                    (ngModelChange)="touch()"
+                  >
+                    @for (n of parallelChoices; track n) {
+                      <option [ngValue]="n">
+                        {{ n === 1 ? ('form.parallelOne' | t) : ('form.parallelN' | t: { n }) }}
+                      </option>
+                    }
+                  </select>
+                </div>
               </div>
+              @if (f.parallel > 1) {
+                <p class="muted small">{{ 'form.parallelHint' | t: { n: f.parallel - 1 } }}</p>
+                @if (f.botMatchMode === 'simulate' && !f.udt) {
+                  <p class="error small">{{ 'form.parallelSimulate' | t }}</p>
+                } @else if (poolSize() < f.parallel) {
+                  <p class="error small">{{ 'form.parallelPool' | t: { n: poolSize() } }}</p>
+                }
+              }
             </fieldset>
             <details class="more" [open]="!!f.connectAddress">
               <summary>{{ 'form.connectAddress' | t }}</summary>
@@ -1221,6 +1250,9 @@ function toLocalInput(iso: string | null): string {
                   @if (profile(); as p) {
                     · {{ p.name }}
                   }
+                }
+                @if (f.parallel > 1) {
+                  · {{ 'form.parallelN' | t: { n: f.parallel } }}
                 }
               </dd>
               <dt>{{ 'form.secBots' | t }}</dt>
@@ -1752,6 +1784,8 @@ export class TournamentFormPage {
   );
   protected readonly profiles = computed(() => this.agent()?.profiles ?? []);
   protected readonly serverAuto = computed(() => !!this.model()?.serverAuto);
+  /** Parallel matches: 1 to 8 servers at once (decision 291). */
+  protected readonly parallelChoices = Array.from({ length: MAX_PARALLEL }, (_, i) => i + 1);
   /** Servers in the pool (decision 282). */
   protected readonly poolSize = computed(
     () => this.agents().filter((a) => a.inPool && a.profiles.length).length,
@@ -2006,6 +2040,7 @@ export class TournamentFormPage {
       agentId: a?.id ?? '',
       profileId: a?.profiles[0]?.id ?? '',
       serverAuto: true,
+      parallel: 1,
       connectAddress: '',
       scheduledAt: '',
       registrationOpen: true,
@@ -2072,6 +2107,7 @@ export class TournamentFormPage {
       agentId: p.agentId,
       profileId: p.profileId,
       serverAuto: p.serverAuto,
+      parallel: p.parallel ?? 1,
       connectAddress: p.connectAddress ?? '',
       scheduledAt: toLocalInput(scheduledAt),
       registrationOpen: p.registrationOpen,
@@ -2125,6 +2161,7 @@ export class TournamentFormPage {
         agentId: d.agentId,
         profileId: d.profileId,
         serverAuto: d.serverAuto,
+        parallel: d.parallel ?? 1,
         connectAddress: d.connectAddressOverride,
         settings: d.settings,
         notifyMode: d.notify?.mode ?? 'default',
@@ -2147,6 +2184,7 @@ export class TournamentFormPage {
         agentId: t.agentId,
         profileId: t.profileId,
         serverAuto: !!t.serverAuto,
+        parallel: t.parallel ?? 1,
         connectAddress: t.connectAddress ?? null,
         settings: t.settings,
         notifyMode: t.notifyMode ?? 'default',
@@ -2419,6 +2457,7 @@ export class TournamentFormPage {
       agentId: f.agentId,
       profileId: f.profileId,
       serverAuto: f.serverAuto,
+      parallel: Math.min(MAX_PARALLEL, Math.max(1, Math.round(Number(f.parallel) || 1))),
       connectAddress: f.connectAddress.trim() || null,
       notifyMode: f.notifyMode,
       webhookUrl: f.notifyMode === 'custom' ? f.webhookUrl.trim() : null,
@@ -2474,6 +2513,7 @@ export class TournamentFormPage {
               agentId: t.agentId,
               profileId: t.profileId,
               serverAuto: t.serverAuto,
+              parallel: t.parallel,
               settings: t.settings,
               ...udt,
             });
@@ -2487,6 +2527,7 @@ export class TournamentFormPage {
             agentId: t.agentId,
             profileId: t.profileId,
             serverAuto: t.serverAuto,
+            parallel: t.parallel,
             settings: t.settings,
             ...udt,
           });

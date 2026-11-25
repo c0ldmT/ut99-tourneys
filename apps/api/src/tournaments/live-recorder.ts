@@ -117,8 +117,8 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
 
   /** Telemetry (`match.live`): frags per side; a race: points and deaths of the run. */
   telemetry(tournamentId: string, t: Telemetry): void {
-    const o = this.current(tournamentId);
-    if (!o || o.matchId !== t.matchId || o.game !== t.game) return;
+    const o = this.current(tournamentId, t.matchId);
+    if (!o || o.game !== t.game) return;
     if (t.scores) o.scores = t.scores;
     if (t.race && t.race.run === (o.run ?? 0))
       o.race = { points: t.race.points, deaths: t.race.deaths };
@@ -170,10 +170,11 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
   /** Timeline of the game (run) in progress (no damage: it is not shown before the end). */
   progress(
     tournamentId: string,
+    matchId?: string,
   ):
     | { matchId: string; game: number; run?: number; sides: string[]; samples: number[][] }
     | undefined {
-    const o = this.current(tournamentId);
+    const o = this.current(tournamentId, matchId);
     if (!o) return undefined;
     // Scores and race points and deaths only: damage and monsters come with the delayed state.
     return {
@@ -203,14 +204,18 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
     return res.changes;
   }
 
-  private current(tournamentId: string): Open | undefined {
+  /** The open game (run) of a match, or the tournament's latest (parallel matches: several). */
+  private current(tournamentId: string, matchId?: string): Open | undefined {
     let last: Open | undefined;
-    for (const o of this.open.values()) if (o.tournamentId === tournamentId) last = o;
+    for (const o of this.open.values())
+      if (o.tournamentId === tournamentId && (matchId === undefined || o.matchId === matchId))
+        last = o;
     return last;
   }
 
   /**
-   * The open game (run); a new one stores the tournament's previous one (its end was missed).
+   * The open game (run); a new one stores the match's previous one (its end was missed; other
+   * matches may be played at the same time on other servers, decision 291).
    * Lines of a game that ended shortly before are late and dropped; much later the match is
    * played again (an earlier result was corrected): its old replays go.
    */
@@ -228,7 +233,7 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
     if (closedAt !== undefined || (game === 1 && (run ?? 1) === 1))
       this.forgetMatch(tournamentId, matchId);
     for (const [ok, x] of [...this.open.entries()])
-      if (x.tournamentId === tournamentId) this.close(ok, x);
+      if (x.tournamentId === tournamentId && x.matchId === matchId) this.close(ok, x);
     o = {
       tournamentId,
       matchId,

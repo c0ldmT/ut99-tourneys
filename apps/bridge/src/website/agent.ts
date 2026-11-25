@@ -36,7 +36,8 @@ import { ServerProcess } from '../ut99/server-process.js';
 import { WebsiteLink } from './link.js';
 import { RemoteEventStore } from './remote-store.js';
 
-export const AGENT_VERSION = '0.3.0';
+/** 0.4.0: extra servers for parallel matches (decision 291). */
+export const AGENT_VERSION = '0.4.0';
 
 type AssetPayload = Extract<BridgeToWebsite, { type: 'asset.data' }>['payload'];
 
@@ -76,6 +77,8 @@ export class WebsiteAgent {
   private antiIdle = new Map<string, number>();
   /** Bot skill curve per tournament (tournament.sync `skillCurve`, missing = on). */
   private skillCurve = new Map<string, boolean>();
+  /** Parallel matches: extra servers per tournament (tournament.sync `lanes`). */
+  private lanes = new Map<string, number>();
   private runtime?: Runtime;
   private level?: string;
   private statusTimer?: NodeJS.Timeout;
@@ -189,6 +192,17 @@ export class WebsiteAgent {
       case 'tournament.sync': {
         const p = msg.payload;
         const changed = this.store.applySync(p);
+        if (p.eventsOnly) {
+          // Parallel matches: events another server of the tournament wrote (decision 291).
+          const lanesBefore = this.lanes.get(p.tournamentId) ?? 0;
+          if (p.lanes !== undefined) this.lanes.set(p.tournamentId, p.lanes);
+          const rt = this.runtime;
+          if (rt && rt.tournamentId === p.tournamentId) {
+            if ((p.lanes ?? lanesBefore) !== lanesBefore) await rt.director.setLanes(p.lanes);
+            if (changed) await rt.director.refresh();
+          }
+          return;
+        }
         const before = JSON.stringify(this.access.get(p.tournamentId) ?? []);
         this.access.set(p.tournamentId, p.access);
         const recordsBefore = JSON.stringify(this.records.get(p.tournamentId));
@@ -203,6 +217,8 @@ export class WebsiteAgent {
         this.antiIdle.set(p.tournamentId, p.antiIdle ?? 0);
         const curveBefore = this.skillCurve.get(p.tournamentId) ?? true;
         this.skillCurve.set(p.tournamentId, p.skillCurve ?? true);
+        const lanesBefore = this.lanes.get(p.tournamentId) ?? 0;
+        this.lanes.set(p.tournamentId, p.lanes ?? 0);
         const rt = this.runtime;
         if (rt && rt.tournamentId === p.tournamentId) {
           if (JSON.stringify(p.access) !== before) await rt.director.setAccess(p.access);
@@ -215,6 +231,7 @@ export class WebsiteAgent {
           if ((p.antiIdle ?? 0) !== aiBefore) await rt.director.setAntiIdle(p.antiIdle);
           if ((p.skillCurve ?? true) !== curveBefore)
             await rt.director.setSkillCurve(p.skillCurve ?? true);
+          if ((p.lanes ?? 0) !== lanesBefore) await rt.director.setLanes(p.lanes);
           if (changed) await rt.director.refresh();
         }
         return;
@@ -309,7 +326,12 @@ export class WebsiteAgent {
   private async handleCommand(cmd: AgentCommand): Promise<void> {
     switch (cmd.kind) {
       case 'tournament.run':
-        return this.run(cmd.tournamentId, cmd.profileId, cmd.botPool);
+        return this.run(cmd.tournamentId, cmd.profileId, cmd.botPool, cmd.lane ?? false);
+      case 'tournament.leave':
+        // Parallel matches: this extra server is no longer needed (decision 291).
+        if (this.runtime?.tournamentId !== cmd.tournamentId) return;
+        this.o.log.info(`extra server of ${cmd.tournamentId} released: stopping the game server`);
+        return this.dispose();
       case 'tournament.forceStart':
         return this.requireRuntime(cmd.tournamentId).director.forceStart();
       case 'tournament.pause':
@@ -422,7 +444,12 @@ export class WebsiteAgent {
     this.modelsUnsent = false;
   }
 
-  private async run(tournamentId: string, profileId: string, botPool: BotSpec[]): Promise<void> {
+  private async run(
+    tournamentId: string,
+    profileId: string,
+    botPool: BotSpec[],
+    lane = false,
+  ): Promise<void> {
     if (this.runtime?.tournamentId === tournamentId) return; // already running (website resent it)
     if (this.runtime) throw new Error(`busy with tournament ${this.runtime.tournamentId}`);
     const profile = this.profileConfig(profileId);
@@ -479,6 +506,7 @@ export class WebsiteAgent {
       betWindowSec: this.betWindows.get(tournamentId) ?? 0,
       antiIdle: this.antiIdle.get(tournamentId) ?? 0,
       skillCurve: this.skillCurve.get(tournamentId) ?? true,
+      ...(lane ? { lane: true } : { lanes: this.lanes.get(tournamentId) ?? 0 }),
       ...(this.o.timing ? { timing: this.o.timing } : {}),
     });
     director.on('live', (info: LiveInfo) => {
@@ -518,8 +546,8 @@ export class WebsiteAgent {
       cleanup: () => cleanups.forEach((f) => f()),
     };
     await director.start();
-    await director.openCheckIn(profileId);
-    this.o.log.info(`running tournament ${tournamentId}`);
+    if (!lane) await director.openCheckIn(profileId);
+    this.o.log.info(`running tournament ${tournamentId}${lane ? ' (extra server)' : ''}`);
     this.sendStatus();
   }
 

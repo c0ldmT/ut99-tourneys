@@ -111,6 +111,22 @@ and re-sends `tournament.run` after every reconnect of an agent whose tournament
 ignores it if it already runs that tournament). A `tournament.sync` with events the bridge did not write itself
 (an admin action while the bridge was offline) makes the director reload and continue from the new state.
 
+**Parallel matches (decision 291).** A tournament with `parallel` > 1 takes up to `parallel - 1` extra
+servers (lanes) of the pool when it starts (bridges from agent version 0.4.0, only for bot pairings that are
+played, not simulated). The website picks them before it starts the tournament's own server, tells that server
+their number (`lanes` in `tournament.sync`) and starts each with `tournament.run` and `lane: true`. A lane
+opens no check-in; once the tournament runs it calls ready matches between bots itself (`match.called` with
+`server` = its agent id) and plays them like the main server. Both write to the same log: a stale `baseSeq`
+brings the other servers' events, which do not concern the server's own match, and the append is retried on
+top (two servers calling the same match: the second chooses again). The projection keeps every match being
+played in `liveMatches` (`currentMatch` stays the main server's). The main server plays matches with players
+first, starts and finishes the tournament; pauses and aborts reach the lanes through the log. After every
+append the website sends the other servers the new events (`tournament.sync` with `eventsOnly`), accepts
+events and live data of the lanes, and releases an idle lane (`tournament.leave`, its game server stops) when
+no bot match is ready for it and there are more servers than bot matches left - all of them when the
+tournament ends. Live data (`match.live`/`feed`/`state`) is kept per match; `/feed` and `/live-state` take
+`?match=`.
+
 While the website is unreachable the bridge keeps the game running; `events.append` waits and is retried after
 the reconnect (a stale `baseSeq` is answered with the missing events, as usual).
 

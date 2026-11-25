@@ -46,6 +46,8 @@ export const ERRORS_DE: Record<string, string> = {
   'agent {agentId} is offline': 'Server {agentId} ist offline.',
   'agent {agentId} is busy with {name}': 'Server {agentId} ist mit {name} beschäftigt.',
   'no free server in the pool': 'Kein freier Server im Pool.',
+  'parallel matches can only be changed before the start':
+    'Parallele Matches lassen sich nur vor dem Start ändern.',
   // --- moderation (decision 283)
   'moderators only': 'Nur für Moderatoren.',
   'this text is not allowed here': 'Dieser Text ist hier nicht erlaubt.',

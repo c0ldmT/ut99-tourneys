@@ -126,6 +126,7 @@ export class AgentGateway {
           payload: { agentId, serverTime: Date.now() },
         });
         // Bring the agent's copies of the logs up to date, then resume what it should be running.
+        this.tournaments.forgetSynced(agentId);
         for (const t of this.tournaments.byAgent(agentId)) {
           const known = p.knownSeq[t.id];
           if (known === undefined && t.phase === 'draft') continue;
@@ -142,12 +143,14 @@ export class AgentGateway {
               this.logger.warn(`resume ${active.id} on ${agentId}: ${e.message}`),
             );
         }
+        // An extra server of a running tournament goes on with it (decision 291).
+        this.tournaments.resumeLanesOn(agentId, p.knownSeq);
         return;
       }
       case 'events.append': {
         const { tournamentId, baseSeq, events } = msg.payload;
         const t = this.tournaments.get(tournamentId);
-        if (!t || t.agentId !== agentId) {
+        if (!t || !this.tournaments.servesTournament(t, agentId)) {
           this.connections.send(agentId, {
             type: 'events.ack',
             re: msg.id,
@@ -169,13 +172,25 @@ export class AgentGateway {
             ? { tournamentId, accepted: true, events: res.events }
             : { tournamentId, accepted: false, events: res.missing, reason: res.reason },
         });
-        if (res.accepted) this.recordEnds(tournamentId, res.events);
-        if (res.accepted && res.events.some((e) => e.type === 'match.result')) {
-          this.hub.clearLive(tournamentId);
-          // Bets were decided: the bots' personalities (bet news) go to the bridge.
-          const t = this.tournaments.get(tournamentId);
-          if (t) this.tournaments.syncToAgent(t, res.projection.headSeq);
+        if (res.accepted) {
+          this.recordEnds(tournamentId, res.events);
+          const head = res.projection.headSeq;
+          this.tournaments.markSynced(tournamentId, agentId, head);
+          // Parallel matches (decision 291): the other servers of the tournament get the events.
+          const now = this.tournaments.get(tournamentId);
+          if (now && now.lanesJson !== '[]')
+            this.tournaments.syncServers(now, head - res.events.length, agentId);
         }
+        if (res.accepted && res.events.some((e) => e.type === 'match.result')) {
+          for (const e of res.events)
+            if (e.type === 'match.result') this.hub.clearLive(tournamentId, e.data.result.matchId);
+          // Bets were decided: the bots' personalities (bet news) go to the bridges.
+          const t = this.tournaments.get(tournamentId);
+          if (t)
+            for (const a of this.tournaments.serversOf(t))
+              this.tournaments.syncToAgent(t, res.projection.headSeq, a);
+        }
+        if (res.accepted) this.tournaments.releaseLanes(tournamentId);
         if (res.accepted && res.events.some((e) => e.type === 'match.called')) {
           // The access list puts the players of the current match first (64 entries at most).
           void this.tournaments.refreshAccessForMatch(tournamentId);
@@ -205,14 +220,14 @@ export class AgentGateway {
       }
       case 'match.live': {
         const t = this.tournaments.get(msg.payload.tournamentId);
-        if (!t || t.agentId !== agentId) return;
+        if (!t || !this.tournaments.servesTournament(t, agentId)) return;
         this.hub.publish(t.id, { type: 'live', data: msg.payload });
         this.recorder.telemetry(t.id, msg.payload);
         return;
       }
       case 'match.feed': {
         const t = this.tournaments.get(msg.payload.tournamentId);
-        if (!t || t.agentId !== agentId) return;
+        if (!t || !this.tournaments.servesTournament(t, agentId)) return;
         this.recorder.feed(t.id, msg.payload);
         const e = msg.payload;
         const delay = e.humans ? this.delayMs() : 0;
@@ -227,7 +242,7 @@ export class AgentGateway {
       }
       case 'match.state': {
         const t = this.tournaments.get(msg.payload.tournamentId);
-        if (!t || t.agentId !== agentId) return;
+        if (!t || !this.tournaments.servesTournament(t, agentId)) return;
         this.recorder.state(t.id, msg.payload);
         const delay = msg.payload.humans ? this.delayMs() : 0;
         this.hub.publish(t.id, { type: 'state', data: msg.payload }, delay);

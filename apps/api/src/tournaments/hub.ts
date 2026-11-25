@@ -30,19 +30,46 @@ const byTheWay = (x: KillFeedEntry) =>
  * bot thoughts of a game with a human player can be published with a delay (kills stay live), so
  * a player cannot read the opponent's health or a bot's plans on a second screen.
  */
+/** The match a live message belongs to (live telemetry, feed entries and states carry it). */
+const matchOf = (msg: HubMessage): string | undefined =>
+  msg.type === 'live' || msg.type === 'feed' || msg.type === 'state'
+    ? (msg.data as { matchId?: string } | undefined)?.matchId
+    : undefined;
+
+/** Per tournament, per match: the newest entry is moved last (the "latest" match). */
+type PerMatch<T> = Map<string, Map<string, T>>;
+
+function put<T>(m: PerMatch<T>, tournamentId: string, matchId: string, value: T): void {
+  let inner = m.get(tournamentId);
+  if (!inner) m.set(tournamentId, (inner = new Map()));
+  inner.delete(matchId);
+  inner.set(matchId, value);
+}
+
+function pick<T>(m: PerMatch<T>, tournamentId: string, matchId?: string): T | undefined {
+  const inner = m.get(tournamentId);
+  if (!inner) return undefined;
+  if (matchId !== undefined) return inner.get(matchId);
+  return [...inner.values()].at(-1);
+}
+
+/**
+ * In-process fan-out of tournament updates to the browsers' event streams. Live state, items and
+ * bot thoughts of a game with a human player can be published with a delay (kills stay live), so
+ * a player cannot read the opponent's health or a bot's plans on a second screen. Live data is
+ * kept per match: with parallel matches (decision 291) several games of a tournament run at once.
+ */
 @Injectable()
 export class LiveHub implements OnModuleDestroy {
   private listeners = new Map<string, Set<Listener>>();
-  /** Latest live telemetry per tournament (not persisted). */
-  private live = new Map<string, unknown>();
-  /** Latest live state per tournament (as published, i.e. after the delay). */
-  private state = new Map<string, LiveState>();
-  /** Feed of the game in progress per tournament (the last FEED_SIZE entries per run). */
-  private feed = new Map<string, KillFeedEntry[]>();
-  /** The game (match/game) the kept feed belongs to, per tournament. */
-  private feedGame = new Map<string, string>();
-  /** Delayed messages waiting per tournament. */
-  private pending = new Map<string, Set<NodeJS.Timeout>>();
+  /** Latest live telemetry per tournament and match (not persisted). */
+  private live: PerMatch<unknown> = new Map();
+  /** Latest live state per tournament and match (as published, i.e. after the delay). */
+  private state: PerMatch<LiveState> = new Map();
+  /** Feed of the game in progress per tournament and match (the last FEED_SIZE entries per run). */
+  private feed: PerMatch<{ game: string; list: KillFeedEntry[] }> = new Map();
+  /** Delayed messages waiting per tournament (with their match). */
+  private pending = new Map<string, Map<NodeJS.Timeout, string | undefined>>();
 
   subscribe(tournamentId: string, fn: Listener): () => void {
     let set = this.listeners.get(tournamentId);
@@ -57,20 +84,23 @@ export class LiveHub implements OnModuleDestroy {
   /** Publishes now, or after `delayMs` (dropped when the live data is cleared meanwhile). */
   publish(tournamentId: string, msg: HubMessage, delayMs = 0): void {
     if (delayMs <= 0) return this.deliver(tournamentId, msg);
-    let set = this.pending.get(tournamentId);
-    if (!set) this.pending.set(tournamentId, (set = new Set()));
+    let waiting = this.pending.get(tournamentId);
+    if (!waiting) this.pending.set(tournamentId, (waiting = new Map()));
     const timer = setTimeout(() => {
-      set.delete(timer);
+      waiting.delete(timer);
       this.deliver(tournamentId, msg);
     }, delayMs);
     timer.unref?.();
-    set.add(timer);
+    waiting.set(timer, matchOf(msg));
   }
 
   private deliver(tournamentId: string, msg: HubMessage): void {
-    if (msg.type === 'live') this.live.set(tournamentId, msg.data);
-    if (msg.type === 'state') this.state.set(tournamentId, msg.data);
-    if (msg.type === 'feed') this.keep(tournamentId, msg.data);
+    const matchId = matchOf(msg);
+    if (matchId !== undefined) {
+      if (msg.type === 'live') put(this.live, tournamentId, matchId, msg.data);
+      if (msg.type === 'state') put(this.state, tournamentId, matchId, msg.data);
+      if (msg.type === 'feed') this.keep(tournamentId, msg.data);
+    }
     for (const fn of this.listeners.get(tournamentId) ?? []) {
       try {
         fn(msg);
@@ -82,45 +112,60 @@ export class LiveHub implements OnModuleDestroy {
 
   /**
    * Keeps the last FEED_SIZE kills and chat lines and FEED_SIZE items and thoughts per run of the
-   * game in progress. A live entry of another game starts over; a delayed one of an earlier game
-   * goes to the streams only.
+   * game in progress of each match. A live entry of another game starts over; a delayed one of an
+   * earlier game goes to the streams only.
    */
   private keep(tournamentId: string, e: KillFeedEntry): void {
-    const key = `${e.matchId}/${e.game}`;
-    if (!heldBack(e) && this.feedGame.get(tournamentId) !== key) {
-      this.feedGame.set(tournamentId, key);
-      this.feed.set(tournamentId, []);
+    const key = `${e.game}`;
+    let kept = pick(this.feed, tournamentId, e.matchId);
+    if (!heldBack(e) && kept?.game !== key) {
+      kept = { game: key, list: [] };
     }
-    if (this.feedGame.get(tournamentId) !== key) return;
-    const list = this.feed.get(tournamentId) ?? [];
+    if (!kept || kept.game !== key) return;
+    const list = kept.list;
     const side = (x: KillFeedEntry) => (byTheWay(x) ? 1 : 0);
     const group = (x: KillFeedEntry) => `${x.run ?? 0}/${side(x)}`;
     const g = group(e);
     const same = list.filter((x) => group(x) === g);
     const drop = new Set(same.slice(0, Math.max(0, same.length + 1 - FEED_SIZE)));
-    this.feed.set(tournamentId, [...list.filter((x) => !drop.has(x)), e]);
+    put(this.feed, tournamentId, e.matchId, {
+      game: key,
+      list: [...list.filter((x) => !drop.has(x)), e],
+    });
   }
 
-  latestLive(tournamentId: string): unknown {
-    return this.live.get(tournamentId);
+  /** Telemetry of a match, or of the match that sent the latest. */
+  latestLive(tournamentId: string, matchId?: string): unknown {
+    return pick(this.live, tournamentId, matchId);
   }
 
-  latestState(tournamentId: string): LiveState | undefined {
-    return this.state.get(tournamentId);
+  /** Telemetry of every match being played (parallel matches), oldest update first. */
+  allLive(tournamentId: string): unknown[] {
+    return [...(this.live.get(tournamentId)?.values() ?? [])];
   }
 
-  clearLive(tournamentId: string): void {
-    this.live.delete(tournamentId);
-    this.state.delete(tournamentId);
-    this.feed.delete(tournamentId);
-    this.feedGame.delete(tournamentId);
-    for (const t of this.pending.get(tournamentId) ?? []) clearTimeout(t);
-    this.pending.delete(tournamentId);
+  latestState(tournamentId: string, matchId?: string): LiveState | undefined {
+    return pick(this.state, tournamentId, matchId);
   }
 
-  /** Feed of the game in progress (both runs of a Monster Hunt game), oldest first. */
-  latestFeed(tournamentId: string): KillFeedEntry[] {
-    return this.feed.get(tournamentId) ?? [];
+  /** The live data of a match (it was decided), or of the whole tournament. */
+  clearLive(tournamentId: string, matchId?: string): void {
+    for (const m of [this.live, this.state, this.feed] as PerMatch<unknown>[]) {
+      if (matchId === undefined) m.delete(tournamentId);
+      else m.get(tournamentId)?.delete(matchId);
+    }
+    const waiting = this.pending.get(tournamentId);
+    for (const [t, mid] of [...(waiting?.entries() ?? [])]) {
+      if (matchId !== undefined && mid !== matchId) continue;
+      clearTimeout(t);
+      waiting?.delete(t);
+    }
+    if (matchId === undefined || !waiting?.size) this.pending.delete(tournamentId);
+  }
+
+  /** Feed of the game in progress of a match (or the latest match), oldest first. */
+  latestFeed(tournamentId: string, matchId?: string): KillFeedEntry[] {
+    return pick(this.feed, tournamentId, matchId)?.list ?? [];
   }
 
   subscriberCount(tournamentId: string): number {

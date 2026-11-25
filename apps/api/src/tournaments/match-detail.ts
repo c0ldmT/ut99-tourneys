@@ -149,8 +149,8 @@ export function matchDetail(
       delete g.live;
     }
   }
-  // A game in progress only while the match is the current one.
-  if (proj.currentMatch?.matchId !== matchId) for (const g of games.values()) delete g.live;
+  // A game in progress only while the match is being played (on any server, decision 291).
+  if (!proj.liveMatches[matchId]) for (const g of games.values()) delete g.live;
   const list = [...games.values()].sort((x, y) => x.game - y.game);
   const wins: Record<string, number> = {};
   for (const s of entrants) wins[s.id] = 0;

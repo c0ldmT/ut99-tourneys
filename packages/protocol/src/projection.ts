@@ -51,6 +51,8 @@ export interface CurrentMatch {
   map?: string;
   mapMethod?: string;
   status: 'called' | 'mapSelected' | 'live';
+  /** Parallel matches (decision 291): the extra server (agent id) playing it; missing = main. */
+  server?: string;
   /** Monster Hunt race: run order of the current game, finished runs, the running team. */
   runOrder?: [string, string];
   runs?: RunRecord[];
@@ -74,7 +76,13 @@ export interface TournamentProjection {
   seedRatings?: Record<string, number>;
   results: MatchResult[];
   bracket?: BracketState;
+  /** The match on the tournament's own server (main). */
   currentMatch?: CurrentMatch;
+  /**
+   * Every match being played, by match id: the main server's (also `currentMatch`) and those on
+   * extra servers (decision 291).
+   */
+  liveMatches: Record<string, CurrentMatch>;
   /** Finished games per match id (best-of series). */
   games: Record<string, GameRecord[]>;
   /** Every map played so far, in order (input for repetition penalties). */
@@ -111,6 +119,7 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
     results: [],
     games: {},
     mapHistory: [],
+    liveMatches: {},
   };
   let phaseBeforePause: TournamentPhase = 'draft';
 
@@ -179,18 +188,30 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         if (p.phase !== 'checkIn') fail(`cannot start in phase ${p.phase}`);
         p.phase = 'running';
         break;
-      case 'match.called':
+      case 'match.called': {
         if (p.phase !== 'running') fail(`cannot call a match in phase ${p.phase}`);
+        const id = e.data.matchId;
+        const server = e.data.server;
+        const other = p.liveMatches[id];
+        // Parallel matches: a match plays on one server, an extra server plays one match.
+        if (other && (other.server || server)) fail(`match ${id} is already being played`);
+        if (server && Object.values(p.liveMatches).some((m) => m.server === server))
+          fail(`server ${server} already plays a match`);
+        if (!server && p.currentMatch) delete p.liveMatches[p.currentMatch.matchId];
         // A match is called once; games left from an earlier call were made void by an admin
         // override (its pairing changed or it was interrupted), so the series starts over.
-        delete p.games[e.data.matchId];
-        p.currentMatch = {
-          matchId: e.data.matchId,
+        delete p.games[id];
+        const cm: CurrentMatch = {
+          matchId: id,
           entrants: e.data.entrants,
-          game: (p.games[e.data.matchId]?.length ?? 0) + 1,
+          game: 1,
           status: 'called',
+          ...(server ? { server } : {}),
         };
+        p.liveMatches[id] = cm;
+        if (!server) p.currentMatch = cm;
         break;
+      }
       case 'match.mapSelected': {
         const cm = requireCurrent(p, e.data.matchId, fail);
         cm.game = e.data.game;
@@ -265,18 +286,24 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
       }
       case 'match.result': {
         p.results.push(e.data.result);
-        const cm = p.currentMatch;
-        if (cm?.matchId === e.data.result.matchId) delete p.currentMatch;
-        else if (cm && p.bracketDefinition && e.data.result.outcome === 'override') {
-          // An admin corrected an earlier match: the current match may not exist any more in this
-          // form (other entrants), then it is called off and scheduled again.
-          const node = computeBracket(p.bracketDefinition, p.results).byId[cm.matchId];
-          const [a, b] = node?.entrants ?? [];
-          const same =
-            node?.status === 'ready' &&
-            ((a === cm.entrants[0] && b === cm.entrants[1]) ||
-              (a === cm.entrants[1] && b === cm.entrants[0]));
-          if (!same) delete p.currentMatch;
+        const drop = (id: string) => {
+          delete p.liveMatches[id];
+          if (p.currentMatch?.matchId === id) delete p.currentMatch;
+        };
+        drop(e.data.result.matchId);
+        if (p.bracketDefinition && e.data.result.outcome === 'override') {
+          // An admin corrected an earlier match: a match being played may not exist any more in
+          // this form (other entrants), then it is called off and scheduled again.
+          const byId = computeBracket(p.bracketDefinition, p.results).byId;
+          for (const cm of Object.values(p.liveMatches)) {
+            const node = byId[cm.matchId];
+            const [a, b] = node?.entrants ?? [];
+            const same =
+              node?.status === 'ready' &&
+              ((a === cm.entrants[0] && b === cm.entrants[1]) ||
+                (a === cm.entrants[1] && b === cm.entrants[0]));
+            if (!same) drop(cm.matchId);
+          }
         }
         break;
       }
@@ -298,11 +325,13 @@ export function projectTournament(events: readonly TournamentEvent[]): Tournamen
         p.phase = 'finished';
         p.championId = e.data.championId;
         delete p.currentMatch;
+        p.liveMatches = {};
         break;
       case 'tournament.aborted':
         p.phase = 'aborted';
         p.abortedReason = e.data.reason;
         delete p.currentMatch;
+        p.liveMatches = {};
         break;
       default: {
         const never: never = e;
@@ -320,8 +349,7 @@ function requireCurrent(
   matchId: string,
   fail: (msg: string) => never,
 ): CurrentMatch {
-  if (!p.currentMatch || p.currentMatch.matchId !== matchId) {
-    fail(`match ${matchId} is not the current match`);
-  }
-  return p.currentMatch as CurrentMatch;
+  const cm = p.liveMatches[matchId];
+  if (!cm) fail(`match ${matchId} is not being played`);
+  return cm as CurrentMatch;
 }

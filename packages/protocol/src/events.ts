@@ -166,7 +166,18 @@ export const TournamentEventSchema = z.discriminatedUnion('type', [
     }),
   ),
   event('tournament.started', z.object({})),
-  event('match.called', z.object({ matchId: Id, entrants: z.tuple([Id, Id]) })),
+  event(
+    'match.called',
+    z.object({
+      matchId: Id,
+      entrants: z.tuple([Id, Id]),
+      /**
+       * Parallel matches (decision 291): the agent of the extra server (lane) that plays the
+       * match; missing = the tournament's own server.
+       */
+      server: Id.optional(),
+    }),
+  ),
   event(
     'match.mapSelected',
     z.object({

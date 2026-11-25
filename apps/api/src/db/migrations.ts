@@ -903,4 +903,10 @@ export const MIGRATIONS: string[] = [
   `
   ALTER TABLE users ADD COLUMN last_seen_at TEXT;
   `,
+  // 60: parallel matches (decision 291): servers a tournament may use at once, and the extra
+  // servers (lanes) it plays on now.
+  `
+  ALTER TABLE tournaments ADD COLUMN parallel INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE tournaments ADD COLUMN lanes_json TEXT NOT NULL DEFAULT '[]';
+  `,
 ];

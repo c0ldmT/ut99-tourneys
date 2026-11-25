@@ -1,10 +1,5 @@
 import { EventEmitter } from 'node:events';
-import {
-  createRng,
-  nextMatch as scheduleNextMatch,
-  type MatchResult,
-  type Rng,
-} from '@tourney/bracket';
+import { createRng, playableMatches, type MatchResult, type Rng } from '@tourney/bracket';
 import {
   isBotEntrant,
   projectTournament,
@@ -22,6 +17,7 @@ import {
   type NewTournamentEvent,
   type PlayerGameStats,
   type BotMeasures,
+  type CurrentMatch,
   type TraitGameStats,
   type TeamEntrant,
   type TournamentEvent,
@@ -138,6 +134,14 @@ export interface DirectorOptions {
   antiIdle?: number;
   /** Bot skill curve (mod 0.13.0, all game types), sent with each match; default on. */
   skillCurve?: boolean;
+  /**
+   * Parallel matches (decision 291): this server is an extra server (lane) of the tournament. It
+   * opens no check-in and plays matches without players (`match.called` with `server`) while the
+   * tournament runs; the main server starts and finishes the tournament.
+   */
+  lane?: boolean;
+  /** Main server: how many lanes the tournament has (it leaves bot matches to them first). */
+  lanes?: number;
   timing?: Partial<DirectorTiming>;
 }
 
@@ -275,6 +279,8 @@ export class MatchDirector extends EventEmitter {
   private betWindowMs = 0;
   private antiIdle = 0;
   private skillCurve = true;
+  /** Parallel matches: number of extra servers of the tournament (main server). */
+  private lanes = 0;
   private calledAt = new Map<string, number>();
   /** Website bots' personalities by lower-case name in the game. */
   private personas = new Map<string, BotPersonality>();
@@ -320,6 +326,7 @@ export class MatchDirector extends EventEmitter {
     this.betWindowMs = Math.max(0, (o.betWindowSec ?? 0) * 1000);
     this.antiIdle = clampAi(o.antiIdle);
     this.skillCurve = o.skillCurve ?? true;
+    this.lanes = o.lanes ?? 0;
     this.board = new LiveBoard(
       o.clock,
       (state) => this.emit('state', state),
@@ -478,6 +485,7 @@ export class MatchDirector extends EventEmitter {
   pause(reason: string): Promise<void> {
     return this.enqueue(async () => {
       if (this.proj.phase !== 'running' && this.proj.phase !== 'checkIn') return;
+      if (this.o.lane) return; // the main server pauses; lanes follow the log
       if (!(await this.append({ type: 'tournament.paused', data: { reason } }))) return;
       this.suspendTimer();
       this.send([{ t: 'pause', on: true, why: reason.slice(0, 100) }, this.phase()]);
@@ -488,7 +496,7 @@ export class MatchDirector extends EventEmitter {
   /** Website mode: the bridge opens check-in itself once the server is up. */
   openCheckIn(serverProfileId: string): Promise<void> {
     return this.enqueue(async () => {
-      if (this.proj.phase !== 'seeded') return;
+      if (this.o.lane || this.proj.phase !== 'seeded') return;
       if (!(await this.append({ type: 'checkin.opened', data: { serverProfileId } }))) return;
       await this.enterCheckIn();
     });
@@ -516,7 +524,7 @@ export class MatchDirector extends EventEmitter {
   setAccess(entries: readonly AccessEntry[]): Promise<void> {
     return this.enqueue(() => {
       this.access = [...entries];
-      this.send(this.aclFor(this.proj.currentMatch?.entrants));
+      this.send(this.aclFor(this.myMatch?.entrants));
     });
   }
 
@@ -541,6 +549,13 @@ export class MatchDirector extends EventEmitter {
     });
   }
 
+  /** Parallel matches: the number of extra servers changed (website). */
+  setLanes(n: number | undefined): Promise<void> {
+    return this.enqueue(() => {
+      this.lanes = Math.max(0, n ?? 0);
+    });
+  }
+
   /** New bot personalities from the website: used from the next bot lines on. */
   setBotPersonalities(list: readonly BotPersonality[] | undefined): Promise<void> {
     return this.enqueue(() => this.setPersonas(list));
@@ -561,7 +576,7 @@ export class MatchDirector extends EventEmitter {
   setMapRecords(records: MapRecords | undefined): Promise<void> {
     return this.enqueue(() => {
       this.mapRecords = records ? cloneRecords(records) : undefined;
-      const cm = this.proj.currentMatch;
+      const cm = this.myMatch;
       if (this.raceMode && cm?.map && this.runner()) this.send([this.mrecLine(cm.map)]);
     });
   }
@@ -586,6 +601,7 @@ export class MatchDirector extends EventEmitter {
     return this.enqueue(async () => {
       const before = this.proj.headSeq;
       const onServer = this.stageMatch();
+      const mine = onServer?.matchId ?? this.myMatch?.matchId;
       await this.reload();
       if (this.proj.headSeq === before) return;
       const fresh = this.events.slice(before);
@@ -595,6 +611,9 @@ export class MatchDirector extends EventEmitter {
         return;
       }
       this.callOffIfGone(onServer);
+      if (this.o.lane && (this.proj.phase === 'finished' || this.proj.phase === 'aborted'))
+        return this.laneEnd();
+      if (fresh.every((e) => this.isForeign(e, mine))) return this.applyForeign(fresh);
       await this.resumeFromProjection();
       if (this.proj.phase === 'aborted') this.emit('aborted', this.proj.abortedReason ?? '');
     });
@@ -602,7 +621,7 @@ export class MatchDirector extends EventEmitter {
 
   /** Players currently on the server (for status reports). */
   connectedPlayers(): { name: string; userId?: string; role: 'player' | 'spectator' }[] {
-    const match: readonly string[] = this.proj?.currentMatch?.entrants ?? [];
+    const match: readonly string[] = (this.proj ? this.myMatch : undefined)?.entrants ?? [];
     return [...this.players.values()].map((p) => ({
       name: p.name,
       ...(p.userId ? { userId: p.userId } : {}),
@@ -612,7 +631,7 @@ export class MatchDirector extends EventEmitter {
 
   resume(): Promise<void> {
     return this.enqueue(async () => {
-      if (this.proj.phase !== 'paused') return;
+      if (this.proj.phase !== 'paused' || this.o.lane) return;
       if (!(await this.append({ type: 'tournament.resumed', data: {} }))) return;
       this.send([{ t: 'pause', on: false, why: '' }, this.phase()]);
       this.rearmTimer();
@@ -625,7 +644,7 @@ export class MatchDirector extends EventEmitter {
    */
   restartGame(matchId: string): Promise<void> {
     return this.enqueueChecked(async () => {
-      const cm = this.proj.currentMatch;
+      const cm = this.myMatch;
       if (!cm || cm.matchId !== matchId) throw new Error(`match ${matchId} is not running`);
       if (this.proj.phase === 'paused')
         throw new Error('the tournament is paused, resume it first');
@@ -659,7 +678,7 @@ export class MatchDirector extends EventEmitter {
    * on the server and tell the players.
    */
   private callOffIfGone(onServer: { matchId: string; live: boolean } | undefined): void {
-    if (!onServer || this.proj.currentMatch?.matchId === onServer.matchId) return;
+    if (!onServer || this.myMatch?.matchId === onServer.matchId) return;
     const { matchId } = onServer;
     this.clearTimer();
     this.resetGame();
@@ -722,19 +741,38 @@ export class MatchDirector extends EventEmitter {
   private async append(...events: EventDraft[]): Promise<boolean> {
     const actor = { kind: 'bridge' as const, id: this.o.agentId };
     const full = events.map((e) => ({ ...e, actor })) as NewTournamentEvent[];
-    for (let attempt = 0; attempt < 5; attempt++) {
+    // Parallel matches: events of the other servers that came in between (applied afterwards).
+    const foreign: TournamentEvent[] = [];
+    for (let attempt = 0; attempt < 8; attempt++) {
       const res = await this.o.store.append(this.o.tournamentId, this.proj.headSeq, full);
       if (res.accepted) {
         this.events.push(...res.events);
         this.proj = projectTournament(this.events);
+        if (foreign.length) void this.enqueue(() => this.applyForeign(foreign));
         return true;
+      }
+      if (res.reason === 'not your tournament') {
+        // The website moved the tournament or released this extra server: stop here.
+        this.o.log.warn('the website no longer takes events from this server: stopping');
+        this.clearTimer();
+        this.stage = { kind: 'idle' };
+        this.emit('shutdown');
+        return false;
       }
       const before = this.proj.headSeq;
       const onServer = this.stageMatch();
+      const mine = onServer?.matchId ?? this.myMatch?.matchId;
       await this.reload();
       const fresh = this.events.slice(before);
       if (fresh.length && fresh.every((e) => PASSIVE_EVENTS.has(e.type))) continue;
-      this.o.log.warn(`event append rejected (${res.reason}), re-planning`);
+      const others = fresh.length > 0 && fresh.every((e) => this.isForeign(e, mine));
+      if (others && this.fits(full)) {
+        foreign.push(...fresh);
+        continue;
+      }
+      // Parallel matches: another server called the same match first; not worth a warning.
+      if (others) this.o.log.info('another server was quicker, re-planning');
+      else this.o.log.warn(`event append rejected (${res.reason}), re-planning`);
       this.callOffIfGone(onServer);
       await this.resumeFromProjection();
       return false;
@@ -829,12 +867,12 @@ export class MatchDirector extends EventEmitter {
 
   /** Monster Hunt: the run of the current game being prepared or played (1 or 2). */
   private raceRun(): number {
-    return (this.proj.currentMatch?.runs?.length ?? 0) + 1;
+    return (this.myMatch?.runs?.length ?? 0) + 1;
   }
 
   /** Monster Hunt: the team that runs next (or now); undefined outside a race game. */
   private runner(): string | undefined {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     return cm?.runOrder?.[cm.runs?.length ?? 0];
   }
 
@@ -876,7 +914,7 @@ export class MatchDirector extends EventEmitter {
 
   /** Team games: the line-up of an entrant for the current game (empty for bot teams). */
   private lineupOf(entrantId: string): string[] {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     if (!this.lineup || !cm || this.lineup.matchId !== cm.matchId) return [];
     return this.lineup.sides[entrantId] ?? [];
   }
@@ -891,7 +929,7 @@ export class MatchDirector extends EventEmitter {
   }
 
   private roleContext(): RoleContext {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     const ctx: RoleContext = {};
     if (!cm || !this.teamMode) return ctx;
     if (this.lineup?.matchId === cm.matchId) ctx.lineup = this.lineup.sides;
@@ -932,7 +970,7 @@ export class MatchDirector extends EventEmitter {
     if (head?.t === 'match' && this.antiIdle > 0 && !this.raceMode) head.ai = this.antiIdle;
     // The skill curve applies to all game types (Monster Hunt too).
     if (head?.t === 'match') head.sc = this.skillCurve ? 1 : 0;
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     const runner = this.raceMode ? this.runner() : undefined;
     if (cm?.matchId === matchId && cm.game === game && runner) {
       const prev = cm.runs?.[0];
@@ -964,7 +1002,7 @@ export class MatchDirector extends EventEmitter {
   }
 
   private treadyLines(s: ReadyState): BridgeToMod[] {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     if (!this.teamMode || !cm) return [];
     return cm.entrants
       .map((e, i): BridgeToMod | undefined =>
@@ -988,7 +1026,7 @@ export class MatchDirector extends EventEmitter {
 
   /** The game (run) in progress for the live data and the feed. */
   private liveCtx(s: { matchId: string; game: number }): LiveContext {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     const runner = this.raceMode ? (this.runner() ?? null) : null;
     const since = this.liveSince;
     return {
@@ -1018,14 +1056,87 @@ export class MatchDirector extends EventEmitter {
     return this.raceMode ? n === this.raceRun() : n === 0;
   }
 
+  /**
+   * The match this server plays (decision 291): the main server's `currentMatch`, on an extra
+   * server (lane) the match called with its agent id.
+   */
+  private get myMatch(): CurrentMatch | undefined {
+    if (!this.o.lane) return this.proj.currentMatch;
+    return Object.values(this.proj.liveMatches).find((m) => m.server === this.o.agentId);
+  }
+
+  /** Parallel matches: an extra server plays a pairing without players that is not simulated. */
+  private laneCanPlay(entrants: readonly (string | null)[]): boolean {
+    if (this.proj.settings.botMatchMode === 'simulate') return false;
+    return entrants.every((e) => e !== null && this.isBot(e));
+  }
+
+  /**
+   * An event that does not concern the match on this server: written by another server of the
+   * tournament (parallel matches) or for another match, a pause, a line-up change.
+   */
+  private isForeign(e: TournamentEvent, mine: string | undefined): boolean {
+    if (PASSIVE_EVENTS.has(e.type)) return true;
+    if (e.type === 'tournament.paused' || e.type === 'tournament.resumed') return true;
+    if (e.type === 'match.result') return e.data.result.matchId !== mine;
+    if (e.type.startsWith('match.')) return (e.data as { matchId?: string }).matchId !== mine;
+    return false;
+  }
+
+  /** Whether events can still be appended on top of the log as it is now. */
+  private fits(events: readonly NewTournamentEvent[]): boolean {
+    let seq = this.proj.headSeq;
+    const at = new Date(this.o.clock.now()).toISOString();
+    try {
+      projectTournament([
+        ...this.events,
+        ...events.map((e) => ({ ...e, seq: ++seq, at }) as TournamentEvent),
+      ]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Events of other servers or for other matches came in (parallel matches, decision 291): the
+   * match on this server goes on. A pause holds the timers, results update the bracket in the
+   * HUD, and an idle server takes the next match.
+   */
+  private async applyForeign(fresh: readonly TournamentEvent[]): Promise<void> {
+    for (const e of fresh) {
+      if (e.type === 'tournament.paused' && this.proj.phase === 'paused') {
+        this.suspendTimer();
+        this.send([{ t: 'pause', on: true, why: e.data.reason.slice(0, 100) }, this.phase()]);
+        this.telemetry('paused');
+      }
+      if (e.type === 'tournament.resumed' && this.proj.phase !== 'paused') {
+        this.send([{ t: 'pause', on: false, why: '' }, this.phase()]);
+        this.rearmTimer();
+      }
+    }
+    if (fresh.some((e) => e.type === 'match.result')) this.send(this.bracketUpdate());
+    if (this.proj.phase !== 'running') return;
+    if (this.stage.kind === 'between' || this.stage.kind === 'idle') await this.nextMatch();
+  }
+
+  /** An extra server: the tournament is over (the main server finished or aborted it). */
+  private async laneEnd(): Promise<void> {
+    this.clearTimer();
+    if (this.proj.phase === 'finished') return this.finish();
+    this.stage = { kind: 'idle' };
+    this.send(this.snapshot());
+    this.emit('aborted', this.proj.abortedReason ?? '');
+  }
+
   private current(): { matchId: string; entrants: [string, string] } {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     if (!cm) throw new Error('no current match');
     return cm;
   }
 
   private telemetry(phase: LiveInfo['phase'], extra: Partial<LiveInfo> = {}): void {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     if (!cm) return;
     this.emit('live', {
       tournamentId: this.o.tournamentId,
@@ -1045,8 +1156,7 @@ export class MatchDirector extends EventEmitter {
     const s = this.stage;
     const secs = (deadline: number) =>
       Math.max(0, Math.round((deadline - this.o.clock.now()) / 1000));
-    if (this.proj.phase === 'paused')
-      return phaseLine('paused', this.proj.currentMatch?.matchId ?? '');
+    if (this.proj.phase === 'paused') return phaseLine('paused', this.myMatch?.matchId ?? '');
     const map: Record<Stage['kind'], ModPhase> = {
       idle: 'lobby',
       checkIn: 'lobby',
@@ -1059,7 +1169,7 @@ export class MatchDirector extends EventEmitter {
       simulating: 'post',
       finished: 'finished',
     };
-    const mid = 'matchId' in s ? s.matchId : (this.proj.currentMatch?.matchId ?? '');
+    const mid = 'matchId' in s ? s.matchId : (this.myMatch?.matchId ?? '');
     const sec = 'deadline' in s ? secs(s.deadline) : -1;
     return phaseLine(map[s.kind], mid, sec);
   }
@@ -1072,7 +1182,7 @@ export class MatchDirector extends EventEmitter {
 
   private snapshot(): BridgeToMod[] {
     this.rev++;
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     const lines: BridgeToMod[] = [
       { t: 'welcome', pv: 1, rev: this.rev },
       { t: 'sync', st: 'begin', rev: this.rev },
@@ -1131,10 +1241,16 @@ export class MatchDirector extends EventEmitter {
         this.send(this.snapshot());
         return;
       case 'checkIn':
+        if (this.o.lane) {
+          // An extra server waits in the lobby until the main server starts the tournament.
+          this.stage = { kind: 'idle' };
+          this.send(this.snapshot());
+          return;
+        }
         return this.enterCheckIn();
       case 'running':
       case 'paused': {
-        const cm = p.currentMatch;
+        const cm = this.myMatch;
         if (!cm) return this.nextMatch();
         if (cm.status === 'called') return this.startGame(cm.matchId, cm.game);
         // mapSelected or live: (re)load the map; a game interrupted by a restart is replayed.
@@ -1238,17 +1354,37 @@ export class MatchDirector extends EventEmitter {
   private async nextMatch(): Promise<void> {
     const bracket = this.proj.bracket;
     if (!bracket) throw new Error('no bracket');
-    if (bracket.status === 'finished') return this.finish();
-    const m = scheduleNextMatch(bracket, this.proj.results);
+    if (bracket.status === 'finished') {
+      // The main server finishes the tournament; an extra server waits for that.
+      if (!this.o.lane) return this.finish();
+      this.stage = { kind: 'between' };
+      return;
+    }
+    // Parallel matches (decision 291): matches on other servers are taken; an extra server only
+    // plays matches without players, the main server plays those with players first.
+    const live = this.proj.liveMatches;
+    const last = this.proj.results[this.proj.results.length - 1];
+    let list = playableMatches(bracket, last ? { justPlayed: last.entrants } : {}).filter(
+      (x) => !live[x.id],
+    );
+    if (this.o.lane) list = list.filter((x) => this.laneCanPlay(x.entrants));
+    else if (this.lanes > 0)
+      list = [
+        ...list.filter((x) => !this.laneCanPlay(x.entrants)),
+        ...list.filter((x) => this.laneCanPlay(x.entrants)),
+      ];
+    const m = list[0];
     if (!m) {
-      this.o.log.error(
-        `no playable match, but bracket not finished (issues: ${bracket.issues.length})`,
-      );
+      if (!this.o.lane && !Object.keys(live).length)
+        this.o.log.error(
+          `no playable match, but bracket not finished (issues: ${bracket.issues.length})`,
+        );
       this.stage = { kind: 'between' };
       return;
     }
     const entrants = m.entrants as [string, string];
-    if (!(await this.append({ type: 'match.called', data: { matchId: m.id, entrants } }))) return;
+    const called = { matchId: m.id, entrants, ...(this.o.lane ? { server: this.o.agentId } : {}) };
+    if (!(await this.append({ type: 'match.called', data: called }))) return;
     this.calledAt.set(m.id, this.o.clock.now());
     this.lineup = undefined;
     this.resetGame();
@@ -1752,7 +1888,7 @@ export class MatchDirector extends EventEmitter {
     this.stage = { kind: 'between' };
     this.send([...this.bracketUpdate(), this.phase()]);
     this.telemetry('post');
-    if (this.proj.bracket?.status === 'finished') return this.finish();
+    if (this.proj.bracket?.status === 'finished' && !this.o.lane) return this.finish();
     await this.nextMatch();
   }
 
@@ -1762,6 +1898,7 @@ export class MatchDirector extends EventEmitter {
     const fixtures = this.proj.bracket?.definition.format === 'fixtures';
     if (!champion && !(fixtures && this.proj.bracket?.status === 'finished')) return;
     if (this.proj.phase !== 'finished') {
+      if (this.o.lane) return; // the main server finishes the tournament
       const data = champion ? { championId: champion } : {};
       if (!(await this.append({ type: 'tournament.finished', data }))) return;
     }
@@ -1883,7 +2020,7 @@ export class MatchDirector extends EventEmitter {
   }
 
   private sideOf(entrantId: string | undefined): Side | undefined {
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     if (!cm || !entrantId) return undefined;
     return cm.entrants[0] === entrantId ? 'a' : cm.entrants[1] === entrantId ? 'b' : undefined;
   }
@@ -1959,7 +2096,7 @@ export class MatchDirector extends EventEmitter {
       case 'kf': {
         const s = this.stage;
         if (s.kind !== 'live' || s.matchId !== msg.mid) return;
-        if (!this.proj.currentMatch) return;
+        if (!this.myMatch) return;
         const ctx = this.liveCtx(s);
         this.emit('feed', {
           ...blankFeed({ ...ctx, game: msg.g }, this.o.clock.now()),
@@ -1987,7 +2124,7 @@ export class MatchDirector extends EventEmitter {
       case 'bs': {
         const s = this.stage;
         if (s.kind !== 'live' || s.matchId !== msg.mid) return;
-        if (!this.proj.currentMatch) return;
+        if (!this.myMatch) return;
         const ctx = this.liveCtx(s);
         this.emit('feed', {
           ...blankFeed({ ...ctx, game: msg.g }, this.o.clock.now()),
@@ -2551,7 +2688,7 @@ export class MatchDirector extends EventEmitter {
    */
   forfeitRun(matchId: string): Promise<void> {
     return this.enqueueChecked(async () => {
-      const cm = this.proj.currentMatch;
+      const cm = this.myMatch;
       const runner = this.runner();
       if (!this.raceMode) throw new Error('this is not a Monster Hunt tournament');
       if (!cm || cm.matchId !== matchId || !cm.map || !runner)
@@ -2636,7 +2773,7 @@ export class MatchDirector extends EventEmitter {
           : `${this.name(runner)} did not reach the exit (${r.pts} monster points, ${r.d} deaths)`,
       );
     if (!forfeit && r.done) this.checkMapRecord(map, r.ms + penaltyMs, runner);
-    const cm = this.proj.currentMatch;
+    const cm = this.myMatch;
     const runs = cm?.runs ?? [];
     if (runs.length < 2) {
       // The other team runs the same map after the scoreboard time.

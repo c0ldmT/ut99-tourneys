@@ -137,7 +137,14 @@ export const AgentCommandSchema = z.discriminatedUnion('kind', [
     profileId: Id,
     /** Bots that replace players who do not check in. */
     botPool: z.array(BotSpecSchema).min(1),
+    /**
+     * Parallel matches (decision 291): the server is an extra server (lane) of the tournament: no
+     * check-in, it plays matches without players while the tournament runs.
+     */
+    lane: z.boolean().optional(),
   }),
+  /** Parallel matches: an extra server is no longer needed (the server stops). */
+  z.object({ kind: z.literal('tournament.leave'), tournamentId: Id }),
   z.object({ kind: z.literal('tournament.forceStart'), tournamentId: Id }),
   z.object({ kind: z.literal('tournament.pause'), tournamentId: Id, reason: z.string().max(200) }),
   z.object({ kind: z.literal('tournament.resume'), tournamentId: Id }),
@@ -433,6 +440,16 @@ export const TournamentSync = envelope(
     antiIdle: z.number().int().min(0).max(2).optional(),
     /** Bot skill curve (website setting, all game types); missing = on. */
     skillCurve: z.boolean().optional(),
+    /**
+     * Parallel matches (decision 291): number of extra servers playing matches of the tournament
+     * (the main server then leaves bot matches to them first).
+     */
+    lanes: z.number().int().min(0).max(16).optional(),
+    /**
+     * Only the new events (and `lanes`): another server of the tournament wrote them; access,
+     * records, bots and settings are unchanged (decision 291).
+     */
+    eventsOnly: z.boolean().optional(),
   }),
 );
 

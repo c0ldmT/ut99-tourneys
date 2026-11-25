@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 291,
+    date: '2026-11-26',
+    en: {
+      title: 'Several matches at once',
+      items: [
+        'Tournaments can play bot matches on several servers at the same time - matches with players stay on the main server.',
+        'The tournament page shows one tab per running match; the bracket marks all of them.',
+        'Want to watch a bot match? "More servers" in the join box has the connect command of each server.',
+      ],
+    },
+    de: {
+      title: 'Mehrere Matches gleichzeitig',
+      items: [
+        'Turniere können Bot-Matches auf mehreren Servern gleichzeitig spielen - Matches mit Spielern bleiben auf dem Hauptserver.',
+        'Die Turnierseite zeigt einen Reiter je laufendem Match; der Turnierbaum markiert alle.',
+        'Ein Bot-Match ansehen? Unter „Weitere Server“ im Beitreten-Kasten steht der Befehl für jeden Server.',
+      ],
+    },
+  },
+  {
     id: 289,
     date: '2026-11-26',
     en: {

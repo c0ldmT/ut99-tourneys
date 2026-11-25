@@ -300,6 +300,7 @@ export class SeriesService implements OnModuleInit, OnModuleDestroy {
       profileId: t.profileId,
       connectAddress: t.connectAddress,
       serverAuto: t.serverAuto,
+      parallel: t.parallel,
       settings: TournamentSettingsSchema.parse(JSON.parse(t.settingsJson)),
       // A control-center tournament: the series follows the control center too.
       botPool: t.botsFromLibrary ? [] : JSON.parse(t.botPoolJson),

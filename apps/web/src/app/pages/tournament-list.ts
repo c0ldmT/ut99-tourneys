@@ -345,6 +345,19 @@ function storedFilter(): TournamentFilter {
                         >
                       }
                     </div>
+                    <!-- Parallel matches (decision 291): the others being played right now. -->
+                    @for (o of t.alsoNow ?? []; track o.matchId) {
+                      <div class="also small">
+                        <span class="muted">{{ o.matchId }} · {{ o.server }}</span>
+                        <span class="an">{{ o.names[0] }}</span>
+                        <b
+                          >{{ o.live?.scores?.[o.entrants[0]] ?? '–' }}:{{
+                            o.live?.scores?.[o.entrants[1]] ?? '–'
+                          }}</b
+                        >
+                        <span class="an">{{ o.names[1] }}</span>
+                      </div>
+                    }
                   </div>
                 }
               </a>
@@ -567,6 +580,19 @@ function storedFilter(): TournamentFilter {
     }
   `,
   styles: `
+    .also {
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+      margin-top: 4px;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .also .an {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 9em;
+    }
     .head {
       display: flex;
       justify-content: space-between;

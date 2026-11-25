@@ -9,6 +9,10 @@ import type { KillFeedEntry, LiveInfo, LiveStateView } from './types';
 @Injectable()
 export class TournamentStream {
   readonly live = signal<LiveInfo | null>(null);
+  /** Telemetry per match: several are played at once with parallel matches (decision 291). */
+  readonly lives = signal<Record<string, LiveInfo>>({});
+  /** Live state per match (see `state`). */
+  readonly states = signal<Record<string, LiveStateView>>({});
   /** Feed entries arriving while the stream is open (see `feed` on the match page). */
   readonly kill = signal<KillFeedEntry | null>(null);
   /** Called for every feed entry (several can arrive between two renderings). */
@@ -26,6 +30,8 @@ export class TournamentStream {
 
   open(id: string, onChange: () => void): void {
     this.close();
+    this.lives.set({});
+    this.states.set({});
     this.onChange = onChange;
     const es = new EventSource(`/api/tournaments/${encodeURIComponent(id)}/stream`, {
       withCredentials: true,
@@ -47,14 +53,18 @@ export class TournamentStream {
     });
     es.addEventListener('state', (ev) => {
       try {
-        this.state.set(JSON.parse((ev as MessageEvent<string>).data) as LiveStateView);
+        const s = JSON.parse((ev as MessageEvent<string>).data) as LiveStateView;
+        this.state.set(s);
+        this.states.update((m) => ({ ...m, [s.matchId]: s }));
       } catch {
         // ignore a malformed state
       }
     });
     es.addEventListener('live', (ev) => {
       try {
-        this.live.set(JSON.parse((ev as MessageEvent<string>).data) as LiveInfo);
+        const l = JSON.parse((ev as MessageEvent<string>).data) as LiveInfo;
+        this.live.set(l);
+        this.lives.update((m) => ({ ...m, [l.matchId]: l }));
       } catch {
         // ignore malformed telemetry
       }

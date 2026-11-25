@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Parallel matches: tournaments and series may use up to 8 servers at once; extra pool servers play the bot matches at the same time, matches with players stay on the main server; tabs per running match, extra servers with their connect command (decision 291, patch note 291).
 - User list (admin): last activity and last login per player, inactive players (30 days) marked and sorted first (decision 290).
 - Elite packs rise a little less with the index (index^0.35; 24,590 at index 5) (decision 289, patch note 289).
 - deploy/update.sh: updates a running installation from the PC (bundle, optionally the mod, backup first, checks) (decision 288).

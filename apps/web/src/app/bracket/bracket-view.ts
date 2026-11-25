@@ -33,7 +33,7 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
               class="match"
               [class.open]="m.entrants[0] && m.entrants[1]"
               (click)="openMatch(m)"
-              [class.live]="m.id === currentMatchId()"
+              [class.live]="m.id === currentMatchId() || liveMatchIds().includes(m.id)"
               [class.void]="m.status === 'void'"
               [class.done]="m.status === 'completed'"
             >
@@ -183,7 +183,11 @@ export class BracketView {
   readonly entrants = input.required<Record<string, Entrant>>();
   readonly games = input<Record<string, GameRec[]>>({});
   readonly currentMatchId = input<string | undefined>(undefined);
+  /** Every match being played (parallel matches, decision 291). */
+  readonly liveMatchIds = input<string[]>([]);
   readonly live = input<LiveInfo | null>(null);
+  /** Telemetry per match being played (parallel matches). */
+  readonly lives = input<Record<string, LiveInfo>>({});
   readonly myEntrantId = input<string | null>(null);
   /** Monster Hunt: scores are run times. */
   readonly race = input(false);
@@ -260,7 +264,8 @@ export class BracketView {
 
   protected score(m: MatchState): [string, string] {
     const runs = m.id === this.currentMatchId() ? this.currentRuns() : [];
-    return matchScore(m, this.games()[m.id] ?? [], this.live(), this.race(), runs);
+    const live = this.lives()[m.id] ?? this.live();
+    return matchScore(m, this.games()[m.id] ?? [], live, this.race(), runs);
   }
 
   protected openMatch(m: { id: string; entrants: [string | null, string | null] }) {
