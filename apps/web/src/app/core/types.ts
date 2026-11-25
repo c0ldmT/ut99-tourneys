@@ -231,6 +231,10 @@ export interface PublicUser {
   warnings?: number;
   textBanUntil?: string | null;
   bannedUntil?: string | null;
+  /** Admin list only (decision 290). */
+  createdAt?: string;
+  lastLoginAt?: string;
+  lastSeenAt?: string | null;
 }
 
 export type Phase = 'draft' | 'seeded' | 'checkIn' | 'running' | 'paused' | 'finished' | 'aborted';

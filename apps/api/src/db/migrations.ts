@@ -899,4 +899,8 @@ export const MIGRATIONS: string[] = [
     detail_json TEXT
   );
   `,
+  // 59: last activity of a user (decision 290): logins are rare with 30-day sessions.
+  `
+  ALTER TABLE users ADD COLUMN last_seen_at TEXT;
+  `,
 ];

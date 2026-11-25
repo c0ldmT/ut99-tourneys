@@ -26,6 +26,11 @@ export const users = sqliteTable('users', {
   /** No new names, team names or chat lines until then (ISO). */
   textBanUntil: text('text_ban_until'),
   warnings: integer('warnings').notNull().default(0),
+  /**
+   * Last request (decision 290), written at most every 10 minutes: a session lasts 30 days, so
+   * the last login says little about who still plays.
+   */
+  lastSeenAt: text('last_seen_at'),
 });
 
 /** Neuro shop purchases: paid with the Neuro of a season, owned for good. */

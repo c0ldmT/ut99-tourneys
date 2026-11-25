@@ -124,6 +124,7 @@ export class UsersService {
           username: identity.username,
           avatar: identity.avatar ?? existing.avatar,
           lastLoginAt: now,
+          lastSeenAt: now,
           isAdmin: existing.isAdmin || forcedAdmin,
         })
         .where(eq(users.id, existing.id))
@@ -145,6 +146,7 @@ export class UsersService {
         joinToken: newJoinToken(),
         createdAt: now,
         lastLoginAt: now,
+        lastSeenAt: now,
         // A new user has nothing to catch up on (decision 243).
         patchSeen: LATEST_PATCH,
       })

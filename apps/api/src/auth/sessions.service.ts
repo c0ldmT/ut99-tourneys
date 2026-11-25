@@ -54,7 +54,17 @@ export class SessionsService {
         ),
       )
       .get();
+    if (row) this.seen(row.user);
     return row?.user;
+  }
+
+  /** Notes a user's activity (decision 290), at most every 10 minutes. */
+  private seen(u: User): void {
+    const now = this.clock.now();
+    if (u.lastSeenAt && now - Date.parse(u.lastSeenAt) < 10 * 60_000) return;
+    const at = new Date(now).toISOString();
+    this.db.update(users).set({ lastSeenAt: at }).where(eq(users.id, u.id)).run();
+    u.lastSeenAt = at;
   }
 
   destroy(id: string | undefined): void {

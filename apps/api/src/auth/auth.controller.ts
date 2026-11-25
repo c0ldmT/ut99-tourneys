@@ -258,6 +258,10 @@ export class AuthController {
       warnings: u.warnings,
       textBanUntil: u.textBanUntil,
       bannedUntil: u.bannedUntil,
+      // Inactive players (decision 290): last login and last request.
+      createdAt: u.createdAt,
+      lastLoginAt: u.lastLoginAt,
+      lastSeenAt: u.lastSeenAt ?? u.lastLoginAt,
     }));
   }
 
