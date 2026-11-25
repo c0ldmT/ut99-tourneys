@@ -135,7 +135,8 @@ describe('packs', () => {
     expect(packPrice('elite', 1)).toBe(DEFAULT_ECONOMY.packs.elite.price);
     // Decision 286: a higher base, a flat rise (below index 1 the index itself).
     expect(packPrice('elite', 0.3)).toBe(4200);
-    expect(packPrice('elite', 5)).toBe(26_650);
+    expect(packPrice('elite', 5)).toBe(24_590); // decision 289: index^0.35
+    expect(packPrice('elite', 2.7)).toBe(19_820);
   });
 
   it('rolls by the chances and keeps the pity promises', () => {

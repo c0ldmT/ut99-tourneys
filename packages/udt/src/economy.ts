@@ -18,6 +18,8 @@ export interface PackConfig {
   pityEpic: number;
   /** A legendary at the latest after this many boxes without one. */
   pityLegendary: number;
+  /** Premium and elite: the box's own `packIndexExp` (decision 289: elite flatter still). */
+  indexExp?: number;
 }
 
 export interface EconomyConfig {
@@ -165,7 +167,15 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
     // (`packIndexExp`): elite 4,200 / 14,000 / 20,830 / 26,650 at index 0.3 / 1 / 2.7 / 5
     // (before 3,000 / 10,000 / 27,000 / 50,000), premium 1,500 / 5,000 / 7,440 / 9,520.
     premium: { price: 5000, rates: [35, 35, 20, 8, 2], pityEpic: 15, pityLegendary: 75 },
-    elite: { price: 14_000, rates: [0, 30, 40, 22, 8], pityEpic: 6, pityLegendary: 20 },
+    // Decision 289: elite a little flatter still (index^0.35): 16,130 / 19,820 / 24,590 at index
+    // 1.5 / 2.7 / 5 (with 0.4: 16,470 / 20,830 / 26,650).
+    elite: {
+      price: 14_000,
+      rates: [0, 30, 40, 22, 8],
+      pityEpic: 6,
+      pityLegendary: 20,
+      indexExp: 0.35,
+    },
   },
   tenPullBoxes: 9,
   scouting: 1200,
@@ -405,15 +415,21 @@ export const campPrice = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): 
  * The index factor of premium and elite boxes (decision 286): the index up to 1, above it only
  * index^packIndexExp.
  */
-export const packIndex = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number =>
-  index > 1 ? index ** cfg.packIndexExp : index;
+export const packIndex = (
+  index: number,
+  cfg: EconomyConfig = DEFAULT_ECONOMY,
+  exp: number = cfg.packIndexExp,
+): number => (index > 1 ? index ** exp : index);
 
 /**
  * Price of a box or a 10-pull at the index (standard boxes: a basic need, `basicIndex`; premium
  * and elite: `packIndex`).
  */
 export function packPrice(box: PackBox, index: number, ten = false, cfg = DEFAULT_ECONOMY): number {
-  const f = box === 'standard' ? basicIndex(index, cfg) : packIndex(index, cfg);
+  const f =
+    box === 'standard'
+      ? basicIndex(index, cfg)
+      : packIndex(index, cfg, cfg.packs[box].indexExp ?? cfg.packIndexExp);
   return roundNeuro(cfg.packs[box].price * (ten ? cfg.tenPullBoxes : 1) * f);
 }
 

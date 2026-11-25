@@ -22,6 +22,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 289,
+    date: '2026-11-26',
+    en: {
+      title: 'Elite packs a little cheaper',
+      items: [
+        'Elite packs rise a little less with the economy index: 19,820 at index 2.7 and 24,590 at index 5 (before 20,830 and 26,650).',
+      ],
+    },
+    de: {
+      title: 'Elite-Packs etwas günstiger',
+      items: [
+        'Elite-Packs steigen mit dem Wirtschaftsindex noch etwas weniger: 19.820 bei Index 2,7 und 24.590 bei Index 5 (vorher 20.830 und 26.650).',
+      ],
+    },
+  },
+  {
     id: 286,
     date: '2026-11-26',
     en: {
