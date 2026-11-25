@@ -262,8 +262,10 @@ export function rosterCard(
         <div class="tier">{{ skillName(sk) }}{{ b.prestige?.stage === 'ascended' ? '+' : '' }}</div>
         @if (b.prestige; as pr) {
           <div class="udt-pres" [title]="'udt.pres.chipTitle' | t">
-            <span>{{ stars(pr.stars) }}</span
-            ><span>Prestige {{ pr.spent }}/{{ pr.cap }}</span>
+            @if (pr.stars > 0) {
+              <span class="st">{{ stars(pr.stars) }}</span>
+            }
+            <span class="pt">Prestige {{ pr.spent }}/{{ pr.cap }}</span>
           </div>
         }
         @if (!small()) {
@@ -344,8 +346,9 @@ export class UdtCard {
   /** Free prestige points (decision 265): a gold "P" plaque when no development points wait. */
   readonly prestigeFree = input(0);
   readonly pointsClick = output<void>();
+  /** Stars as "★3" like everywhere else (a row of stars broke the chip on small cards). */
   protected stars(n: number) {
-    return '★'.repeat(Math.max(0, n));
+    return n > 0 ? `★${n}` : '';
   }
   /** XP within the level and what the next level needs (roster bots). */
   protected readonly xpStep = computed(() => xpStep(this.bot().xp, this.bot().level));

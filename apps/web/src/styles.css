@@ -1903,6 +1903,15 @@ udt-pack-stage .stage.lg .rays {
   border: 1px solid rgba(245, 199, 94, 0.45);
   background: rgba(245, 199, 94, 0.08);
 }
+.udt-card .udt-pres .st {
+  flex: none;
+}
+.udt-card .udt-pres .pt {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 @keyframes udt-plaque {
   0% {
     box-shadow: 0 0 0 0 rgba(245, 184, 61, 0.55);

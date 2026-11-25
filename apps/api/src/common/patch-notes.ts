@@ -22,6 +22,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 280,
+    date: '2026-11-25',
+    en: {
+      title: 'Small fix',
+      items: [
+        'Cards show prestige stars as ★3 instead of a row of stars, so the prestige chip no longer breaks on small cards.',
+      ],
+    },
+    de: {
+      title: 'Kleine Korrektur',
+      items: [
+        'Karten zeigen Prestige-Sterne als ★3 statt als Sternreihe, damit die Prestige-Leiste auf kleinen Karten nicht mehr umbricht.',
+      ],
+    },
+  },
+  {
     id: 279,
     date: '2026-11-22',
     en: {
