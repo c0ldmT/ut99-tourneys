@@ -2288,7 +2288,7 @@ const en = {
     'Under Events you enter your team (or let it enter automatically). Games, wins and places bring Neuro and experience; the table shows the best teams of the season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
-    "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Neuro in bought bots count towards that floor: the rescue after a lost bet only tops up what is missing beyond them. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike until a market day can collect what it is owed (a sale pays it too). Prices follow the economy index; salaries, standard packs and licences only its square root above 1 (at index 5 about ×2.2 instead of ×5).",
+    "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Neuro in bought bots count towards that floor: the rescue after a lost bet only tops up what is missing beyond them. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike until a market day can collect what it is owed (a sale pays it too). Prices follow the economy index; salaries, standard packs and licences only its square root above 1 (at index 5 about ×2.2 instead of ×5), premium and elite packs even less (index^0.4, at index 5 about ×1.9).",
   'udt.help.go': "Let's go",
   'udt.rename.once': 'Once per bot, free (the look can change any time).',
   'ok.udt.autoOn': 'Automatic sign-up on: {n} tournament(s) entered right away.',
@@ -5393,7 +5393,7 @@ const de: Record<TKey, string> = {
     'Unter Events meldest du dein Team an (oder lässt es automatisch anmelden). Spiele, Siege und Platzierungen bringen Neuro und Erfahrung; die Tabelle zeigt die besten Teams der Season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
-    'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Neuro in gekauften Bots zählen zur Rettungsgrenze: Die Rettung nach einer verlorenen Wette füllt nur auf, was darüber hinaus fehlt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot, bis ein Markttag das Offene einziehen kann (ein Verkauf zahlt es auch). Preise folgen dem Wirtschaftsindex; Gehälter, Standard-Packs und Lizenzen über 1 nur seiner Wurzel (bei Index 5 etwa ×2,2 statt ×5).',
+    'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Neuro in gekauften Bots zählen zur Rettungsgrenze: Die Rettung nach einer verlorenen Wette füllt nur auf, was darüber hinaus fehlt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot, bis ein Markttag das Offene einziehen kann (ein Verkauf zahlt es auch). Preise folgen dem Wirtschaftsindex; Gehälter, Standard-Packs und Lizenzen über 1 nur seiner Wurzel (bei Index 5 etwa ×2,2 statt ×5), Premium- und Elite-Packs noch flacher (Index^0,4, bei Index 5 etwa ×1,9).',
   'udt.help.go': "Los geht's",
   'udt.rename.once': 'Einmal pro Bot, kostenlos (das Aussehen jederzeit).',
   'ok.udt.autoOn': 'Automatische Anmeldung an: {n} Turnier(e) sofort angemeldet.',

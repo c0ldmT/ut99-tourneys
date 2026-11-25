@@ -66,6 +66,12 @@ export interface EconomyConfig {
    * what every team needs. Premium and elite boxes, the market and scouting stay fully indexed.
    */
   basicIndexExp: number;
+  /**
+   * Premium and elite boxes follow the index above 1 only at index^this (decision 286): rewards
+   * follow it at index^rewardIndexExp, so fully indexed boxes ran away from what a team earns
+   * (elite 50,000 at index 5) and only betting paid for them. Below 1 they follow the index.
+   */
+  packIndexExp: number;
   /** Reward factor per team size (more bots invested). */
   formatFactor: Readonly<Record<number, number>>;
   stamina: { perGame: number; perDay: number; tiredBelow: number };
@@ -138,6 +144,7 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
   rewardIndexExp: 0.2,
   // √index above 1 (Konzept-Endgame 8, Mario 20.11.): at index 5 basic needs cost ×2.2, not ×5.
   basicIndexExp: 0.5,
+  packIndexExp: 0.4,
   formatFactor: { 1: 1, 2: 1.5, 3: 2, 5: 3 },
   // 6 per game (was 15): a 4-team double elimination (up to 5 games) leaves a bot at 70.
   stamina: { perGame: 6, perDay: 30, tiredBelow: 40 },
@@ -154,8 +161,11 @@ export const DEFAULT_ECONOMY: EconomyConfig = {
     // epic+ and 2.5/4.4/11 % legendary for 5/10/30 and 1/2/8 shown; now about 6.5/13/35 % and
     // 1.2/2.5/10 % (simulator, 20,000 boxes each), and the 10-pull guarantees count again.
     standard: { price: 1500, rates: [60, 25, 10, 4, 1], pityEpic: 30, pityLegendary: 150 },
-    premium: { price: 4000, rates: [35, 35, 20, 8, 2], pityEpic: 15, pityLegendary: 75 },
-    elite: { price: 10_000, rates: [0, 30, 40, 22, 8], pityEpic: 6, pityLegendary: 20 },
+    // Decision 286 (players' wish): a higher base, a much flatter rise with the index
+    // (`packIndexExp`): elite 4,200 / 14,000 / 20,830 / 26,650 at index 0.3 / 1 / 2.7 / 5
+    // (before 3,000 / 10,000 / 27,000 / 50,000), premium 1,500 / 5,000 / 7,440 / 9,520.
+    premium: { price: 5000, rates: [35, 35, 20, 8, 2], pityEpic: 15, pityLegendary: 75 },
+    elite: { price: 14_000, rates: [0, 30, 40, 22, 8], pityEpic: 6, pityLegendary: 20 },
   },
   tenPullBoxes: 9,
   scouting: 1200,
@@ -391,9 +401,19 @@ export const tiredPenalty = (stamina: number, cfg = DEFAULT_ECONOMY): number =>
 export const campPrice = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number =>
   roundNeuro(cfg.camp.price * basicIndex(index, cfg));
 
-/** Price of a box or a 10-pull at the index (standard boxes: a basic need, `basicIndex`). */
+/**
+ * The index factor of premium and elite boxes (decision 286): the index up to 1, above it only
+ * index^packIndexExp.
+ */
+export const packIndex = (index: number, cfg: EconomyConfig = DEFAULT_ECONOMY): number =>
+  index > 1 ? index ** cfg.packIndexExp : index;
+
+/**
+ * Price of a box or a 10-pull at the index (standard boxes: a basic need, `basicIndex`; premium
+ * and elite: `packIndex`).
+ */
 export function packPrice(box: PackBox, index: number, ten = false, cfg = DEFAULT_ECONOMY): number {
-  const f = box === 'standard' ? basicIndex(index, cfg) : index;
+  const f = box === 'standard' ? basicIndex(index, cfg) : packIndex(index, cfg);
   return roundNeuro(cfg.packs[box].price * (ten ? cfg.tenPullBoxes : 1) * f);
 }
 

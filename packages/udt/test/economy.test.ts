@@ -94,11 +94,11 @@ describe('market values', () => {
     // A value of 22,000 at index 4 (5,500 at index 1): the salary of index 2, not 4.
     expect(weeklySalary(22_000, 7, 4)).toBe(2200);
     expect(weeklySalary(1500, 3, 0.5)).toBe(120);
-    // Standard boxes damped, premium and elite fully indexed.
+    // Standard boxes damped (√index), premium and elite flatter still (index^0.4, decision 286).
     expect(packPrice('standard', 4)).toBe(3000);
     expect(packPrice('standard', 4, true)).toBe(27_000);
     expect(packPrice('standard', 0.3)).toBe(450);
-    expect(packPrice('premium', 4)).toBe(16_000);
+    expect(packPrice('premium', 4)).toBe(8710);
   });
 });
 
@@ -130,9 +130,12 @@ describe('rewards and stamina', () => {
 
 describe('packs', () => {
   it('prices boxes and 10-pulls with the index', () => {
-    expect(packPrice('premium', 1.84)).toBe(7360);
-    expect(packPrice('premium', 1.84, true)).toBe(66_240);
+    expect(packPrice('premium', 1.84)).toBe(6380);
+    expect(packPrice('premium', 1.84, true)).toBe(57_430);
     expect(packPrice('elite', 1)).toBe(DEFAULT_ECONOMY.packs.elite.price);
+    // Decision 286: a higher base, a flat rise (below index 1 the index itself).
+    expect(packPrice('elite', 0.3)).toBe(4200);
+    expect(packPrice('elite', 5)).toBe(26_650);
   });
 
   it('rolls by the chances and keeps the pity promises', () => {

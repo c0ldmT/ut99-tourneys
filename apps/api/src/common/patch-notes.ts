@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 286,
+    date: '2026-11-26',
+    en: {
+      title: 'Cheaper elite packs late in the season, a tidier menu',
+      items: [
+        'Premium and elite packs rise much less with the economy index: elite costs 14,000 at index 1, 20,830 at 2.7 and 26,650 at 5 (before 10,000 / 27,000 / 50,000). In exchange the base price is a bit higher early in the season.',
+        'The menu bar is tidier: profile, language and logout are behind your avatar.',
+      ],
+    },
+    de: {
+      title: 'Günstigere Elite-Packs spät in der Season, aufgeräumtes Menü',
+      items: [
+        'Premium- und Elite-Packs steigen mit dem Wirtschaftsindex viel weniger: Elite kostet bei Index 1 14.000, bei 2,7 20.830 und bei 5 26.650 (vorher 10.000 / 27.000 / 50.000). Dafür ist der Grundpreis früh in der Season etwas höher.',
+        'Die Menüleiste ist aufgeräumt: Profil, Sprache und Abmelden liegen hinter deinem Avatar.',
+      ],
+    },
+  },
+  {
     id: 283,
     date: '2026-11-25',
     en: {

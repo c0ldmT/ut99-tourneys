@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Premium and elite packs: higher base prices, a much flatter rise with the index (index^0.4 above 1; elite at index 5: 26,650 instead of 50,000) (decision 286, patch note 286).
 - Header: administration in one dropdown, account (profile, language, logout) behind the avatar, the bar keeps one line (decision 285).
 - Further game servers play from the one UT folder (own Tourney-<n>.ini/log only); older instances are moved onto it by install.sh; the bridge finds maps behind folder links (decision 284).
 - Moderation: word filter for player texts (names, team names and tags, bot names, chat lines, trade messages), reports, moderator role, queue with reset, warnings, text and login bans, log, check of all texts (decision 283, migration 58, patch note 283).
