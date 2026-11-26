@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import {
   afterNextRender,
   ChangeDetectionStrategy,
@@ -481,6 +482,7 @@ export function staminaColor(s: number): string {
   `,
 })
 export class UdtNav {
+  private readonly confirm = inject(Confirm);
   private readonly auth = inject(Auth);
   private readonly router = inject(Router);
   /** Only the help and the test bar (the hub draws its own areas). */
@@ -586,7 +588,8 @@ export class UdtNav {
     }
   }
 
-  protected endSeason() {
-    if (confirm(this.i18n.t('udt.test.seasonEndConfirm'))) void this.run('season-end');
+  protected async endSeason() {
+    if (await this.confirm.ask(this.i18n.t('udt.test.seasonEndConfirm'), { danger: true }))
+      void this.run('season-end');
   }
 }

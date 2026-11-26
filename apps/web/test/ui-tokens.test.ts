@@ -66,7 +66,7 @@ describe('UI tokens (ratchet)', () => {
         code.map((f) => f.text),
         native,
       ),
-    ).toBeLessThanOrEqual(30);
+    ).toBeLessThanOrEqual(0);
   });
 
   it('formats dates through I18n', () => {

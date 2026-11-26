@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
@@ -759,6 +760,7 @@ const emptyLines = () =>
   `,
 })
 export class BotsPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   private readonly route = inject(ActivatedRoute);
@@ -881,8 +883,14 @@ export class BotsPage {
     void this.run(() => this.api.updateBot(b.id, { active: !b.active }));
   }
 
-  protected removeBot(b: LibraryBot) {
-    if (!confirm(this.i18n.t('bots.deleteConfirm', { name: b.gameName }))) return;
+  protected async removeBot(b: LibraryBot) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('bots.deleteConfirm', { name: b.gameName }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     void this.run(() => this.api.deleteBot(b.id));
   }
 
@@ -1080,8 +1088,14 @@ export class BotsPage {
     if (ok) this.resetClan();
   }
 
-  protected removeClan(c: BotClan) {
-    if (!confirm(this.i18n.t('bots.deleteClanConfirm', { name: c.name }))) return;
+  protected async removeClan(c: BotClan) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('bots.deleteClanConfirm', { name: c.name }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     void this.run(() => this.api.deleteClan(c.id));
   }
 

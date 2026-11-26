@@ -34,6 +34,7 @@ import { ActivityBar } from './components/activity-bar';
 import { ServerActivity } from './core/activity';
 import { Loader } from './components/loader';
 import { NoticeModal } from './components/notice-modal';
+import { ConfirmDialog } from './components/confirm-dialog';
 import { PatchNotes } from './components/patch-notes';
 import { Feedback } from './components/feedback';
 
@@ -56,6 +57,7 @@ import { Feedback } from './components/feedback';
     Loader,
     ActivityBar,
     NoticeModal,
+    ConfirmDialog,
     PatchNotes,
     Feedback,
   ],
@@ -269,6 +271,7 @@ import { Feedback } from './components/feedback';
     <app-toasts />
     @if (auth.me()) {
       <na-notice-modal />
+      <na-confirm />
     }
     <na-patch-notes #patchNotes />
     <na-feedback #feedback />

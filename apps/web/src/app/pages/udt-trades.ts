@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api, errorText } from '../core/api';
@@ -482,6 +483,7 @@ import { ReportButton } from '../components/report-button';
   `,
 })
 export class UdtTradesPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   protected readonly data = signal<UdtTrades | null>(null);
@@ -649,7 +651,8 @@ export class UdtTradesPage {
   }
 
   protected async accept(t: UdtTrade) {
-    if (!confirm(this.i18n.t('udt.trades.acceptConfirm', { fee: t.feeTo }))) return;
+    if (!(await this.confirm.ask(this.i18n.t('udt.trades.acceptConfirm', { fee: t.feeTo }))))
+      return;
     await this.act(async () => {
       this.data.set(await this.api.udtAccept(t.id));
       this.partners.set(await this.api.udtPartners());

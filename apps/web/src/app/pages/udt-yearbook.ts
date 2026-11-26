@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -244,6 +245,7 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
   `,
 })
 export class UdtYearbookPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
   private readonly i18n = inject(I18n);
@@ -300,7 +302,7 @@ export class UdtYearbookPage {
   }
 
   protected async retire(id: string) {
-    if (!confirm(this.i18n.t('udt.hall.retireConfirm'))) return;
+    if (!(await this.confirm.ask(this.i18n.t('udt.hall.retireConfirm'), { danger: true }))) return;
     await this.act(async () => {
       await this.api.udtRetire(id);
       this.hall.set(await this.api.udtHall());

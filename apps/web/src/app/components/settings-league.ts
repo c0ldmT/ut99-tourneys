@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -718,6 +719,7 @@ interface StatusView {
   ],
 })
 export class SettingsLeague {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   private readonly cdr = inject(ChangeDetectorRef);
@@ -1255,7 +1257,12 @@ export class SettingsLeague {
   }
 
   protected async abort(kind: 'test' | 'real') {
-    if (!confirm(this.i18n.t(kind === 'test' ? 'lgs.testAbortConfirm' : 'lgs.abortConfirm')))
+    if (
+      !(await this.confirm.ask(
+        this.i18n.t(kind === 'test' ? 'lgs.testAbortConfirm' : 'lgs.abortConfirm'),
+        { danger: true },
+      ))
+    )
       return;
     this.busy.set(true);
     try {

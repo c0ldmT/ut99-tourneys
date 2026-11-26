@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../core/brand';
 import { FormsModule } from '@angular/forms';
@@ -202,6 +203,7 @@ import type { AgentView, Inventory } from '../core/types';
   `,
 })
 export class AgentsPage {
+  private readonly confirm = inject(Confirm);
   protected readonly i18n = inject(I18n);
   private readonly api = inject(Api);
   protected readonly agents = signal<AgentView[]>([]);
@@ -279,16 +281,27 @@ export class AgentsPage {
     });
   }
 
-  protected rotate(a: AgentView) {
-    if (!confirm(this.i18n.t('agents.confirmRotate', { id: a.id }))) return;
+  protected async rotate(a: AgentView) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('agents.confirmRotate', { id: a.name || a.id }), {
+        danger: true,
+      }))
+    )
+      return;
     return this.act(async () => {
       const r = await this.api.rotateAgentToken(a.id);
       this.newToken.set({ id: a.id, token: r.token });
     });
   }
 
-  protected remove(a: AgentView) {
-    if (!confirm(this.i18n.t('agents.confirmDelete', { id: a.id }))) return;
+  protected async remove(a: AgentView) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('agents.confirmDelete', { id: a.name || a.id }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     return this.act(() => this.api.deleteAgent(a.id));
   }
 

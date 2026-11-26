@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 299,
+    date: '2026-11-26',
+    en: {
+      title: 'Easier to read, clearer to confirm',
+      items: [
+        'Small labels are a little bigger and the pale grey text has more contrast.',
+        'Dates read the same everywhere ("today 18:00", "Sat 05/12", "5 Dec 2026"); the ledger shows when in your local time.',
+        'Buying, selling and deleting ask in a dialog of the website instead of the browser; deleting and other steps that cannot be undone have a red button and start on Cancel.',
+      ],
+    },
+    de: {
+      title: 'Besser lesbar, klarer bestätigen',
+      items: [
+        'Kleine Beschriftungen sind etwas größer, der blasse graue Text hat mehr Kontrast.',
+        'Daten lesen sich überall gleich („heute 18:00“, „Sa., 05.12.“, „05.12.2026“); das Kontobuch zeigt die Zeit in deiner Ortszeit, die Statistik deutsche Daten.',
+        'Kaufen, Verkaufen und Löschen fragen in einem Dialog der Website statt des Browsers; Löschen und andere endgültige Schritte haben einen roten Knopf und starten auf „Abbrechen“.',
+      ],
+    },
+  },
+  {
     id: 296,
     date: '2026-11-26',
     en: {

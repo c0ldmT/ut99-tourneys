@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -127,6 +128,7 @@ export type SettingsTab = (typeof TABS)[number];
   `,
 })
 export class SettingsPage {
+  private readonly confirm = inject(Confirm);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly i18n = inject(I18n);
@@ -153,10 +155,11 @@ export class SettingsPage {
   }
 
   /** Opens tab `t`; false when the admin keeps the unsaved changes of the open tab. */
-  protected open(t: SettingsTab): boolean {
+  protected async open(t: SettingsTab): Promise<boolean> {
     if (t === this.tab()) return true;
     if (this.off(t)) return false;
-    if (this.unsaved() && !confirm(this.i18n.t('settings.unsavedConfirm'))) return false;
+    if (this.unsaved() && !(await this.confirm.ask(this.i18n.t('settings.unsavedConfirm'))))
+      return false;
     void this.router.navigate([], {
       relativeTo: this.route,
       queryParams: { tab: t === 'season' ? null : t },
@@ -182,7 +185,9 @@ export class SettingsPage {
     if (!next) return;
     e.preventDefault();
     // Focus follows only when the tab really changes (not when the admin keeps the changes).
-    if (this.open(next)) document.getElementById(`st-tab-${next}`)?.focus();
+    void this.open(next).then((ok) => {
+      if (ok) document.getElementById(`st-tab-${next}`)?.focus();
+    });
   }
 
   /** The league tab needs the Dream Team module (switched on in the tab "Dream Team"). */

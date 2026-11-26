@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -351,6 +352,7 @@ const STATS: readonly UdtPrestigeStat[] = [
   `,
 })
 export class UdtPrestigeBox {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   readonly bot = input.required<UdtRosterBot>();
@@ -418,17 +420,23 @@ export class UdtPrestigeBox {
     return this.act(() => this.api.udtPrestigeBuy(this.bot().botId));
   }
 
-  protected reset() {
+  protected async reset() {
     const p = this.prestige();
     const price = formatNeuro(p.prices.respec ?? 0, this.i18n.lang());
-    if (!confirm(this.i18n.t('udt.pres.resetConfirm', { n: p.spent, price }))) return;
+    if (
+      !(await this.confirm.ask(this.i18n.t('udt.pres.resetConfirm', { n: p.spent, price }), {
+        danger: true,
+      }))
+    )
+      return;
     return this.act(() => this.api.udtPrestigeReset(this.bot().botId));
   }
 
-  protected ascend() {
+  protected async ascend() {
     const p = this.prestige();
     const price = formatNeuro(p.prices.ascend ?? 0, this.i18n.lang());
-    if (!confirm(this.i18n.t('udt.asc.confirm', { name: this.bot().name, price }))) return;
+    if (!(await this.confirm.ask(this.i18n.t('udt.asc.confirm', { name: this.bot().name, price }))))
+      return;
     return this.act(() => this.api.udtAscend(this.bot().botId));
   }
 

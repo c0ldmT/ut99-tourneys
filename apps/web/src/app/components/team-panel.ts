@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -338,6 +339,7 @@ export function inviteCodeFrom(text: string): string {
   `,
 })
 export class TeamPanel {
+  private readonly confirm = inject(Confirm);
   readonly tournament = input.required<TournamentDetail>();
   readonly isAdmin = input(false);
   readonly myUserId = input<string | null>(null);
@@ -470,8 +472,14 @@ export class TeamPanel {
     );
   }
 
-  protected remove(team: TeamView) {
-    if (!confirm(this.i18n.t('team.confirmDelete', { name: team.name }))) return;
+  protected async remove(team: TeamView) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('team.confirmDelete', { name: team.name }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     void this.act(this.api.deleteTeam(this.tournament().id, team.id));
   }
 

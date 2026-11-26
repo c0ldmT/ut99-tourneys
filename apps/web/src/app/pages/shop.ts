@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -501,6 +502,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
   `,
 })
 export class ShopPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);
@@ -594,8 +596,13 @@ export class ShopPage {
     return (look as Record<string, string>)[i.slot] === i.id;
   }
 
-  protected buy(i: ShopItem) {
-    if (!confirm(this.i18n.t('shop.confirm', { name: i.name, n: this.neuro(i.price) }))) return;
+  protected async buy(i: ShopItem) {
+    if (
+      !(await this.confirm.ask(
+        this.i18n.t('shop.confirm', { name: i.name, n: this.neuro(i.price) }),
+      ))
+    )
+      return;
     void this.run(() => this.api.buy(i.id));
   }
 

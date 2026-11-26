@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -219,6 +220,7 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
   ],
 })
 export class SettingsSeason {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   /** A form was saved (the page drops its "unsaved" mark). */
@@ -306,13 +308,22 @@ export class SettingsSeason {
     void this.run(() => this.api.updateSeason(s.number, body));
   }
 
-  protected end(s: Season) {
-    if (!confirm(this.i18n.t('season.endConfirm', { n: s.number }))) return;
+  protected async end(s: Season) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('season.endConfirm', { n: s.number }), { danger: true }))
+    )
+      return;
     void this.run(() => this.api.endSeason(s.number));
   }
 
-  protected remove(s: Season) {
-    if (!confirm(this.i18n.t('season.deleteConfirm', { n: s.number }))) return;
+  protected async remove(s: Season) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('season.deleteConfirm', { n: s.number }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     void this.run(() => this.api.deleteSeason(s.number));
   }
 

@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -669,6 +670,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
   `,
 })
 export class UdtBotPanel {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   private readonly dlg = viewChild.required<ElementRef<HTMLDialogElement>>('dlg');
@@ -820,7 +822,12 @@ export class UdtBotPanel {
   }
 
   protected async breakthrough(b: UdtRosterBot, x: { from: number; to: number; cut: number }) {
-    if (!confirm(this.i18n.t('udt.bt.confirm', { from: x.from, to: x.to, cut: x.cut }))) return;
+    if (
+      !(await this.confirm.ask(
+        this.i18n.t('udt.bt.confirm', { from: x.from, to: x.to, cut: x.cut }),
+      ))
+    )
+      return;
     await this.act(() => this.api.udtBreakthrough(b.botId));
   }
 
@@ -846,7 +853,13 @@ export class UdtBotPanel {
 
   protected async unassign(t: UdtTraitOnBot) {
     const name = this.i18n.t(`udt.trait.${t.code}`);
-    if (!confirm(this.i18n.t('udt.traits.removeConfirm', { name, n: SCRAP[t.rarity] }))) return;
+    if (
+      !(await this.confirm.ask(
+        this.i18n.t('udt.traits.removeConfirm', { name, n: SCRAP[t.rarity] }),
+        { danger: true },
+      ))
+    )
+      return;
     await this.act(() => this.api.udtUnassign(t.id));
   }
 
@@ -885,12 +898,12 @@ export class UdtBotPanel {
       name: b.name,
       price: formatNeuro(price, this.i18n.lang()),
     });
-    if (!confirm(msg)) return;
+    if (!(await this.confirm.ask(msg))) return;
     await this.act(() => this.api.udtBuy(b.botId));
   }
 
   protected async sell(b: UdtRosterBot) {
-    if (!confirm(this.i18n.t('udt.sellConfirm', { name: b.name }))) return;
+    if (!(await this.confirm.ask(this.i18n.t('udt.sellConfirm', { name: b.name })))) return;
     await this.act(async () => {
       await this.api.udtSell(b.botId);
       this.close();

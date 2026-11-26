@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
@@ -407,6 +408,7 @@ interface WallItem {
   `,
 })
 export class UdtClubPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   protected readonly view = signal<UdtView | null>(null);
@@ -544,7 +546,7 @@ export class UdtClubPage {
 
   protected async build(x: Tile) {
     if (x.b.price === null) return;
-    const ok = confirm(
+    const ok = await this.confirm.ask(
       this.i18n.t('udt.club.confirm', {
         name: this.i18n.t(`udt.club.k.${x.b.kind}`),
         n: x.b.level + 1,

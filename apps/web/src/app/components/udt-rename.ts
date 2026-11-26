@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api';
@@ -48,6 +49,7 @@ import { I18n, TPipe } from '../core/i18n';
   `,
 })
 export class UdtRename {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   readonly botId = input.required<string>();
@@ -64,7 +66,7 @@ export class UdtRename {
   protected async save() {
     const name = (this.draft() ?? '').trim();
     if (!this.changed()) return;
-    if (!confirm(this.confirmText(name))) return;
+    if (!(await this.confirm.ask(this.confirmText(name)))) return;
     this.busy.set(true);
     try {
       await this.api.udtRenameBot(this.botId(), name);

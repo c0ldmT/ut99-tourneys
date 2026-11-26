@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
@@ -151,6 +152,7 @@ import type { SeriesView } from '../core/types';
   `,
 })
 export class SeriesPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   protected readonly list = signal<SeriesView[]>([]);
@@ -184,13 +186,25 @@ export class SeriesPage {
     void this.run(() => this.api.updateSeries(s.id, { active: !s.active }));
   }
 
-  protected runNow(s: SeriesView) {
-    if (!confirm(this.i18n.t('series.runNowConfirm', { name: s.nextName ?? s.name }))) return;
+  protected async runNow(s: SeriesView) {
+    if (
+      !(await this.confirm.ask(
+        this.i18n.t('series.runNowConfirm', { name: s.nextName ?? s.name }),
+        { danger: true },
+      ))
+    )
+      return;
     void this.run(() => this.api.runSeries(s.id));
   }
 
-  protected remove(s: SeriesView) {
-    if (!confirm(this.i18n.t('series.deleteConfirm', { name: s.name }))) return;
+  protected async remove(s: SeriesView) {
+    if (
+      !(await this.confirm.ask(this.i18n.t('series.deleteConfirm', { name: s.name }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     void this.run(() => this.api.deleteSeries(s.id));
   }
 

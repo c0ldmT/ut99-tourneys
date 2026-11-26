@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -1172,6 +1173,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
   `,
 })
 export class TournamentPage {
+  private readonly confirm = inject(Confirm);
   readonly id = input.required<string>();
   /** Invite code of a team (link "?join=…"). */
   readonly join = input<string | undefined>(undefined);
@@ -1779,27 +1781,28 @@ export class TournamentPage {
   }
 
   /** Monster Hunt: the running team gives up its run (bots stuck); the other team runs next. */
-  protected forfeitRun() {
+  protected async forfeitRun() {
     const cm = this.current();
     const runner = this.runnerNow() ?? cm?.runOrder?.[cm.runs?.length ?? 0];
     if (!cm || !runner) return;
     if (
-      confirm(
+      await this.confirm.ask(
         this.i18n.t('admin.forfeitRunConfirm', { team: this.name(runner), match: cm.matchId }),
+        { danger: true },
       )
     )
       void this.command({ kind: 'forfeitRun', matchId: cm.matchId });
   }
 
-  protected restart() {
+  protected async restart() {
     const cm = this.current();
     if (!cm) return;
     const key = this.race() ? 'admin.restartRunConfirm' : 'admin.restartGameConfirm';
-    if (confirm(this.i18n.t(key, { match: cm.matchId, map: cm.map ?? '' })))
+    if (await this.confirm.ask(this.i18n.t(key, { match: cm.matchId, map: cm.map ?? '' })))
       void this.command({ kind: 'restart', matchId: cm.matchId });
   }
 
-  protected overrideWinner(matchId: string, winnerId: string) {
+  protected async overrideWinner(matchId: string, winnerId: string) {
     const m = this.t()?.projection?.bracket?.byId[matchId];
     const key =
       m?.status === 'completed'
@@ -1807,7 +1810,8 @@ export class TournamentPage {
         : matchId === this.current()?.matchId
           ? 'admin.overrideConfirmNow'
           : 'admin.overrideConfirm';
-    if (!confirm(this.i18n.t(key, { match: matchId, name: this.name(winnerId) }))) return;
+    if (!(await this.confirm.ask(this.i18n.t(key, { match: matchId, name: this.name(winnerId) }))))
+      return;
     this.overrideMatch.set('');
     void this.act(this.api.override(this.id(), matchId, winnerId));
   }
@@ -1825,7 +1829,13 @@ export class TournamentPage {
   }
 
   protected async remove() {
-    if (!confirm(this.i18n.t('admin.confirmDelete', { name: this.t()?.name ?? '' }))) return;
+    if (
+      !(await this.confirm.ask(this.i18n.t('admin.confirmDelete', { name: this.t()?.name ?? '' }), {
+        danger: true,
+        ok: 'common.delete',
+      }))
+    )
+      return;
     try {
       await this.api.deleteTournament(this.id());
       await this.router.navigateByUrl('/');

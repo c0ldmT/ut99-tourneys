@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
@@ -339,6 +340,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
   `,
 })
 export class UdtMarketPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   private readonly store = inject(NeuroStore);
@@ -411,7 +413,7 @@ export class UdtMarketPage {
       price: this.neuro(o.loanFee ?? 0),
       n: days,
     });
-    if (!confirm(msg)) return;
+    if (!(await this.confirm.ask(msg))) return;
     this.busy.set(true);
     try {
       this.market.set(await this.api.udtLoan(o.botId));
@@ -464,7 +466,7 @@ export class UdtMarketPage {
 
   protected async buy(o: UdtOffer, price = o.price) {
     const msg = this.i18n.t('udt.market.buyConfirm', { name: o.name, price: this.neuro(price) });
-    if (!confirm(msg)) return;
+    if (!(await this.confirm.ask(msg))) return;
     this.busy.set(true);
     try {
       this.market.set(await this.api.udtBuy(o.botId));

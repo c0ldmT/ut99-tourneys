@@ -1,3 +1,4 @@
+import { Confirm } from './confirm-dialog';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api';
@@ -83,6 +84,7 @@ import { I18n, TPipe } from '../core/i18n';
   `,
 })
 export class SettingsSystem {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   protected readonly busy = signal(false);
@@ -102,7 +104,7 @@ export class SettingsSystem {
 
   protected async reset() {
     if (!this.resetUnderstood || this.resetTyped !== this.resetWord) return;
-    if (!confirm(this.i18n.t('reset.lastChance'))) return;
+    if (!(await this.confirm.ask(this.i18n.t('reset.lastChance'), { danger: true }))) return;
     this.busy.set(true);
     try {
       this.resetDone.set(await this.api.resetAll(this.resetTyped));
