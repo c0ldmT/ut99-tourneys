@@ -618,7 +618,7 @@ export interface TraitDrop {
         padding: 6px 8px;
         border: 1px solid var(--line);
         border-radius: var(--radius);
-        background: #0c0f16;
+        background: var(--well);
       }
       .mtxt {
         display: flex;

@@ -260,7 +260,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
       text-align: left;
       padding: 10px 12px;
       border-radius: var(--radius);
-      background: #0c0f16;
+      background: var(--well);
       border: 1px solid var(--border);
       color: var(--text);
     }

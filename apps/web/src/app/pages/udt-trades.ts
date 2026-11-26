@@ -345,8 +345,7 @@ import { ReportButton } from '../components/report-button';
       flex: 1 1 220px;
       padding: 10px 12px;
       border-radius: var(--radius-sm);
-      background: #0c0f16;
-      border: 1px solid var(--border);
+      background: var(--panel-2);
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
@@ -396,8 +395,7 @@ import { ReportButton } from '../components/report-button';
       gap: 12px;
       padding: 14px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: #0c0f16;
+      background: var(--panel-2);
     }
     .col h3 {
       margin: 0;
@@ -451,7 +449,8 @@ import { ReportButton } from '../components/report-button';
     .balance {
       padding: 12px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
+      border: 1px solid transparent;
+      background: var(--panel-2);
     }
     .balance.bad {
       border-color: color-mix(in srgb, var(--danger) 45%, transparent);

@@ -578,7 +578,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       gap: 6px;
       position: relative;
       overflow: hidden;
-      background: radial-gradient(120% 70% at 50% 0%, var(--rg), transparent 70%), #0c0f16;
+      background: radial-gradient(120% 70% at 50% 0%, var(--rg), transparent 70%), var(--well);
     }
     .front-in.dup {
       filter: saturate(0.5);

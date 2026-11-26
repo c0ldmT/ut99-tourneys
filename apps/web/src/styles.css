@@ -13,6 +13,7 @@
   --panel: #0e1118;
   --panel-2: #151a24;
   --panel-3: #1b2130;
+  --well: #0c0f16; /* recessed areas inside a card: bot card faces, trade sides */
   --border: #1d2330;
   --line: #2a3242;
 
@@ -1300,7 +1301,7 @@ main section[id] {
   white-space: nowrap;
   padding: 2px 10px;
   border-radius: var(--radius-pill);
-  border: 2px solid #0c0f16;
+  border: 2px solid var(--well);
   font-size: var(--fs-2xs);
   font-weight: 800;
   letter-spacing: 0.06em;
@@ -1323,7 +1324,7 @@ main section[id] {
   gap: 7px;
   height: 100%;
   min-width: 0;
-  background: radial-gradient(120% 70% at 50% 0%, var(--rg), transparent 65%), #0c0f16;
+  background: radial-gradient(120% 70% at 50% 0%, var(--rg), transparent 65%), var(--well);
 }
 .udt-card .top {
   display: flex;
@@ -1488,7 +1489,7 @@ main section[id] {
 .udt-chip span {
   height: 100%;
   border-radius: var(--radius-sm);
-  background: #0c0f16;
+  background: var(--well);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1997,7 +1998,7 @@ udt-pack-stage .stage.lg .rays {
   min-height: 0;
   padding: 0 7px;
   border-radius: var(--radius-pill);
-  border: 2px solid #0c0f16;
+  border: 2px solid var(--well);
   background: linear-gradient(135deg, #ffe08a, var(--neuro) 60%, #d98e1c);
   color: #2a1a00;
   font-weight: 800;
@@ -2308,7 +2309,7 @@ details.help ul {
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: #0c0f16;
+  background: var(--well);
 }
 .restslider {
   display: grid;

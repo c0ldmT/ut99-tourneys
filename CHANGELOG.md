@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Two levels of depth on the Dream Team pages: the sides of a trade, its balance and the own bots of the academy are flat surfaces instead of framed boxes inside a card; token --well for the dark faces inside cards (decision 316).
 - Tints of the token colours (188 rgba values) use color-mix with the token, so they follow it; no visible change; the UI ratchet counts rgba (decision 315).
 - Quick search in the header and with Ctrl+K: bots, teams, players, tournaments and pages (admins: administration and all users); `GET /search` (decision 313, patch note 313).
 - Dream Team hub: "For you" with what needs the manager (urgent lineup before a game, trades, cup sign-up, points, market day) and "First steps" for new managers instead of the help opening by itself; the hub sends `now` and `onboarding` (decisions 311, 312, patch note 312).

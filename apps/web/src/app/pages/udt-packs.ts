@@ -311,7 +311,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       gap: 12px;
       height: 100%;
       box-sizing: border-box;
-      background: radial-gradient(90% 60% at 50% 18%, var(--rg), transparent 70%), #0c0f16;
+      background: radial-gradient(90% 60% at 50% 18%, var(--rg), transparent 70%), var(--well);
     }
     .bhead {
       display: flex;

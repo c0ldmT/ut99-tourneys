@@ -330,8 +330,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
       align-items: flex-start;
       padding: 12px;
       border-radius: var(--radius-sm);
-      border: 1px solid var(--border);
-      background: #0c0f16;
+      background: var(--panel-2);
     }
     .oinfo {
       flex: 1;
