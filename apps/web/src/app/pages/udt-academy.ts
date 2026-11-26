@@ -339,7 +339,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     .rg {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .build {
       display: flex;
@@ -407,7 +407,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     }
     .tname {
       font-family: var(--font-display);
-      font-size: 1.5rem;
+      font-size: var(--fs-2xl);
       text-transform: uppercase;
       overflow-wrap: anywhere;
     }
@@ -415,7 +415,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
       font-family: var(--font-display);
       font-weight: 800;
       font-style: italic;
-      font-size: 1.9rem;
+      font-size: var(--fs-3xl);
       line-height: 1;
     }
     .tpot {
@@ -432,17 +432,17 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
       flex-direction: column;
       align-items: center;
       padding: 4px 0;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       background: rgba(255, 255, 255, 0.03);
     }
     .tval i {
       font-style: normal;
-      font-size: 0.65rem;
+      font-size: var(--fs-2xs);
       font-weight: 700;
       color: var(--muted);
     }
     .tval b {
-      font-size: 0.82rem;
+      font-size: var(--fs-sm);
     }
     .tchips {
       display: flex;
@@ -451,8 +451,8 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     }
     .tchip {
       padding: 2px 9px;
-      border-radius: 999px;
-      font-size: 0.75rem;
+      border-radius: var(--radius-pill);
+      font-size: var(--fs-xs);
       font-weight: 700;
     }
     .tchip.dia {

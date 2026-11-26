@@ -125,7 +125,7 @@ function setGuestSeen(id: number): void {
     }
     h3 {
       margin: 8px 0 2px;
-      font-size: 1.05rem;
+      font-size: var(--fs-base);
     }
     .meta {
       margin: 0 0 6px;

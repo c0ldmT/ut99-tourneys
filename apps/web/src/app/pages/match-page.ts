@@ -418,14 +418,14 @@ const SUM_KEYS = [
     .pill {
       font-family: var(--font);
       font-style: normal;
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       font-weight: 700;
       letter-spacing: 0.06em;
       height: 22px;
       display: inline-flex;
       align-items: center;
       padding: 0 10px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       border: 1px solid var(--line);
       color: var(--text-2);
     }
@@ -462,7 +462,7 @@ const SUM_KEYS = [
     }
     .side h2 {
       margin: 0;
-      font-size: 2rem;
+      font-size: var(--fs-3xl);
       font-weight: 800;
       font-style: italic;
       overflow: hidden;
@@ -473,7 +473,7 @@ const SUM_KEYS = [
     }
     .score {
       font-family: var(--font-display);
-      font-size: 3.4rem;
+      font-size: var(--fs-6xl);
       line-height: 1;
       font-weight: 800;
       color: var(--side-a);
@@ -488,7 +488,7 @@ const SUM_KEYS = [
       margin-top: 6px;
     }
     .badge {
-      font-size: 0.6rem;
+      font-size: var(--fs-2xs);
       padding: 0 5px;
       margin-left: 4px;
       height: 17px;
@@ -537,7 +537,7 @@ const SUM_KEYS = [
     .sharebar {
       height: 4px;
       background: var(--panel-2);
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
       margin: 4px 0;
       overflow: hidden;
     }
@@ -582,7 +582,7 @@ const SUM_KEYS = [
       font-weight: 800;
       font-style: italic;
       text-transform: uppercase;
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
       color: var(--side-a);
     }
     .livescore .nm:last-child {
@@ -613,16 +613,16 @@ const SUM_KEYS = [
         padding: 10px 12px;
       }
       .livescore .nm {
-        font-size: 1.05rem;
+        font-size: var(--fs-base);
       }
       .livescore .sc {
-        font-size: 2.4rem;
+        font-size: var(--fs-4xl);
       }
     }
     .livescore .sc {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 3rem;
+      font-size: var(--fs-6xl);
       line-height: 1;
     }
     .livescore i {
@@ -640,11 +640,11 @@ const SUM_KEYS = [
       margin-top: 24px;
     }
     .delay {
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
       color: var(--neuro-text);
       border: 1px solid rgba(245, 184, 61, 0.4);
       background: rgba(245, 184, 61, 0.08);
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       padding: 1px 10px;
       margin-left: 6px;
     }

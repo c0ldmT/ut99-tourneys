@@ -184,7 +184,7 @@ const ARMOR_FULL = 250;
       font-weight: 800;
       font-style: italic;
       text-transform: uppercase;
-      font-size: 1.5rem;
+      font-size: var(--fs-2xl);
       line-height: 1;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -197,7 +197,7 @@ const ARMOR_FULL = 250;
     .blabel {
       display: flex;
       justify-content: space-between;
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
       color: var(--text-2);
       margin: 2px 0 3px;
     }
@@ -221,7 +221,7 @@ const ARMOR_FULL = 250;
       flex-wrap: wrap;
       gap: 4px 14px;
       margin-top: 8px;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       color: var(--text-2);
     }
     .pstats b {
@@ -243,7 +243,7 @@ const ARMOR_FULL = 250;
       min-height: 0;
       padding: 0 0 6px;
       border-top: 0;
-      font-size: 0.7rem;
+      font-size: var(--fs-2xs);
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
@@ -293,7 +293,7 @@ const ARMOR_FULL = 250;
     .td,
     .tp {
       text-align: right;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       color: var(--text-2);
       white-space: nowrap;
     }
@@ -333,7 +333,7 @@ const ARMOR_FULL = 250;
         display: none;
       }
       .pname {
-        font-size: 1.15rem;
+        font-size: var(--fs-lg);
       }
     }
   `,

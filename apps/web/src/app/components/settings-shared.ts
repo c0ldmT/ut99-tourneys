@@ -14,7 +14,7 @@ export const SETTINGS_STYLES = `
   }
   h3 {
     margin: 20px 0 8px;
-    font-size: 1rem;
+    font-size: var(--fs-base);
   }
   input.narrow {
     width: 120px;

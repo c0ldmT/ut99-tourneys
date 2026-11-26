@@ -234,7 +234,7 @@ interface WallItem {
       text-align: right;
     }
     .spent .v {
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
     }
     .cgrid {
       display: grid;
@@ -264,7 +264,7 @@ interface WallItem {
       margin: 0;
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 1.3rem;
+      font-size: var(--fs-xl);
       text-transform: uppercase;
     }
     .lvl {
@@ -275,7 +275,7 @@ interface WallItem {
       display: block;
       width: 16px;
       height: 6px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--line);
     }
     .lvl i.on {
@@ -295,7 +295,7 @@ interface WallItem {
     }
     .acts a {
       font-weight: 700;
-      font-size: 0.9rem;
+      font-size: var(--fs-md);
     }
     button.topped:disabled {
       opacity: 1;
@@ -333,7 +333,7 @@ interface WallItem {
     }
     .tname {
       font-family: var(--font-display);
-      font-size: 1.35rem;
+      font-size: var(--fs-xl);
       text-transform: uppercase;
     }
     .inline {
@@ -381,7 +381,7 @@ interface WallItem {
       flex-direction: column;
       gap: 4px;
       padding: 12px 14px;
-      border-radius: 10px;
+      border-radius: var(--radius);
       border: 1px solid var(--line);
       background: var(--bg-2);
     }
@@ -390,7 +390,7 @@ interface WallItem {
       background: rgba(245, 199, 94, 0.08);
     }
     .wkind {
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       text-transform: uppercase;
       letter-spacing: 0.08em;
       font-weight: 700;

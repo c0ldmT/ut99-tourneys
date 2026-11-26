@@ -202,7 +202,7 @@ const EPISODE_VALUE: Record<string, string> = {
     }
     .tl-eps li {
       border: 1px solid var(--line);
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       padding: 1px 8px;
       color: var(--text-2);
     }

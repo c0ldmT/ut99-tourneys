@@ -201,7 +201,7 @@ export const feedKind = (e: FeedRow): FeedKind =>
       color: var(--muted);
       background: transparent;
       border: 1px solid var(--line);
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       min-height: 32px;
       padding: 0 12px;
       cursor: pointer;
@@ -263,7 +263,7 @@ export const feedKind = (e: FeedRow): FeedKind =>
       }
     }
     .t {
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
     }
     .line {
       display: flex;
@@ -321,10 +321,10 @@ export const feedKind = (e: FeedRow): FeedKind =>
     }
     .wp {
       flex: none;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       color: var(--text-2);
       border: 1px solid var(--line);
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       padding: 0 6px;
       line-height: 18px;
     }
@@ -340,7 +340,7 @@ export const feedKind = (e: FeedRow): FeedKind =>
       font-style: italic;
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       color: var(--hot-text);
     }
     .tag.fb {
@@ -358,7 +358,7 @@ export const feedKind = (e: FeedRow): FeedKind =>
     }
     .det {
       grid-column: 2 / -1;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
     }
     @media (max-width: 640px) {
       li {

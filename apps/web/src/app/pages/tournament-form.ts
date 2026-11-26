@@ -1309,7 +1309,7 @@ function toLocalInput(iso: string | null): string {
       gap: 10px;
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
       letter-spacing: 0.05em;
       text-transform: uppercase;
       color: var(--text);
@@ -1328,14 +1328,14 @@ function toLocalInput(iso: string | null): string {
       border: 1px solid var(--accent-dim);
       color: var(--accent);
       font-family: var(--font-mono);
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
     }
     .lock .sh::after {
       content: '🔒';
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     input.big {
-      font-size: 1.25rem;
+      font-size: var(--fs-xl);
       font-weight: 600;
       min-height: 46px;
       margin-bottom: 4px;
@@ -1384,7 +1384,7 @@ function toLocalInput(iso: string | null): string {
     }
     .pvh {
       font-weight: 600;
-      font-size: 0.86rem;
+      font-size: var(--fs-sm);
       color: var(--text-2);
     }
     .pv li span {
@@ -1393,13 +1393,13 @@ function toLocalInput(iso: string | null): string {
     .pv ol {
       margin: 6px 0 0;
       padding-left: 18px;
-      font-size: 0.9rem;
+      font-size: var(--fs-md);
     }
     .seg.days button {
       min-width: 46px;
     }
     .lbl {
-      font-size: 0.86rem;
+      font-size: var(--fs-sm);
       font-weight: 600;
       color: var(--text-2);
       margin: 14px 0 6px;
@@ -1443,7 +1443,7 @@ function toLocalInput(iso: string | null): string {
     }
     .seg.len small {
       font-weight: 500;
-      font-size: 0.74rem;
+      font-size: var(--fs-xs);
       opacity: 0.85;
     }
     .tiles {
@@ -1466,7 +1466,7 @@ function toLocalInput(iso: string | null): string {
     }
     .tile b {
       font-family: var(--font-display);
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
       letter-spacing: 0.03em;
       color: var(--text);
     }
@@ -1495,7 +1495,7 @@ function toLocalInput(iso: string | null): string {
       cursor: pointer;
       color: var(--accent);
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: var(--fs-md);
       margin-bottom: 10px;
     }
     details.adv > summary {
@@ -1554,7 +1554,7 @@ function toLocalInput(iso: string | null): string {
     }
     .mid {
       font-family: var(--font-mono);
-      font-size: 0.82rem;
+      font-size: var(--fs-sm);
       color: var(--text);
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1563,7 +1563,7 @@ function toLocalInput(iso: string | null): string {
     .mt {
       font-weight: 400;
       color: var(--muted);
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -1600,14 +1600,14 @@ function toLocalInput(iso: string | null): string {
     }
     .sum .sh {
       margin-bottom: 8px;
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
       color: var(--text-2);
     }
     .sname {
       font-family: var(--font-display);
       font-style: italic;
       font-weight: 800;
-      font-size: 1.5rem;
+      font-size: var(--fs-2xl);
       text-transform: uppercase;
       line-height: 1.1;
       margin-bottom: 6px;
@@ -1618,7 +1618,7 @@ function toLocalInput(iso: string | null): string {
       display: grid;
       grid-template-columns: auto 1fr;
       gap: 6px 12px;
-      font-size: 0.9rem;
+      font-size: var(--fs-md);
     }
     dt {
       color: var(--muted);
@@ -1630,7 +1630,7 @@ function toLocalInput(iso: string | null): string {
     .go {
       width: 100%;
       min-height: 44px;
-      font-size: 1.02rem;
+      font-size: var(--fs-base);
     }
     .cancel {
       width: 100%;

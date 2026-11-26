@@ -575,9 +575,9 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
     }
     .badge {
       margin-left: 6px;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       padding: 1px 6px;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       border: 1px solid var(--border);
       color: var(--muted);
     }
@@ -602,7 +602,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
       gap: 4px;
     }
     .record .value {
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
       font-weight: 700;
       color: var(--accent);
     }

@@ -254,7 +254,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
       width: 100%;
       text-align: left;
       padding: 10px 12px;
-      border-radius: 12px;
+      border-radius: var(--radius);
       background: #0c0f16;
       border: 1px solid var(--border);
       color: var(--text);

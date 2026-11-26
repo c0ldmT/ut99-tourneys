@@ -265,7 +265,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
     .swatch {
       width: 14px;
       height: 14px;
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       display: inline-block;
     }
     .sub {
@@ -299,7 +299,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
     .bar {
       height: 8px;
       background: var(--panel-2);
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       overflow: hidden;
     }
     .bar span {
@@ -312,7 +312,7 @@ import { BOT_LINE_KINDS, type BotProfile, type UdtCareer, type UserBets } from '
       border-color: var(--danger);
     }
     h3 {
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
       margin: 12px 0 4px;
     }
     ul {

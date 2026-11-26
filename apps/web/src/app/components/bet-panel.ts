@@ -208,7 +208,7 @@ interface Draft {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
     }
     .switch {
       display: grid;
@@ -220,7 +220,7 @@ interface Draft {
     .nav {
       min-height: 36px;
       padding: 0;
-      font-size: 1.3rem;
+      font-size: var(--fs-xl);
       line-height: 1;
     }
     .which {
@@ -300,7 +300,7 @@ interface Draft {
     .quick button {
       min-height: 30px;
       padding: 2px 10px;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       background: transparent;
     }
     .quick .wd {
@@ -340,14 +340,14 @@ interface Draft {
       gap: 10px;
       padding: 8px 6px;
       border-top: 1px solid var(--border);
-      font-size: 0.92rem;
+      font-size: var(--fs-md);
     }
     .nrow:first-of-type {
       border-top: 0;
     }
     .nrow.sel {
       background: var(--me-bg);
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
     }
     .id {
       width: 44px;

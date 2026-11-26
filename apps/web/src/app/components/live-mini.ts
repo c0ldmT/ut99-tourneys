@@ -160,11 +160,11 @@ const MAX_ROWS = 5;
       flex-wrap: wrap;
     }
     .lm-badge {
-      font-size: 0.66rem;
+      font-size: var(--fs-2xs);
       font-weight: 800;
       letter-spacing: 0.1em;
       padding: 1px 6px;
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       color: var(--muted);
       border: 1px solid var(--line);
     }
@@ -210,14 +210,14 @@ const MAX_ROWS = 5;
       font-weight: 800;
       font-style: italic;
       text-transform: uppercase;
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
       color: var(--side-a);
     }
     .lm-side.b .lm-nm {
       color: var(--side-b);
     }
     .lm-time {
-      font-size: 1.5rem;
+      font-size: var(--fs-2xl);
       font-weight: 700;
       color: var(--text);
     }
@@ -228,7 +228,7 @@ const MAX_ROWS = 5;
     .lm-sc {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 2.8rem;
+      font-size: var(--fs-5xl);
       line-height: 1;
       font-variant-numeric: tabular-nums;
     }
@@ -246,7 +246,7 @@ const MAX_ROWS = 5;
     .lm-vs {
       color: var(--muted);
       font-family: var(--font-display);
-      font-size: 1.2rem;
+      font-size: var(--fs-lg);
     }
     .lm-clk {
       color: var(--muted);
@@ -291,7 +291,7 @@ const MAX_ROWS = 5;
       grid-template-columns: minmax(0, 1fr) 72px auto;
       align-items: center;
       gap: 8px;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .lm-p.dead {
       opacity: 0.45;
@@ -304,7 +304,7 @@ const MAX_ROWS = 5;
     }
     .lm-hp {
       height: 6px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--panel-3);
       overflow: hidden;
     }
@@ -329,13 +329,13 @@ const MAX_ROWS = 5;
         gap: 8px;
       }
       .lm-nm {
-        font-size: 1rem;
+        font-size: var(--fs-base);
       }
       .lm-sc {
-        font-size: 2.2rem;
+        font-size: var(--fs-3xl);
       }
       .lm-time {
-        font-size: 1.1rem;
+        font-size: var(--fs-lg);
       }
       .lm-teams {
         grid-template-columns: minmax(0, 1fr);

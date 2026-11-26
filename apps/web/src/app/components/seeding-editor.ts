@@ -81,7 +81,7 @@ interface Option {
     }
     .pair {
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       padding: 8px;
       display: grid;
       gap: 6px;

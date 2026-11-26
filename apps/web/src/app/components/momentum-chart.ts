@@ -94,7 +94,7 @@ export interface RaceLine {
     .axis {
       display: flex;
       justify-content: space-between;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       color: var(--muted);
       margin-top: 4px;
     }

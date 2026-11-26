@@ -147,7 +147,7 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
       gap: 4px;
     }
     .record .value {
-      font-size: 1.5rem;
+      font-size: var(--fs-2xl);
       font-weight: 700;
       color: var(--accent);
     }
@@ -165,7 +165,7 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
     }
     .vbar {
       height: 10px;
-      border-radius: 5px;
+      border-radius: var(--radius-xs);
       background: var(--hot);
       overflow: hidden;
       margin-top: 8px;
@@ -176,7 +176,7 @@ const MONEY = new Set(['peak', 'bestWin', 'worstLoss', 'profit', 'allInWin', 'bi
       background: var(--accent);
     }
     h3 {
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
       margin: 8px 0;
     }
     .check {

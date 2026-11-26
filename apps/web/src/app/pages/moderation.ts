@@ -256,10 +256,10 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
     .n {
       margin-left: 6px;
       padding: 0 6px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       background: var(--danger, #ff6b6b);
       color: #fff;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
     }
     .item.rep {
       border-color: rgba(255, 107, 107, 0.45);
@@ -275,9 +275,9 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
     }
     .chip {
       padding: 1px 8px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       border: 1px solid var(--border);
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       font-weight: 600;
     }
     .chip.hot,
@@ -290,7 +290,7 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
     }
     .text {
       margin: 10px 0 6px;
-      font-size: 1.1rem;
+      font-size: var(--fs-lg);
       font-weight: 700;
       word-break: break-word;
     }

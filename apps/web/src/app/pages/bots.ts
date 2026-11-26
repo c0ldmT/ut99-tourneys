@@ -697,13 +697,13 @@ const emptyLines = () =>
     }
     .actions button {
       padding: 3px 9px;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .swatch {
       display: inline-block;
       width: 10px;
       height: 10px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       margin-right: 6px;
       vertical-align: middle;
     }

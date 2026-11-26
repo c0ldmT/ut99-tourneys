@@ -339,7 +339,7 @@ import { Feedback } from './components/feedback';
       display: inline-flex;
       align-items: center;
       gap: 10px;
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
       color: var(--text);
       flex: none;
     }
@@ -355,9 +355,9 @@ import { Feedback } from './components/feedback';
     nav a {
       color: var(--text-2);
       font-weight: 500;
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
       padding: 8px 7px;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       white-space: nowrap;
     }
     .navlive {
@@ -365,7 +365,7 @@ import { Feedback } from './components/feedback';
       align-items: center;
       gap: 4px;
       margin-left: 6px;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       font-weight: 700;
       color: var(--live);
     }
@@ -421,9 +421,9 @@ import { Feedback } from './components/feedback';
       min-height: 0;
       color: var(--text-2);
       font-weight: 500;
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
       padding: 8px 7px;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       white-space: nowrap;
     }
     .navbtn:hover,
@@ -456,7 +456,7 @@ import { Feedback } from './components/feedback';
       gap: 2px;
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 10px;
+      border-radius: var(--radius);
       box-shadow: 0 16px 32px rgba(0, 0, 0, 0.55);
       z-index: 30;
     }
@@ -473,7 +473,7 @@ import { Feedback } from './components/feedback';
       align-items: center;
       gap: 8px;
       padding: 8px 10px;
-      border-radius: 6px;
+      border-radius: var(--radius-sm);
       color: var(--text-2);
       font-weight: 500;
       white-space: nowrap;
@@ -483,7 +483,7 @@ import { Feedback } from './components/feedback';
       text-align: left;
       justify-content: flex-start;
       width: 100%;
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
     }
     .menu a:hover,
     .menu .mi:hover,
@@ -504,10 +504,10 @@ import { Feedback } from './components/feedback';
     .navbadge {
       margin-left: auto;
       padding: 0 6px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       background: var(--danger, #ff6b6b);
       color: #fff;
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       font-weight: 700;
       line-height: 1.5;
     }
@@ -523,7 +523,7 @@ import { Feedback } from './components/feedback';
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
     }
     .wallet:hover {
       color: var(--neuro);
@@ -546,7 +546,7 @@ import { Feedback } from './components/feedback';
       border: 0;
       min-height: 0;
       padding: 4px 6px;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
     }
     .user:hover,
     .usermenu.open .user {
@@ -587,7 +587,7 @@ import { Feedback } from './components/feedback';
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-size: 1rem;
+      font-size: var(--fs-base);
     }
     @media (max-width: 1080px) {
       .bar {
@@ -596,7 +596,7 @@ import { Feedback } from './components/feedback';
         min-height: 56px;
       }
       .brand {
-        font-size: 1.2rem;
+        font-size: var(--fs-lg);
       }
       .burger {
         display: inline-flex;
@@ -619,7 +619,7 @@ import { Feedback } from './components/feedback';
       }
       nav a {
         padding: 12px 10px;
-        font-size: 1.05rem;
+        font-size: var(--fs-base);
       }
       nav a.active {
         box-shadow: inset 3px 0 0 var(--accent);
@@ -653,7 +653,7 @@ import { Feedback } from './components/feedback';
       }
       .navmore .menu a {
         padding: 12px 10px;
-        font-size: 1.05rem;
+        font-size: var(--fs-base);
       }
       .uname,
       .user .chev {

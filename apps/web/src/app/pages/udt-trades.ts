@@ -343,15 +343,15 @@ import { ReportButton } from '../components/report-button';
     }
     .arrow {
       align-self: center;
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
       color: var(--udt);
     }
     .chip {
       padding: 2px 8px;
-      border-radius: 10px;
+      border-radius: var(--radius);
       background: var(--bg-2);
       border: 1px solid var(--line);
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .msg {
       margin: 0;
@@ -397,7 +397,7 @@ import { ReportButton } from '../components/report-button';
       position: relative;
       padding: 3px;
       min-height: 0;
-      border-radius: 18px;
+      border-radius: var(--radius-lg);
       border: 2px solid transparent;
       background: transparent;
       transition:
@@ -425,7 +425,7 @@ import { ReportButton } from '../components/report-button';
       background: var(--udt);
       color: #0b0614;
       font-weight: 800;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
     }
     .pb:disabled {
       cursor: not-allowed;

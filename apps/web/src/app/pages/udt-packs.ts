@@ -287,7 +287,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     }
     .box {
       position: relative;
-      border-radius: 16px;
+      border-radius: var(--radius-lg);
       padding: 2px;
       background: var(--rc);
     }
@@ -296,7 +296,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       animation: udt-holo 6s linear infinite;
     }
     .box-in {
-      border-radius: 14px;
+      border-radius: var(--radius);
       padding: 20px;
       display: flex;
       flex-direction: column;
@@ -312,7 +312,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     }
     .bhead h2 {
       margin: 0;
-      font-size: 1.9rem;
+      font-size: var(--fs-3xl);
       font-weight: 800;
       font-style: italic;
       color: var(--rt);
@@ -333,7 +333,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       display: flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
     }
     .rn {
       width: 96px;
@@ -346,7 +346,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     .rbar {
       flex: 1;
       height: 6px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--border);
       overflow: hidden;
     }
@@ -403,7 +403,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     }
     .cat {
       margin: 16px 0 2px;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--muted);

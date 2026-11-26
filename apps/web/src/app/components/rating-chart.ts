@@ -166,7 +166,7 @@ const PAD = { l: 44, r: 14, t: 14, b: 26 };
       transform: translateX(12px);
       background: var(--panel-3);
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       padding: 6px 10px;
       font-size: 0.82rem;
       pointer-events: none;

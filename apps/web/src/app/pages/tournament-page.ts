@@ -967,7 +967,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
     .lh-bets h3 {
       margin: 0;
-      font-size: 1rem;
+      font-size: var(--fs-base);
     }
     .lh-watch {
       padding: 12px 16px;
@@ -981,7 +981,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       }
     }
     .lg-vs {
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
       margin: 6px 0 2px;
     }
     table.ratings td {
@@ -1019,7 +1019,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       min-width: 0;
     }
     .head h1 {
-      font-size: 3.4rem;
+      font-size: var(--fs-6xl);
       margin: 0;
       overflow-wrap: anywhere;
     }
@@ -1079,7 +1079,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       font-family: var(--font-display);
       text-transform: uppercase;
       letter-spacing: 0.04em;
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
       font-weight: 800;
       font-style: italic;
       color: var(--neuro-text);
@@ -1088,18 +1088,18 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
     .fanfare {
       position: relative;
-      font-size: 2rem;
+      font-size: var(--fs-3xl);
       line-height: 1.1;
     }
     .fanfare small {
       display: block;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       letter-spacing: 0.1em;
       color: var(--hot-text);
     }
     @media (max-width: 640px) {
       .head h1 {
-        font-size: 2.4rem;
+        font-size: var(--fs-4xl);
       }
     }
     .connect {
@@ -1108,7 +1108,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       align-items: center;
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       padding: 8px 10px;
       margin: 8px 0;
     }

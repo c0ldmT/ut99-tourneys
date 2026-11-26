@@ -268,7 +268,7 @@ import { ReportButton } from '../components/report-button';
     }
     .ub-res {
       min-width: 64px;
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;

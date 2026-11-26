@@ -289,7 +289,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       position: relative;
       overflow: hidden;
       margin: 22px 0;
-      border-radius: 16px;
+      border-radius: var(--radius-lg);
       border: 1px solid var(--border);
       min-height: 560px;
       padding: 32px 16px;
@@ -318,7 +318,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       max-width: 460px;
     }
     .big {
-      font-size: 1.8rem;
+      font-size: var(--fs-3xl);
       font-weight: 700;
     }
     .ov {
@@ -378,7 +378,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       text-align: center;
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
       letter-spacing: 0.3em;
       text-transform: uppercase;
       color: var(--text-2);
@@ -428,7 +428,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       width: 8px;
       height: 8px;
       margin: -4px;
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
       background: var(--tc);
       box-shadow: 0 0 14px var(--tc);
       animation: udt-expl 0.9s cubic-bezier(0.1, 0.8, 0.3, 1) both;
@@ -439,7 +439,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
     }
     .stitle {
       position: relative;
-      font-size: 1.35rem;
+      font-size: var(--fs-xl);
       font-weight: 700;
       color: var(--text-2);
       letter-spacing: 0.14em;
@@ -478,7 +478,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
     .fc:focus-visible {
       outline: 2px solid var(--accent);
       outline-offset: 4px;
-      border-radius: 14px;
+      border-radius: var(--radius);
     }
     .fc-in {
       position: absolute;
@@ -499,7 +499,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       inset: 0;
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
-      border-radius: 14px;
+      border-radius: var(--radius);
     }
     .back {
       transform: rotateY(180deg);
@@ -512,7 +512,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       gap: 8px;
     }
     .tiny {
-      font-size: 0.62rem;
+      font-size: var(--fs-2xs);
     }
     .fc.t-e.down .back {
       border-color: #6b3fa8;
@@ -547,7 +547,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
     .front-in {
       height: 100%;
       box-sizing: border-box;
-      border-radius: 12px;
+      border-radius: var(--radius);
       padding: 12px;
       display: flex;
       flex-direction: column;
@@ -573,7 +573,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       animation: udt-holo 2.6s linear infinite;
     }
     .rk {
-      font-size: 0.62rem;
+      font-size: var(--fs-2xs);
       font-weight: 700;
       letter-spacing: 0.12em;
       text-transform: uppercase;
@@ -587,12 +587,12 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       color: var(--rt);
     }
     .tn {
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
       font-weight: 700;
       line-height: 1;
     }
     .te {
-      font-size: 0.7rem;
+      font-size: var(--fs-2xs);
       line-height: 1.3;
     }
     .te .full {

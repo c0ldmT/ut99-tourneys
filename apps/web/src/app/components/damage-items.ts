@@ -49,7 +49,7 @@ export interface CompareRow {
       gap: 8px;
       align-items: center;
       padding: 4px 0;
-      font-size: 0.86rem;
+      font-size: var(--fs-sm);
     }
     .row.big {
       margin-bottom: 8px;

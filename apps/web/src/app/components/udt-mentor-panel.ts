@@ -232,7 +232,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
     }
     h3 {
       margin: 18px 0 8px;
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
     }
     .mp-pairs {
       display: grid;
@@ -257,7 +257,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
       gap: 8px;
     }
     .mp-arrow {
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
       color: var(--udt);
     }
     .mp-away {
@@ -290,7 +290,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
       border-radius: 50%;
       background: var(--udt);
       color: #fff;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
     }
     .mp-pick {
       display: flex;
@@ -301,7 +301,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
       position: relative;
       padding: 3px;
       min-height: 0;
-      border-radius: 18px;
+      border-radius: var(--radius-lg);
       border: 2px solid transparent;
       background: transparent;
       transition:
@@ -326,7 +326,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
       grid-template-columns: 96px 1fr auto;
       align-items: center;
       gap: 10px;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .mp-row.same {
       color: var(--muted);
@@ -334,7 +334,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
     .bar {
       position: relative;
       height: 8px;
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       background: var(--panel-3);
       overflow: hidden;
     }

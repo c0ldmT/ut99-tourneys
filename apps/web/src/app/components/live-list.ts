@@ -114,7 +114,7 @@ export interface LiveListItem {
       width: 100%;
       min-height: 0;
       padding: 8px 10px;
-      border-radius: 10px;
+      border-radius: var(--radius);
       border: 1px solid var(--line);
       background: var(--panel-2);
       color: var(--text);
@@ -141,7 +141,7 @@ export interface LiveListItem {
       display: flex;
       justify-content: space-between;
       gap: 8px;
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
       color: var(--text-2);
     }
     .ll-srv {
@@ -168,7 +168,7 @@ export interface LiveListItem {
       text-align: right;
     }
     .ll-st {
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       color: var(--text-2);
     }
   `,

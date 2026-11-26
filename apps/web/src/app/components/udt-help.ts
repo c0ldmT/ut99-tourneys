@@ -108,7 +108,7 @@ const WAYS = [
       background: none;
       border: none;
       color: var(--muted);
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
       line-height: 1;
       cursor: pointer;
     }
@@ -136,7 +136,7 @@ const WAYS = [
     }
     .steps h3 {
       margin: 0 0 4px;
-      font-size: 1.05rem;
+      font-size: var(--fs-base);
     }
     .steps p {
       margin: 0;

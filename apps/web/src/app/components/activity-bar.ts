@@ -74,7 +74,7 @@ import { I18n } from '../core/i18n';
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       font-weight: 600;
       color: var(--text);
     }
@@ -112,7 +112,7 @@ import { I18n } from '../core/i18n';
       flex: 0 0 120px;
       height: 4px;
       margin-left: auto;
-      border-radius: 2px;
+      border-radius: var(--radius-xs);
       background: var(--panel-3);
       overflow: hidden;
     }
@@ -133,7 +133,7 @@ import { I18n } from '../core/i18n';
     @media (max-width: 640px) {
       .in {
         padding: 6px 16px;
-        font-size: 0.8rem;
+        font-size: var(--fs-sm);
       }
       .meter {
         flex-basis: 60px;

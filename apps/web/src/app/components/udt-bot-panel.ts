@@ -458,13 +458,13 @@ const SHORT: Readonly<Record<Stat, string>> = {
     }
     .head h2 {
       margin: 0;
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
     }
     .x {
       background: none;
       border: none;
       color: var(--muted);
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
       cursor: pointer;
     }
     .body {
@@ -495,7 +495,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
     }
     h3 {
       margin: 0;
-      font-size: 1rem;
+      font-size: var(--fs-base);
     }
     .between {
       justify-content: space-between;
@@ -547,11 +547,11 @@ const SHORT: Readonly<Record<Stat, string>> = {
       min-width: 40px;
       height: 40px;
       padding: 0 10px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       display: grid;
       place-items: center;
       font-weight: 800;
-      font-size: 1.3rem;
+      font-size: var(--fs-xl);
       color: #2a1a00;
       background: linear-gradient(135deg, #ffe08a, #f5b83d 60%, #d98e1c);
     }
@@ -587,7 +587,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
       gap: 6px;
     }
     .dcost {
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       color: var(--neuro-text);
       white-space: nowrap;
     }
@@ -597,7 +597,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
       gap: 6px;
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 1.45rem;
+      font-size: var(--fs-xl);
       line-height: 1;
     }
     .dnow {
@@ -621,7 +621,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
     .dbar {
       position: relative;
       height: 5px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--panel-3);
       overflow: hidden;
     }

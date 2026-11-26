@@ -610,7 +610,7 @@ function storedFilter(): TournamentFilter {
       margin-bottom: 14px;
     }
     .head h1 {
-      font-size: 3.2rem;
+      font-size: var(--fs-6xl);
       margin: 0;
     }
     section {
@@ -633,7 +633,7 @@ function storedFilter(): TournamentFilter {
       font-style: normal;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
       color: var(--text-2);
       margin: 0 0 12px;
       display: flex;
@@ -642,7 +642,7 @@ function storedFilter(): TournamentFilter {
     }
     h2 .n {
       font-family: var(--font-mono);
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
       color: var(--faint);
       letter-spacing: 0;
       text-transform: none;
@@ -685,7 +685,7 @@ function storedFilter(): TournamentFilter {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      font-size: 0.88rem;
+      font-size: var(--fs-sm);
       color: var(--text-2);
       cursor: pointer;
       white-space: nowrap;
@@ -700,7 +700,7 @@ function storedFilter(): TournamentFilter {
     .mine i {
       width: 34px;
       height: 20px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       background: var(--panel-3);
       border: 1px solid var(--line);
       position: relative;
@@ -767,7 +767,7 @@ function storedFilter(): TournamentFilter {
       font-weight: 800;
       font-style: italic;
       text-transform: uppercase;
-      font-size: 2.4rem;
+      font-size: var(--fs-4xl);
       line-height: 1;
     }
     .hero-r {
@@ -787,7 +787,7 @@ function storedFilter(): TournamentFilter {
     }
     .nm {
       font-weight: 700;
-      font-size: 1.15rem;
+      font-size: var(--fs-lg);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -798,17 +798,17 @@ function storedFilter(): TournamentFilter {
     .sc {
       font-family: var(--font-display);
       font-weight: 800;
-      font-size: 2.5rem;
+      font-size: var(--fs-4xl);
       line-height: 1;
     }
     .sc i {
       color: var(--muted);
       font-style: normal;
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
       padding: 0 6px;
     }
     .sc.race {
-      font-size: 1.7rem;
+      font-size: var(--fs-2xl);
     }
     .state {
       display: flex;
@@ -851,10 +851,10 @@ function storedFilter(): TournamentFilter {
       border-top: 1px solid var(--border);
     }
     .lgrid.multi .hero-name {
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
     }
     .lgrid.multi .sc {
-      font-size: 2rem;
+      font-size: var(--fs-3xl);
     }
     .srv {
       color: var(--accent);
@@ -874,8 +874,8 @@ function storedFilter(): TournamentFilter {
     .chip-x {
       min-height: 0;
       padding: 4px 12px;
-      border-radius: 999px;
-      font-size: 0.85rem;
+      border-radius: var(--radius-pill);
+      font-size: var(--fs-sm);
     }
     .series {
       display: grid;
@@ -905,14 +905,14 @@ function storedFilter(): TournamentFilter {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.03em;
-      font-size: 1.45rem;
+      font-size: var(--fs-xl);
       line-height: 1.05;
     }
     dl {
       display: grid;
       grid-template-columns: auto 1fr;
       gap: 4px 12px;
-      font-size: 0.86rem;
+      font-size: var(--fs-sm);
       margin: 4px 0 0;
     }
     dt {
@@ -928,7 +928,7 @@ function storedFilter(): TournamentFilter {
       align-items: center;
       border-top: 1px solid var(--border);
       padding: 6px 10px 6px 18px;
-      font-size: 0.86rem;
+      font-size: var(--fs-sm);
     }
     .sfoot button {
       background: none;
@@ -965,7 +965,7 @@ function storedFilter(): TournamentFilter {
       gap: 10px;
       padding: 7px 18px;
       border-top: 1px solid var(--border);
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       color: var(--text);
     }
     .hist .h:hover {
@@ -974,19 +974,19 @@ function storedFilter(): TournamentFilter {
     .hist .d {
       color: var(--muted);
       font-family: var(--font-mono);
-      font-size: 0.78rem;
+      font-size: var(--fs-xs);
     }
     .hist .all {
       display: block;
       padding: 8px 18px 12px;
       border-top: 1px solid var(--border);
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       font-weight: 600;
     }
     /* Phones: every filter group a full row; the rows in two columns, the state below. */
     @media (max-width: 640px) {
       .head h1 {
-        font-size: 2.4rem;
+        font-size: var(--fs-4xl);
       }
       .hide-sm {
         display: none;
@@ -1001,7 +1001,7 @@ function storedFilter(): TournamentFilter {
       .pills button {
         flex: 1 1 auto;
         padding: 5px 6px;
-        font-size: 0.8rem;
+        font-size: var(--fs-sm);
       }
       .mine {
         margin-left: auto;
@@ -1011,7 +1011,7 @@ function storedFilter(): TournamentFilter {
         border-top: 1px solid var(--border);
       }
       .hero-name {
-        font-size: 2rem;
+        font-size: var(--fs-3xl);
       }
       .series {
         grid-template-columns: 1fr;

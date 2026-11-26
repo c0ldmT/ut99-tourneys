@@ -108,7 +108,7 @@ type Team = Extract<Entrant, { kind: 'team' }>;
     }
     .team {
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       padding: 10px;
     }
     .team.mine {
@@ -130,7 +130,7 @@ type Team = Extract<Entrant, { kind: 'team' }>;
       gap: 6px;
       align-items: center;
       color: var(--text);
-      font-size: 1rem;
+      font-size: var(--fs-base);
       margin: 0;
     }
     .nmb {

@@ -264,7 +264,7 @@ const AREAS = ['dreamTeam', 'league', 'tournaments', 'bets', 'website', 'other']
       }
       .seg button {
         padding: 4px 9px;
-        font-size: 0.88rem;
+        font-size: var(--fs-sm);
       }
     }
   `,

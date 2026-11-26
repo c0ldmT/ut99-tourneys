@@ -193,7 +193,7 @@ const STATS: readonly UdtPrestigeStat[] = [
     }
     h3 {
       margin: 0;
-      font-size: 1rem;
+      font-size: var(--fs-base);
     }
     p {
       margin: 0;
@@ -242,7 +242,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       white-space: nowrap;
     }
     .count b {
-      font-size: 1.6rem;
+      font-size: var(--fs-2xl);
     }
     .gold {
       color: #f5c75e;
@@ -250,8 +250,8 @@ const STATS: readonly UdtPrestigeStat[] = [
     }
     .stage {
       padding: 1px 9px;
-      border-radius: 999px;
-      font-size: 0.72rem;
+      border-radius: var(--radius-pill);
+      font-size: var(--fs-xs);
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -299,7 +299,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       display: block;
       width: 13px;
       height: 6px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--panel-3);
     }
     .pips i.full {
@@ -335,7 +335,7 @@ const STATS: readonly UdtPrestigeStat[] = [
     }
     .starline {
       color: #f5c75e;
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
       letter-spacing: 3px;
     }
     .req {

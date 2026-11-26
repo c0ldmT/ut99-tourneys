@@ -115,7 +115,7 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
       background: linear-gradient(180deg, rgba(76, 141, 255, 0.07), transparent 60%), var(--panel);
     }
     .rk {
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -126,13 +126,13 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
       margin-right: 6px;
     }
     .rtime {
-      font-size: 2rem;
+      font-size: var(--fs-3xl);
       font-weight: 600;
       line-height: 1.15;
       margin: 6px 0 2px;
     }
     .rtime.big {
-      font-size: 2.6rem;
+      font-size: var(--fs-5xl);
       color: #cfe0ff;
     }
     .boxes {
@@ -148,7 +148,7 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
       display: grid;
     }
     .boxes span {
-      font-size: 0.7rem;
+      font-size: var(--fs-2xs);
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.06em;
@@ -156,7 +156,7 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
     }
     .boxes b {
       font-family: var(--font-mono);
-      font-size: 1.1rem;
+      font-size: var(--fs-lg);
       font-weight: 600;
     }
     .boxes .pen,
@@ -202,7 +202,7 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
         grid-template-columns: minmax(0, 1fr);
       }
       .rtime.big {
-        font-size: 2.1rem;
+        font-size: var(--fs-3xl);
       }
     }
   `,

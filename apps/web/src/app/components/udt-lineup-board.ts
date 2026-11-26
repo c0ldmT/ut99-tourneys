@@ -386,7 +386,7 @@ export interface TraitDrop {
       display: block;
       margin-top: 4px;
       text-align: center;
-      font-size: 0.7rem;
+      font-size: var(--fs-2xs);
       font-weight: 700;
       letter-spacing: 0.04em;
       text-transform: uppercase;
@@ -424,7 +424,7 @@ export interface TraitDrop {
     .place {
       position: relative;
       min-height: 150px;
-      border-radius: 16px;
+      border-radius: var(--radius-lg);
       transition:
         box-shadow 0.15s,
         background 0.15s;
@@ -433,7 +433,7 @@ export interface TraitDrop {
       position: absolute;
       left: 6px;
       bottom: -18px;
-      font-size: 0.7rem;
+      font-size: var(--fs-2xs);
       color: var(--muted);
     }
     .empty {
@@ -441,12 +441,12 @@ export interface TraitDrop {
       height: 100%;
       min-height: 150px;
       border: 2px dashed var(--line);
-      border-radius: 14px;
+      border-radius: var(--radius);
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .benchrow {
       display: flex;
@@ -479,7 +479,7 @@ export interface TraitDrop {
     .dcard {
       cursor: grab;
       touch-action: manipulation;
-      border-radius: 16px;
+      border-radius: var(--radius-lg);
       transition: transform 0.12s;
     }
     .dcard.sel {
@@ -502,7 +502,7 @@ export interface TraitDrop {
     .ph {
       position: absolute;
       inset: 0;
-      border-radius: 14px;
+      border-radius: var(--radius);
       border: 2px dashed var(--udt);
       background: rgba(178, 107, 255, 0.08);
       pointer-events: none;
@@ -562,7 +562,7 @@ export interface TraitDrop {
       padding: 8px;
       text-align: center;
       color: var(--muted);
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .cards {
       display: flex;
@@ -573,7 +573,7 @@ export interface TraitDrop {
     }
     .rslot {
       position: relative;
-      border-radius: 16px;
+      border-radius: var(--radius-lg);
       scroll-snap-align: start;
     }
     .chips {
@@ -586,14 +586,14 @@ export interface TraitDrop {
       height: auto;
       min-height: 30px;
       padding: 4px 10px;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       cursor: grab;
       white-space: normal;
       touch-action: manipulation;
     }
     .chip small {
       font-weight: 400;
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
     }
     .chip.sel {
       box-shadow: 0 0 0 2px var(--udt);
@@ -617,7 +617,7 @@ export interface TraitDrop {
         width: 150px;
         padding: 6px 8px;
         border: 1px solid var(--line);
-        border-radius: 12px;
+        border-radius: var(--radius);
         background: #0c0f16;
       }
       .mtxt {
@@ -635,11 +635,11 @@ export interface TraitDrop {
         margin-left: auto;
         min-width: 26px;
         height: 26px;
-        font-size: 0.8rem;
+        font-size: var(--fs-sm);
       }
       .outzone {
         padding: 4px;
-        font-size: 0.75rem;
+        font-size: var(--fs-xs);
       }
       .tray {
         padding: 8px;

@@ -73,7 +73,7 @@ import { TPipe } from '../core/i18n';
       font-family: var(--font-display);
       text-transform: uppercase;
       letter-spacing: 0.18em;
-      font-size: 0.75rem;
+      font-size: var(--fs-xs);
       color: var(--muted);
     }
     @keyframes trace {

@@ -317,7 +317,7 @@ interface AreaView {
     .hub-lab b {
       display: block;
       font-family: var(--font-display);
-      font-size: 1.35rem;
+      font-size: var(--fs-xl);
       font-weight: 700;
       letter-spacing: 0.03em;
       text-transform: uppercase;
@@ -330,15 +330,15 @@ interface AreaView {
       margin-bottom: 3px;
     }
     .hub-lab.sm b {
-      font-size: 0.95rem;
+      font-size: var(--fs-md);
     }
     .hub-badge {
       display: inline-block;
       margin-top: 6px;
       padding: 0 9px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       color: var(--bg);
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       font-weight: 800;
       letter-spacing: 0.04em;
       text-transform: uppercase;
@@ -369,11 +369,11 @@ interface AreaView {
     }
     .hub-help b {
       font-family: var(--font-display);
-      font-size: 1.9rem;
+      font-size: var(--fs-3xl);
       line-height: 1;
     }
     .hub-help small {
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
@@ -397,7 +397,7 @@ interface AreaView {
       height: 65px;
     }
     .hub-help.sm b {
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
     }
     .hub-field,
     .hub-card {
@@ -425,14 +425,14 @@ interface AreaView {
       color: var(--text);
       font-family: var(--font-display);
       font-weight: 700;
-      font-size: 1.2rem;
+      font-size: var(--fs-lg);
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
     .hub-ftitle .dot {
       width: 10px;
       height: 10px;
-      border-radius: 3px;
+      border-radius: var(--radius-xs);
       background: var(--ac);
     }
     .go {
@@ -444,7 +444,7 @@ interface AreaView {
     .hub-card p {
       margin: 4px 0 10px;
       color: var(--text-2);
-      font-size: 0.84rem;
+      font-size: var(--fs-sm);
       line-height: 1.35;
     }
     .hub-pills {
@@ -458,11 +458,11 @@ interface AreaView {
       gap: 6px;
       min-height: 32px;
       padding: 4px 12px;
-      border-radius: 999px;
+      border-radius: var(--radius-pill);
       border: 1px solid var(--line);
       background: var(--panel-2);
       color: var(--text-2);
-      font-size: 0.88rem;
+      font-size: var(--fs-sm);
       font-weight: 600;
     }
     .hub-pill:hover {

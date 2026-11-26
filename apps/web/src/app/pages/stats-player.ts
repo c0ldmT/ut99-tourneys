@@ -456,9 +456,9 @@ import type {
       margin: 8px 0 12px;
     }
     .badge {
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       padding: 1px 8px;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       border: 1px solid var(--border);
       color: var(--muted);
       vertical-align: middle;
@@ -484,7 +484,7 @@ import type {
     }
     .tile .value {
       font-family: var(--font-display);
-      font-size: 1.9rem;
+      font-size: var(--fs-3xl);
       line-height: 1.1;
       font-weight: 800;
       color: var(--accent);
@@ -525,7 +525,7 @@ import type {
     }
     .bar {
       background: var(--panel-2);
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       height: 10px;
       overflow: hidden;
     }

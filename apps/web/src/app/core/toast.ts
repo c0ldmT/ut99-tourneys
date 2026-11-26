@@ -189,7 +189,7 @@ function topModal(): HTMLDialogElement | null {
       display: grid;
       place-items: center;
       font-weight: 800;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       color: var(--bg);
       margin-top: 1px;
     }
@@ -211,14 +211,14 @@ function topModal(): HTMLDialogElement | null {
       flex: none;
       min-height: 0;
       padding: 2px 10px;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .x {
       flex: none;
       background: none;
       border: none;
       color: var(--muted);
-      font-size: 1.2rem;
+      font-size: var(--fs-lg);
       line-height: 1;
       padding: 0 4px;
       cursor: pointer;

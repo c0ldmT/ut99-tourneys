@@ -119,7 +119,7 @@ import { SKILL_NAMES, UdtCard, type CardBot } from '../core/udt';
     }
     .count b {
       font-family: var(--font-display);
-      font-size: 1.9rem;
+      font-size: var(--fs-3xl);
     }
     .kbots {
       display: flex;
@@ -139,7 +139,7 @@ import { SKILL_NAMES, UdtCard, type CardBot } from '../core/udt';
       border: 0;
       background: none;
       font: inherit;
-      border-radius: 18px;
+      border-radius: var(--radius-lg);
       cursor: pointer;
     }
     .kpick:disabled {
@@ -151,7 +151,7 @@ import { SKILL_NAMES, UdtCard, type CardBot } from '../core/udt';
       outline-offset: 4px;
     }
     .next {
-      font-size: 0.82rem;
+      font-size: var(--fs-sm);
       font-weight: 700;
       text-align: center;
       color: var(--muted);
@@ -193,7 +193,7 @@ import { SKILL_NAMES, UdtCard, type CardBot } from '../core/udt';
         justify-content: space-between;
         align-items: center;
         padding: 10px 14px;
-        border-radius: 10px;
+        border-radius: var(--radius);
         background: var(--panel);
         border: 1px solid var(--line);
       }

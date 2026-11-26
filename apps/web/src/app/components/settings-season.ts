@@ -179,9 +179,9 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
         flex-wrap: wrap;
       }
       .pill {
-        font-size: 0.8rem;
+        font-size: var(--fs-sm);
         padding: 2px 10px;
-        border-radius: 999px;
+        border-radius: var(--radius-pill);
         border: 1px solid var(--border);
         color: var(--muted);
         white-space: nowrap;

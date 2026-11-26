@@ -169,7 +169,7 @@ import { UdtNav } from '../core/udt';
       align-items: flex-start;
     }
     .name {
-      font-size: 1.3rem;
+      font-size: var(--fs-xl);
       font-weight: 700;
     }
     .up {

@@ -334,7 +334,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      font-size: 1.4rem;
+      font-size: var(--fs-xl);
     }
     .intro {
       margin: 6px 0 14px;
@@ -383,7 +383,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
     }
     .prev {
       height: 86px;
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       background: var(--bg-2);
       display: flex;
       flex-direction: column;
@@ -393,18 +393,18 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
     }
     .pn {
       font-weight: 700;
-      font-size: 1.1rem;
+      font-size: var(--fs-lg);
     }
     .pn.big {
       font-family: var(--font-display);
-      font-size: 1.7rem;
+      font-size: var(--fs-2xl);
       text-transform: uppercase;
       font-style: italic;
     }
     .pt {
       font-family: var(--font-display);
       font-weight: 600;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--hot-text);
@@ -419,15 +419,15 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.8rem;
+      font-size: var(--fs-3xl);
     }
     .fan {
       background: linear-gradient(90deg, rgba(245, 184, 61, 0.15), transparent);
     }
     .bubble {
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
       padding: 8px 12px;
-      border-radius: 12px;
+      border-radius: var(--radius);
       background: var(--panel-3);
       max-width: 90%;
       text-align: center;

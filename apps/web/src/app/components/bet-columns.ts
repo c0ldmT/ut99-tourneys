@@ -66,7 +66,7 @@ import type { BetMatchView } from '../core/types';
     .bar {
       height: 8px;
       background: var(--panel-2);
-      border-radius: 4px;
+      border-radius: var(--radius-xs);
       overflow: hidden;
     }
     .bar span {
@@ -79,14 +79,14 @@ import type { BetMatchView } from '../core/types';
       grid-template-columns: 1fr 1fr;
       gap: 6px;
       margin-top: 6px;
-      font-size: 0.9rem;
+      font-size: var(--fs-md);
     }
     .col {
       min-width: 0;
       box-shadow: inset 0 3px 0 var(--side-a);
       border: 1px solid var(--border);
       background: linear-gradient(180deg, rgba(255, 77, 94, 0.06), transparent 120px), var(--panel);
-      border-radius: 10px;
+      border-radius: var(--radius);
       padding: 10px 12px;
     }
     .col.b {
@@ -110,7 +110,7 @@ import type { BetMatchView } from '../core/types';
     }
     .col .sum {
       font-weight: 700;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       color: var(--neuro-text);
       white-space: nowrap;
     }
@@ -137,7 +137,7 @@ import type { BetMatchView } from '../core/types';
     .bet .amt {
       color: var(--neuro-text);
       white-space: nowrap;
-      font-size: 0.85rem;
+      font-size: var(--fs-sm);
     }
     .bet .who {
       overflow: hidden;
@@ -145,7 +145,7 @@ import type { BetMatchView } from '../core/types';
       white-space: nowrap;
     }
     .bet .res {
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
       white-space: nowrap;
     }
     .res.won {
@@ -162,7 +162,7 @@ import type { BetMatchView } from '../core/types';
     }
     .badge {
       margin-left: 4px;
-      font-size: 0.6rem;
+      font-size: var(--fs-2xs);
       padding: 0 5px;
       height: 17px;
     }

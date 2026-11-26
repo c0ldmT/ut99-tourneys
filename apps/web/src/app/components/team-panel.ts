@@ -271,7 +271,7 @@ export function inviteCodeFrom(text: string): string {
       align-items: center;
       gap: 12px;
       border: 1px solid var(--accent);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       padding: 10px 12px;
       margin: 8px 0 14px;
     }
@@ -293,7 +293,7 @@ export function inviteCodeFrom(text: string): string {
     }
     .team {
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: var(--radius-sm);
       padding: 10px;
     }
     .team.mine {
@@ -320,7 +320,7 @@ export function inviteCodeFrom(text: string): string {
     }
     h3 {
       margin: 16px 0 6px;
-      font-size: 1rem;
+      font-size: var(--fs-base);
     }
     .invite button {
       white-space: nowrap;
@@ -333,7 +333,7 @@ export function inviteCodeFrom(text: string): string {
       width: auto;
       padding: 2px 6px;
       margin-left: 6px;
-      font-size: 0.8rem;
+      font-size: var(--fs-sm);
     }
   `,
 })

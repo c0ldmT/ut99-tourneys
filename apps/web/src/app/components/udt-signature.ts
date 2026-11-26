@@ -85,7 +85,7 @@ export function weaponName(cls: string | undefined): string {
       place-items: center;
       background: rgba(178, 107, 255, 0.18);
       color: #d4adff;
-      font-size: 1.25rem;
+      font-size: var(--fs-xl);
     }
     .col {
       display: flex;
@@ -94,7 +94,7 @@ export function weaponName(cls: string | undefined): string {
       min-width: 0;
     }
     .kick {
-      font-size: 0.72rem;
+      font-size: var(--fs-xs);
       font-weight: 700;
       letter-spacing: 0.08em;
       text-transform: uppercase;
@@ -102,7 +102,7 @@ export function weaponName(cls: string | undefined): string {
     }
     .title {
       font-family: var(--font-display);
-      font-size: 1.3rem;
+      font-size: var(--fs-xl);
       text-transform: uppercase;
       overflow-wrap: anywhere;
     }
