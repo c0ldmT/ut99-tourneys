@@ -85,17 +85,28 @@ import type { BetMatchView } from '../core/types';
       min-width: 0;
       box-shadow: inset 0 3px 0 var(--side-a);
       border: 1px solid var(--border);
-      background: linear-gradient(180deg, rgba(255, 77, 94, 0.06), transparent 120px), var(--panel);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--side-a) 6%, transparent),
+          transparent 120px
+        ),
+        var(--panel);
       border-radius: var(--radius);
       padding: 10px 12px;
     }
     .col.b {
       box-shadow: inset 0 3px 0 var(--side-b);
       background:
-        linear-gradient(180deg, rgba(76, 141, 255, 0.06), transparent 120px), var(--panel);
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--side-b) 6%, transparent),
+          transparent 120px
+        ),
+        var(--panel);
     }
     .col.won {
-      border-color: rgba(74, 222, 128, 0.55);
+      border-color: color-mix(in srgb, var(--live) 55%, transparent);
     }
     .col .head {
       display: flex;

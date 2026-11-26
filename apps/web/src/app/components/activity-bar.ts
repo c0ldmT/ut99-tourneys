@@ -57,8 +57,12 @@ import { I18n } from '../core/i18n';
     }
     .act.on {
       grid-template-rows: 1fr;
-      border-top: 1px solid rgba(178, 107, 255, 0.35);
-      background: linear-gradient(90deg, rgba(34, 211, 238, 0.08), rgba(178, 107, 255, 0.12));
+      border-top: 1px solid color-mix(in srgb, var(--udt) 35%, transparent);
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--accent) 8%, transparent),
+        color-mix(in srgb, var(--udt) 12%, transparent)
+      );
     }
     .act.on.busy {
       border-top-color: rgba(245, 158, 11, 0.4);

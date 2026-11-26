@@ -250,7 +250,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
       background: var(--panel-2);
     }
     .mp-pair.on {
-      border-color: rgba(74, 222, 128, 0.45);
+      border-color: color-mix(in srgb, var(--live) 45%, transparent);
     }
     .mp-who {
       display: flex;
@@ -314,7 +314,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
     }
     .mp-pb.on {
       border-color: var(--udt);
-      box-shadow: 0 0 0 4px rgba(178, 107, 255, 0.18);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--udt) 18%, transparent);
       transform: translateY(-3px);
     }
     .mp-lesson {

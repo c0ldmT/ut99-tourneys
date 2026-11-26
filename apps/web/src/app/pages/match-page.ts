@@ -431,8 +431,8 @@ const SUM_KEYS = [
     }
     .pill.live {
       color: var(--live);
-      border-color: rgba(74, 222, 128, 0.4);
-      background: rgba(74, 222, 128, 0.1);
+      border-color: color-mix(in srgb, var(--live) 40%, transparent);
+      background: color-mix(in srgb, var(--live) 10%, transparent);
     }
     .pill.done {
       color: var(--text);
@@ -448,14 +448,18 @@ const SUM_KEYS = [
       margin-bottom: 0;
       padding: 20px 22px;
       box-shadow: inset 0 4px 0 var(--side-a);
-      background: linear-gradient(180deg, rgba(255, 77, 94, 0.08), transparent 70%), var(--panel);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--side-a) 8%, transparent), transparent 70%),
+        var(--panel);
     }
     .versus > .card.b {
       box-shadow: inset 0 4px 0 var(--side-b);
-      background: linear-gradient(180deg, rgba(76, 141, 255, 0.08), transparent 70%), var(--panel);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--side-b) 8%, transparent), transparent 70%),
+        var(--panel);
     }
     .side.won {
-      border-color: rgba(74, 222, 128, 0.55);
+      border-color: color-mix(in srgb, var(--live) 55%, transparent);
     }
     .side .spread {
       flex-wrap: nowrap;
@@ -495,8 +499,8 @@ const SUM_KEYS = [
     }
     .badge.mvp {
       color: var(--hot-text);
-      border-color: rgba(240, 70, 140, 0.5);
-      background: rgba(240, 70, 140, 0.1);
+      border-color: color-mix(in srgb, var(--hot) 50%, transparent);
+      background: color-mix(in srgb, var(--hot) 10%, transparent);
     }
     .meta {
       margin: 0 0 10px;
@@ -570,10 +574,10 @@ const SUM_KEYS = [
       background:
         linear-gradient(
           90deg,
-          rgba(255, 77, 94, 0.1),
+          color-mix(in srgb, var(--side-a) 10%, transparent),
           transparent 35%,
           transparent 65%,
-          rgba(76, 141, 255, 0.1)
+          color-mix(in srgb, var(--side-b) 10%, transparent)
         ),
         var(--panel);
     }
@@ -642,8 +646,8 @@ const SUM_KEYS = [
     .delay {
       font-size: var(--fs-xs);
       color: var(--neuro-text);
-      border: 1px solid rgba(245, 184, 61, 0.4);
-      background: rgba(245, 184, 61, 0.08);
+      border: 1px solid color-mix(in srgb, var(--neuro) 40%, transparent);
+      background: color-mix(in srgb, var(--neuro) 8%, transparent);
       border-radius: var(--radius-pill);
       padding: 1px 10px;
       margin-left: 6px;

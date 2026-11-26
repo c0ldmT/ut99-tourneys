@@ -336,7 +336,7 @@ import { Feedback } from './components/feedback';
       }
     }
     header {
-      background: rgba(11, 13, 19, 0.92);
+      background: color-mix(in srgb, var(--bg-2) 92%, transparent);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--border);
       position: sticky;

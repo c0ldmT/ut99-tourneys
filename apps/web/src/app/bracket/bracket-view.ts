@@ -171,7 +171,7 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
     .match.live .box {
       stroke: var(--accent);
       stroke-width: 2;
-      filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.35));
+      filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 35%, transparent));
     }
     .match.void {
       opacity: 0.35;

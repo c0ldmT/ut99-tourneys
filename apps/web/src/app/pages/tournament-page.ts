@@ -1111,8 +1111,10 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       font-weight: 800;
       font-style: italic;
       color: var(--neuro-text);
-      border-color: rgba(245, 184, 61, 0.35);
-      background: linear-gradient(90deg, rgba(245, 184, 61, 0.1), transparent 60%), var(--panel);
+      border-color: color-mix(in srgb, var(--neuro) 35%, transparent);
+      background:
+        linear-gradient(90deg, color-mix(in srgb, var(--neuro) 10%, transparent), transparent 60%),
+        var(--panel);
     }
     .fanfare {
       position: relative;

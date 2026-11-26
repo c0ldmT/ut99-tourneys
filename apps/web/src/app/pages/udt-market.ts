@@ -266,7 +266,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
     }
     .offer.on {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
     }
     .grow {
       flex: 1;
@@ -295,7 +295,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
     }
     .udt-mark.cheap {
       color: var(--accent);
-      border-color: rgba(34, 211, 238, 0.45);
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
     }
     @media (max-width: 480px) {
       .spark {

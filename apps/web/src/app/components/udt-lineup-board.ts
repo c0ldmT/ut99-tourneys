@@ -462,7 +462,7 @@ export interface TraitDrop {
     /* Places that take what is dragged or picked. */
     .cdk-drop-list-receiving,
     .picking .target {
-      box-shadow: 0 0 0 2px rgba(178, 107, 255, 0.55);
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--udt) 55%, transparent);
       cursor: pointer;
     }
     .picking .target .empty,
@@ -473,8 +473,8 @@ export interface TraitDrop {
     .cdk-drop-list-dragging {
       box-shadow:
         0 0 0 3px var(--udt),
-        0 0 24px rgba(178, 107, 255, 0.45);
-      background: rgba(178, 107, 255, 0.08);
+        0 0 24px color-mix(in srgb, var(--udt) 45%, transparent);
+      background: color-mix(in srgb, var(--udt) 8%, transparent);
     }
     .dcard {
       cursor: grab;
@@ -504,7 +504,7 @@ export interface TraitDrop {
       inset: 0;
       border-radius: var(--radius);
       border: 2px dashed var(--udt);
-      background: rgba(178, 107, 255, 0.08);
+      background: color-mix(in srgb, var(--udt) 8%, transparent);
       pointer-events: none;
     }
     .pickbar {

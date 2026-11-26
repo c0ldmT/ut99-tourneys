@@ -1413,12 +1413,12 @@ function toLocalInput(iso: string | null): string {
     }
     .tile.udt.on {
       border-color: var(--udt);
-      background: rgba(178, 107, 255, 0.12);
+      background: color-mix(in srgb, var(--udt) 12%, transparent);
       color: #d7b4ff;
       box-shadow: inset 0 0 0 1px var(--udt);
     }
     fieldset.plain.udtbox {
-      border: 1px solid rgba(178, 107, 255, 0.45);
+      border: 1px solid color-mix(in srgb, var(--udt) 45%, transparent);
       border-radius: var(--radius);
       padding: 12px 16px 4px;
       margin: 6px 0 14px;
@@ -1659,7 +1659,7 @@ function toLocalInput(iso: string | null): string {
         align-items: center;
         gap: 12px;
         padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
-        background: rgba(11, 13, 19, 0.96);
+        background: color-mix(in srgb, var(--bg-2) 96%, transparent);
         border-top: 1px solid var(--line);
         backdrop-filter: blur(8px);
       }

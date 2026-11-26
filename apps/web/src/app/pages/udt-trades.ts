@@ -426,7 +426,7 @@ import { ReportButton } from '../components/report-button';
     }
     .pb.on {
       border-color: var(--udt);
-      box-shadow: 0 0 0 4px rgba(178, 107, 255, 0.18);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--udt) 18%, transparent);
       transform: translateY(-3px);
     }
     .pb.on::after {
@@ -454,7 +454,7 @@ import { ReportButton } from '../components/report-button';
       border: 1px solid var(--border);
     }
     .balance.bad {
-      border-color: rgba(255, 122, 135, 0.45);
+      border-color: color-mix(in srgb, var(--danger) 45%, transparent);
     }
     .bars {
       display: flex;

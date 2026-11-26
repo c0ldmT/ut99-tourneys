@@ -112,7 +112,9 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
     }
     .run.b {
       box-shadow: inset 0 3px 0 var(--side-b);
-      background: linear-gradient(180deg, rgba(76, 141, 255, 0.07), transparent 60%), var(--panel);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--side-b) 7%, transparent), transparent 60%),
+        var(--panel);
     }
     .rk {
       font-size: var(--fs-sm);

@@ -379,11 +379,14 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       box-shadow: 0 0 18px var(--rg);
     }
     .item.owned {
-      background: linear-gradient(180deg, rgba(34, 211, 238, 0.06), transparent 60%), var(--panel);
+      background:
+        linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%),
+        var(--panel);
     }
     .item.r-legendary.owned {
       background:
-        linear-gradient(180deg, rgba(34, 211, 238, 0.06), transparent 60%) padding-box,
+        linear-gradient(180deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 60%)
+          padding-box,
         linear-gradient(var(--panel), var(--panel)) padding-box,
         var(--rc) border-box;
     }
@@ -428,7 +431,11 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       font-size: var(--fs-3xl);
     }
     .fan {
-      background: linear-gradient(90deg, rgba(245, 184, 61, 0.15), transparent);
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--neuro) 15%, transparent),
+        transparent
+      );
     }
     .bubble {
       font-size: var(--fs-sm);

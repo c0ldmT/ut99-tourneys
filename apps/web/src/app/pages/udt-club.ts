@@ -235,8 +235,8 @@ interface WallItem {
       background: var(--bg-2);
     }
     .bld.built {
-      border-color: rgba(74, 222, 128, 0.5);
-      background: rgba(74, 222, 128, 0.05);
+      border-color: color-mix(in srgb, var(--live) 50%, transparent);
+      background: color-mix(in srgb, var(--live) 5%, transparent);
     }
     .bhead {
       display: flex;
@@ -333,7 +333,7 @@ interface WallItem {
     }
     .shape.on {
       border-color: var(--accent);
-      background: rgba(34, 211, 238, 0.14);
+      background: color-mix(in srgb, var(--accent) 14%, transparent);
     }
     .swatch {
       width: 44px;
@@ -370,8 +370,8 @@ interface WallItem {
       background: var(--bg-2);
     }
     .trophy.gold {
-      border-color: rgba(245, 199, 94, 0.6);
-      background: rgba(245, 199, 94, 0.08);
+      border-color: color-mix(in srgb, var(--neuro-text) 60%, transparent);
+      background: color-mix(in srgb, var(--neuro-text) 8%, transparent);
     }
     .wkind {
       font-size: var(--fs-xs);

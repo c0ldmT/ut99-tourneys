@@ -194,7 +194,7 @@ export class NameTag {
       box-shadow:
         0 0 0 2px var(--accent),
         0 0 0 5px var(--hot),
-        0 0 16px rgba(240, 70, 140, 0.5);
+        0 0 16px color-mix(in srgb, var(--hot) 50%, transparent);
     }
     .fr-champion {
       box-shadow:
@@ -206,7 +206,7 @@ export class NameTag {
       box-shadow:
         0 0 0 3px var(--udt),
         0 0 0 6px var(--accent),
-        0 0 18px rgba(178, 107, 255, 0.6);
+        0 0 18px color-mix(in srgb, var(--udt) 60%, transparent);
     }
     .fr-throne {
       box-shadow:

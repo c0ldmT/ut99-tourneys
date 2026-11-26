@@ -131,7 +131,7 @@ const PAD = { l: 44, r: 14, t: 14, b: 26 };
       stroke-dasharray: 4 4;
     }
     .start {
-      stroke: rgba(240, 70, 140, 0.25);
+      stroke: color-mix(in srgb, var(--hot) 25%, transparent);
       stroke-width: 1;
     }
     .tick,

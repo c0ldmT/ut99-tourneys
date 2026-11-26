@@ -96,7 +96,7 @@ import { SKILL_NAMES, UdtCard, type CardBot } from '../core/udt';
   styles: `
     .udt-keep {
       border-color: var(--udt);
-      box-shadow: 0 0 0 4px rgba(178, 107, 255, 0.1);
+      box-shadow: 0 0 0 4px color-mix(in srgb, var(--udt) 10%, transparent);
     }
     .kh {
       display: flex;

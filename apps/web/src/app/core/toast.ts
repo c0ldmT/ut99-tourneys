@@ -170,15 +170,15 @@ function topModal(): HTMLDialogElement | null {
       animation: in 0.18s ease-out;
     }
     .toast.error {
-      border-color: rgba(255, 92, 108, 0.55);
+      border-color: color-mix(in srgb, var(--danger-strong) 55%, transparent);
       border-left-color: var(--danger-strong);
     }
     .toast.success {
-      border-color: rgba(74, 222, 128, 0.45);
+      border-color: color-mix(in srgb, var(--live) 45%, transparent);
       border-left-color: var(--live);
     }
     .toast.info {
-      border-color: rgba(34, 211, 238, 0.45);
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
       border-left-color: var(--accent);
     }
     .ico {

@@ -760,11 +760,16 @@ function storedFilter(): TournamentFilter {
       border-color: var(--accent-dim);
     }
     .hero.udt {
-      border-color: rgba(178, 107, 255, 0.55);
+      border-color: color-mix(in srgb, var(--udt) 55%, transparent);
     }
     .hero.udt .hero-l {
       background:
-        radial-gradient(120% 120% at 0% 0%, rgba(178, 107, 255, 0.18), transparent 60%), #0e0c1a;
+        radial-gradient(
+          120% 120% at 0% 0%,
+          color-mix(in srgb, var(--udt) 18%, transparent),
+          transparent 60%
+        ),
+        #0e0c1a;
     }
     .hero-l {
       flex: 1 1 380px;
@@ -898,7 +903,7 @@ function storedFilter(): TournamentFilter {
       overflow: hidden;
     }
     .scard.udt {
-      border-color: rgba(178, 107, 255, 0.45);
+      border-color: color-mix(in srgb, var(--udt) 45%, transparent);
     }
     .stop {
       padding: 16px 18px 12px;

@@ -514,7 +514,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
       padding: 12px 14px;
       border-radius: var(--radius-sm);
       border: 1px dashed var(--info);
-      background: rgba(122, 169, 255, 0.07);
+      background: color-mix(in srgb, var(--info) 7%, transparent);
     }
     .loan b {
       color: var(--info);
@@ -541,8 +541,8 @@ const SHORT: Readonly<Record<Stat, string>> = {
       background: var(--panel-2);
     }
     .dev.has {
-      border-color: rgba(245, 184, 61, 0.6);
-      box-shadow: 0 0 0 3px rgba(245, 184, 61, 0.1);
+      border-color: color-mix(in srgb, var(--neuro) 60%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--neuro) 10%, transparent);
     }
     .pts {
       min-width: 40px;
@@ -575,8 +575,8 @@ const SHORT: Readonly<Record<Stat, string>> = {
       background: var(--panel);
     }
     .dtile.ready {
-      border-color: rgba(34, 211, 238, 0.45);
-      background: rgba(34, 211, 238, 0.05);
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      background: color-mix(in srgb, var(--accent) 5%, transparent);
     }
     .dtile.capped {
       border-style: dashed;

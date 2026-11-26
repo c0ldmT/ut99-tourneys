@@ -242,7 +242,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
       padding: 10px 14px;
       border-radius: var(--radius-sm);
       border: 1px solid var(--udt);
-      background: rgba(178, 107, 255, 0.08);
+      background: color-mix(in srgb, var(--udt) 8%, transparent);
     }
     .lrow {
       display: flex;

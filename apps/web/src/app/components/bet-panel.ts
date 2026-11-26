@@ -202,7 +202,7 @@ interface Draft {
       margin: 0;
     }
     .bets {
-      border-color: rgba(245, 184, 61, 0.28);
+      border-color: color-mix(in srgb, var(--neuro) 28%, transparent);
     }
     .bal {
       display: inline-flex;
@@ -371,8 +371,8 @@ interface Draft {
     }
     .eur {
       color: var(--neuro-text);
-      border-color: rgba(245, 184, 61, 0.4);
-      background: rgba(245, 184, 61, 0.08);
+      border-color: color-mix(in srgb, var(--neuro) 40%, transparent);
+      background: color-mix(in srgb, var(--neuro) 8%, transparent);
       height: 20px;
     }
     p {

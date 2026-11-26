@@ -37,7 +37,7 @@
   --info: #7aa9ff;
   --side-a: #ff4d5e; /* red side / team */
   --side-b: #4c8dff; /* blue side / team */
-  --me-bg: rgba(34, 211, 238, 0.08);
+  --me-bg: color-mix(in srgb, var(--accent) 8%, transparent);
 
   /* radii: 4 sizes and the pill (circles stay 50%) */
   --radius-xs: 4px;
@@ -94,7 +94,7 @@ a:hover {
   outline-offset: 2px;
 }
 ::selection {
-  background: rgba(34, 211, 238, 0.3);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 h1 {
   font-family: var(--font-display);
@@ -255,7 +255,7 @@ button.danger {
   color: var(--danger);
 }
 button.danger:hover:not(:disabled) {
-  background: rgba(255, 92, 108, 0.1);
+  background: color-mix(in srgb, var(--danger-strong) 10%, transparent);
   border-color: var(--danger-strong);
 }
 button.link {
@@ -473,24 +473,24 @@ tbody tr:hover td {
 }
 .badge.draft {
   color: var(--accent-hover);
-  border-color: rgba(34, 211, 238, 0.4);
-  background: rgba(34, 211, 238, 0.08);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .badge.seeded {
   color: var(--info);
-  border-color: rgba(122, 169, 255, 0.4);
-  background: rgba(122, 169, 255, 0.08);
+  border-color: color-mix(in srgb, var(--info) 40%, transparent);
+  background: color-mix(in srgb, var(--info) 8%, transparent);
 }
 .badge.checkIn,
 .badge.paused {
   color: var(--neuro-text);
-  border-color: rgba(245, 184, 61, 0.4);
-  background: rgba(245, 184, 61, 0.08);
+  border-color: color-mix(in srgb, var(--neuro) 40%, transparent);
+  background: color-mix(in srgb, var(--neuro) 8%, transparent);
 }
 .badge.running {
   color: var(--live);
-  border-color: rgba(74, 222, 128, 0.4);
-  background: rgba(74, 222, 128, 0.1);
+  border-color: color-mix(in srgb, var(--live) 40%, transparent);
+  background: color-mix(in srgb, var(--live) 10%, transparent);
 }
 .badge.running::before {
   content: '';
@@ -498,55 +498,73 @@ tbody tr:hover td {
   height: 6px;
   border-radius: 50%;
   background: var(--live);
-  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 20%, transparent);
 }
 .badge.finished {
   color: var(--text-2);
 }
 .badge.aborted {
   color: var(--danger);
-  border-color: rgba(255, 92, 108, 0.4);
+  border-color: color-mix(in srgb, var(--danger-strong) 40%, transparent);
 }
 .badge.season {
   color: var(--hot-text);
-  border-color: rgba(240, 70, 140, 0.4);
-  background: rgba(240, 70, 140, 0.1);
+  border-color: color-mix(in srgb, var(--hot) 40%, transparent);
+  background: color-mix(in srgb, var(--hot) 10%, transparent);
 }
 .badge.udt {
   color: #d7b4ff;
-  border-color: rgba(178, 107, 255, 0.5);
-  background: rgba(178, 107, 255, 0.14);
+  border-color: color-mix(in srgb, var(--udt) 50%, transparent);
+  background: color-mix(in srgb, var(--udt) 14%, transparent);
   padding-left: 5px;
 }
 /* Tournament cards: Dream Team tournaments in violet, finished and aborted ones toned down. */
 a.tcard.udt {
-  border-color: rgba(178, 107, 255, 0.45);
+  border-color: color-mix(in srgb, var(--udt) 45%, transparent);
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.16), transparent 55%),
-    linear-gradient(180deg, rgba(178, 107, 255, 0.06), transparent 40%), var(--panel);
-  box-shadow: inset 0 2px 0 rgba(178, 107, 255, 0.55);
+    radial-gradient(
+      120% 90% at 100% 0%,
+      color-mix(in srgb, var(--udt) 16%, transparent),
+      transparent 55%
+    ),
+    linear-gradient(180deg, color-mix(in srgb, var(--udt) 6%, transparent), transparent 40%),
+    var(--panel);
+  box-shadow: inset 0 2px 0 color-mix(in srgb, var(--udt) 55%, transparent);
 }
 a.tcard.udt:hover {
-  border-color: rgba(178, 107, 255, 0.75);
+  border-color: color-mix(in srgb, var(--udt) 75%, transparent);
 }
 a.tcard.udt .bar div {
   background: var(--udt);
 }
 a.tcard.done {
-  background: linear-gradient(180deg, rgba(245, 184, 61, 0.07), transparent 55%), var(--panel);
-  border-left: 3px solid rgba(245, 184, 61, 0.45);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--neuro) 7%, transparent), transparent 55%),
+    var(--panel);
+  border-left: 3px solid color-mix(in srgb, var(--neuro) 45%, transparent);
 }
 a.tcard.done.aborted {
-  background: linear-gradient(180deg, rgba(255, 92, 108, 0.06), transparent 55%), var(--panel);
-  border-left-color: rgba(255, 92, 108, 0.4);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--danger-strong) 6%, transparent),
+      transparent 55%
+    ),
+    var(--panel);
+  border-left-color: color-mix(in srgb, var(--danger-strong) 40%, transparent);
 }
 a.tcard.done .name {
   color: var(--text-2);
 }
 a.tcard.udt.done {
   background:
-    linear-gradient(180deg, rgba(245, 184, 61, 0.06), transparent 55%),
-    radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.12), transparent 55%), var(--panel);
+    linear-gradient(180deg, color-mix(in srgb, var(--neuro) 6%, transparent), transparent 55%),
+    radial-gradient(
+      120% 90% at 100% 0%,
+      color-mix(in srgb, var(--udt) 12%, transparent),
+      transparent 55%
+    ),
+    var(--panel);
 }
 /* "BOT" next to a name */
 .badge.bot {
@@ -567,20 +585,20 @@ a.tcard.udt.done {
 }
 .dot.on {
   background: var(--live);
-  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--live) 18%, transparent);
 }
 
 .error {
   color: var(--danger);
-  background: rgba(255, 92, 108, 0.08);
-  border: 1px solid rgba(255, 92, 108, 0.4);
+  background: color-mix(in srgb, var(--danger-strong) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger-strong) 40%, transparent);
   border-radius: var(--radius-sm);
   padding: 9px 12px;
 }
 .notice {
   color: var(--accent-hover);
-  background: rgba(34, 211, 238, 0.07);
-  border: 1px solid rgba(34, 211, 238, 0.35);
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
   border-radius: var(--radius-sm);
   padding: 9px 12px;
 }
@@ -730,7 +748,7 @@ button.icon:hover:not(:disabled),
 button.icon.dng:hover:not(:disabled) {
   color: var(--danger);
   border-color: var(--danger-strong);
-  background: rgba(255, 92, 108, 0.08);
+  background: color-mix(in srgb, var(--danger-strong) 8%, transparent);
 }
 .iconbtns {
   display: inline-flex;
@@ -748,13 +766,19 @@ button.icon.dng:hover:not(:disabled) {
 /* Neuro shop: banner motifs (player page, shop previews) */
 .bn-grid {
   background:
-    linear-gradient(rgba(34, 211, 238, 0.18) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(90deg, rgba(34, 211, 238, 0.18) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(color-mix(in srgb, var(--accent) 18%, transparent) 1px, transparent 1px) 0 0 /
+      22px 22px,
+    linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent) 1px, transparent 1px)
+      0 0 / 22px 22px,
     linear-gradient(180deg, #0b1420, var(--bg));
 }
 .bn-lava {
   background:
-    radial-gradient(circle at 20% 120%, rgba(255, 77, 94, 0.7), transparent 55%),
+    radial-gradient(
+      circle at 20% 120%,
+      color-mix(in srgb, var(--side-a) 70%, transparent),
+      transparent 55%
+    ),
     radial-gradient(circle at 75% 110%, rgba(251, 191, 36, 0.55), transparent 50%),
     linear-gradient(180deg, #1a0a08, var(--bg));
 }
@@ -766,8 +790,16 @@ button.icon.dng:hover:not(:disabled) {
 }
 .bn-circuit {
   background:
-    repeating-linear-gradient(90deg, rgba(74, 222, 128, 0.14) 0 2px, transparent 2px 38px),
-    repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.1) 0 2px, transparent 2px 30px),
+    repeating-linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--live) 14%, transparent) 0 2px,
+      transparent 2px 38px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--live) 10%, transparent) 0 2px,
+      transparent 2px 30px
+    ),
     linear-gradient(135deg, #07140d, var(--bg));
 }
 .bn-sunset {
@@ -990,7 +1022,7 @@ label.switch input:disabled + .tr {
 }
 .r-epic {
   --rc: #b26bff;
-  --rg: rgba(178, 107, 255, 0.3);
+  --rg: color-mix(in srgb, var(--udt) 30%, transparent);
   --rt: #d4adff;
 }
 .r-legendary {
@@ -1113,13 +1145,13 @@ main section[id] {
   padding: 6px 14px 6px 8px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--udt);
-  background: rgba(178, 107, 255, 0.12);
+  background: color-mix(in srgb, var(--udt) 12%, transparent);
   color: var(--text);
   font-weight: 700;
-  box-shadow: 0 0 0 3px rgba(178, 107, 255, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--udt) 12%, transparent);
 }
 .udt-nav .udt-help-btn:hover {
-  background: rgba(178, 107, 255, 0.22);
+  background: color-mix(in srgb, var(--udt) 22%, transparent);
 }
 @media (max-width: 1100px) {
   .udt-nav .udt-help-btn {
@@ -1436,7 +1468,11 @@ main section[id] {
   gap: 16px;
   justify-content: center;
   background:
-    radial-gradient(70% 80% at 50% 45%, rgba(34, 211, 238, 0.08), transparent 70%),
+    radial-gradient(
+      70% 80% at 50% 45%,
+      color-mix(in srgb, var(--accent) 8%, transparent),
+      transparent 70%
+    ),
     repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 40px),
     repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 40px),
     #090b11;
@@ -1489,34 +1525,34 @@ main section[id] {
 }
 .udt-mark.tired {
   color: #ff9aa4;
-  border-color: rgba(255, 122, 135, 0.4);
+  border-color: color-mix(in srgb, var(--danger) 40%, transparent);
 }
 .udt-mark.star {
   color: #d4adff;
-  border-color: rgba(178, 107, 255, 0.45);
+  border-color: color-mix(in srgb, var(--udt) 45%, transparent);
 }
 .udt-mark.own {
   color: var(--accent-hover);
-  border-color: rgba(34, 211, 238, 0.4);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .udt-mark.sig {
   color: #d4adff;
-  border-color: rgba(178, 107, 255, 0.5);
+  border-color: color-mix(in srgb, var(--udt) 50%, transparent);
 }
 .udt-mark.sig.star {
-  background: rgba(178, 107, 255, 0.14);
+  background: color-mix(in srgb, var(--udt) 14%, transparent);
 }
 .udt-mark.mentor {
   color: var(--accent-hover);
-  border-color: rgba(34, 211, 238, 0.4);
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 .udt-mark.loan {
   color: var(--info);
-  border-color: rgba(122, 169, 255, 0.5);
+  border-color: color-mix(in srgb, var(--info) 50%, transparent);
 }
 .udt-mark.anlage {
   color: var(--udt);
-  border-color: rgba(178, 107, 255, 0.5);
+  border-color: color-mix(in srgb, var(--udt) 50%, transparent);
 }
 /* Decision 279: prestige stages in the yearbook and the hall of fame. */
 .udt-mark.pres.st-mature,
@@ -1526,12 +1562,12 @@ main section[id] {
 }
 .udt-mark.pres.st-godlike {
   color: #d4adff;
-  border-color: rgba(178, 107, 255, 0.5);
+  border-color: color-mix(in srgb, var(--udt) 50%, transparent);
 }
 .udt-mark.pres.st-ascended {
   color: var(--neuro-text);
-  border-color: rgba(245, 199, 94, 0.55);
-  background: rgba(245, 199, 94, 0.08);
+  border-color: color-mix(in srgb, var(--neuro-text) 55%, transparent);
+  background: color-mix(in srgb, var(--neuro-text) 8%, transparent);
 }
 @media (max-width: 560px) {
   .udt-card.small {
@@ -1774,24 +1810,24 @@ main section[id] {
 @keyframes udt-teaseE {
   0%,
   100% {
-    box-shadow: 0 0 0 rgba(178, 107, 255, 0);
+    box-shadow: 0 0 0 color-mix(in srgb, var(--udt) 0%, transparent);
   }
   50% {
-    box-shadow: 0 0 34px rgba(178, 107, 255, 0.85);
+    box-shadow: 0 0 34px color-mix(in srgb, var(--udt) 85%, transparent);
   }
 }
 @keyframes udt-teaseL {
   0% {
-    box-shadow: 0 0 30px rgba(34, 211, 238, 0.8);
+    box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 80%, transparent);
   }
   33% {
-    box-shadow: 0 0 44px rgba(240, 70, 140, 0.9);
+    box-shadow: 0 0 44px color-mix(in srgb, var(--hot) 90%, transparent);
   }
   66% {
     box-shadow: 0 0 38px rgba(163, 230, 53, 0.8);
   }
   100% {
-    box-shadow: 0 0 30px rgba(34, 211, 238, 0.8);
+    box-shadow: 0 0 30px color-mix(in srgb, var(--accent) 80%, transparent);
   }
 }
 @keyframes udt-wob {
@@ -1945,11 +1981,11 @@ udt-pack-stage .stage.lg .rays {
 }
 .udt-card .frm.f-hot {
   color: var(--live);
-  background: rgba(74, 222, 128, 0.12);
+  background: color-mix(in srgb, var(--live) 12%, transparent);
 }
 .udt-card .frm.f-cold {
   color: var(--danger);
-  background: rgba(255, 92, 108, 0.12);
+  background: color-mix(in srgb, var(--danger-strong) 12%, transparent);
 }
 .udt-plaque {
   position: absolute;
@@ -1967,7 +2003,7 @@ udt-pack-stage .stage.lg .rays {
   font-weight: 800;
   font-size: var(--fs-md);
   cursor: pointer;
-  box-shadow: 0 0 0 0 rgba(245, 184, 61, 0.6);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--neuro) 60%, transparent);
   animation: udt-plaque 2.2s ease-out infinite;
 }
 .udt-plaque.pres {
@@ -1988,8 +2024,8 @@ udt-pack-stage .stage.lg .rays {
   text-transform: uppercase;
   white-space: nowrap;
   color: var(--neuro-text);
-  border: 1px solid rgba(245, 199, 94, 0.45);
-  background: rgba(245, 199, 94, 0.08);
+  border: 1px solid color-mix(in srgb, var(--neuro-text) 45%, transparent);
+  background: color-mix(in srgb, var(--neuro-text) 8%, transparent);
 }
 .udt-card .udt-pres .st {
   flex: none;
@@ -2002,11 +2038,11 @@ udt-pack-stage .stage.lg .rays {
 }
 @keyframes udt-plaque {
   0% {
-    box-shadow: 0 0 0 0 rgba(245, 184, 61, 0.55);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--neuro) 55%, transparent);
   }
   70%,
   100% {
-    box-shadow: 0 0 0 10px rgba(245, 184, 61, 0);
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--neuro) 0%, transparent);
   }
 }
 .udt-bar.xp {
@@ -2031,10 +2067,10 @@ udt-pack-stage .stage.lg .rays {
 /* Dream Team potential: chip on the card, skill ladder (udt-potential) */
 .udt-card .udt-potc {
   color: var(--accent);
-  border: 1px solid rgba(34, 211, 238, 0.45);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   border-radius: var(--radius-xs);
   padding: 0 4px;
-  background: rgba(34, 211, 238, 0.08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 .udt-card .udt-potc.max {
   color: var(--muted);
@@ -2046,8 +2082,8 @@ udt-pack-stage .stage.lg .rays {
   gap: 6px;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  border: 1px solid rgba(34, 211, 238, 0.35);
-  background: rgba(34, 211, 238, 0.06);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 .udt-pot.reached {
   border-color: var(--line);
@@ -2110,7 +2146,7 @@ udt-pack-stage .stage.lg .rays {
   color: var(--bg);
 }
 .udt-pot-s.reach {
-  background: rgba(34, 211, 238, 0.28);
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
   border-color: var(--accent);
   color: var(--text);
 }
@@ -2126,7 +2162,7 @@ udt-pack-stage .stage.lg .rays {
 .udt-pot-s.lock.bt {
   border: 1px dashed var(--neuro);
   color: var(--neuro-text);
-  background: rgba(245, 184, 61, 0.1);
+  background: color-mix(in srgb, var(--neuro) 10%, transparent);
 }
 /* Dream Team breakthrough card (bot details) */
 .udt-bt {
@@ -2135,13 +2171,13 @@ udt-pack-stage .stage.lg .rays {
   margin-top: 10px;
   padding: 10px 12px;
   border-radius: var(--radius-sm);
-  border: 1px dashed rgba(245, 184, 61, 0.5);
-  background: rgba(245, 184, 61, 0.05);
+  border: 1px dashed color-mix(in srgb, var(--neuro) 50%, transparent);
+  background: color-mix(in srgb, var(--neuro) 5%, transparent);
 }
 .udt-bt.ready {
   border-style: solid;
   border-color: var(--neuro);
-  background: rgba(245, 184, 61, 0.1);
+  background: color-mix(in srgb, var(--neuro) 10%, transparent);
 }
 .udt-bt p {
   margin: 0;
@@ -2186,9 +2222,14 @@ udt-pack-stage .stage.lg .rays {
 }
 /* Dream Team sign-up on the tournament page */
 .card.udt-signup {
-  border-color: rgba(178, 107, 255, 0.45);
+  border-color: color-mix(in srgb, var(--udt) 45%, transparent);
   background:
-    radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.14), transparent 55%), var(--panel);
+    radial-gradient(
+      120% 90% at 100% 0%,
+      color-mix(in srgb, var(--udt) 14%, transparent),
+      transparent 55%
+    ),
+    var(--panel);
 }
 .card.udt-signup h2 {
   display: flex;
@@ -2226,9 +2267,9 @@ details.look[open] > summary {
   display: grid;
   gap: 8px;
   padding: 12px 14px;
-  border: 1px solid rgba(178, 107, 255, 0.4);
+  border: 1px solid color-mix(in srgb, var(--udt) 40%, transparent);
   border-radius: var(--radius);
-  background: rgba(178, 107, 255, 0.06);
+  background: color-mix(in srgb, var(--udt) 6%, transparent);
 }
 .udt-seed b {
   display: flex;
@@ -2438,7 +2479,7 @@ details.help ul {
 .trow.aborted .nm {
   color: var(--text-2);
   text-decoration: line-through;
-  text-decoration-color: rgba(255, 122, 135, 0.5);
+  text-decoration-color: color-mix(in srgb, var(--danger) 50%, transparent);
 }
 /* Match list (tournament-list): a league evening as one row, its games below. */
 .tl-ev {
@@ -2757,17 +2798,17 @@ nav.udt-nav {
 }
 .lc-pu.amp {
   color: #ffd6f0;
-  background: rgba(240, 70, 140, 0.25);
-  border-color: rgba(240, 70, 140, 0.7);
+  background: color-mix(in srgb, var(--hot) 25%, transparent);
+  border-color: color-mix(in srgb, var(--hot) 70%, transparent);
 }
 .lc-pu.belt {
   color: #fff3cf;
-  background: rgba(245, 184, 61, 0.18);
-  border-color: rgba(245, 184, 61, 0.6);
+  background: color-mix(in srgb, var(--neuro) 18%, transparent);
+  border-color: color-mix(in srgb, var(--neuro) 60%, transparent);
 }
 .lc-pu.dead {
   color: var(--danger);
-  border-color: rgba(255, 122, 135, 0.5);
+  border-color: color-mix(in srgb, var(--danger) 50%, transparent);
 }
 .lc-ping {
   font-family: var(--font-mono);
@@ -2941,7 +2982,7 @@ nav.udt-nav {
 }
 .lg-tier.on {
   border-color: var(--accent);
-  background: rgba(34, 211, 238, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--text);
 }
 .lg-scroll {
@@ -3156,7 +3197,7 @@ tr[class*='lg-z-'] .pl {
 }
 .lg-steps .now i {
   background: var(--accent);
-  box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.18);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 /* The games on the server now: the shared live list (decision 294). */
 .lg-runlist {
@@ -3208,7 +3249,7 @@ tr[class*='lg-z-'] .pl {
   color: var(--text-2);
 }
 .lg-badge.b-next {
-  background: rgba(245, 184, 61, 0.14);
+  background: color-mix(in srgb, var(--neuro) 14%, transparent);
   color: var(--neuro-text);
 }
 .lg-bet {
@@ -3360,7 +3401,7 @@ tr[class*='lg-z-'] .pl {
 }
 .lg-tie.gold {
   border-color: var(--udt);
-  box-shadow: 0 0 0 4px rgba(178, 107, 255, 0.12);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--udt) 12%, transparent);
 }
 .lg-res {
   padding: 8px 14px;
@@ -3518,7 +3559,7 @@ tr[class*='lg-z-'] .pl {
   margin-left: auto;
   padding: 4px 12px;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(34, 211, 238, 0.5);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
   color: var(--accent);
   font-weight: 700;
   font-size: var(--fs-sm);
@@ -3625,8 +3666,8 @@ tr[class*='lg-z-'] .pl {
   font-weight: 700;
 }
 .lg-an-map.best {
-  border-color: rgba(74, 222, 128, 0.5);
-  background: rgba(74, 222, 128, 0.06);
+  border-color: color-mix(in srgb, var(--live) 50%, transparent);
+  background: color-mix(in srgb, var(--live) 6%, transparent);
 }
 .lg-an-pick {
   display: flex;
@@ -3722,8 +3763,8 @@ tr[class*='lg-z-'] .pl {
   margin: 14px 0 0;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
-  background: rgba(245, 199, 94, 0.08);
-  border: 1px solid rgba(245, 199, 94, 0.35);
+  background: color-mix(in srgb, var(--neuro-text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--neuro-text) 35%, transparent);
   color: var(--neuro-text);
 }
 .lgs-days {
@@ -3744,7 +3785,7 @@ tr[class*='lg-z-'] .pl {
 }
 .lgs-day[aria-pressed='true'] {
   border-color: var(--accent);
-  background: rgba(34, 211, 238, 0.12);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--text);
 }
 .lgs-time {
@@ -3772,7 +3813,7 @@ tr[class*='lg-z-'] .pl {
 }
 .lgs-len[aria-checked='true'] {
   border-color: var(--accent);
-  background: rgba(34, 211, 238, 0.1);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .lgs-ai {
   display: flex;
@@ -4144,7 +4185,7 @@ tr[class*='lg-z-'] .pl {
 .lgs-warn {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  background: rgba(245, 199, 94, 0.08);
+  background: color-mix(in srgb, var(--neuro-text) 8%, transparent);
   color: var(--neuro-text);
 }
 .lgs-acts {
@@ -4196,11 +4237,11 @@ tr[class*='lg-z-'] .pl {
 }
 .lgs-modes button.on[data-mode='real'] {
   border-color: var(--udt);
-  background: rgba(178, 107, 255, 0.12);
+  background: color-mix(in srgb, var(--udt) 12%, transparent);
 }
 .lgs-modes button.on[data-mode='test'] {
   border-color: var(--neuro-text);
-  background: rgba(245, 199, 94, 0.1);
+  background: color-mix(in srgb, var(--neuro-text) 10%, transparent);
 }
 .lgs-plan {
   margin-top: 12px;
@@ -4445,16 +4486,16 @@ a.cal-card:hover {
   overflow: hidden;
 }
 .cal-band.s {
-  background: rgba(245, 199, 94, 0.25);
+  background: color-mix(in srgb, var(--neuro-text) 25%, transparent);
 }
 .cal-band.cur {
-  background: rgba(245, 199, 94, 0.55);
+  background: color-mix(in srgb, var(--neuro-text) 55%, transparent);
 }
 .cal-band.keep {
   background: repeating-linear-gradient(
     135deg,
-    rgba(245, 199, 94, 0.6) 0 4px,
-    rgba(245, 199, 94, 0.18) 4px 8px
+    color-mix(in srgb, var(--neuro-text) 60%, transparent) 0 4px,
+    color-mix(in srgb, var(--neuro-text) 18%, transparent) 4px 8px
   );
 }
 .cal-num {

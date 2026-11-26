@@ -401,7 +401,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
       background: var(--bg-2);
     }
     .talent.anlage {
-      border-color: rgba(178, 107, 255, 0.6);
+      border-color: color-mix(in srgb, var(--udt) 60%, transparent);
     }
     .thead {
       display: flex;
@@ -461,11 +461,11 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     }
     .tchip.dia {
       color: var(--live);
-      border: 1px solid rgba(74, 222, 128, 0.45);
+      border: 1px solid color-mix(in srgb, var(--live) 45%, transparent);
     }
     .tchip.anl {
       color: var(--udt);
-      border: 1px solid rgba(178, 107, 255, 0.5);
+      border: 1px solid color-mix(in srgb, var(--udt) 50%, transparent);
     }
     .talent label {
       display: flex;

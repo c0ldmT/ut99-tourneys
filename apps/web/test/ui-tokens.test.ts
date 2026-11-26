@@ -59,6 +59,29 @@ describe('UI tokens (ratchet)', () => {
     ).toBeLessThanOrEqual(98);
   });
 
+  it('tints the colours of the tokens with color-mix, not rgba', () => {
+    // rgba() of a token's colour becomes color-mix(in srgb, var(--token) n%, transparent).
+    const root = styles.slice(
+      styles.indexOf(':root'),
+      styles.indexOf('}', styles.indexOf(':root')),
+    );
+    const tokens = new Set(
+      [...root.matchAll(/--[\w-]+:\s*#([0-9a-fA-F]{6})\b/g)].map((m) =>
+        [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16)).join(','),
+      ),
+    );
+    const rgba = /rgba\(\s*(\d+),\s*(\d+),\s*(\d+),/g;
+    const all = [globalRules, ...code.map((f) => f.text)];
+    const tinted = all.reduce(
+      (n, t) => n + [...t.matchAll(rgba)].filter((m) => tokens.has(m.slice(1, 4).join(','))).length,
+      0,
+    );
+    // The one left is an SVG fill attribute (pack stage), where var() does not work.
+    expect(tinted).toBeLessThanOrEqual(1);
+    // Other rgba (shadows, white and black veils, colours without a token) may only get fewer.
+    expect(count(all, rgba)).toBeLessThanOrEqual(61);
+  });
+
   it('asks with the dialog of the website, not the browser', () => {
     const native = /[^.\w](confirm|prompt|alert)\(/g;
     expect(

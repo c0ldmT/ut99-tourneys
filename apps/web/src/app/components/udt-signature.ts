@@ -70,11 +70,11 @@ export function weaponName(cls: string | undefined): string {
       align-items: flex-start;
       padding: 14px;
       border-radius: var(--radius-sm);
-      border: 1px solid rgba(178, 107, 255, 0.55);
-      background: rgba(178, 107, 255, 0.05);
+      border: 1px solid color-mix(in srgb, var(--udt) 55%, transparent);
+      background: color-mix(in srgb, var(--udt) 5%, transparent);
     }
     .sigbox.star {
-      box-shadow: 0 0 0 3px rgba(178, 107, 255, 0.1);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--udt) 10%, transparent);
     }
     .icon {
       width: 40px;
@@ -83,7 +83,7 @@ export function weaponName(cls: string | undefined): string {
       border-radius: 50%;
       display: grid;
       place-items: center;
-      background: rgba(178, 107, 255, 0.18);
+      background: color-mix(in srgb, var(--udt) 18%, transparent);
       color: #d4adff;
       font-size: var(--fs-xl);
     }

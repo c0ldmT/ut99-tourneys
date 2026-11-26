@@ -208,8 +208,8 @@ export const feedKind = (e: FeedRow): FeedKind =>
     }
     .chip.on {
       color: var(--text);
-      border-color: rgba(34, 211, 238, 0.55);
-      background: rgba(34, 211, 238, 0.1);
+      border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+      background: color-mix(in srgb, var(--accent) 10%, transparent);
     }
     .sec + .sec {
       border-top: 1px solid var(--border);
@@ -251,10 +251,14 @@ export const feedKind = (e: FeedRow): FeedKind =>
       border-top: 0;
     }
     li.big {
-      background: linear-gradient(90deg, rgba(240, 70, 140, 0.08), transparent 70%);
+      background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--hot) 8%, transparent),
+        transparent 70%
+      );
     }
     li.thought {
-      background: rgba(122, 169, 255, 0.04);
+      background: color-mix(in srgb, var(--info) 4%, transparent);
     }
     @keyframes in {
       from {

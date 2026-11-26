@@ -223,8 +223,8 @@ const STATS: readonly UdtPrestigeStat[] = [
       background: var(--panel-2);
     }
     .pres.has {
-      border-color: rgba(245, 199, 94, 0.7);
-      box-shadow: 0 0 0 3px rgba(245, 199, 94, 0.1);
+      border-color: color-mix(in srgb, var(--neuro-text) 70%, transparent);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--neuro-text) 10%, transparent);
     }
     .phead {
       display: flex;
@@ -285,8 +285,8 @@ const STATS: readonly UdtPrestigeStat[] = [
       background: var(--panel);
     }
     .tile.on {
-      border-color: rgba(245, 199, 94, 0.45);
-      background: rgba(245, 199, 94, 0.05);
+      border-color: color-mix(in srgb, var(--neuro-text) 45%, transparent);
+      background: color-mix(in srgb, var(--neuro-text) 5%, transparent);
     }
     .eff {
       flex: 1;
@@ -328,7 +328,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       border-style: dashed;
     }
     .pcard.stars {
-      border-color: rgba(245, 199, 94, 0.35);
+      border-color: color-mix(in srgb, var(--neuro-text) 35%, transparent);
     }
     .price {
       color: var(--neuro-text);

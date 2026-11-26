@@ -59,7 +59,7 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
   `,
   styles: `
     tr.mine td {
-      background: rgba(178, 107, 255, 0.06);
+      background: color-mix(in srgb, var(--udt) 6%, transparent);
     }
   `,
 })

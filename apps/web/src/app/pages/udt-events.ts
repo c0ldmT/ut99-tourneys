@@ -143,9 +143,13 @@ import { UdtNav } from '../core/udt';
       border-color: var(--border);
     }
     .auto.on {
-      border-color: rgba(178, 107, 255, 0.5);
+      border-color: color-mix(in srgb, var(--udt) 50%, transparent);
       background:
-        radial-gradient(120% 90% at 100% 0%, rgba(178, 107, 255, 0.12), transparent 55%),
+        radial-gradient(
+          120% 90% at 100% 0%,
+          color-mix(in srgb, var(--udt) 12%, transparent),
+          transparent 55%
+        ),
         var(--panel);
     }
     .auto p {
@@ -178,7 +182,7 @@ import { UdtNav } from '../core/udt';
     }
     .hs {
       color: var(--neuro-text);
-      border-color: rgba(245, 199, 94, 0.45);
+      border-color: color-mix(in srgb, var(--neuro-text) 45%, transparent);
     }
     .rules {
       display: flex;

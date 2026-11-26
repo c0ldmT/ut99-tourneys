@@ -134,10 +134,10 @@ const MAX_ROWS = 5;
       background:
         linear-gradient(
           90deg,
-          rgba(255, 77, 94, 0.1),
+          color-mix(in srgb, var(--side-a) 10%, transparent),
           transparent 35%,
           transparent 65%,
-          rgba(76, 141, 255, 0.1)
+          color-mix(in srgb, var(--side-b) 10%, transparent)
         ),
         var(--panel);
       transition:
