@@ -524,7 +524,7 @@ export class UdtClubPage {
 
   /** The index with two decimals in the page's language ("2,70"). */
   protected readonly indexText = computed(() =>
-    (this.view()?.index ?? 0).toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB', {
+    (this.view()?.index ?? 0).toLocaleString(this.i18n.locale(), {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }),

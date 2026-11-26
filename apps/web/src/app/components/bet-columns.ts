@@ -200,7 +200,7 @@ export class BetColumns {
 
   /** Odds with two decimals in the language's format (×1,31 / ×1.31). */
   protected oddsText(o: number): string {
-    return o.toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB', {
+    return o.toLocaleString(this.i18n.locale(), {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });

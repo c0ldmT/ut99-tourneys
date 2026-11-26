@@ -1,4 +1,3 @@
-import { DatePipe } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   DestroyRef,
@@ -15,7 +14,7 @@ import { PageTitle } from '../core/page-title';
 import { RouterLink } from '@angular/router';
 import { Api, ApiError, errorText } from '../core/api';
 import { Toasts } from '../core/toast';
-import { I18n, TPipe } from '../core/i18n';
+import { I18n, TPipe, WhenPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import { RatingChart } from '../components/rating-chart';
 import { Coin } from '../core/brand';
@@ -39,7 +38,7 @@ import type {
   imports: [
     TPipe,
     RouterLink,
-    DatePipe,
+    WhenPipe,
     NeuroPipe,
     Coin,
     RatingChart,
@@ -154,11 +153,7 @@ import type {
                 </div>
               }
             </div>
-            <app-rating-chart
-              [points]="chartPoints()"
-              [label]="'rating.chart' | t"
-              [locale]="i18n.lang() === 'de' ? 'de-DE' : 'en-GB'"
-            />
+            <app-rating-chart [points]="chartPoints()" [label]="'rating.chart' | t" />
             <p class="muted small">{{ 'rating.chartHint' | t }}</p>
           </div>
         }
@@ -168,7 +163,7 @@ import type {
               <tbody>
                 @for (g of ratingRecent(); track g.tournamentId + g.matchId + g.game) {
                   <tr>
-                    <td class="muted small">{{ g.at | date: 'short' }}</td>
+                    <td class="muted small">{{ g.at | when }}</td>
                     <td>
                       <a [routerLink]="['/t', g.tournamentId]">{{
                         g.tournamentName ?? g.tournamentId
@@ -294,7 +289,7 @@ import type {
                   <td>{{ m.team }}</td>
                   <td>
                     {{ m.tournamentName }}
-                    <span class="muted small">{{ m.at | date: 'mediumDate' }}</span>
+                    <span class="muted small">{{ m.at | when: 'date' }}</span>
                   </td>
                 </tr>
               }
@@ -312,7 +307,7 @@ import type {
             <tbody>
               @for (m of d.recent; track m.tournamentId + m.matchId) {
                 <tr>
-                  <td class="muted small">{{ m.at | date: 'short' }}</td>
+                  <td class="muted small">{{ m.at | when }}</td>
                   <td>
                     <a [routerLink]="['/t', m.tournamentId]">{{ m.tournamentName }}</a>
                     <span class="muted small match-id">{{ m.matchId }}</span>

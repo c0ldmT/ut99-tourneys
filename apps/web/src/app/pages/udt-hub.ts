@@ -661,19 +661,7 @@ export class UdtHubPage {
 
   /** "today 20:00", "tomorrow 18:00", "Thu 18:00". */
   private when(iso: string): string {
-    const d = new Date(iso);
-    const loc = this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
-    const time = d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
-    const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-    const diff = Math.round((day(d) - day(new Date())) / 86_400_000);
-    if (diff === 0) return this.i18n.t('udt.hub.today', { t: time });
-    if (diff === 1) return this.i18n.t('udt.hub.tomorrow', { t: time });
-    // Within the week the weekday, else with the date.
-    const date =
-      diff > 1 && diff < 7
-        ? d.toLocaleDateString(loc, { weekday: 'short' })
-        : d.toLocaleDateString(loc, { weekday: 'short', day: '2-digit', month: '2-digit' });
-    return `${date} ${time}`;
+    return this.i18n.when(iso, 'relShort');
   }
 
   /** The short state of an area and its badge. */

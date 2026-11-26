@@ -222,11 +222,7 @@ export class UdtKeepersPanel {
   protected readonly deadline = computed(() => {
     const k = this.view();
     if (!k?.until) return this.i18n.t('udt.keep.untilNext');
-    const [y, m, d] = k.until.split('-').map(Number) as [number, number, number];
-    const day = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(
-      this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB',
-      { weekday: 'long', timeZone: 'UTC' },
-    );
+    const day = this.i18n.whenDay(k.until, 'weekday');
     return this.i18n.t('udt.keep.until', { day });
   });
 

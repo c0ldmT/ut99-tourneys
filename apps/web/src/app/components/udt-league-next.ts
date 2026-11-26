@@ -232,14 +232,7 @@ export class UdtLeagueNext {
   protected title(): string {
     const n = this.next();
     if (!n) return '';
-    const at = new Date(n.scheduledAt).toLocaleString(
-      this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB',
-      {
-        weekday: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-      },
-    );
+    const at = this.i18n.when(n.scheduledAt, 'relShort');
     const what =
       n.kind === 'league'
         ? this.i18n.t('league.matchday', { n: n.matchday })

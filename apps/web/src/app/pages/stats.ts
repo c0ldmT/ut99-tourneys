@@ -1,11 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { BetBoardView } from '../components/bet-board';
-import { TPipe } from '../core/i18n';
+import { TPipe, WhenPipe } from '../core/i18n';
 import { raceTime } from '../core/race';
 import { defaultScope, parseScope, startedSeasons } from '../core/season';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
@@ -33,7 +32,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 
 @Component({
   selector: 'app-stats',
-  imports: [TPipe, RouterLink, DatePipe, BetBoardView, NameTag],
+  imports: [TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
@@ -175,7 +174,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                     <td class="num strong">{{ r.rating }}</td>
                     <td class="num">{{ r.wins }}–{{ r.games - r.wins }}</td>
                     <td class="num">{{ pct(r.wins / r.games) }}</td>
-                    <td class="num muted">{{ r.lastAt | date: 'mediumDate' }}</td>
+                    <td class="num muted">{{ r.lastAt | when: 'date' }}</td>
                   </tr>
                 }
               </tbody>
@@ -393,7 +392,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                         · {{ r.map }}
                       }
                       @if (r.at) {
-                        · {{ r.at | date: 'mediumDate' }}
+                        · {{ r.at | when: 'date' }}
                       }
                     </div>
                   }
@@ -461,7 +460,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
                       </td>
                       <td>
                         <a [routerLink]="['/t', m.tournamentId]">{{ m.tournamentName }}</a>
-                        <div class="small muted">{{ m.at | date: 'mediumDate' }}</div>
+                        <div class="small muted">{{ m.at | when: 'date' }}</div>
                       </td>
                     </tr>
                   }

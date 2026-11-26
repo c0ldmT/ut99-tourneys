@@ -761,23 +761,17 @@ export class UdtLeaguePage implements OnDestroy {
   );
 
   protected readonly moneyText = computed(() =>
-    (this.view()?.rules?.tableMoney ?? []).map((x) => x.toLocaleString(this.locale())).join(' / '),
+    (this.view()?.rules?.tableMoney ?? [])
+      .map((x) => x.toLocaleString(this.i18n.locale()))
+      .join(' / '),
   );
 
-  private locale() {
-    return this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
-  }
-
   protected when(iso: string): string {
-    return new Date(iso).toLocaleString(this.locale(), {
-      weekday: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return this.i18n.when(iso, 'relShort');
   }
 
   protected time(iso: string): string {
-    return new Date(iso).toLocaleTimeString(this.locale(), { hour: '2-digit', minute: '2-digit' });
+    return this.i18n.when(iso, 'time');
   }
 
   protected minutes(a: string, b: string): number {
@@ -785,13 +779,7 @@ export class UdtLeaguePage implements OnDestroy {
   }
 
   protected dayName(day: string): string {
-    const [y, m, d] = day.split('-').map(Number) as [number, number, number];
-    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(this.locale(), {
-      weekday: 'long',
-      day: '2-digit',
-      month: '2-digit',
-      timeZone: 'UTC',
-    });
+    return this.i18n.whenDay(day, 'day');
   }
 
   protected gameTitle(g: LeagueGame): string {

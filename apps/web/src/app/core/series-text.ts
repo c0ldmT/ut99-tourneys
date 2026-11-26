@@ -10,12 +10,9 @@ export interface ScheduleLike {
 
 /** Short weekday names, Monday first (1 = Monday). */
 export function weekdayNames(i18n: I18n, style: 'short' | 'long' = 'short'): string[] {
-  const loc = i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
   // 2026-10-19 is a Monday.
-  return [1, 2, 3, 4, 5, 6, 7].map((n) =>
-    new Date(Date.UTC(2026, 9, 18 + n))
-      .toLocaleDateString(loc, { weekday: style, timeZone: 'UTC' })
-      .replace('.', ''),
+  return [19, 20, 21, 22, 23, 24, 25].map((d) =>
+    i18n.whenDay(`2026-10-${d}`, style === 'long' ? 'weekday' : 'weekdayShort').replace('.', ''),
   );
 }
 

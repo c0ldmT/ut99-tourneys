@@ -77,6 +77,6 @@ describe('UI tokens (ratchet)', () => {
         outside.map((f) => f.text),
         local,
       ),
-    ).toBeLessThanOrEqual(24);
+    ).toBeLessThanOrEqual(0);
   });
 });

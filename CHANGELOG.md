@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dates and times written the same way on every page (I18n.when), German dates on the statistics pages, local times in the ledger (decision 298).
 - Design tokens for type sizes and corner radii used everywhere, small text at least about 11px, the faint grey readable (4.5:1); test ui-tokens.test.ts keeps raw values from coming back (decision 297).
 - Neuro shown with its own N coin and the symbol N instead of €; consistent wording: Teams (all teams of the season), Dream Team league, server names, real plurals, rarities in German, shop tiers in the rarity colours, own place on finished cups, no BOT marks in Dream Team tournaments (decisions 295, 296, patch note 296).
 - scripts/ui-snapshots.mjs: demo data and screenshots of every page at 1280 and 390 px for UI reviews.

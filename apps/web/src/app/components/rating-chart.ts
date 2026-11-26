@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { I18n } from '../core/i18n';
 
 export interface RatingPoint {
   at: string;
@@ -191,7 +192,7 @@ export class RatingChart {
   /** The games of one mode, oldest first. */
   readonly points = input.required<RatingPoint[]>();
   readonly label = input('Rating');
-  readonly locale = input('de-DE');
+  private readonly i18n = inject(I18n);
   protected readonly w = W;
   protected readonly h = H;
   protected readonly pad = PAD;
@@ -211,8 +212,7 @@ export class RatingChart {
     const n = values.length;
     const x = (i: number) => PAD.l + (n === 1 ? 0 : (i / (n - 1)) * (W - PAD.l - PAD.r));
     const y = (v: number) => PAD.t + ((hi - v) / (hi - lo)) * (H - PAD.t - PAD.b);
-    const date = (iso: string) =>
-      new Date(iso).toLocaleDateString(this.locale(), { day: '2-digit', month: '2-digit' });
+    const date = (iso: string) => this.i18n.when(iso, 'dayMonth');
     const xy = values.map((v, i) => ({
       x: x(i),
       y: y(v),

@@ -769,13 +769,9 @@ export class SettingsLeague {
   private readonly toasts = inject(Toasts);
 
   protected readonly weekdays = computed(() => {
-    const de = this.i18n.lang() === 'de';
     // 2024-01-01 was a Monday.
     return Array.from({ length: 7 }, (_, i) =>
-      new Date(Date.UTC(2024, 0, 1 + i)).toLocaleDateString(de ? 'de-DE' : 'en-GB', {
-        weekday: 'short',
-        timeZone: 'UTC',
-      }),
+      this.i18n.whenDay(`2024-01-0${1 + i}`, 'weekdayShort'),
     );
   });
 
@@ -1023,11 +1019,7 @@ export class SettingsLeague {
 
   protected date(day: string | undefined): string {
     if (!day) return '';
-    const [y, m, d] = day.split('-').map(Number) as [number, number, number];
-    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(
-      this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB',
-      { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' },
-    );
+    return this.i18n.whenDay(day, 'day');
   }
 
   protected tierName(t: number): string {
@@ -1088,7 +1080,7 @@ export class SettingsLeague {
   /** Table money of a band in a tier per week (index 1, rounded like the payment). */
   protected amount(g: number, t: number): string {
     const v = Math.round(((Number(this.money[g]) || 0) * (this.mult[t] ?? 1)) / 10) * 10;
-    return v.toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB');
+    return v.toLocaleString(this.i18n.locale());
   }
 
   protected nudge(list: number[], i: number, d: number) {
@@ -1196,16 +1188,10 @@ export class SettingsLeague {
   protected readonly startDates = computed(() => {
     const today = this.admin()?.today ?? new Date().toISOString().slice(0, 10);
     const [y, m, d] = today.split('-').map(Number) as [number, number, number];
-    const de = this.i18n.lang() === 'de';
     const slotTime = this.udtSlot();
     return [0, 1, 2].map((i) => {
       const day = new Date(Date.UTC(y, m - 1, d + i));
-      const name = day.toLocaleDateString(de ? 'de-DE' : 'en-GB', {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-        timeZone: 'UTC',
-      });
+      const name = this.i18n.whenDay(day.toISOString(), 'day');
       return {
         value: day.toISOString().slice(0, 10),
         label: `${this.i18n.t(`lgs.day.${i}`)}, ${name} · ${slotTime}`,

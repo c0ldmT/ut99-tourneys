@@ -30,7 +30,7 @@ import { UdtHelp } from '../components/udt-help';
 import { Api } from './api';
 import { Auth } from './auth';
 import { Coin } from './brand';
-import { I18n, TPipe } from './i18n';
+import { I18n, TPipe, WhenPipe } from './i18n';
 import { NeuroPipe } from './neuro';
 import { Toasts } from './toast';
 import { UDT_AREAS, udtAreaOf, udtAreas, type UdtAreaItem } from './udt-areas';
@@ -390,7 +390,7 @@ export function staminaColor(s: number): string {
  */
 @Component({
   selector: 'udt-nav',
-  imports: [RouterLink, TPipe, UdtHelp],
+  imports: [RouterLink, TPipe, WhenPipe, UdtHelp],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (!bare()) {
@@ -457,9 +457,7 @@ export function staminaColor(s: number): string {
       <div class="udt-test" role="region" [attr.aria-label]="'udt.test.title' | t">
         <b>{{ 'udt.test.title' | t }}</b>
         @if (state(); as s) {
-          <span class="mono small"
-            >{{ s.now.slice(0, 16).replace('T', ' ') }} (+{{ s.offsetHours }} h)</span
-          >
+          <span class="mono small">{{ s.now | when: 'dayTime' }} (+{{ s.offsetHours }} h)</span>
         }
         <button type="button" (click)="run('advance', { hours: 1 })">+1 h</button>
         <button type="button" (click)="run('advance', { hours: 24 })">

@@ -1339,36 +1339,21 @@ export class TournamentListPage {
     return out;
   }
 
-  private locale() {
-    return this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
-  }
-
   /** "Today", "Tomorrow", "Yesterday", a weekday within a week, else the date. */
   protected dayLabel(iso: string): string {
-    const d = new Date(iso);
-    const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-    const n = Math.round((day(d) - day(new Date())) / 86_400_000);
-    if (n === 0) return this.i18n.t('list.today');
-    if (n === 1) return this.i18n.t('list.tomorrow');
-    if (n === -1) return this.i18n.t('list.yesterday');
-    const loc = this.locale();
-    if (n > 1 && n < 7)
-      return d.toLocaleDateString(loc, { weekday: 'long', day: '2-digit', month: '2-digit' });
-    if (n < 0 && n > -7) return d.toLocaleDateString(loc, { weekday: 'long' });
-    const year = d.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined;
-    return d.toLocaleDateString(loc, { weekday: 'short', day: '2-digit', month: 'long', year });
+    return this.i18n.when(iso, 'relDay');
   }
 
   protected time(iso: string): string {
-    return new Date(iso).toLocaleTimeString(this.locale(), { hour: '2-digit', minute: '2-digit' });
+    return this.i18n.when(iso, 'time');
   }
 
   protected shortDate(iso: string): string {
-    return new Date(iso).toLocaleDateString(this.locale(), { day: '2-digit', month: '2-digit' });
+    return this.i18n.when(iso, 'dayMonth');
   }
 
   protected dayTime(iso: string): string {
-    return `${this.dayLabel(iso)}, ${this.time(iso)}`;
+    return this.i18n.when(iso, 'relative');
   }
 
   protected schedule(s: SeriesOverview): string {

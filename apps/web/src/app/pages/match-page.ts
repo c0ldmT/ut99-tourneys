@@ -1122,7 +1122,7 @@ export class MatchPage {
 
   protected kd(p: MatchPlayerView): string {
     const v = p.deaths ? p.kills / p.deaths : p.kills;
-    return v.toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB', {
+    return v.toLocaleString(this.i18n.locale(), {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });

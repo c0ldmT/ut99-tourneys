@@ -299,24 +299,16 @@ export class CalendarPage {
   });
 
   protected readonly weekdays = computed(() => {
-    const loc = this.locale();
     // 2024-01-01 was a Monday.
     return Array.from({ length: 7 }, (_, i) =>
-      new Date(Date.UTC(2024, 0, 1 + i)).toLocaleDateString(loc, {
-        weekday: 'short',
-        timeZone: 'UTC',
-      }),
+      this.i18n.whenDay(`2024-01-0${1 + i}`, 'weekdayShort'),
     );
   });
 
   protected readonly monthTitle = computed(() => {
     const m = this.month();
     if (!m) return '';
-    return new Date(`${m}-15T12:00:00Z`).toLocaleDateString(this.locale(), {
-      month: 'long',
-      year: 'numeric',
-      timeZone: 'UTC',
-    });
+    return this.i18n.whenDay(`${m}-15`, 'monthYear');
   });
 
   protected readonly currentSeason = computed(() => {
@@ -362,7 +354,6 @@ export class CalendarPage {
     const v = this.view();
     if (!from || !v) return [];
     const m = this.month();
-    const loc = this.locale();
     return Array.from({ length: 42 }, (_, n) => {
       const day = addDays(from, n);
       const s = v.seasons.find((x) => x.startDate <= day && x.endDate >= day) ?? null;
@@ -371,12 +362,7 @@ export class CalendarPage {
       const keepers = v.items.some(
         (i) => i.kind === 'keepers' && i.day <= day && String(i.meta.until ?? '') >= day,
       );
-      const label = new Date(`${day}T12:00:00Z`).toLocaleDateString(loc, {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        timeZone: 'UTC',
-      });
+      const label = this.i18n.whenDay(day, 'dayLong');
       return {
         day,
         num: Number(day.slice(8)),
@@ -397,12 +383,7 @@ export class CalendarPage {
   protected readonly selectedTitle = computed(() => {
     const d = this.selected();
     if (!d) return '';
-    const t = new Date(`${d}T12:00:00Z`).toLocaleDateString(this.locale(), {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      timeZone: 'UTC',
-    });
+    const t = this.i18n.whenDay(d, 'day');
     return d === this.today() ? `${t} · ${this.i18n.t('cal.today')}` : t;
   });
 
@@ -411,19 +392,14 @@ export class CalendarPage {
   /** The month as a list: the days with items, in order. */
   protected readonly listDays = computed(() => {
     const m = this.month();
-    const loc = this.locale();
     return [...this.byDay().entries()]
       .filter(([d]) => d.startsWith(m))
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([day, items]) => ({
         day,
         title:
-          new Date(`${day}T12:00:00Z`).toLocaleDateString(loc, {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            timeZone: 'UTC',
-          }) + (day === this.today() ? ` · ${this.i18n.t('cal.today')}` : ''),
+          this.i18n.whenDay(day, 'dayLong') +
+          (day === this.today() ? ` · ${this.i18n.t('cal.today')}` : ''),
         season: this.seasonOf(day),
         items,
       }));
@@ -474,10 +450,6 @@ export class CalendarPage {
 
   constructor() {
     void this.load();
-  }
-
-  private locale(): string {
-    return this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB';
   }
 
   private async load() {
@@ -542,21 +514,12 @@ export class CalendarPage {
   }
 
   private dayShort(day: string): string {
-    return new Date(`${day}T12:00:00Z`).toLocaleDateString(this.locale(), {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      timeZone: 'UTC',
-    });
+    return this.i18n.whenDay(day, 'day');
   }
 
   private time(iso: string | null): string {
-    if (!iso) return '';
-    return new Date(iso).toLocaleTimeString(this.locale(), {
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: this.view()?.timeZone,
-    });
+    // In the website's time zone (league evenings are planned in it).
+    return this.i18n.when(iso, 'time', this.view()?.timeZone);
   }
 
   private show(i: CalendarItem): Shown {

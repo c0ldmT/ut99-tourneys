@@ -9,7 +9,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Api } from '../core/api';
 import { Coin } from '../core/brand';
-import { I18n, TPipe } from '../core/i18n';
+import { I18n, TPipe, WhenPipe } from '../core/i18n';
 import { NeuroPipe, NeuroStore } from '../core/neuro';
 import { Toasts } from '../core/toast';
 import type { UdtLedgerEntry, UdtPacks, UdtView } from '../core/types';
@@ -30,6 +30,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
 @Component({
   selector: 'app-udt-team',
   imports: [
+    WhenPipe,
     FormsModule,
     TPipe,
     NeuroPipe,
@@ -200,7 +201,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           @for (l of ledger(); track l.id) {
             <div class="lrow">
               <span class="grow">{{ 'udt.kind.' + l.kind | t }}</span>
-              <span class="muted small">{{ l.at.slice(0, 16).replace('T', ' ') }}</span>
+              <span class="muted small">{{ l.at | when: 'relShort' }}</span>
               <span class="mono" [class.up]="l.amount > 0" [class.down]="l.amount < 0"
                 >{{ l.amount > 0 ? '+' : '' }}{{ l.amount | neuro }}</span
               >
