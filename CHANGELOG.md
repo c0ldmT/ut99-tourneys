@@ -7,6 +7,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Neuro shown with its own N coin and the symbol N instead of €; consistent wording: Teams (all teams of the season), Dream Team league, server names, real plurals, rarities in German, shop tiers in the rarity colours, own place on finished cups, no BOT marks in Dream Team tournaments (decisions 295, 296, patch note 296).
+- scripts/ui-snapshots.mjs: demo data and screenshots of every page at 1280 and 390 px for UI reviews.
 - One live list for parallel matches and league evenings (tournament page, league page, overview); the header counter counts matches; league evenings reserve the pool only as long as parallel games need (decision 294, patch note 294).
 - Tournament page: live section with the list of running matches and the chosen one with its bets; joining in the side column, no more scrollbars (decision 293, patch note 293).
 - User list: AI managers without login columns, not counted as inactive (decision 292).

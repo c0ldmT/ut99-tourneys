@@ -52,7 +52,11 @@ import { ReportButton } from '../components/report-button';
       <div class="udt-head">
         <div>
           <h1 class="disp">
-            {{ p.bot.gameName }}
+            @let tn = titleParts(p);
+            @if (tn[0]) {
+              <span class="ub-tag">{{ tn[0] }}</span>
+            }
+            {{ tn[1] }}
             @if (!p.team?.mine && !p.team?.ai) {
               <na-report [options]="reportOptions(p)" />
             }
@@ -82,11 +86,11 @@ import { ReportButton } from '../components/report-button';
         </div>
         <div class="udt-kpis">
           <div>
-            <div class="kpi">{{ 'udt.bot.games' | t }}</div>
+            <div class="kpi">{{ kpiLabel('udt.bot.games') }}</div>
             <div class="v">{{ kpi()?.games ?? 0 }}</div>
           </div>
           <div>
-            <div class="kpi">{{ 'udt.bot.wins' | t }}</div>
+            <div class="kpi">{{ kpiLabel('udt.bot.wins') }}</div>
             <div class="v">{{ kpi()?.gamesWon ?? 0 }}</div>
           </div>
           @if (!p.roster?.starter && p.bot.value !== null) {
@@ -211,6 +215,10 @@ import { ReportButton } from '../components/report-button';
     }
   `,
   styles: `
+    .ub-tag {
+      color: var(--hot-text);
+      margin-right: 0.2em;
+    }
     .ub-sub {
       display: flex;
       flex-wrap: wrap;
@@ -354,6 +362,20 @@ export class UdtBotProfilePage {
     const p = this.p();
     return p ? (p.season === null ? p.lifetime : p.stats) : null;
   });
+  /** The title as on the cards: the team tag apart from the name ("NX Nova", not "NXNova"). */
+  protected titleParts(p: { bot: { gameName: string }; team?: { tag?: string } | null }) {
+    const tag = p.team?.tag ?? '';
+    const name = p.bot.gameName;
+    return tag && name.startsWith(tag) && name.length > tag.length
+      ? [tag, name.slice(tag.length)]
+      : ['', name];
+  }
+  /** "Games · season 3": the head counts Dream Team games, the career all games (decision 296). */
+  protected kpiLabel(key: string): string {
+    const season = this.p()?.season ?? null;
+    const label = this.i18n.t(key);
+    return season === null ? label : `${label} · ${this.seasonLabel(season)}`;
+  }
 
   private readonly i18n = inject(I18n);
 

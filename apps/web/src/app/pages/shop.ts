@@ -6,7 +6,7 @@ import { Auth } from '../core/auth';
 import { Coin, Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import { Avatar, Looks, nameStyle } from '../core/looks';
-import { NeuroPipe, NeuroStore } from '../core/neuro';
+import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
 import type { ShopItem, ShopPurchaseView, ShopSlot, ShopView } from '../core/types';
 
 type Tab = 'shop' | 'wardrobe' | 'admin';
@@ -73,7 +73,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
               <p class="muted small">{{ 'shop.slotHint.' + g.slot | t }}</p>
               <div class="items">
                 @for (i of g.items; track i.id) {
-                  <div class="item" [class]="'tier' + i.tier" [class.owned]="i.owned">
+                  <div class="item" [class]="rarity(i.tier)" [class.owned]="i.owned">
                     <div class="prev">
                       @switch (i.slot) {
                         @case ('title') {
@@ -360,15 +360,26 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       border: 1px solid var(--border);
       border-radius: var(--radius);
     }
-    .item.tier3 {
-      border-color: rgba(240, 70, 140, 0.4);
+    /* Tiers in the colours of the Dream Team rarities (decision 296). */
+    .item.r-rare,
+    .item.r-epic {
+      border-color: color-mix(in srgb, var(--rc) 55%, transparent);
     }
-    .item.tier4 {
-      border-color: rgba(251, 191, 36, 0.55);
-      box-shadow: 0 0 18px rgba(251, 191, 36, 0.12);
+    .item.r-legendary {
+      border-color: transparent;
+      background:
+        linear-gradient(var(--panel), var(--panel)) padding-box,
+        var(--rc) border-box;
+      box-shadow: 0 0 18px var(--rg);
     }
     .item.owned {
       background: linear-gradient(180deg, rgba(34, 211, 238, 0.06), transparent 60%), var(--panel);
+    }
+    .item.r-legendary.owned {
+      background:
+        linear-gradient(180deg, rgba(34, 211, 238, 0.06), transparent 60%) padding-box,
+        linear-gradient(var(--panel), var(--panel)) padding-box,
+        var(--rc) border-box;
     }
     .prev {
       height: 86px;
@@ -443,11 +454,8 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
     .tier {
       color: var(--muted);
     }
-    .tier4 .tier {
-      color: var(--neuro-text);
-    }
-    .tier3 .tier {
-      color: var(--hot-text);
+    .item:not(.r-common) .tier {
+      color: var(--rt);
     }
     .price {
       display: inline-flex;
@@ -636,7 +644,12 @@ export class ShopPage {
     return nameStyle(v);
   }
 
+  /** Shop tiers 1-4 as the rarities Common, Rare, Epic, Legendary. */
+  protected rarity(tier: number): string {
+    return `r-${['common', 'rare', 'epic', 'legendary'][tier - 1] ?? 'common'}`;
+  }
+
   protected neuro(n: number): string {
-    return `${Math.round(n).toLocaleString(this.i18n.lang() === 'de' ? 'de-DE' : 'en-GB')} €`;
+    return formatNeuro(n, this.i18n.lang());
   }
 }

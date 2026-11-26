@@ -117,12 +117,12 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           <div class="head-r">
             <div class="kpi">Server</div>
             <div class="srv">
-              <span class="dot" [class.on]="t.agent.online"></span> {{ t.agentId }}
+              <span class="dot" [class.on]="t.agent.online"></span> {{ t.serverName || t.agentId }}
             </div>
             @for (l of t.lanes ?? []; track l.agentId) {
               <!-- Parallel matches (decision 291): its extra servers. -->
               <div class="srv small">
-                <span class="dot" [class.on]="l.online"></span> + {{ l.agentId }}
+                <span class="dot" [class.on]="l.online"></span> + {{ l.name || l.agentId }}
               </div>
             }
           </div>
@@ -480,6 +480,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             <div class="card">
               <app-bracket
                 [bracket]="b"
+                [botMarks]="!udtMode()"
                 [entrants]="t.projection!.entrants"
                 [games]="t.projection!.games"
                 [currentMatchId]="current()?.matchId"
@@ -556,7 +557,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                   <thead>
                     <tr>
                       <th class="num">#</th>
-                      <th>{{ (teamMode() ? 'tp.team' : 'tp.player') | t }}</th>
+                      <th>{{ (teamMode() || udtMode() ? 'tp.team' : 'tp.player') | t }}</th>
                       @if (t.seasonal && ratedGames().length) {
                         <th>{{ 'tp.rating' | t }}</th>
                       }
@@ -578,7 +579,8 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                             } @else {
                               <span>{{ name(s.entrantId) }}</span>
                             }
-                            @if (isBot(s.entrantId)) {
+                            <!-- In the Dream Team every entrant is bots: no badge. -->
+                            @if (isBot(s.entrantId) && !udtMode()) {
                               <span class="badge bot">BOT</span>
                             }
                           </span>

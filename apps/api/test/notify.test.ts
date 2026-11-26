@@ -260,10 +260,10 @@ describe('bets in the channel', () => {
       expect(posts.at(-1)!.embeds[0]).toMatchObject({
         title: `🔒 Wetten geschlossen: ${name(a)} vs ${name(b)}`,
         fields: [
-          { name: name(a), value: '**1,5x**\n600 € · 1 Wette', inline: true },
-          { name: name(b), value: '**3x**\n300 € · 1 Wette', inline: true },
-          { name: 'Pool', value: '**900 €**', inline: true },
-          { name: 'Größte Wette', value: `Boss: 600 € → ${name(a)}`, inline: false },
+          { name: name(a), value: '**1,5x**\n600 N · 1 Wette', inline: true },
+          { name: name(b), value: '**3x**\n300 N · 1 Wette', inline: true },
+          { name: 'Pool', value: '**900 N**', inline: true },
+          { name: 'Größte Wette', value: `Boss: 600 N → ${name(a)}`, inline: false },
         ],
       });
       append([{ type: 'match.started', data: { matchId: m.matchId, game: 2 } }]);
@@ -289,13 +289,13 @@ describe('bets in the channel', () => {
       ]);
       const result = posts.find((p) => p.embeds[0]?.fields?.some((f) => f.name === '💰 Wetten'))!;
       expect(result.embeds[0]!.fields!.find((f) => f.name === '💰 Wetten')!.value).toBe(
-        `Überraschung! 1 Wette auf **${name(b)}**: +600 € – größter Gewinn: Carl +600 € (3x)`,
+        `Überraschung! 1 Wette auf **${name(b)}**: +600 N – größter Gewinn: Carl +600 N (3x)`,
       );
       expect(result.embeds[0]!.title).toBe(`⚔️ ${name(b)} schlägt ${name(a)}`);
       const svc = api.app.get(BetsService);
       const names = { entrant: name, bettor: svc.bettorNames() };
       expect(M.betsTournament('de', svc.discordTournament(id)!, names)).toBe(
-        '📊 Wetten: größter Gewinner Carl +600 € · größter Verlierer Boss −600 €',
+        '📊 Wetten: größter Gewinner Carl +600 N · größter Verlierer Boss −600 N',
       );
 
       // Switched off in the season's betting settings: nothing about bets.
@@ -323,14 +323,14 @@ describe('bet texts', () => {
       outcome: { kind: 'refunded' as const, reason: 'oneSided' as const },
     };
     expect(M.betsClosed('en', s, names)).toBe(
-      '🔒 Bets closed: **A** vs **B** – pool 1,240 € · A 1.24x (1 bet) / B – (1 bet)',
+      '🔒 Bets closed: **A** vs **B** – pool 1,240 N · A 1.24x (1 bet) / B – (1 bet)',
     );
     expect(M.betsPayout('de', s, names)).toBe(
       '↩️ Wetten zurückgezahlt (nur auf eine Seite gewettet)',
     );
-    expect(M.neuro('de', 12345)).toBe('12.345 €');
+    expect(M.neuro('de', 12345)).toBe('12.345 N');
     expect(
       M.betsTournament('en', { top: null, flop: null, versus: { humans: 210, bots: -215 } }, names),
-    ).toBe('📊 Bets: man vs. machine: players +210 € / bots −215 €');
+    ).toBe('📊 Bets: man vs. machine: players +210 N / bots −215 N');
   });
 });

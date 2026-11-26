@@ -73,7 +73,9 @@ type Team = Extract<Entrant, { kind: 'team' }>;
                   } @else {
                     <span>{{ b.name }}</span>
                   }
-                  <span class="badge bot">BOT</span>
+                  @if (tournament().kind !== 'udt') {
+                    <span class="badge bot">BOT</span>
+                  }
                 </span>
               </li>
             }

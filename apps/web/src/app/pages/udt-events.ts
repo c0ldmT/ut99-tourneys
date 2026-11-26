@@ -75,7 +75,12 @@ import { UdtNav } from '../core/udt';
                 'udt.events.minTeams' | t: { n: e.rules.minTeams ?? 4 }
               }}</span>
             }
-            @if (e.entered) {
+            @if (e.place) {
+              <!-- Finished: the own place instead of "entered" (decision 296). -->
+              <span class="udt-mark own" [class.star]="e.place === 1">{{
+                (e.place === 1 ? 'udt.events.won' : 'udt.events.place') | t: { n: e.place }
+              }}</span>
+            } @else if (e.entered) {
               <span class="udt-mark own">{{ 'udt.events.entered' | t }}</span>
             }
           </div>

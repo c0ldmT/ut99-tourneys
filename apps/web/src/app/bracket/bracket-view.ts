@@ -45,7 +45,7 @@ type GameRec = { winnerId: string; scores: Record<string, number> };
                   · Bo{{ m.bestOf }}
                 }
                 @if (betOpen().includes(m.id)) {
-                  <tspan class="bet">· €</tspan>
+                  <tspan class="bet">· N</tspan>
                 }
               </text>
               @for (slot of [0, 1]; track slot) {
@@ -197,8 +197,10 @@ export class BracketView {
   readonly ratings = input<Record<string, number> | undefined>(undefined);
   /** A click on a match with both entrants (match page). */
   readonly matchClick = output<string>();
-  /** Matches that take bets right now (marked with €). */
+  /** Matches that take bets right now (marked with N). */
   readonly betOpen = input<readonly string[]>([]);
+  /** Mark bots with "BOT" (off in the Dream Team, where every entrant is bots). */
+  readonly botMarks = input(true);
 
   private readonly i18n = inject(I18n);
   protected readonly boxH = BOX_H;
@@ -236,6 +238,7 @@ export class BracketView {
   }
 
   protected isBot(id: string | null): boolean {
+    if (!this.botMarks()) return false;
     const e = id ? this.entrants()[id] : undefined;
     return e?.kind === 'bot' || (e?.kind === 'team' && e.members.length === 0);
   }

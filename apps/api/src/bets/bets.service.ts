@@ -199,7 +199,7 @@ const toBooking = (r: typeof neuroLedger.$inferSelect): Bailout => ({
 });
 
 /**
- * Betting with Neuro (€), the website's virtual currency: per season, in season tournaments
+ * Betting with Neuro (N), the website's virtual currency: per season, in season tournaments
  * only, on the winner of a match. Wallets, settlement and records are derived from the stored
  * bets, rescues and event logs.
  */

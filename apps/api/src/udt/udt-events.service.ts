@@ -155,6 +155,13 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     return n;
   }
 
+  /** The place of a manager's team in a finished tournament (null without one). */
+  private placeOf(tournamentId: string, userId: string): number | null {
+    const me = udtEntrantId(userId);
+    const s = this.log.projection(tournamentId)?.bracket?.standings.find((x) => x.entrantId === me);
+    return s?.placement ?? null;
+  }
+
   private row(id: string): TournamentRow {
     const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
     if (!t || t.kind !== 'udt') throw notFound('Dream Team tournament {id}', { id });
@@ -740,6 +747,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         /** AI teams among them (a human takes the place of the last one when it is full). */
         aiEntries: who.filter((u) => ai.has(u)).length,
         entered: who.includes(user.id),
+        /** Finished: the team's place (null: not entered or not placed). */
+        place: t.phase === 'finished' && who.includes(user.id) ? this.placeOf(t.id, user.id) : null,
         open: t.phase === 'draft' && t.registrationOpen && !rules.finale && this.inSeason(t),
         /** Finale: the teams that would play now (top of the table). */
         qualified: rules.finale && t.phase === 'draft' ? this.qualified(t, s) : null,

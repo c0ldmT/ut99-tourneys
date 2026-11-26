@@ -122,4 +122,14 @@ describe('translations', () => {
     expect(translate('de', 'list.registered', { n: 5 })).toBe('5 angemeldet');
     expect(translate('de', 'no.such.key')).toBe('no.such.key');
   });
+
+  it('picks the plural form (decision 296)', () => {
+    expect(translate('de', 'cal.inDays', { n: 1 })).toBe('in 1 Tag');
+    expect(translate('de', 'cal.inDays', { n: 3 })).toBe('in 3 Tagen');
+    expect(translate('en', 'lgs.step.evenings', { n: 1, p: 2 })).toBe('1 evening with 2 matchdays');
+    // No hand-made plurals like "Tag(e)" any more.
+    for (const lang of ['en', 'de'] as const)
+      for (const [key, text] of Object.entries(DICT[lang]))
+        expect(/[a-zß]\((e|en|n|s|es)\)/.test(text), `${lang} ${key}`).toBe(false);
+  });
 });

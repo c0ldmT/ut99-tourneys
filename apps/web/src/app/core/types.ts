@@ -828,7 +828,7 @@ export interface BotProfile extends LibraryBot {
   rivalOf: { id: string; name: string }[];
 }
 
-// --- Betting with Neuro (€) ----------------------------------------------------------------
+// --- Betting with Neuro (N) ----------------------------------------------------------------
 
 export type BookState = 'waiting' | 'open' | 'closed' | 'settled' | 'refunded';
 export type BetStatus = 'open' | 'won' | 'lost' | 'refunded';
@@ -1687,6 +1687,8 @@ export interface UdtEvent {
   /** AI teams among the entries (they make room for humans). */
   aiEntries?: number;
   entered: boolean;
+  /** Finished: the own team's place (null: not entered or not placed). */
+  place?: number | null;
   open: boolean;
   lineup: {
     bots: string[];

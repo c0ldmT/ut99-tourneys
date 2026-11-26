@@ -289,14 +289,14 @@ export function dmPlacement(lang: Lang, t: TournamentInfo, place: number, team?:
     : fill(lang, 'dmOut', { who, name, place });
 }
 
-// --- Bets with Neuro (€) ----------------------------------------------------------------------
+// --- Bets with Neuro (N) ----------------------------------------------------------------------
 
 const locale = (lang: Lang) => (lang === 'de' ? 'de-DE' : 'en-US');
 
-/** "1.240 €" (Neuro). */
-export const neuro = (lang: Lang, n: number) => `${n.toLocaleString(locale(lang))} €`;
+/** "1.240 N" (Neuro). */
+export const neuro = (lang: Lang, n: number) => `${n.toLocaleString(locale(lang))} N`;
 
-/** "+320 €", "−400 €". */
+/** "+320 N", "−400 N". */
 const signed = (lang: Lang, n: number) =>
   (n > 0 ? '+' : n < 0 ? '−' : '') + neuro(lang, Math.abs(n));
 

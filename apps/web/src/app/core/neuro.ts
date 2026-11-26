@@ -16,16 +16,17 @@ import { Auth } from './auth';
 import { I18n } from './i18n';
 
 /**
- * Neuro, the website's virtual currency (symbol €). Amounts are whole Neuro, written with the
- * language's digit grouping and the symbol after the number: "1.250 €" / "1,250 €".
+ * Neuro, the website's virtual currency (symbol N, the coin `na-coin` where there is room).
+ * Amounts are whole Neuro, written with the language's digit grouping and the symbol after the
+ * number: "1.250 N" / "1,250 N". Never "€": Neuro is not money (decision 295).
  */
 export function formatNeuro(n: number, lang: string, symbol = true): string {
   const locale = lang === 'de' ? 'de-DE' : 'en-GB';
   const s = Math.round(n).toLocaleString(locale);
-  return symbol ? `${s}\u00a0€` : s;
+  return symbol ? `${s}\u00a0N` : s;
 }
 
-/** {{ amount | neuro }} ({{ amount | neuro: false }} without €, next to the coin); re-evaluated
+/** {{ amount | neuro }} ({{ amount | neuro: false }} without N, next to the coin); re-evaluated
  * when the language changes. */
 @Pipe({ name: 'neuro', pure: false })
 export class NeuroPipe implements PipeTransform {

@@ -69,7 +69,7 @@ export class Wordmark {
   });
 }
 
-/** The Neuro coin (gold, with €), shown before Neuro amounts. */
+/** The Neuro coin (gold, with the slanted N of the logo), shown before Neuro amounts. */
 @Component({
   selector: 'na-coin',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -81,17 +81,14 @@ export class Wordmark {
   >
     <circle cx="8" cy="8" r="7.5" fill="var(--neuro)" />
     <circle cx="8" cy="8" r="5.6" fill="none" stroke="#9a6a12" stroke-width="0.9" />
-    <text
-      x="8"
-      y="11.1"
-      text-anchor="middle"
-      font-size="8.5"
-      font-weight="800"
-      fill="#3d2a05"
-      font-family="Barlow, sans-serif"
-    >
-      €
-    </text>
+    <path
+      d="M5.3 11.3 6.5 4.7l3.2 6.6 1.2-6.6"
+      fill="none"
+      stroke="#3d2a05"
+      stroke-width="1.6"
+      stroke-linejoin="round"
+      stroke-linecap="round"
+    />
   </svg>`,
   styles: `
     :host {

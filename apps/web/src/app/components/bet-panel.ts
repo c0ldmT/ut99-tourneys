@@ -117,10 +117,9 @@ interface Draft {
                     [max]="maxFor(m)"
                     [name]="'amt' + m.matchId"
                     [ngModel]="draft(m).amount"
-                    (ngModelChange)="setAmount(m, $event)"
-                  />
-                  <span class="sym">€</span></label
-                >
+                    (ngModelChange)="setAmount(m, $event)" />
+                  <na-coin class="sym" [size]="15"
+                /></label>
                 <button
                   type="button"
                   class="primary"
@@ -182,7 +181,7 @@ interface Draft {
               <button type="button" class="link vsl" (click)="select(n.id)">
                 {{ n.a }} <span class="muted">vs</span> {{ n.b }}
               </button>
-              <span class="badge eur">€</span>
+              <span class="badge eur"><na-coin [size]="12" /></span>
             } @else if (n.ready) {
               <a class="vsl" [routerLink]="['/t', tournament().id, 'm', n.id]"
                 >{{ n.a }} <span class="muted">vs</span> {{ n.b }}</a
@@ -283,7 +282,7 @@ interface Draft {
       min-width: 0;
     }
     .sym {
-      color: var(--muted);
+      align-self: center;
     }
     .sr {
       position: absolute;

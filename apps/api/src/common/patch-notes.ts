@@ -22,6 +22,28 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 296,
+    date: '2026-11-26',
+    en: {
+      title: 'Neuro gets its own sign',
+      items: [
+        'Neuro now has its own coin with an N, and amounts read "1,250 N" - no more € sign that looked like real money.',
+        'Clearer words: "Teams" under Transfers lists every team of the season ("Roster" stays your own bots), and texts say "1 day" or "3 days" instead of "day(s)".',
+        "Finished cups show your team's place, Dream Team tournaments drop the BOT marks.",
+        "Shop titles and colours show their rarity in the Dream Team's colours.",
+      ],
+    },
+    de: {
+      title: 'Neuro bekommt ein eigenes Zeichen',
+      items: [
+        'Neuro hat jetzt eine eigene Münze mit N, Beträge stehen als „1.250 N“ da - kein €-Zeichen mehr, das nach Echtgeld aussah.',
+        'Klarere Begriffe: „Teams“ unter Transfers zeigt alle Teams der Season („Kader“ bleiben deine eigenen Bots), und Texte sagen „1 Tag“ oder „3 Tage“ statt „Tag(e)“.',
+        'Seltenheiten heißen auf Deutsch Gewöhnlich, Ungewöhnlich, Selten, Episch und Legendär; Shop-Titel und Namensfarben tragen die Farben der Dream-Team-Seltenheiten.',
+        'Beendete Cups zeigen den Platz deines Teams, Dream-Team-Turniere ohne BOT-Marken.',
+      ],
+    },
+  },
+  {
     id: 294,
     date: '2026-11-26',
     en: {
