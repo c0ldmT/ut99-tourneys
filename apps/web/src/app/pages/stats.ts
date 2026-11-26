@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import { EmptyState } from '../components/empty-state';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NameTag } from '../core/looks';
@@ -33,7 +34,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 
 @Component({
   selector: 'app-stats',
-  imports: [EmptyState, TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
+  imports: [Tabs, EmptyState, TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
@@ -55,24 +56,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
         <option value="lifetime">{{ 'season.lifetime' | t }}</option>
       </select>
     </div>
-    <div class="tabs">
-      @if (scope() !== 'lifetime') {
-        <button [class.active]="tab() === 'ratings'" (click)="setTab('ratings')">
-          {{ 'rating.list' | t }}
-        </button>
-      }
-      <button [class.active]="tab() === 'players'" (click)="setTab('players')">
-        {{ 'stats.players' | t }}
-      </button>
-      @if (scope() !== 'lifetime') {
-        <button [class.active]="tab() === 'records'" (click)="setTab('records')">
-          {{ 'stats.records' | t }}
-        </button>
-        <button [class.active]="tab() === 'bets'" (click)="setTab('bets')">
-          {{ 'bets.tab' | t }}
-        </button>
-      }
-    </div>
+    <na-tabs [options]="tabOptions()" [value]="tab()" (valueChange)="setTab($event)" />
 
     @if (!seasons().length) {
       <p class="muted small">{{ 'season.noneYet' | t }}</p>
@@ -623,6 +607,19 @@ export class StatsPage {
       'ratings',
   );
   protected readonly auth = inject(Auth);
+  protected readonly tabOptions = computed<Choice<Tab>[]>(() => {
+    const season = this.scope() !== 'lifetime';
+    return [
+      ...(season ? [{ value: 'ratings' as const, label: 'rating.list' }] : []),
+      { value: 'players' as const, label: 'stats.players' },
+      ...(season
+        ? [
+            { value: 'records' as const, label: 'stats.records' },
+            { value: 'bets' as const, label: 'bets.tab' },
+          ]
+        : []),
+    ];
+  });
   /** The season shown (betting exists per season only). */
   protected readonly seasonNo = computed(() => {
     const s = this.scope();

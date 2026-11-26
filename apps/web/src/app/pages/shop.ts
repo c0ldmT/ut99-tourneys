@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -25,7 +26,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
 /** The Neuro shop: cosmetics for Neuro, the wardrobe, and (admins) prices and approvals. */
 @Component({
   selector: 'app-shop',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, Coin, Icon, Avatar],
+  imports: [Tabs, FormsModule, RouterLink, TPipe, NeuroPipe, Coin, Icon, Avatar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
@@ -41,22 +42,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       }
     </div>
     <p class="muted small intro">{{ 'shop.intro' | t }}</p>
-    <div class="tabs">
-      <button [class.active]="tab() === 'shop'" (click)="tab.set('shop')">
-        {{ 'shop.tab.shop' | t }}
-      </button>
-      <button [class.active]="tab() === 'wardrobe'" (click)="tab.set('wardrobe')">
-        {{ 'shop.tab.wardrobe' | t }}
-      </button>
-      @if (auth.me()?.isAdmin) {
-        <button [class.active]="tab() === 'admin'" (click)="openAdmin()">
-          {{ 'shop.tab.admin' | t }}
-          @if (pending().length) {
-            <span class="badge season">{{ pending().length }}</span>
-          }
-        </button>
-      }
-    </div>
+    <na-tabs [options]="tabOptions()" [value]="tab()" (valueChange)="pickTab($event)" />
 
     @if (view(); as v) {
       @if (!v.enabled && tab() !== 'admin') {
@@ -586,6 +572,19 @@ export class ShopPage {
     } catch {
       // not an admin
     }
+  }
+
+  protected readonly tabOptions = computed<Choice<Tab>[]>(() => [
+    { value: 'shop', label: 'shop.tab.shop' },
+    { value: 'wardrobe', label: 'shop.tab.wardrobe' },
+    ...(this.auth.me()?.isAdmin
+      ? [{ value: 'admin' as const, label: 'shop.tab.admin', badge: this.pending().length }]
+      : []),
+  ]);
+
+  protected pickTab(t: Tab) {
+    if (t === 'admin') this.openAdmin();
+    else this.tab.set(t);
   }
 
   protected openAdmin() {

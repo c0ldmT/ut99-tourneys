@@ -1,3 +1,4 @@
+import { type Choice, Segment } from '../components/choice';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -36,7 +37,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
  */
 @Component({
   selector: 'app-udt-league',
-  imports: [TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark, LiveList],
+  imports: [Segment, TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark, LiveList],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -90,17 +91,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
             <div class="lg-cols">
               <section class="lg-card lg-main" [attr.aria-label]="'league.view.table' | t">
                 <div class="lg-bar">
-                  @for (tb of v.tables ?? []; track tb.tier) {
-                    <button
-                      type="button"
-                      class="lg-tier"
-                      [class.on]="tier() === tb.tier"
-                      [attr.aria-pressed]="tier() === tb.tier"
-                      (click)="tier.set(tb.tier)"
-                    >
-                      {{ tierName(tb.tier) }}
-                    </button>
-                  }
+                  <na-segment [options]="tierOptions()" [(value)]="tier" label="league.tiers" />
                   <span class="muted small lg-note">{{ tableNote() }}</span>
                 </div>
                 <div class="lg-scroll">
@@ -246,18 +237,12 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                   }
                 </h2>
               </div>
-              <div class="pills" role="group" [attr.aria-label]="'league.filter' | t">
-                @for (f of filters; track f) {
-                  <button
-                    type="button"
-                    [class.on]="filter() === f"
-                    [attr.aria-pressed]="filter() === f"
-                    (click)="filter.set(f)"
-                  >
-                    {{ 'league.filter.' + f | t }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                variant="chips"
+                [options]="filterOptions"
+                [(value)]="filter"
+                label="league.filter"
+              />
             </div>
             <div class="lg-cols">
               <div class="lg-main lg-stack">
@@ -395,17 +380,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
           @case ('plan') {
             <section class="lg-card">
               <div class="lg-bar">
-                @for (tb of v.tables ?? []; track tb.tier) {
-                  <button
-                    type="button"
-                    class="lg-tier"
-                    [class.on]="tier() === tb.tier"
-                    [attr.aria-pressed]="tier() === tb.tier"
-                    (click)="tier.set(tb.tier)"
-                  >
-                    {{ tierName(tb.tier) }}
-                  </button>
-                }
+                <na-segment [options]="tierOptions()" [(value)]="tier" label="league.tiers" />
                 @if (v.myClub?.tier === tier()) {
                   <label class="switch small lg-note"
                     ><input
@@ -637,6 +612,13 @@ export class UdtLeaguePage implements OnDestroy {
   protected readonly history = signal<LeagueHistorySeason[]>([]);
   protected readonly tier = signal(0);
   protected readonly filter = signal<'all' | 'real' | 'sim'>('all');
+  protected readonly tierOptions = computed<Choice<number>[]>(() =>
+    (this.view()?.tables ?? []).map((tb) => ({ value: tb.tier, text: this.tierName(tb.tier) })),
+  );
+  protected readonly filterOptions: Choice<'all' | 'real' | 'sim'>[] = this.filters.map((f) => ({
+    value: f,
+    label: 'league.filter.' + f,
+  }));
   private readonly param = toSignal(this.route.paramMap.pipe(map((p) => p.get('view'))), {
     initialValue: this.route.snapshot.paramMap.get('view'),
   });

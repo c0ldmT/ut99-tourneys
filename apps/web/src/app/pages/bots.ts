@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Icon } from '../core/brand';
@@ -65,22 +66,12 @@ const emptyLines = () =>
 /** Bot control center (admins): the website's bots, clans and team names. */
 @Component({
   selector: 'app-bots',
-  imports: [TPipe, FormsModule, RouterLink, Icon, LookPicker],
+  imports: [Tabs, TPipe, FormsModule, RouterLink, Icon, LookPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'bots.title' | t }}</h1>
     <p class="muted small">{{ 'bots.intro' | t }}</p>
-    <div class="tabs">
-      <button [class.active]="tab() === 'bots'" (click)="tab.set('bots')">
-        {{ 'bots.tab.bots' | t: { n: bots().length } }}
-      </button>
-      <button [class.active]="tab() === 'clans'" (click)="tab.set('clans')">
-        {{ 'bots.tab.clans' | t: { n: clans().length } }}
-      </button>
-      <button [class.active]="tab() === 'teams'" (click)="tab.set('teams')">
-        {{ 'bots.tab.teams' | t }}
-      </button>
-    </div>
+    <na-tabs [options]="tabOptions()" [(value)]="tab" />
     @if (notice()) {
       <p class="notice">{{ notice() }}</p>
     }
@@ -768,6 +759,11 @@ export class BotsPage {
   protected readonly tab = signal<Tab>('bots');
   protected readonly bots = signal<LibraryBot[]>([]);
   protected readonly clans = signal<BotClan[]>([]);
+  protected readonly tabOptions = computed<Choice<Tab>[]>(() => [
+    { value: 'bots', label: 'bots.tab.bots', params: { n: this.bots().length } },
+    { value: 'clans', label: 'bots.tab.clans', params: { n: this.clans().length } },
+    { value: 'teams', label: 'bots.tab.teams' },
+  ]);
   protected readonly assets = signal<BotAssets | null>(null);
   protected readonly users = signal<PublicUser[]>([]);
   protected readonly agents = signal<AgentView[]>([]);

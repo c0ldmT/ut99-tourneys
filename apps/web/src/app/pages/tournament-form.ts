@@ -1,3 +1,4 @@
+import { type Choice, Segment } from '../components/choice';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -205,7 +206,7 @@ function toLocalInput(iso: string | null): string {
  */
 @Component({
   selector: 'app-tournament-form',
-  imports: [FormsModule, RouterLink, TPipe, Icon, UdtMark],
+  imports: [Segment, FormsModule, RouterLink, TPipe, Icon, UdtMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -381,14 +382,13 @@ function toLocalInput(iso: string | null): string {
             }
 
             @if (canChooseWhen()) {
-              <div class="seg when" role="group" [attr.aria-label]="'form.when' | t">
-                <button type="button" [class.on]="f.when === 'once'" (click)="setWhen('once')">
-                  {{ 'form.once' | t }}
-                </button>
-                <button type="button" [class.on]="f.when === 'series'" (click)="setWhen('series')">
-                  <na-icon name="copyToNew" [size]="15" /> {{ 'form.repeat' | t }}
-                </button>
-              </div>
+              <na-segment
+                class="when"
+                [options]="whenOptions"
+                [value]="f.when"
+                (valueChange)="setWhen($event)"
+                label="form.when"
+              />
             }
 
             @if (f.when === 'once') {
@@ -408,22 +408,12 @@ function toLocalInput(iso: string | null): string {
               <div class="sched">
                 <div>
                   <label>{{ 'series.repeat' | t }}</label>
-                  <div class="seg">
-                    <button
-                      type="button"
-                      [class.on]="f.repeat === 'weekly'"
-                      (click)="f.repeat = 'weekly'; touch()"
-                    >
-                      {{ 'series.weekly' | t }}
-                    </button>
-                    <button
-                      type="button"
-                      [class.on]="f.repeat === 'daily'"
-                      (click)="f.repeat = 'daily'; touch()"
-                    >
-                      {{ 'series.daily' | t }}
-                    </button>
-                  </div>
+                  <na-segment
+                    [options]="repeatOptions"
+                    [value]="f.repeat"
+                    (valueChange)="f.repeat = $event; touch()"
+                    label="series.repeat"
+                  />
                 </div>
                 @if (f.repeat === 'weekly') {
                   <div>
@@ -461,22 +451,13 @@ function toLocalInput(iso: string | null): string {
                 </div>
               }
               <label>{{ 'series.times' | t }}</label>
-              <div class="seg tmode">
-                <button
-                  type="button"
-                  [class.on]="f.timeMode === 'fixed'"
-                  (click)="f.timeMode = 'fixed'; touch()"
-                >
-                  {{ 'series.fixedTimes' | t }}
-                </button>
-                <button
-                  type="button"
-                  [class.on]="f.timeMode === 'interval'"
-                  (click)="f.timeMode = 'interval'; touch()"
-                >
-                  {{ 'series.interval' | t }}
-                </button>
-              </div>
+              <na-segment
+                class="tmode"
+                [options]="timeModeOptions"
+                [value]="f.timeMode"
+                (valueChange)="f.timeMode = $event; touch()"
+                label="series.times"
+              />
               @if (f.timeMode === 'fixed') {
                 <div class="times">
                   @for (tm of f.times; track $index) {
@@ -680,63 +661,43 @@ function toLocalInput(iso: string | null): string {
             <div class="opts">
               <div>
                 <label>{{ 'form.mode' | t }}</label>
-                <div class="seg">
-                  @for (k of f.game === 'mh' ? [2, 3, 5] : teamSizes; track k) {
-                    <button
-                      type="button"
-                      [class.on]="f.teamSize === k"
-                      [disabled]="locked()"
-                      (click)="onTeamSize(k)"
-                    >
-                      {{ k === 1 ? '1v1' : k + 'v' + k }}
-                    </button>
-                  }
-                </div>
+                <na-segment
+                  [options]="f.game === 'mh' ? teamSizeOptionsMh : teamSizeOptions"
+                  [value]="f.teamSize"
+                  (valueChange)="onTeamSize($event)"
+                  [disabled]="locked()"
+                  label="form.mode"
+                />
               </div>
               <div>
                 <label>{{ 'form.format' | t }}</label>
-                <div class="seg">
-                  @for (x of formats; track x) {
-                    <button
-                      type="button"
-                      [class.on]="f.format === x"
-                      [disabled]="locked()"
-                      (click)="f.format = x; touch()"
-                    >
-                      {{ 'format.' + x | t }}
-                    </button>
-                  }
-                </div>
+                <na-segment
+                  [options]="formatOptions"
+                  [value]="f.format"
+                  (valueChange)="f.format = $event; touch()"
+                  [disabled]="locked()"
+                  label="form.format"
+                />
               </div>
               <div>
                 <label>{{ (f.teamSize > 1 ? 'form.sizeTeams' : 'form.size') | t }}</label>
-                <div class="seg">
-                  @for (s of f.teamSize > 1 ? [4, 8, 16] : [4, 8, 16, 32]; track s) {
-                    <button
-                      type="button"
-                      [class.on]="f.size === s"
-                      [disabled]="locked()"
-                      (click)="f.size = s; touch()"
-                    >
-                      {{ s }}
-                    </button>
-                  }
-                </div>
+                <na-segment
+                  [options]="f.teamSize > 1 ? sizeOptionsTeams : sizeOptions"
+                  [value]="f.size"
+                  (valueChange)="f.size = $event; touch()"
+                  [disabled]="locked()"
+                  [label]="f.teamSize > 1 ? 'form.sizeTeams' : 'form.size'"
+                />
               </div>
               <div>
                 <label>{{ 'form.boDefault' | t }}</label>
-                <div class="seg">
-                  @for (b of bestOf; track b) {
-                    <button
-                      type="button"
-                      [class.on]="f.boDefault === b"
-                      [disabled]="locked()"
-                      (click)="f.boDefault = b; touch()"
-                    >
-                      Bo{{ b }}
-                    </button>
-                  }
-                </div>
+                <na-segment
+                  [options]="boOptions"
+                  [value]="f.boDefault"
+                  (valueChange)="f.boDefault = $event; touch()"
+                  [disabled]="locked()"
+                  label="form.boDefault"
+                />
               </div>
             </div>
             <div class="optrows">
@@ -882,17 +843,12 @@ function toLocalInput(iso: string | null): string {
                   @if (f.teamSize > 1) {
                     <div class="field">
                       <label>{{ 'form.friendlyFire' | t }}</label>
-                      <div class="seg">
-                        @for (p of ffChoices; track p) {
-                          <button
-                            type="button"
-                            [class.on]="f.friendlyFirePct === p"
-                            (click)="f.friendlyFirePct = p"
-                          >
-                            {{ p }} %
-                          </button>
-                        }
-                      </div>
+                      <na-segment
+                        [options]="ffOptions"
+                        [value]="f.friendlyFirePct"
+                        (valueChange)="f.friendlyFirePct = $event"
+                        label="form.friendlyFire"
+                      />
                     </div>
                   }
                 }
@@ -909,22 +865,12 @@ function toLocalInput(iso: string | null): string {
               <div class="maphead">
                 <div>
                   <label>{{ 'form.maps' | t }}</label>
-                  <div class="seg">
-                    <button
-                      type="button"
-                      [class.on]="f.mapMode === 'vote'"
-                      (click)="f.mapMode = 'vote'; touch()"
-                    >
-                      {{ 'form.mapVote' | t }}
-                    </button>
-                    <button
-                      type="button"
-                      [class.on]="f.mapMode === 'random'"
-                      (click)="f.mapMode = 'random'; touch()"
-                    >
-                      {{ 'form.mapRandom' | t }}
-                    </button>
-                  </div>
+                  <na-segment
+                    [options]="mapModeOptions"
+                    [value]="f.mapMode"
+                    (valueChange)="f.mapMode = $event; touch()"
+                    label="form.maps"
+                  />
                 </div>
                 <span class="grow"></span>
                 <input
@@ -1079,17 +1025,12 @@ function toLocalInput(iso: string | null): string {
           <!-- 5 Discord -->
           <section class="card sec">
             <header class="sh"><span class="no">5</span>{{ 'form.notify' | t }}</header>
-            <div class="seg">
-              @for (x of notifyModes; track x) {
-                <button
-                  type="button"
-                  [class.on]="f.notifyMode === x"
-                  (click)="f.notifyMode = x; touch()"
-                >
-                  {{ notifyLabel(x) | t }}
-                </button>
-              }
-            </div>
+            <na-segment
+              [options]="notifyOptions()"
+              [value]="f.notifyMode"
+              (valueChange)="f.notifyMode = $event; touch()"
+              label="form.notify"
+            />
             @if (f.notifyMode === 'custom') {
               <div class="field hook">
                 <label for="fwh">{{ 'form.webhookUrl' | t }}</label>
@@ -1713,11 +1654,49 @@ export class TournamentFormPage {
   protected readonly seriesView = signal<SeriesView | null>(null);
   protected readonly busy = signal(false);
   protected readonly bestOf = [1, 3, 5, 7];
+  protected readonly boOptions: Choice<number>[] = this.bestOf.map((b) => ({
+    value: b,
+    text: 'Bo' + b,
+  }));
+  protected readonly whenOptions: Choice<'once' | 'series'>[] = [
+    { value: 'once', label: 'form.once' },
+    { value: 'series', label: 'form.repeat', icon: 'copyToNew' },
+  ];
+  protected readonly repeatOptions: Choice<'weekly' | 'daily'>[] = [
+    { value: 'weekly', label: 'series.weekly' },
+    { value: 'daily', label: 'series.daily' },
+  ];
+  protected readonly timeModeOptions: Choice<'fixed' | 'interval'>[] = [
+    { value: 'fixed', label: 'series.fixedTimes' },
+    { value: 'interval', label: 'series.interval' },
+  ];
+  protected readonly mapModeOptions: Choice<'vote' | 'random'>[] = [
+    { value: 'vote', label: 'form.mapVote' },
+    { value: 'random', label: 'form.mapRandom' },
+  ];
+  protected readonly sizeOptions: Choice<number>[] = [4, 8, 16, 32].map((s) => ({
+    value: s,
+    text: String(s),
+  }));
+  protected readonly sizeOptionsTeams = this.sizeOptions.slice(0, 3);
   protected readonly skills = [0, 1, 2, 3, 4, 5, 6, 7];
   protected readonly livesChoices = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20];
   protected readonly teamSizes = [1, 2, 3, 5];
   protected readonly formats = ['single', 'double'] as const;
   protected readonly ffChoices = [0, 50, 100] as const;
+  protected readonly teamSizeOptions: Choice<number>[] = this.teamSizes.map((k) => ({
+    value: k,
+    text: k === 1 ? '1v1' : k + 'v' + k,
+  }));
+  protected readonly teamSizeOptionsMh: Choice<number>[] = [2, 3, 5].map((k) => ({
+    value: k,
+    text: k + 'v' + k,
+  }));
+  protected readonly formatOptions = this.formats.map((x) => ({ value: x, label: 'format.' + x }));
+  protected readonly ffOptions = this.ffChoices.map((p) => ({ value: p, text: p + ' %' }));
+  protected readonly notifyOptions = computed(() =>
+    this.notifyModes.map((x) => ({ value: x, label: this.notifyLabel(x) })),
+  );
   protected readonly notifyModes = ['default', 'custom', 'off'] as const;
   protected readonly mapFilter = signal('');
   protected readonly lengths: Length[] = ['short', 'medium', 'long'];

@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from './choice';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -45,7 +46,7 @@ const AREAS = ['dreamTeam', 'league', 'tournaments', 'bets', 'website', 'other']
  */
 @Component({
   selector: 'na-feedback',
-  imports: [TPipe, FormsModule],
+  imports: [Tabs, TPipe, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <dialog #dlg class="fb" aria-labelledby="fb-title" (close)="closed()">
@@ -55,26 +56,12 @@ const AREAS = ['dreamTeam', 'league', 'tournaments', 'bets', 'website', 'other']
             {{ (m === 'survey' ? 'fb.survey.title' : 'fb.note.title') | t: { n: season() } }}
           </h2>
           @if (canSurvey()) {
-            <div class="pills" role="tablist" [attr.aria-label]="'fb.tabs' | t">
-              <button
-                type="button"
-                role="tab"
-                [class.on]="m === 'survey'"
-                [attr.aria-selected]="m === 'survey'"
-                (click)="mode.set('survey')"
-              >
-                {{ 'fb.tab.survey' | t }}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                [class.on]="m === 'note'"
-                [attr.aria-selected]="m === 'note'"
-                (click)="mode.set('note')"
-              >
-                {{ 'fb.tab.note' | t }}
-              </button>
-            </div>
+            <na-tabs
+              [options]="modeTabs"
+              [value]="m"
+              (valueChange)="mode.set($event)"
+              label="fb.tabs"
+            />
           }
           <p class="muted small">
             {{ (m === 'survey' ? 'fb.survey.text' : 'fb.note.text') | t }}
@@ -206,8 +193,8 @@ const AREAS = ['dreamTeam', 'league', 'tournaments', 'bets', 'website', 'other']
     header p {
       margin: 0;
     }
-    .pills {
-      justify-self: start;
+    .tabs {
+      margin-bottom: 0;
     }
     .body {
       overflow-y: auto;
@@ -275,6 +262,10 @@ export class Feedback {
   private readonly dlg = viewChild<ElementRef<HTMLDialogElement>>('dlg');
 
   protected readonly mode = signal<'survey' | 'note' | null>(null);
+  protected readonly modeTabs: Choice<'survey' | 'note'>[] = [
+    { value: 'survey', label: 'fb.tab.survey' },
+    { value: 'note', label: 'fb.tab.note' },
+  ];
   protected readonly view = signal<SurveyView | null>(null);
   protected readonly answers = signal<Record<string, number | string>>({});
   protected readonly texts = signal<Record<string, string>>({});

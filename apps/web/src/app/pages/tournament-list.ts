@@ -1,3 +1,4 @@
+import { Segment } from '../components/choice';
 import { EmptyState } from '../components/empty-state';
 import {
   ChangeDetectionStrategy,
@@ -65,7 +66,16 @@ function storedFilter(): TournamentFilter {
  */
 @Component({
   selector: 'app-tournament-list',
-  imports: [EmptyState, RouterLink, TPipe, UdtMark, FormsModule, NgTemplateOutlet, LiveList],
+  imports: [
+    Segment,
+    EmptyState,
+    RouterLink,
+    TPipe,
+    UdtMark,
+    FormsModule,
+    NgTemplateOutlet,
+    LiveList,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -110,44 +120,32 @@ function storedFilter(): TournamentFilter {
       />
       <!-- Without Dream Team every tournament is classic. -->
       @if (auth.config().udt) {
-        <div class="pills" role="group" [attr.aria-label]="'list.kind.label' | t">
-          @for (k of kinds; track k) {
-            <button
-              type="button"
-              [class.on]="(filter().kind ?? 'all') === k"
-              [attr.aria-pressed]="(filter().kind ?? 'all') === k"
-              (click)="set({ kind: k === 'all' ? undefined : k })"
-            >
-              {{ 'list.kind.' + k | t }}
-            </button>
-          }
-        </div>
+        <na-segment
+          variant="chips"
+          class="fill"
+          [options]="kindOptions"
+          [value]="filter().kind ?? 'all'"
+          (valueChange)="set({ kind: $event === 'all' ? undefined : $event })"
+          label="list.kind.label"
+        />
       }
-      <div class="pills" role="group" [attr.aria-label]="'list.mode.label' | t">
-        @for (m of modes; track m) {
-          <button
-            type="button"
-            [class.on]="(filter().mode ?? 'all') === m"
-            [attr.aria-pressed]="(filter().mode ?? 'all') === m"
-            (click)="set({ mode: m === 'all' ? undefined : m })"
-          >
-            {{ 'list.mode.' + m | t }}
-          </button>
-        }
-      </div>
+      <na-segment
+        variant="chips"
+        class="fill"
+        [options]="modeOptions"
+        [value]="filter().mode ?? 'all'"
+        (valueChange)="set({ mode: $event === 'all' ? undefined : $event })"
+        label="list.mode.label"
+      />
       @if (tab() === 'archive') {
-        <div class="pills" role="group" [attr.aria-label]="'list.status.label' | t">
-          @for (st of statuses; track st) {
-            <button
-              type="button"
-              [class.on]="(filter().status ?? 'all') === st"
-              [attr.aria-pressed]="(filter().status ?? 'all') === st"
-              (click)="set({ status: st === 'all' ? undefined : st })"
-            >
-              {{ 'list.status.' + st | t }}
-            </button>
-          }
-        </div>
+        <na-segment
+          variant="chips"
+          class="fill"
+          [options]="statusOptions"
+          [value]="filter().status ?? 'all'"
+          (valueChange)="set({ status: $event === 'all' ? undefined : $event })"
+          label="list.status.label"
+        />
       }
       <label class="mine">
         <input
@@ -1009,11 +1007,6 @@ function storedFilter(): TournamentFilter {
       .pills {
         flex: 1 1 100%;
       }
-      .pills button {
-        flex: 1 1 auto;
-        padding: 5px 6px;
-        font-size: var(--fs-sm);
-      }
       .mine {
         margin-left: auto;
       }
@@ -1048,6 +1041,12 @@ export class TournamentListPage {
   protected readonly kinds = ['all', 'classic', 'udt', 'league'] as const;
   protected readonly modes = ['all', '1v1', 'team', 'mh'] as const;
   protected readonly statuses = ['all', 'finished', 'aborted'] as const;
+  protected readonly kindOptions = this.kinds.map((k) => ({ value: k, label: 'list.kind.' + k }));
+  protected readonly modeOptions = this.modes.map((m) => ({ value: m, label: 'list.mode.' + m }));
+  protected readonly statusOptions = this.statuses.map((x) => ({
+    value: x,
+    label: 'list.status.' + x,
+  }));
 
   protected readonly filter = signal<TournamentFilter>(storedFilter());
   /** The filter as it counts: without Dream Team the kind filter is hidden and ignored. */

@@ -1,3 +1,4 @@
+import { type Choice, Segment, Tabs } from './choice';
 import {
   CdkDrag,
   CdkDragPlaceholder,
@@ -53,6 +54,8 @@ export interface TraitDrop {
 @Component({
   selector: 'udt-lineup-board',
   imports: [
+    Segment,
+    Tabs,
     CdkDropListGroup,
     CdkDropList,
     CdkDrag,
@@ -67,14 +70,7 @@ export interface TraitDrop {
     <div class="board" cdkDropListGroup [class.picking]="picked() !== null">
       <div class="row between">
         <h2>{{ 'udt.lineup' | t }}</h2>
-        <div class="seg">
-          <button type="button" [class.on]="mode() === 'dm'" (click)="mode.set('dm')">
-            Deathmatch
-          </button>
-          <button type="button" [class.on]="mode() === 'mh'" (click)="mode.set('mh')">
-            Monster Hunt
-          </button>
-        </div>
+        <na-segment [options]="modeOptions" [(value)]="mode" label="udt.board.mode" />
       </div>
       <p class="muted small hint">{{ 'udt.board.hint' | t }}</p>
 
@@ -239,26 +235,7 @@ export interface TraitDrop {
       }
 
       <div class="trays">
-        <div class="tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="tray() === 'roster'"
-            [class.on]="tray() === 'roster'"
-            (click)="tray.set('roster')"
-          >
-            {{ 'udt.roster' | t: { n: roster().length } }}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            [attr.aria-selected]="tray() === 'traits'"
-            [class.on]="tray() === 'traits'"
-            (click)="tray.set('traits')"
-          >
-            {{ 'udt.board.traits' | t: { n: inventory().length } }}
-          </button>
-        </div>
+        <na-tabs [options]="trayTabs()" [(value)]="tray" class="inset udt" />
         <div class="tray" [class.hide]="tray() !== 'roster'">
           <div
             class="outzone"
@@ -529,24 +506,6 @@ export interface TraitDrop {
       border-radius: var(--radius);
       background: var(--panel);
     }
-    .tabs {
-      display: flex;
-      gap: 4px;
-      border-bottom: 1px solid var(--border);
-      padding: 0 8px;
-    }
-    .tabs button {
-      border: none;
-      border-bottom: 2px solid transparent;
-      border-radius: 0;
-      background: none;
-      color: var(--text-2);
-      font-weight: 600;
-    }
-    .tabs button.on {
-      color: var(--text);
-      border-bottom-color: var(--udt);
-    }
     .tray {
       padding: 12px;
       display: flex;
@@ -679,7 +638,15 @@ export class UdtLineupBoard {
   readonly open = output<string>();
 
   protected readonly mode = signal<LineupMode>('dm');
+  protected readonly modeOptions: Choice<LineupMode>[] = [
+    { value: 'dm', text: 'Deathmatch' },
+    { value: 'mh', text: 'Monster Hunt' },
+  ];
   protected readonly tray = signal<'roster' | 'traits'>('roster');
+  protected readonly trayTabs = computed<Choice<'roster' | 'traits'>[]>(() => [
+    { value: 'roster', label: 'udt.roster', params: { n: this.roster().length } },
+    { value: 'traits', label: 'udt.board.traits', params: { n: this.inventory().length } },
+  ]);
   protected readonly picked = signal<Item | null>(null);
   protected readonly weaponFor = signal<{ card: UdtInventoryCard; botId: string } | null>(null);
   protected weapon: string | null = null;

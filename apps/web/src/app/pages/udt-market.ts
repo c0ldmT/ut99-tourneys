@@ -1,3 +1,4 @@
+import { type Choice, Segment } from '../components/choice';
 import { HelpMore } from '../components/help-more';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
@@ -15,7 +16,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
 /** Dream Team transfer market: today's offers at fixed prices (buy at once), the next market day. */
 @Component({
   selector: 'app-udt-market',
-  imports: [HelpMore, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
+  imports: [Segment, HelpMore, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -52,13 +53,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
       } @else {
         <div class="wrap">
           <div class="list">
-            <div class="seg">
-              @for (f of filters; track f) {
-                <button type="button" [class.on]="filter() === f" (click)="filter.set(f)">
-                  {{ 'udt.market.f.' + f | t }}
-                </button>
-              }
-            </div>
+            <na-segment [options]="filterOptions" [(value)]="filter" label="udt.market.filter" />
             <na-help id="market-legend" label="udt.market.legendLink" class="legend">{{
               'udt.market.legend' | t
             }}</na-help>
@@ -352,6 +347,10 @@ export class UdtMarketPage {
   protected readonly busy = signal(false);
   protected readonly filter = signal<Filter>('all');
   protected readonly filters: Filter[] = ['all', 'weak', 'mid', 'strong'];
+  protected readonly filterOptions: Choice<Filter>[] = this.filters.map((f) => ({
+    value: f,
+    label: 'udt.market.f.' + f,
+  }));
   protected readonly selId = signal<string | null>(null);
 
   protected readonly shown = computed(() =>

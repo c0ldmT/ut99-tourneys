@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -77,6 +78,7 @@ const SUM_KEYS = [
 @Component({
   selector: 'app-match-page',
   imports: [
+    Tabs,
     TPipe,
     RouterLink,
     BetColumns,
@@ -142,20 +144,7 @@ const SUM_KEYS = [
       }
 
       @if (views().length) {
-        <div class="tabs">
-          @for (v of views(); track v.key) {
-            <button [class.active]="tab() === v.key" (click)="tab.set(v.key)">
-              @if (v.game; as g) {
-                {{ 'match.game' | t: { n: g.game } }}
-                @if (g.live) {
-                  <span class="live-dot"></span>
-                }
-              } @else {
-                {{ 'match.total' | t }}
-              }
-            </button>
-          }
-        </div>
+        <na-tabs [options]="tabOptions()" [(value)]="tab" />
 
         @if (current(); as v) {
           @if (v.game; as g) {
@@ -682,6 +671,13 @@ export class MatchPage {
   });
 
   /** Tabs: the whole series (more than one game) and every game. */
+  protected readonly tabOptions = computed<Choice[]>(() =>
+    this.views().map((v) =>
+      v.game
+        ? { value: v.key, label: 'match.game', params: { n: v.game.game }, live: !!v.game.live }
+        : { value: v.key, label: 'match.total' },
+    ),
+  );
   protected readonly views = computed<View[]>(() => {
     const d = this.d();
     if (!d || !d.games.length) return [];

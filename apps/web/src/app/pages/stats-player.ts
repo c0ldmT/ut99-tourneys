@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import {
   ChangeDetectionStrategy,
   DestroyRef,
@@ -36,6 +37,7 @@ import type {
 @Component({
   selector: 'app-stats-player',
   imports: [
+    Tabs,
     TPipe,
     RouterLink,
     WhenPipe,
@@ -138,19 +140,13 @@ import type {
             <div class="spread">
               <h3>{{ 'rating.chart' | t }}</h3>
               @if (ratingModes().length > 1) {
-                <div class="tabs mini" role="tablist">
-                  @for (m of ratingModes(); track m.mode) {
-                    <button
-                      type="button"
-                      role="tab"
-                      [class.active]="chartMode() === m.mode"
-                      [attr.aria-selected]="chartMode() === m.mode"
-                      (click)="pickMode.set(m.mode)"
-                    >
-                      {{ m.label | t }}
-                    </button>
-                  }
-                </div>
+                <na-tabs
+                  [options]="modeOptions()"
+                  [value]="chartMode()"
+                  (valueChange)="pickMode.set($event)"
+                  class="mini"
+                  label="rating.chart"
+                />
               }
             </div>
             <app-rating-chart [points]="chartPoints()" [label]="'rating.chart' | t" />
@@ -464,14 +460,6 @@ import type {
     .chart .spread {
       margin-bottom: 8px;
     }
-    .tabs.mini {
-      margin: 0;
-      border: 0;
-    }
-    .tabs.mini button {
-      min-height: 32px;
-      padding: 4px 10px;
-    }
     .tiles {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
@@ -590,6 +578,9 @@ export class StatsPlayerPage {
   });
   protected readonly i18n = inject(I18n);
   protected readonly pickMode = signal<StatMode | null>(null);
+  protected readonly modeOptions = computed<Choice<StatMode>[]>(() =>
+    this.ratingModes().map((m) => ({ value: m.mode, label: m.label })),
+  );
   /** The chart's mode: picked, else the one with the most games. */
   protected readonly chartMode = computed<StatMode | null>(() => {
     const modes = this.ratingModes();

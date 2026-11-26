@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import { Confirm } from '../components/confirm-dialog';
 import {
   ChangeDetectionStrategy,
@@ -36,6 +37,7 @@ export type SettingsTab = (typeof TABS)[number];
 @Component({
   selector: 'app-settings',
   imports: [
+    Tabs,
     TPipe,
     SettingsSeason,
     SettingsBets,
@@ -48,30 +50,14 @@ export type SettingsTab = (typeof TABS)[number];
   template: `
     <h1>{{ 'settings.title' | t }}</h1>
 
-    <div class="tabs" role="tablist" [attr.aria-label]="'settings.tabs' | t">
-      @for (t of tabs; track t) {
-        <button
-          type="button"
-          role="tab"
-          [id]="'st-tab-' + t"
-          [attr.aria-selected]="tab() === t"
-          [attr.aria-controls]="tab() === t ? 'st-panel' : null"
-          [attr.tabindex]="tab() === t ? 0 : -1"
-          [class.active]="tab() === t"
-          [attr.aria-disabled]="off(t) || null"
-          [title]="off(t) ? ('settings.leagueOff' | t) : ''"
-          (click)="open(t)"
-          (keydown)="key($event, t)"
-        >
-          {{ 'settings.tab.' + t | t }}
-          @if (tab() === t && unsaved()) {
-            <span class="dot" [title]="'settings.unsaved' | t"
-              ><span class="sr">{{ 'settings.unsaved' | t }}</span></span
-            >
-          }
-        </button>
-      }
-    </div>
+    <na-tabs
+      [options]="tabOptions()"
+      [value]="tab()"
+      (valueChange)="open($event)"
+      label="settings.tabs"
+      panel="st-panel"
+      ids="st-tab"
+    />
 
     <div class="st-body" [class.withtoc]="toc().length > 1">
       <div
@@ -203,6 +189,16 @@ export class SettingsPage {
     const t = (TABS as readonly string[]).includes(q ?? '') ? (q as SettingsTab) : 'season';
     return this.off(t) ? 'season' : t;
   });
+  protected readonly tabOptions = computed<Choice<SettingsTab>[]>(() =>
+    TABS.map((t) => ({
+      value: t,
+      label: 'settings.tab.' + t,
+      disabled: this.off(t),
+      title: this.off(t) ? 'settings.leagueOff' : undefined,
+      dot: t === this.tab() && this.unsaved(),
+      dotLabel: 'settings.unsaved',
+    })),
+  );
   /** Forms of the open tab with changes not saved yet. */
   private readonly dirty = signal<ReadonlySet<string>>(new Set());
   protected readonly unsaved = computed(() => this.dirty().size > 0);
@@ -291,28 +287,6 @@ export class SettingsPage {
       queryParamsHandling: 'merge',
     });
     return true;
-  }
-
-  /** Arrow keys, Home and End move between the tabs (the tab pattern of ARIA). */
-  protected key(e: KeyboardEvent, t: SettingsTab) {
-    const tabs = TABS.filter((x) => !this.off(x) || x === t);
-    const i = tabs.indexOf(t);
-    const next =
-      e.key === 'ArrowRight'
-        ? tabs[(i + 1) % tabs.length]
-        : e.key === 'ArrowLeft'
-          ? tabs[(i - 1 + tabs.length) % tabs.length]
-          : e.key === 'Home'
-            ? tabs[0]
-            : e.key === 'End'
-              ? tabs[tabs.length - 1]
-              : null;
-    if (!next) return;
-    e.preventDefault();
-    // Focus follows only when the tab really changes (not when the admin keeps the changes).
-    void this.open(next).then((ok) => {
-      if (ok) document.getElementById(`st-tab-${next}`)?.focus();
-    });
   }
 
   /** The league tab needs the Dream Team module (switched on in the tab "Dream Team"). */

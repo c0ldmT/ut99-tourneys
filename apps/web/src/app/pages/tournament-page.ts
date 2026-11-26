@@ -1,3 +1,4 @@
+import { type Choice, Tabs } from '../components/choice';
 import { Confirm } from '../components/confirm-dialog';
 import { NgTemplateOutlet } from '@angular/common';
 import {
@@ -49,6 +50,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
 @Component({
   selector: 'app-tournament-page',
   imports: [
+    Tabs,
     FormsModule,
     NgTemplateOutlet,
     RouterLink,
@@ -707,19 +709,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       @if (isAdmin()) {
         <div class="card admin">
           <h2>{{ 'admin.title' | t }}</h2>
-          <div class="tabs">
-            <button [class.active]="tab() === 'control'" (click)="tab.set('control')">
-              {{ 'admin.control' | t }}
-            </button>
-            @if ((t.phase === 'draft' || t.phase === 'seeded') && !udtMode() && !leagueMode()) {
-              <button [class.active]="tab() === 'seeding'" (click)="tab.set('seeding')">
-                {{ 'admin.seeding' | t }}
-              </button>
-            }
-            <button [class.active]="tab() === 'events'" (click)="openEvents()">
-              {{ 'admin.events' | t }}
-            </button>
-          </div>
+          <na-tabs [options]="adminTabs()" [value]="tab()" (valueChange)="pickAdminTab($event)" />
 
           @if (tab() === 'control') {
             <div class="stack">
@@ -1905,6 +1895,22 @@ export class TournamentPage {
     } catch {
       // the Api shows the error as a toast
     }
+  }
+
+  protected readonly adminTabs = computed<Choice<'control' | 'seeding' | 'events'>[]>(() => {
+    const t = this.t();
+    const seeding =
+      !!t && (t.phase === 'draft' || t.phase === 'seeded') && !this.udtMode() && !this.leagueMode();
+    return [
+      { value: 'control', label: 'admin.control' },
+      ...(seeding ? [{ value: 'seeding' as const, label: 'admin.seeding' }] : []),
+      { value: 'events', label: 'admin.events' },
+    ];
+  });
+
+  protected pickAdminTab(v: 'control' | 'seeding' | 'events') {
+    if (v === 'events') void this.openEvents();
+    else this.tab.set(v);
   }
 
   protected async openEvents() {

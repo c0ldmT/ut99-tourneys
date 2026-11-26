@@ -1,3 +1,4 @@
+import { type Choice, Segment } from './choice';
 import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
@@ -61,6 +62,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
 @Component({
   selector: 'udt-bot-panel',
   imports: [
+    Segment,
     FormsModule,
     RouterLink,
     TPipe,
@@ -385,19 +387,13 @@ const SHORT: Readonly<Record<Stat, string>> = {
 
             <section>
               <h3>{{ 'udt.mhFocus.title' | t }}</h3>
-              <div class="seg" role="group" [attr.aria-label]="'udt.mhFocus.title' | t">
-                @for (f of focusSteps; track f) {
-                  <button
-                    type="button"
-                    [class.on]="(b.mhFocus ?? 0) === f"
-                    [attr.aria-pressed]="(b.mhFocus ?? 0) === f"
-                    [disabled]="busy()"
-                    (click)="setFocus(b, f)"
-                  >
-                    {{ 'udt.mhFocus.' + f | t }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                [options]="focusOptions"
+                [value]="b.mhFocus ?? 0"
+                (valueChange)="setFocus(b, $event)"
+                [disabled]="busy()"
+                label="udt.mhFocus.title"
+              />
               <p class="muted small">{{ 'udt.mhFocus.hint.' + (b.mhFocus ?? 0) | t }}</p>
             </section>
 
@@ -837,6 +833,10 @@ export class UdtBotPanel {
 
   /** Monster Hunt focus steps: hunter … sprinter (decisions 238, 239). */
   protected readonly focusSteps = [-2, -1, 0, 1, 2] as const;
+  protected readonly focusOptions: Choice<number>[] = this.focusSteps.map((f) => ({
+    value: f,
+    label: 'udt.mhFocus.' + f,
+  }));
 
   protected async setFocus(b: UdtRosterBot, focus: number) {
     if ((b.mhFocus ?? 0) === focus) return;

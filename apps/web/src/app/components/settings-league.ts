@@ -1,3 +1,4 @@
+import { type Choice, Segment } from './choice';
 import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
@@ -62,7 +63,7 @@ interface StatusView {
  */
 @Component({
   selector: 'app-settings-league',
-  imports: [FormsModule, RouterLink, TPipe],
+  imports: [Segment, FormsModule, RouterLink, TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <form class="lgs" data-form="league" (ngSubmit)="save()">
@@ -85,36 +86,22 @@ interface StatusView {
           <div class="lgs-trio">
             <div>
               <span class="lgs-lbl" id="lgs-tiers">{{ 'lgs.tiers' | t }}</span>
-              <div class="seg" role="radiogroup" aria-labelledby="lgs-tiers">
-                @for (n of tiersList; track n) {
-                  <button
-                    type="button"
-                    role="radio"
-                    [class.on]="f.tiers === n"
-                    [attr.aria-checked]="f.tiers === n"
-                    (click)="f.tiers = n; estimate(); touch($event)"
-                  >
-                    {{ n }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                [options]="tierOptions"
+                [value]="f.tiers"
+                (valueChange)="f.tiers = $event; estimate(); bump()"
+                labelledby="lgs-tiers"
+              />
               <span class="muted small">{{ tierNames() }}</span>
             </div>
             <div>
               <span class="lgs-lbl" id="lgs-size">{{ 'lgs.size' | t }}</span>
-              <div class="seg" role="radiogroup" aria-labelledby="lgs-size">
-                @for (n of sizes; track n) {
-                  <button
-                    type="button"
-                    role="radio"
-                    [class.on]="f.size === n"
-                    [attr.aria-checked]="f.size === n"
-                    (click)="f.size = n; estimate(); touch($event)"
-                  >
-                    {{ n }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                [options]="sizeOptions"
+                [value]="f.size"
+                (valueChange)="f.size = $event; estimate(); bump()"
+                labelledby="lgs-size"
+              />
               <span class="muted small">{{ 'lgs.mdN' | t: { n: matchdays(f.size) } }}</span>
             </div>
             <div>
@@ -186,21 +173,13 @@ interface StatusView {
           </div>
           <div class="lgs-ai">
             <span class="kpi">{{ 'lgs.aiGames' | t }}</span>
-            <div class="pills" role="radiogroup" [attr.aria-label]="'lgs.aiGames' | t">
-              @for (m of aiGames; track m) {
-                <button
-                  type="button"
-                  role="radio"
-                  [class.on]="f.aiGames === m"
-                  [attr.aria-checked]="f.aiGames === m"
-                  [attr.tabindex]="f.aiGames === m ? 0 : -1"
-                  (click)="f.aiGames = m; estimate(); touch($event)"
-                  (keydown)="radioKey($event, 'aiGames')"
-                >
-                  {{ 'lgs.aiGames.' + m | t }}
-                </button>
-              }
-            </div>
+            <na-segment
+              variant="chips"
+              [options]="aiOptions"
+              [value]="f.aiGames"
+              (valueChange)="f.aiGames = $event; estimate(); bump()"
+              label="lgs.aiGames"
+            />
           </div>
           @if (est(); as e) {
             <div class="lgs-est" aria-live="polite">
@@ -306,26 +285,12 @@ interface StatusView {
           <div class="lgs-maphead">
             <div>
               <span class="lgs-lbl" id="lgs-pool">{{ 'lgs.mapPool' | t }}</span>
-              <div class="seg" role="radiogroup" aria-labelledby="lgs-pool">
-                <button
-                  type="button"
-                  role="radio"
-                  [class.on]="!ownMaps"
-                  [attr.aria-checked]="!ownMaps"
-                  (click)="setOwnMaps(false); touch($event)"
-                >
-                  {{ 'lgs.mapsAuto' | t }}
-                </button>
-                <button
-                  type="button"
-                  role="radio"
-                  [class.on]="ownMaps"
-                  [attr.aria-checked]="ownMaps"
-                  (click)="setOwnMaps(true); touch($event)"
-                >
-                  {{ 'lgs.mapsOwn' | t }}
-                </button>
-              </div>
+              <na-segment
+                [options]="poolOptions"
+                [value]="ownMaps ? 'own' : 'auto'"
+                (valueChange)="setOwnMaps($event === 'own'); bump()"
+                labelledby="lgs-pool"
+              />
             </div>
             @if (ownMaps) {
               <span class="grow"></span>
@@ -533,33 +498,19 @@ interface StatusView {
             </div>
             <div>
               <span class="lgs-lbl" id="lgs-keep">{{ 'lgs.keepMax' | t }}</span>
-              <div class="seg" role="radiogroup" aria-labelledby="lgs-keep">
-                @for (n of keeperChoices; track n) {
-                  <button
-                    type="button"
-                    role="radio"
-                    [class.on]="keepMax === n"
-                    [attr.aria-checked]="keepMax === n"
-                    (click)="keepMax = n; touch($event)"
-                  >
-                    {{ n }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                [options]="keepOptions"
+                [value]="keepMax"
+                (valueChange)="keepMax = $event; bump()"
+                labelledby="lgs-keep"
+              />
               <span class="lgs-lbl" id="lgs-loss">{{ 'lgs.keepLoss' | t }}</span>
-              <div class="seg" role="radiogroup" aria-labelledby="lgs-loss">
-                @for (n of lossChoices; track n) {
-                  <button
-                    type="button"
-                    role="radio"
-                    [class.on]="keepLoss === n"
-                    [attr.aria-checked]="keepLoss === n"
-                    (click)="keepLoss = n; touch($event)"
-                  >
-                    {{ n ? '−' + n : '0' }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                [options]="lossOptions"
+                [value]="keepLoss"
+                (valueChange)="keepLoss = $event; bump()"
+                labelledby="lgs-loss"
+              />
               <span class="muted small">{{
                 keepLoss
                   ? ('lgs.keepLossN' | t: { n: keepLoss, skill: skillAfter(keepLoss) })
@@ -726,12 +677,31 @@ export class SettingsLeague {
   readonly saved = output<SettingsForm>();
   protected readonly dlg = viewChild.required<ElementRef<HTMLDialogElement>>('dlg');
   protected readonly busy = signal(false);
-  protected readonly sizes = SIZES;
-  protected readonly tiersList = TIERS;
   protected readonly lengths = LENGTHS;
-  protected readonly aiGames = AI_GAMES;
-  protected readonly keeperChoices = KEEPERS;
-  protected readonly lossChoices = LOSSES;
+  protected readonly tierOptions: Choice<number>[] = TIERS.map((n) => ({
+    value: n,
+    text: String(n),
+  }));
+  protected readonly sizeOptions: Choice<number>[] = SIZES.map((n) => ({
+    value: n,
+    text: String(n),
+  }));
+  protected readonly aiOptions: Choice<LeagueAiGames>[] = AI_GAMES.map((m) => ({
+    value: m,
+    label: 'lgs.aiGames.' + m,
+  }));
+  protected readonly keepOptions: Choice<number>[] = KEEPERS.map((n) => ({
+    value: n,
+    text: String(n),
+  }));
+  protected readonly poolOptions: Choice<'auto' | 'own'>[] = [
+    { value: 'auto', label: 'lgs.mapsAuto' },
+    { value: 'own', label: 'lgs.mapsOwn' },
+  ];
+  protected readonly lossOptions: Choice<number>[] = LOSSES.map((n) => ({
+    value: n,
+    text: n ? '−' + n : '0',
+  }));
   protected readonly placements = ['cup', 'random', 'one'] as const;
   protected readonly modes = ['real', 'test'] as const;
   protected readonly admin = signal<LeagueAdmin | null>(null);
@@ -1103,8 +1073,13 @@ export class SettingsLeague {
     e.target?.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
+  /** A segment changed a value (it tells the form itself). */
+  protected bump() {
+    this.shape.update((n) => n + 1);
+  }
+
   /** Arrow keys move the choice of a radio group (one tab stop, ARIA radio pattern). */
-  protected radioKey(e: KeyboardEvent, key: 'length' | 'aiGames') {
+  protected radioKey(e: KeyboardEvent, key: 'length') {
     const d =
       e.key === 'ArrowRight' || e.key === 'ArrowDown'
         ? 1
@@ -1113,10 +1088,9 @@ export class SettingsLeague {
           : 0;
     if (!d) return;
     e.preventDefault();
-    const list: readonly string[] = key === 'length' ? LENGTHS : AI_GAMES;
+    const list: readonly string[] = LENGTHS;
     const i = (list.indexOf(this.f[key]) + d + list.length) % list.length;
-    if (key === 'length') this.f.length = LENGTHS[i]!;
-    else this.f.aiGames = AI_GAMES[i]!;
+    this.f[key] = LENGTHS[i]!;
     void this.estimate();
     this.touch(e);
     this.cdr.markForCheck();

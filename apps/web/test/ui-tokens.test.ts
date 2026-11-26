@@ -82,6 +82,18 @@ describe('UI tokens (ratchet)', () => {
     expect(count(all, rgba)).toBeLessThanOrEqual(61);
   });
 
+  it('builds tab rows and segments with na-tabs / na-segment', () => {
+    // Left by hand: answer scales (feedback), weekdays (several at once), the tournament length
+    // with a line below each choice, the calendar's filter with coloured dots (decision 317).
+    const rows = /class="(seg|pills|tabs)\b/g;
+    expect(
+      count(
+        code.filter((f) => f.name !== 'components/choice.ts').map((f) => f.text),
+        rows,
+      ),
+    ).toBeLessThanOrEqual(4);
+  });
+
   it('asks with the dialog of the website, not the browser', () => {
     const native = /[^.\w](confirm|prompt|alert)\(/g;
     expect(

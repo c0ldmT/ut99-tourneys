@@ -1,6 +1,7 @@
+import { type Choice, Tabs } from '../components/choice';
 import { EmptyState } from '../components/empty-state';
 import { Confirm } from '../components/confirm-dialog';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
@@ -16,7 +17,7 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
  */
 @Component({
   selector: 'app-moderation',
-  imports: [EmptyState, FormsModule, TPipe, RouterLink],
+  imports: [Tabs, EmptyState, FormsModule, TPipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="spread">
@@ -24,22 +25,12 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
       <button (click)="load()">{{ 'common.refresh' | t }}</button>
     </div>
     <p class="muted">{{ 'mod.intro' | t }}</p>
-    <div class="pills" role="tablist" [attr.aria-label]="'mod.title' | t">
-      @for (t of tabs; track t) {
-        <button
-          type="button"
-          role="tab"
-          [class.on]="tab() === t"
-          [attr.aria-selected]="tab() === t"
-          (click)="go(t)"
-        >
-          {{ 'mod.tab.' + t | t }}
-          @if (t === 'open' && openCount()) {
-            <span class="n">{{ openCount() }}</span>
-          }
-        </button>
-      }
-    </div>
+    <na-tabs
+      [options]="tabOptions()"
+      [value]="tab()"
+      (valueChange)="go($event)"
+      label="mod.title"
+    />
 
     @if (tab() === 'open' || tab() === 'done') {
       @for (it of items(); track it.id) {
@@ -250,18 +241,8 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
     }
   `,
   styles: `
-    .pills {
-      margin: 10px 0 16px;
-      max-width: 100%;
-      overflow-x: auto;
-    }
-    .n {
-      margin-left: 6px;
-      padding: 0 6px;
-      border-radius: var(--radius-pill);
-      background: var(--danger, #ff6b6b);
-      color: #fff;
-      font-size: var(--fs-xs);
+    .tabs {
+      margin-top: 10px;
     }
     .item.rep {
       border-color: rgba(255, 107, 107, 0.45);
@@ -355,6 +336,13 @@ export class ModerationPage {
   protected readonly tab = signal<Tab>('open');
   protected readonly items = signal<ModItem[]>([]);
   protected readonly openCount = signal(0);
+  protected readonly tabOptions = computed<Choice<Tab>[]>(() =>
+    this.tabs.map((t) => ({
+      value: t,
+      label: 'mod.tab.' + t,
+      badge: t === 'open' ? this.openCount() : null,
+    })),
+  );
   protected readonly lists = signal<ModSettings | null>(null);
   protected readonly log = signal<ModLogEntry[]>([]);
   protected readonly busy = signal(false);

@@ -1,3 +1,4 @@
+import { type Choice, Segment } from '../components/choice';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -72,7 +73,7 @@ interface Cell {
  */
 @Component({
   selector: 'app-calendar',
-  imports: [NgTemplateOutlet, RouterLink, TPipe],
+  imports: [Segment, NgTemplateOutlet, RouterLink, TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="cal-head">
@@ -83,19 +84,7 @@ interface Cell {
         <h1>{{ 'cal.title' | t }}</h1>
       </div>
       <span class="grow"></span>
-      <div class="seg" role="radiogroup" [attr.aria-label]="'cal.view' | t">
-        @for (m of modes; track m) {
-          <button
-            type="button"
-            role="radio"
-            [class.on]="mode() === m"
-            [attr.aria-checked]="mode() === m"
-            (click)="mode.set(m)"
-          >
-            {{ 'cal.mode.' + m | t }}
-          </button>
-        }
-      </div>
+      <na-segment [options]="modeOptions" [(value)]="mode" label="cal.view" />
       <div class="cal-nav">
         <button type="button" class="btn" [attr.aria-label]="'cal.prev' | t" (click)="move(-1)">
           ‹
@@ -274,6 +263,10 @@ export class CalendarPage {
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   protected readonly modes: Mode[] = ['month', 'list'];
+  protected readonly modeOptions: Choice<Mode>[] = this.modes.map((m) => ({
+    value: m,
+    label: 'cal.mode.' + m,
+  }));
   /** The month shown ("YYYY-MM"); empty until the first answer gives today. */
   protected readonly month = signal('');
   protected readonly mode = signal<Mode>(

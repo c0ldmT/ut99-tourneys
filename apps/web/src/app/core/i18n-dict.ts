@@ -1972,6 +1972,7 @@ const en = {
   'udt.market.title': 'Transfer market',
   'udt.market.next': 'Next market day',
   'udt.market.none': 'The first market day of the season has not run yet.',
+  'udt.market.filter': 'Filter by strength',
   'udt.market.f.all': 'All',
   'udt.market.f.weak': 'Weak 0-3',
   'udt.market.f.mid': 'Middle 4-5',
@@ -2400,6 +2401,7 @@ const en = {
   'udt.market.cheap': 'cheaper',
   'udt.market.cheapTitle':
     'On offer for days without a buyer: the value carries a discount (up to −15 %).',
+  'udt.board.mode': 'Game type',
   'udt.board.hint':
     'Drag cards between the places (they swap), from the roster into the lineup and back, traits onto bots – or tap a card and then its new place. Every change is saved at once; the lineup counts until the bracket is drawn.',
   'udt.board.free': 'free',
@@ -2885,6 +2887,7 @@ const en = {
   'league.kind.semi': 'Final four · semi-final',
   'league.kind.final': 'Final four · final',
   'league.kind.third': 'Final four · third place',
+  'league.tiers': 'League tier',
   'league.filter': 'Show games',
   'league.filter.all': 'All games',
   'league.filter.real': 'On the server',
@@ -5189,6 +5192,7 @@ const de: Record<TKey, string> = {
   'udt.market.title': 'Transfermarkt',
   'udt.market.next': 'Nächster Markttag',
   'udt.market.none': 'Der erste Markttag der Season ist noch nicht gelaufen.',
+  'udt.market.filter': 'Nach Stärke filtern',
   'udt.market.f.all': 'Alle',
   'udt.market.f.weak': 'Schwach 0–3',
   'udt.market.f.mid': 'Mittel 4–5',
@@ -5625,6 +5629,7 @@ const de: Record<TKey, string> = {
   'udt.market.cheap': 'günstiger',
   'udt.market.cheapTitle':
     'Seit Tagen ohne Käufer im Angebot: Der Wert hat einen Abschlag (bis −15 %).',
+  'udt.board.mode': 'Spielmodus',
   'udt.board.hint':
     'Zieh Karten zwischen die Plätze (sie tauschen), aus dem Kader in die Aufstellung und zurück, Traits auf Bots – oder tipp eine Karte an und dann ihren neuen Platz. Jede Änderung wird sofort gespeichert; die Aufstellung zählt bis zur Auslosung.',
   'udt.board.free': 'frei',
@@ -6112,6 +6117,7 @@ const de: Record<TKey, string> = {
   'league.kind.semi': 'Final Four · Halbfinale',
   'league.kind.final': 'Final Four · Finale',
   'league.kind.third': 'Final Four · Spiel um Platz 3',
+  'league.tiers': 'Spielklasse',
   'league.filter': 'Partien zeigen',
   'league.filter.all': 'Alle Partien',
   'league.filter.real': 'Auf dem Server',

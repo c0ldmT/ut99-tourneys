@@ -667,6 +667,21 @@ a.tcard.udt.done {
   color: var(--text);
   border-bottom-color: var(--accent);
 }
+/* Variants of na-tabs (decision 317): small (inside a card head), inset (inside a framed box), Dream Team (violet underline). */
+.tabs.mini {
+  margin: 0;
+  border: 0;
+}
+.tabs.mini button {
+  min-height: 32px;
+  padding: 4px 10px;
+}
+.tabs.inset {
+  padding: 0 8px;
+}
+.tabs.udt button.active {
+  border-bottom-color: var(--udt);
+}
 
 /* Neuro amounts (gold, tabular); gains and losses */
 .neuro {
@@ -2345,6 +2360,14 @@ details.help ul {
   background: var(--panel-3);
   color: var(--text);
 }
+/* Filter rows that share the width on phones (tournament overview). */
+@media (max-width: 640px) {
+  .pills.fill button {
+    flex: 1 1 auto;
+    padding: 5px 6px;
+    font-size: var(--fs-sm);
+  }
+}
 
 /* Row lists (tournament overview and archive): a time column, the title with badges and a
    line below, an optional fill meter and a state on the right; grouped by day (.gttl). */
@@ -2966,25 +2989,16 @@ nav.udt-nav {
   border-bottom: 1px solid var(--border);
   margin: -16px -16px 0;
 }
+/* The tier switch keeps its buttons in one row (decision 317). */
+.lg-bar > na-segment {
+  flex: none;
+  flex-wrap: nowrap;
+}
 .lg-main .lg-bar {
   margin: 0;
 }
 .lg-note {
   margin-left: auto;
-}
-.lg-tier {
-  min-height: 40px;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  font-weight: 700;
-  border: 1px solid var(--line);
-  background: var(--panel-2);
-  color: var(--text-2);
-}
-.lg-tier.on {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--text);
 }
 .lg-scroll {
   overflow-x: auto;
@@ -3494,6 +3508,12 @@ tr[class*='lg-z-'] .pl {
   .lg-main .lg-bar {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+  .lg-bar > na-segment {
+    grid-column: 1 / -1;
+  }
+  .lg-bar > na-segment button {
+    flex: 1 1 0;
   }
   .lg-note {
     grid-column: 1 / -1;

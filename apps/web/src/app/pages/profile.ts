@@ -1,3 +1,4 @@
+import { type Choice, Segment } from '../components/choice';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -19,7 +20,7 @@ const NATIVE: Readonly<Record<string, string>> = { de: 'Deutsch', en: 'English' 
  */
 @Component({
   selector: 'app-profile',
-  imports: [FormsModule, RouterLink, TPipe, Avatar, NameTag],
+  imports: [Segment, FormsModule, RouterLink, TPipe, Avatar, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <h1>{{ 'profile.title' | t }}</h1>
@@ -111,20 +112,12 @@ const NATIVE: Readonly<Record<string, string>> = { de: 'Deutsch', en: 'English' 
                 ><b id="acct-lang">{{ 'nav.language' | t }}</b
                 ><span class="muted small">{{ 'profile.langHint' | t }}</span></span
               >
-              <div class="seg" role="radiogroup" aria-labelledby="acct-lang">
-                @for (l of i18n.languages; track l) {
-                  <button
-                    type="button"
-                    role="radio"
-                    [attr.aria-checked]="i18n.lang() === l"
-                    [class.on]="i18n.lang() === l"
-                    [attr.lang]="l"
-                    (click)="i18n.set(l)"
-                  >
-                    {{ native(l) }}
-                  </button>
-                }
-              </div>
+              <na-segment
+                [options]="langOptions"
+                [value]="i18n.lang()"
+                (valueChange)="i18n.set($event)"
+                labelledby="acct-lang"
+              />
             </div>
             @if (auth.config().notify?.directMessages) {
               <label class="switch optrow"
@@ -264,6 +257,12 @@ export class ProfilePage {
     const until = this.auth.me()?.textBanUntil;
     return !!until && Date.parse(until) > Date.now();
   }
+
+  protected readonly langOptions: Choice<Lang>[] = this.i18n.languages.map((l) => ({
+    value: l,
+    text: this.native(l),
+    lang: l,
+  }));
 
   protected native(l: Lang): string {
     return NATIVE[l] ?? l.toUpperCase();
