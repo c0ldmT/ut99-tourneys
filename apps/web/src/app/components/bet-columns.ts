@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import {
+  booleanAttribute,
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
 import { Auth } from '../core/auth';
@@ -14,22 +21,29 @@ import type { BetMatchView } from '../core/types';
   selector: 'app-bet-columns',
   imports: [TPipe, RouterLink, NeuroPipe, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '[class.scroll]': 'scroll()' },
   template: `
     <div class="sides2">
       @for (e of match().entrants; track e; let side = $index) {
         <div class="col" [class.b]="side === 1" [class.won]="match().winnerId === e">
-          <div class="head">
-            <span class="nm">{{ name(e) }}</span>
-            <span class="sum mono">
-              {{ match().pools?.[e]?.amount ?? 0 | neuro }}
-              @if (match().odds?.[e]; as o) {
-                · ×{{ oddsText(o) }}
-              }
-            </span>
+          <div class="top">
+            <div class="head">
+              <span class="nm">{{ name(e) }}</span>
+              <span class="sum mono">
+                {{ match().pools?.[e]?.amount ?? 0 | neuro }}
+                @if (match().odds?.[e]; as o) {
+                  · ×{{ oddsText(o) }}
+                }
+              </span>
+            </div>
+            <div class="bar"><span [style.width.%]="share(e)"></span></div>
           </div>
-          <div class="bar"><span [style.width.%]="share(e)"></span></div>
-          @for (x of sideBets(e); track x.id) {
-            <div class="bet" [class.me]="!x.bot && x.id === meId()">
+          @for (x of sideBets(e); track x.id; let i = $index) {
+            <div
+              class="bet"
+              [class.me]="!x.bot && x.id === meId()"
+              [class.extra]="!!phoneCap() && i >= phoneCap()"
+            >
               <span class="amt mono">{{ x.amount | neuro }}</span>
               <span class="who">
                 @if (x.bot) {
@@ -63,6 +77,49 @@ import type { BetMatchView } from '../core/types';
     </div>
   `,
   styles: `
+    :host {
+      display: block;
+      min-width: 0;
+    }
+    /* Inside a box of fixed height (live row, decision 322): the bets scroll, each side's name,
+       pool and odds stay on top. */
+    :host(.scroll) {
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+    }
+    :host(.scroll) .top {
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      margin: -10px -12px 0;
+      padding: 10px 12px 0;
+      border-radius: var(--radius) var(--radius) 0 0;
+      box-shadow: inset 0 3px 0 var(--side-a);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--side-a) 6%, transparent),
+          color-mix(in srgb, var(--side-a) 3%, transparent)
+        ),
+        var(--panel);
+    }
+    :host(.scroll) .col.b .top {
+      box-shadow: inset 0 3px 0 var(--side-b);
+      background:
+        linear-gradient(
+          180deg,
+          color-mix(in srgb, var(--side-b) 6%, transparent),
+          color-mix(in srgb, var(--side-b) 3%, transparent)
+        ),
+        var(--panel);
+    }
+    /* Phones: the first bets of each side (the page offers all of them). */
+    @media (max-width: 640px) {
+      .bet.extra {
+        display: none;
+      }
+    }
     .bar {
       height: 8px;
       background: var(--panel-2);
@@ -190,6 +247,10 @@ export class BetColumns {
   readonly match = input.required<BetMatchView>();
   /** Entrant id -> name. */
   readonly names = input<Record<string, string>>({});
+  /** Scrolls in a box of fixed height, the heads of the sides stay on top. */
+  readonly scroll = input(false, { transform: booleanAttribute });
+  /** Phones: the bets shown per side (0 = all). */
+  readonly phoneCap = input(0);
   protected readonly meId = computed(() => this.auth.me()?.id ?? null);
 
   protected name(e: string): string {

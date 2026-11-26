@@ -119,12 +119,16 @@ const MAX_ROWS = 5;
     </a>
   `,
   styles: `
+    /* Fills a taller row (next to the bets, decision 322); the content stays on top. */
     :host {
-      display: block;
+      display: flex;
+      flex-direction: column;
       min-width: 0;
     }
     .lm {
+      flex: 1;
       display: grid;
+      align-content: start;
       gap: 8px;
       padding: 14px 16px;
       border-radius: var(--radius);

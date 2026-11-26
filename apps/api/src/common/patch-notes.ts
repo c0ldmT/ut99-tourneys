@@ -22,6 +22,28 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 322,
+    date: '2026-11-27',
+    en: {
+      title: 'Live matches stay in view',
+      items: [
+        'Tournament page: the live match and its bets form one row; with many bets they scroll inside their box, names, pools and odds stay on top.',
+        'Scroll down and a live bar stays under the header: score, clock, the matches being played to switch between and a way back up.',
+        'Playing in the match shown? The live bar has a button that copies your connect command.',
+        'Phones: the first bets of each side, all of them with one tap.',
+      ],
+    },
+    de: {
+      title: 'Live bleibt im Blick',
+      items: [
+        'Turnierseite: Live-Match und Wetten stehen in einer Zeile; bei vielen Wetten scrollen sie in ihrer Karte, Namen, Pool und Quoten bleiben oben.',
+        'Beim Scrollen bleibt eine Live-Leiste unter dem Kopf: Stand, Uhr, die laufenden Matches zum Umschalten und der Weg zurück nach oben.',
+        'Du spielst im gezeigten Match? Die Live-Leiste kopiert dir deinen Connect-Befehl.',
+        'Handy: die ersten Wetten jeder Seite, alle mit einem Tipp.',
+      ],
+    },
+  },
+  {
     id: 321,
     date: '2026-11-27',
     en: {

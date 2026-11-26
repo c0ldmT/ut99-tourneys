@@ -783,6 +783,10 @@ const en = {
   'tp.liveCount': '{n} matches at once',
   'tp.eveningLive': 'League evening · {n} games on',
   'tp.watchOn': 'Watch on {server}:',
+  'tp.bar.label': 'Live bar',
+  'tp.bar.connect': 'Copy connect',
+  'tp.bar.up': '↑ Live',
+  'tp.allBets': 'All {n} bets',
   'tp.lanesTitle': 'More servers ({n}): parallel bot matches',
   'tp.lanesHint':
     'Bot matches run at the same time on these servers. To watch one, connect to its server with this command.',
@@ -4036,6 +4040,10 @@ const de: Record<TKey, string> = {
   'tp.liveCount': '{n} Matches gleichzeitig',
   'tp.eveningLive': 'Liga-Abend · {n} Spiele laufen',
   'tp.watchOn': 'Zuschauen auf {server}:',
+  'tp.bar.label': 'Live-Leiste',
+  'tp.bar.connect': 'Connect kopieren',
+  'tp.bar.up': '↑ Live',
+  'tp.allBets': 'Alle {n} Wetten',
   'tp.lanesTitle': 'Weitere Server ({n}): parallele Bot-Matches',
   'tp.lanesHint':
     'Auf diesen Servern laufen Bot-Matches gleichzeitig. Zum Zuschauen verbindest du dich mit diesem Befehl zum jeweiligen Server.',

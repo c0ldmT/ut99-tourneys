@@ -20,6 +20,7 @@ import { BetPanel } from '../components/bet-panel';
 import { BetColumns } from '../components/bet-columns';
 import { LiveMini, type MiniSide } from '../components/live-mini';
 import { LiveList, type LiveListItem } from '../components/live-list';
+import { LiveBar } from '../components/live-bar';
 import { leagueItem } from '../core/live-items';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
@@ -63,6 +64,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     BetColumns,
     LiveMini,
     LiveList,
+    LiveBar,
     Icon,
     NameTag,
     UdtMark,
@@ -375,7 +377,12 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         @if (current(); as cm) {
           <!-- Live: the matches being played (a list with parallel matches, decision 291) and
                the chosen one with its bets and its server. -->
-          <section class="lhub" [class.multi]="listItems().length > 1">
+          <section
+            #lhub
+            class="lhub"
+            [class.multi]="listItems().length > 1"
+            [class.bets]="!!betsOf(cm.matchId)"
+          >
             @if (listItems().length > 1) {
               <!-- Parallel matches, or the games of the league evening (decision 294). -->
               <div class="card lh-list">
@@ -388,7 +395,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 />
               </div>
             }
-            <div class="lh-main" [class.duo]="listItems().length <= 1 && !!betsOf(cm.matchId)">
+            <div class="lh-live">
               <app-live-mini
                 [link]="['/t', t.id, 'm', cm.matchId]"
                 [matchId]="cm.matchId"
@@ -404,17 +411,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
                 [delayed]="liveDelay()"
               />
-              @if (betsOf(cm.matchId); as m) {
-                <div class="card lh-bets">
-                  <div class="spread">
-                    <h3>{{ 'bets.title' | t }} · {{ m.matchId }}</h3>
-                    <a class="small" [routerLink]="['/t', t.id, 'm', m.matchId]">{{
-                      'bets.closedNow' | t
-                    }}</a>
-                  </div>
-                  <app-bet-columns [match]="m" [names]="entrantNames()" />
-                </div>
-              }
               @if (cm.server && t.me.hasAccess && addressOf(cm); as addr) {
                 <!-- A match on an extra server: its own connect command (the side has the main one). -->
                 <div class="card lh-watch small">
@@ -433,7 +429,43 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 </div>
               }
             </div>
+            @if (betsOf(cm.matchId); as m) {
+              <!-- As high as the live column: the bets scroll inside (decision 322). -->
+              <div class="card lh-bets">
+                <div class="spread">
+                  <h3>{{ 'bets.title' | t }} · {{ m.matchId }}</h3>
+                  <a class="small" [routerLink]="['/t', t.id, 'm', m.matchId]">{{
+                    'bets.closedNow' | t
+                  }}</a>
+                </div>
+                <app-bet-columns
+                  class="lh-blist"
+                  scroll
+                  [match]="m"
+                  [names]="entrantNames()"
+                  [phoneCap]="allBets() ? 0 : PHONE_BETS"
+                />
+                @if (!allBets() && hiddenBets(m)) {
+                  <button class="link small lh-more" (click)="allBets.set(true)">
+                    {{ 'tp.allBets' | t: { n: m.bets.length } }}
+                  </button>
+                }
+              </div>
+            }
           </section>
+          <na-live-bar
+            [target]="lhub"
+            [matchId]="cm.matchId"
+            [sides]="miniSides()"
+            [race]="race()"
+            [live]="liveNow()?.phase === 'live' || liveNow()?.phase === 'overtime'"
+            [clock]="liveClock()"
+            [items]="listItems()"
+            [selected]="listSelected()"
+            [label]="'tp.parallelTabs' | t"
+            [connect]="barConnect()"
+            (pick)="selected.set($event)"
+          />
         }
       } @else {
         <div class="grid two">
@@ -952,40 +984,46 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     }
   `,
   styles: `
-    /* Live: list of the matches being played and the chosen one (decision 291/293). */
+    /* Live (decisions 291/293/322): the list of the matches being played, the chosen one and
+       its bets in one row as high as the live column; the bets scroll inside. */
     .lhub {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 18px;
+      gap: 14px;
       margin-bottom: 18px;
-      align-items: start;
+      scroll-margin-top: 84px;
     }
-    .lhub.multi {
-      grid-template-columns: 300px minmax(0, 1fr);
+    .lhub > .card {
+      margin: 0;
     }
-    .lh-main {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
+    .lh-live {
+      display: flex;
+      flex-direction: column;
       gap: 12px;
       min-width: 0;
     }
-    .lh-main > .card {
-      margin: 0;
+    .lh-live app-live-mini {
+      flex: 1;
     }
-    /* One match: live and its bets side by side on wide screens. */
-    @media (min-width: 1100px) {
-      .lh-main.duo {
-        grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-        align-items: stretch;
-      }
+    .lh-live > .card {
+      margin: 0;
     }
     .lh-list {
-      margin: 0;
       padding: 14px;
+    }
+    .lh-bets {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 0;
     }
     .lh-bets h3 {
       margin: 0;
       font-size: var(--fs-base);
+    }
+    .lh-more {
+      align-self: flex-start;
+      margin-top: 6px;
     }
     .lh-watch {
       padding: 12px 16px;
@@ -993,9 +1031,34 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     .lh-watch .connect {
       margin-bottom: 0;
     }
-    @media (max-width: 860px) {
+    @media (min-width: 641px) {
+      .lhub.bets {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 340px);
+      }
+      .lhub.multi .lh-list {
+        grid-column: 1 / -1;
+      }
+      .lh-bets {
+        height: 0;
+        min-height: max(100%, 280px);
+      }
+      .lh-blist {
+        flex: 1;
+        min-height: 0;
+      }
+      .lh-more {
+        display: none;
+      }
+    }
+    @media (min-width: 1100px) {
       .lhub.multi {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: 230px minmax(0, 1fr);
+      }
+      .lhub.multi.bets {
+        grid-template-columns: 230px minmax(0, 1fr) minmax(0, 320px);
+      }
+      .lhub.multi .lh-list {
+        grid-column: auto;
       }
     }
     .lg-vs {
@@ -1206,6 +1269,13 @@ export class TournamentPage {
   protected readonly betOpen = signal<string[]>([]);
   /** Bets of the match being played (closed, from the bet panel). */
   protected readonly runningBets = signal<BetMatchView[]>([]);
+  /** Phones: bets shown per side until "All n bets" (decision 322). */
+  protected readonly PHONE_BETS = 3;
+  protected readonly allBets = signal(false);
+  /** Phones: a side has more bets than shown. */
+  protected hiddenBets(m: BetMatchView): boolean {
+    return m.entrants.some((e) => m.bets.filter((b) => b.pick === e).length > this.PHONE_BETS);
+  }
   /** The side column has something to show (bets, next matches). */
   protected readonly sideActive = signal(false);
   protected readonly entrantNames = computed(() =>
@@ -1317,6 +1387,18 @@ export class TournamentPage {
     );
   }
   protected readonly liveNow = computed(() => this.liveOf(this.current()?.matchId));
+  /**
+   * The live bar's connect command (decision 322): only for a player of the match shown, on the
+   * server that plays it; spectators have theirs in the side column.
+   */
+  protected readonly barConnect = computed(() => {
+    const t = this.t();
+    const cm = this.current();
+    const me = t?.me.entrantId;
+    if (!t?.me.hasAccess || !me || !cm?.entrants.includes(me)) return null;
+    const addr = this.addressOf(cm);
+    return addr ? this.laneCommand(addr) : null;
+  });
   /** The server playing a match (parallel matches): its name; the tournament's own: ''. */
   protected serverOf(m: { server?: string }): string {
     if (!m.server) return this.t()?.serverName ?? '';
