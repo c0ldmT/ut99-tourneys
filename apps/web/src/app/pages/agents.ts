@@ -77,9 +77,9 @@ import type { AgentView, Inventory } from '../core/types';
         </div>
         <div class="muted small">
           @if (a.online) {
-            {{ 'agents.online' | t }}
+            <span class="badge running">{{ 'agents.online' | t }}</span>
           } @else {
-            {{ 'agents.offline' | t }}
+            <span class="badge aborted">{{ 'agents.offline' | t }}</span>
           }
           @if (a.agentVersion) {
             · v{{ a.agentVersion }} · {{ a.os }}/{{ a.arch }}

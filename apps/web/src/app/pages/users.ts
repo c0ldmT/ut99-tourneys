@@ -62,21 +62,24 @@ import type { PublicUser } from '../core/types';
                 </td>
               }
               <td>
-                <input
-                  type="checkbox"
-                  [checked]="u.isAdmin"
-                  [disabled]="u.id === auth.me()?.id"
-                  (change)="toggle(u, $event)"
-                />
+                <label class="switch"
+                  ><input
+                    type="checkbox"
+                    [checked]="u.isAdmin"
+                    [disabled]="u.id === auth.me()?.id"
+                    [attr.aria-label]="'users.admin' | t"
+                    (change)="toggle(u, $event)" /><span class="tr"></span
+                ></label>
               </td>
               <td>
-                <input
-                  type="checkbox"
-                  [checked]="u.isModerator || u.isAdmin"
-                  [disabled]="u.isAdmin"
-                  [attr.aria-label]="'users.moderator' | t"
-                  (change)="toggleMod(u, $event)"
-                />
+                <label class="switch"
+                  ><input
+                    type="checkbox"
+                    [checked]="u.isModerator || u.isAdmin"
+                    [disabled]="u.isAdmin"
+                    [attr.aria-label]="'users.moderator' | t"
+                    (change)="toggleMod(u, $event)" /><span class="tr"></span
+                ></label>
               </td>
               <td class="small">
                 @if (u.warnings) {

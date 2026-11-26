@@ -73,7 +73,9 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
                       }
                     </td>
                     <td>
-                      <span class="pill" [class]="s.status">{{ 'season.' + s.status | t }}</span>
+                      <span [class]="'badge ' + statusTone[s.status]">{{
+                        'season.' + s.status | t
+                      }}</span>
                     </td>
                     <td class="actions">
                       @if (editing() === s.number) {
@@ -187,17 +189,12 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
         color: var(--muted);
         white-space: nowrap;
       }
-      .pill.in,
-      .pill.running {
+      .pill.in {
         color: var(--live);
         border-color: var(--live);
       }
       .pill.out {
         color: var(--muted);
-      }
-      .pill.planned {
-        color: var(--info);
-        border-color: var(--info);
       }
       .scroll {
         overflow-x: auto;
@@ -220,6 +217,8 @@ import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
   ],
 })
 export class SettingsSeason {
+  /** Season states in the colours of the tournament phases (decision 320). */
+  protected readonly statusTone = { running: 'running', planned: 'seeded', ended: 'finished' };
   private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);

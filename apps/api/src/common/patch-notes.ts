@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 320,
+    date: '2026-11-26',
+    en: {
+      title: 'Hover cards and one way to choose',
+      items: [
+        'Rest the mouse on a bot or team name: a small card shows rarity, skill, level, team and form of a bot, or the manager and the best bots of a team.',
+        'Tabs and choices work the same everywhere: one Tab stop, the arrow keys switch. The league tiers are one switch; filters that act at once are switches.',
+        'Admins: the Admin menu starts with an overview of servers, moderation queue, season, tournaments, users and recent problems.',
+      ],
+    },
+    de: {
+      title: 'Vorschaukarten und eine Art zu wählen',
+      items: [
+        'Maus auf einem Bot- oder Teamnamen ruhen lassen: eine kleine Karte zeigt Seltenheit, Skill, Level, Team und Form eines Bots oder Manager und beste Bots eines Teams.',
+        'Reiter und Auswahlen funktionieren überall gleich: ein Tab-Stopp, die Pfeiltasten wechseln. Die Liga-Stufen sind ein Umschalter, Filter, die sofort wirken, sind Schalter.',
+        'Admins: Das Menü „Verwaltung“ beginnt mit einer Übersicht über Server, Moderation, Season, Turniere, Benutzer und letzte Probleme.',
+      ],
+    },
+  },
+  {
     id: 313,
     date: '2026-11-26',
     en: {

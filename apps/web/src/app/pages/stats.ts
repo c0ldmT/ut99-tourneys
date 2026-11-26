@@ -104,23 +104,21 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
           }
           <span class="grow"></span>
           @if (tab() !== 'records') {
-            <label class="check"
+            <label class="switch filter"
               ><input
                 type="checkbox"
                 [checked]="bots()"
                 (change)="setBots($any($event.target).checked)"
-              />
-              {{ 'stats.showBots' | t }}</label
+              /><span class="tr"></span> {{ 'stats.showBots' | t }}</label
             >
           }
           @if (tab() === 'ratings') {
-            <label class="check"
+            <label class="switch filter"
               ><input
                 type="checkbox"
                 [checked]="settledOnly()"
                 (change)="settledOnly.set($any($event.target).checked)"
-              />
-              {{ 'rating.settledOnly' | t }}</label
+              /><span class="tr"></span> {{ 'rating.settledOnly' | t }}</label
             >
           }
         </div>
@@ -212,23 +210,21 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
           }
           <span class="grow"></span>
           @if (tab() !== 'records') {
-            <label class="check"
+            <label class="switch filter"
               ><input
                 type="checkbox"
                 [checked]="bots()"
                 (change)="setBots($any($event.target).checked)"
-              />
-              {{ 'stats.showBots' | t }}</label
+              /><span class="tr"></span> {{ 'stats.showBots' | t }}</label
             >
           }
           @if (tab() === 'ratings') {
-            <label class="check"
+            <label class="switch filter"
               ><input
                 type="checkbox"
                 [checked]="settledOnly()"
                 (change)="settledOnly.set($any($event.target).checked)"
-              />
-              {{ 'rating.settledOnly' | t }}</label
+              /><span class="tr"></span> {{ 'rating.settledOnly' | t }}</label
             >
           }
         </div>
@@ -323,23 +319,21 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
         }
         <span class="grow"></span>
         @if (tab() !== 'records') {
-          <label class="check"
+          <label class="switch filter"
             ><input
               type="checkbox"
               [checked]="bots()"
               (change)="setBots($any($event.target).checked)"
-            />
-            {{ 'stats.showBots' | t }}</label
+            /><span class="tr"></span> {{ 'stats.showBots' | t }}</label
           >
         }
         @if (tab() === 'ratings') {
-          <label class="check"
+          <label class="switch filter"
             ><input
               type="checkbox"
               [checked]="settledOnly()"
               (change)="settledOnly.set($any($event.target).checked)"
-            />
-            {{ 'rating.settledOnly' | t }}</label
+            /><span class="tr"></span> {{ 'rating.settledOnly' | t }}</label
           >
         }
       </div>
@@ -494,10 +488,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
       width: 100%;
       margin-top: 4px;
     }
-    .filters label.check {
-      display: flex;
-      gap: 6px;
-      align-items: center;
+    .filters label.switch {
       padding-bottom: 8px;
     }
     /* Long tables scroll inside the card: the horizontal scroll bar stays in view, the header
