@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- League games: the overview names the own game on its evening's row (no second row), a league game's page shows a result card instead of bracket and table (decisions 307, 308).
 - Header: shop with its name on wide screens, burger menu with the administration heading and the profile; bot pages mark the Team tab; the test bar folds (decision 306, patch note 306).
 - Dream Team pages share one plain page head with a violet kicker (area), the club house without a card around its buildings; long rules (trading, market legend, scouting, mentors) behind "So funktioniert's" (decisions 304, 305, patch note 305).
 - Colours equal to a design token use the token (45 places, no visible change) (decision 303).

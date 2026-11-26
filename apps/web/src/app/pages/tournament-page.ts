@@ -478,24 +478,47 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       @if (t.projection?.bracket; as b) {
         <div class="cols" [class.solo]="!sideActive() && !liveLayout()">
           <div class="main">
-            <div class="card">
-              <app-bracket
-                [bracket]="b"
-                [botMarks]="!udtMode()"
-                [entrants]="t.projection!.entrants"
-                [games]="t.projection!.games"
-                [currentMatchId]="current()?.matchId"
-                [liveMatchIds]="liveMatchIds()"
-                [live]="liveNow()"
-                [lives]="livesById()"
-                [myEntrantId]="t.me.entrantId"
-                [race]="race()"
-                [currentRuns]="current()?.runs ?? []"
-                [ratings]="t.projection!.seedRatings"
-                [betOpen]="betOpen()"
-                (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
-              />
-            </div>
+            @if (fixture(); as f) {
+              <!-- A league game: one result card instead of a bracket of two (decision 308). -->
+              <button
+                type="button"
+                class="card fx"
+                [disabled]="!f.ready"
+                (click)="router.navigate(['/t', t.id, 'm', f.matchId])"
+              >
+                <span class="fx-team" [class.win]="f.winner === 0">{{ f.names[0] }}</span>
+                <span class="fx-mid">
+                  @if (f.score; as sc) {
+                    <b class="mono">{{ sc[0] }} : {{ sc[1] }}</b>
+                  } @else {
+                    <b class="disp">vs</b>
+                  }
+                  @if (f.map) {
+                    <small class="muted">{{ f.map }}</small>
+                  }
+                </span>
+                <span class="fx-team r" [class.win]="f.winner === 1">{{ f.names[1] }}</span>
+              </button>
+            } @else {
+              <div class="card">
+                <app-bracket
+                  [bracket]="b"
+                  [botMarks]="!udtMode()"
+                  [entrants]="t.projection!.entrants"
+                  [games]="t.projection!.games"
+                  [currentMatchId]="current()?.matchId"
+                  [liveMatchIds]="liveMatchIds()"
+                  [live]="liveNow()"
+                  [lives]="livesById()"
+                  [myEntrantId]="t.me.entrantId"
+                  [race]="race()"
+                  [currentRuns]="current()?.runs ?? []"
+                  [ratings]="t.projection!.seedRatings"
+                  [betOpen]="betOpen()"
+                  (matchClick)="router.navigate(['/t', t.id, 'm', $event])"
+                />
+              </div>
+            }
             @if (race() && raceRows().length) {
               <div class="card">
                 <h2>{{ 'race.results' | t }}</h2>
@@ -551,71 +574,75 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 </div>
               </div>
             }
-            <div class="card">
-              <h2>{{ 'tp.table' | t }}</h2>
-              <div class="scroll">
-                <table class="table">
-                  <thead>
-                    <tr>
-                      <th class="num">#</th>
-                      <th>{{ (teamMode() || udtMode() ? 'tp.team' : 'tp.player') | t }}</th>
-                      @if (t.seasonal && ratedGames().length) {
-                        <th>{{ 'tp.rating' | t }}</th>
-                      }
-                      <th class="num">{{ 'tp.record' | t }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (s of b.standings; track s.entrantId) {
-                      <tr [class.me]="s.entrantId === t.me.entrantId">
-                        <td class="num mono">{{ s.placement ?? '–' }}</td>
-                        <td>
-                          <span class="who">
-                            @if (libraryBotId(s.entrantId); as bid) {
-                              <a [routerLink]="botRoute(bid, udtMode())">{{ name(s.entrantId) }}</a>
-                            } @else if (humanUserId(s.entrantId); as uid) {
-                              <a [routerLink]="['/stats/p', 'u:' + uid]"
-                                ><na-name [name]="name(s.entrantId)" [id]="uid"
-                              /></a>
-                            } @else {
-                              <span>{{ name(s.entrantId) }}</span>
-                            }
-                            <!-- In the Dream Team every entrant is bots: no badge. -->
-                            @if (isBot(s.entrantId) && !udtMode()) {
-                              <span class="badge bot">BOT</span>
-                            }
-                          </span>
-                        </td>
+            @if (!fixture()) {
+              <div class="card">
+                <h2>{{ 'tp.table' | t }}</h2>
+                <div class="scroll">
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th class="num">#</th>
+                        <th>{{ (teamMode() || udtMode() ? 'tp.team' : 'tp.player') | t }}</th>
                         @if (t.seasonal && ratedGames().length) {
-                          <td>
-                            @for (r of ratingSums().get(s.entrantId) ?? []; track r.key) {
-                              <div class="rt">
-                                @if (teamMode()) {
-                                  <span class="muted small rn">{{ r.name }}</span>
-                                }
-                                <span class="mono">{{ r.after }}</span>
-                                <b
-                                  class="mono"
-                                  [class.up]="r.delta > 0"
-                                  [class.down]="r.delta < 0"
-                                  >{{ signed(r.delta) }}</b
-                                >
-                              </div>
-                            } @empty {
-                              <span class="muted">–</span>
-                            }
-                          </td>
+                          <th>{{ 'tp.rating' | t }}</th>
                         }
-                        <td class="num mono">{{ s.wins }}–{{ s.losses }}</td>
+                        <th class="num">{{ 'tp.record' | t }}</th>
                       </tr>
-                    }
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      @for (s of b.standings; track s.entrantId) {
+                        <tr [class.me]="s.entrantId === t.me.entrantId">
+                          <td class="num mono">{{ s.placement ?? '–' }}</td>
+                          <td>
+                            <span class="who">
+                              @if (libraryBotId(s.entrantId); as bid) {
+                                <a [routerLink]="botRoute(bid, udtMode())">{{
+                                  name(s.entrantId)
+                                }}</a>
+                              } @else if (humanUserId(s.entrantId); as uid) {
+                                <a [routerLink]="['/stats/p', 'u:' + uid]"
+                                  ><na-name [name]="name(s.entrantId)" [id]="uid"
+                                /></a>
+                              } @else {
+                                <span>{{ name(s.entrantId) }}</span>
+                              }
+                              <!-- In the Dream Team every entrant is bots: no badge. -->
+                              @if (isBot(s.entrantId) && !udtMode()) {
+                                <span class="badge bot">BOT</span>
+                              }
+                            </span>
+                          </td>
+                          @if (t.seasonal && ratedGames().length) {
+                            <td>
+                              @for (r of ratingSums().get(s.entrantId) ?? []; track r.key) {
+                                <div class="rt">
+                                  @if (teamMode()) {
+                                    <span class="muted small rn">{{ r.name }}</span>
+                                  }
+                                  <span class="mono">{{ r.after }}</span>
+                                  <b
+                                    class="mono"
+                                    [class.up]="r.delta > 0"
+                                    [class.down]="r.delta < 0"
+                                    >{{ signed(r.delta) }}</b
+                                  >
+                                </div>
+                              } @empty {
+                                <span class="muted">–</span>
+                              }
+                            </td>
+                          }
+                          <td class="num mono">{{ s.wins }}–{{ s.losses }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                @if (t.seasonal && ratedGames().length) {
+                  <p class="muted small">{{ 'tp.tableHint' | t }}</p>
+                }
               </div>
-              @if (t.seasonal && ratedGames().length) {
-                <p class="muted small">{{ 'tp.tableHint' | t }}</p>
-              }
-            </div>
+            }
             @if (teamMode() && t.projection) {
               <div class="card">
                 <app-team-roster
@@ -1394,6 +1421,34 @@ export class TournamentPage {
     () => !!this.t()?.league || this.t()?.settings.format === 'fixtures',
   );
   protected readonly botRoute = botRoute;
+  /** A league game (one match of two teams): its result for the result card (decision 308). */
+  protected readonly fixture = computed(() => {
+    const t = this.t();
+    const b = t?.projection?.bracket;
+    if (!t || !b || !this.leagueMode()) return null;
+    const ms = Object.values(b.byId);
+    if (ms.length !== 1) return null;
+    const m = ms[0]!;
+    const [a, z] = m.entrants;
+    const last = m.result?.games?.at(-1);
+    // Frags of the (last) game; without game scores (simulated, forfeit) the match result 1 : 0.
+    const score: [number, number] | null =
+      last && a && z
+        ? [last.scores[a] ?? 0, last.scores[z] ?? 0]
+        : m.winnerId
+          ? m.winnerId === a
+            ? [1, 0]
+            : [0, 1]
+          : null;
+    return {
+      matchId: m.id,
+      names: [this.name(a), this.name(z)] as const,
+      winner: m.winnerId ? (m.winnerId === a ? 0 : 1) : null,
+      score,
+      map: last?.map ?? null,
+      ready: !!a && !!z,
+    };
+  });
 
   protected humanTeams(t: TournamentDetail): number {
     return t.registrations.filter((r) => !r.ai).length;

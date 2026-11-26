@@ -2494,6 +2494,69 @@ details.help ul {
 .tl-evlist .h:hover {
   background: var(--panel-2);
 }
+/* A league game's result card (decision 308): team · score · team. */
+.card.fx {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 22px 24px;
+  text-align: left;
+  color: var(--text);
+  font: inherit;
+}
+.card.fx:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--panel-2);
+}
+.card.fx:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.fx-team {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-xl);
+  text-transform: uppercase;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.fx-team.r {
+  text-align: right;
+}
+.fx-team.win {
+  color: var(--text);
+}
+.fx-team.win::after {
+  content: ' ★';
+  color: var(--neuro);
+}
+.fx-team.r.win::after {
+  content: '';
+}
+.fx-team.r.win::before {
+  content: '★ ';
+  color: var(--neuro);
+}
+.fx-mid {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.fx-mid b {
+  font-size: var(--fs-3xl);
+  line-height: 1;
+}
+/* The user's own game of the evening (decision 307). */
+.tl-evlist .h.me {
+  background: var(--me-bg);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.tl-evhead .meta .me {
+  color: var(--accent);
+}
 .tl-evlist .d {
   color: var(--muted);
   font-family: var(--font-mono);

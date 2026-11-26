@@ -228,7 +228,18 @@ function storedFilter(): TournamentFilter {
                 ><na-udt-mark [size]="14" />{{ 'list.kind.league' | t }}</span
               ></span
             >
-            <span class="meta">{{ e.label }}</span>
+            <span class="meta"
+              >{{ e.label }}
+              @if (mineOf(e); as m) {
+                ·
+                <span class="me">{{
+                  'list.ev.yours' | t: { vs: m.league.home + ' – ' + m.league.away }
+                }}</span>
+                @if (m.champion) {
+                  <ng-container *ngTemplateOutlet="trophy" />{{ m.champion }}
+                }
+              }
+            </span>
           </span>
           <span class="st tl-evn"
             >{{ 'list.ev.games' | t: { n: e.games.length } }}
@@ -245,7 +256,7 @@ function storedFilter(): TournamentFilter {
         <div class="tl-evlist" [id]="e.id + '-list'" [attr.inert]="isOpen(e.id) ? null : ''">
           <div>
             @for (g of e.games; track g.id) {
-              <a class="h" [routerLink]="['/t', g.id]">
+              <a class="h" [class.me]="g.league.mine" [routerLink]="['/t', g.id]">
                 <span class="d">{{ time(at(g)) }}</span>
                 <span class="tl-evvs">{{ g.league.home }} – {{ g.league.away }}</span>
                 @if (g.phase === 'aborted') {
@@ -1064,7 +1075,7 @@ export class TournamentListPage {
     this.shownActive().filter((t) => RUNNING.includes(t.phase)),
   );
   /** The live tiles: a league evening's games in one (decision 294). */
-  protected readonly liveRows = computed(() => this.fold(this.live(), 'live', true));
+  protected readonly liveRows = computed(() => this.fold(this.live(), 'live'));
 
   /** The games of a league evening as rows of the live list. */
   protected eveningItems(e: LeagueEvening): LiveListItem[] {
@@ -1267,7 +1278,7 @@ export class TournamentListPage {
   }
 
   /** The tournaments as rows, the league's games of an evening folded into one (see rowGroups). */
-  private fold(list: TournamentSummary[], scope: string, withMine = false): ListRow[] {
+  private fold(list: TournamentSummary[], scope: string): ListRow[] {
     // Ids without spaces (aria-controls refers to them).
     const scopeKey = scope.replace(/[^a-z0-9]+/gi, '_');
     const single = this.filter().kind === 'league';
@@ -1275,8 +1286,8 @@ export class TournamentListPage {
     const evenings = new Map<string, LeagueEvening>();
     for (const t of list) {
       const l = t.league;
-      // Live (withMine): the user's own game stays in its evening, marked in the live list.
-      if (!l || (l.mine && !withMine) || single) {
+      // The user's own game stays in its evening, named on the evening's row (decision 307).
+      if (!l || single) {
         rows.push({ id: t.id, t });
         continue;
       }
@@ -1298,6 +1309,11 @@ export class TournamentListPage {
     return rows.map((r) =>
       r.ev?.games.length === 1 ? { id: r.ev.games[0]!.id, t: r.ev.games[0] } : r,
     );
+  }
+
+  /** The user's own game of an evening (named on its row). */
+  protected mineOf(e: LeagueEvening): LeagueGame | null {
+    return e.games.find((g) => g.league.mine) ?? null;
   }
 
   /** "Matchdays 12–13 · Relegation" */
