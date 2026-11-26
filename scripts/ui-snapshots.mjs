@@ -204,6 +204,10 @@ async function routes(admin) {
     ['agents', '/admin/agents'],
     ['bots', '/admin/bots'],
     ['settings', '/admin/settings'],
+    ...['bets', 'bots', 'udt', 'league', 'system'].map((t) => [
+      `settings-${t}`,
+      `/admin/settings?tab=${t}`,
+    ]),
     ['series', '/admin/series'],
     ['moderation', '/moderation'],
     ['users', '/admin/users'],
@@ -220,6 +224,9 @@ async function shoot(out) {
     throw new Error('Playwright is missing (npm i -g playwright, then NODE_PATH=$(npm root -g))');
   }
   const admin = await Client.login('Mario', true);
+  // The "what's new" dialog would cover every page: mark all notes as read.
+  const notes = await admin.get('/patch-notes');
+  if (notes?.latest) await admin.post('/me/patch-notes/seen', { id: notes.latest });
   const only = values.only?.split(',');
   const pages = (await routes(admin)).filter(([name]) => !only || only.includes(name));
   const tsid = admin.cookie.split('=')[1];

@@ -551,10 +551,12 @@ export class ShopPage {
 
   constructor() {
     void this.load();
+    // `?tab=wardrobe` (link from the account page) and `?tab=admin` open that tab.
+    const tab = inject(ActivatedRoute).snapshot.queryParamMap.get('tab');
+    if (tab === 'wardrobe') this.tab.set('wardrobe');
     if (this.auth.me()?.isAdmin) {
       void this.loadAdmin();
-      if (inject(ActivatedRoute).snapshot.queryParamMap.get('tab') === 'admin')
-        this.tab.set('admin');
+      if (tab === 'admin') this.tab.set('admin');
     }
   }
 

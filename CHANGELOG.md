@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Account page instead of the profile: name as others see it, in-game name, join token (copy, new token after a confirm), language and Discord messages in one column; settings with a section index on wide screens; the shop opens the wardrobe with `?tab=wardrobe` (decision 310, patch note 310).
 - Packs: a slim stage until a box opens; calendar: league chips without the time, their names fit (decision 309, patch note 309).
 - League games: the overview names the own game on its evening's row (no second row), a league game's page shows a result card instead of bracket and table (decisions 307, 308).
 - Header: shop with its name on wide screens, burger menu with the administration heading and the profile; bot pages mark the Team tab; the test bar folds (decision 306, patch note 306).

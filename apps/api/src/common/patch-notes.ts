@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 310,
+    date: '2026-11-26',
+    en: {
+      title: 'Your account in one place',
+      items: [
+        'The profile is now "Account": your name as others see it, in-game name, join token (with Copy), language and Discord messages on one page.',
+        'A new join token is only created after you confirm - the old one stops working at once.',
+      ],
+    },
+    de: {
+      title: 'Dein Konto an einem Ort',
+      items: [
+        'Aus dem Profil wird „Konto“: dein Name, wie andere ihn sehen, Ingame-Name, Beitritts-Token (mit Kopieren), Sprache und Discord-Nachrichten auf einer Seite.',
+        'Ein neuer Beitritts-Token entsteht erst nach einer Rückfrage - der alte funktioniert sofort nicht mehr.',
+      ],
+    },
+  },
+  {
     id: 309,
     date: '2026-11-26',
     en: {
