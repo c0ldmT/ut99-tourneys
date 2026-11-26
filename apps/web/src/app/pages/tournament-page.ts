@@ -1775,9 +1775,12 @@ export class TournamentPage {
     return this.act(this.api.command(this.id(), body));
   }
 
-  protected pause() {
-    const reason = prompt(this.i18n.t('admin.pauseReason'), this.i18n.t('admin.pauseDefault'));
-    if (reason) void this.command({ kind: 'pause', reason });
+  protected async pause() {
+    const reason = await this.confirm.prompt(this.i18n.t('admin.pauseReason'), {
+      value: this.i18n.t('admin.pauseDefault'),
+      maxLength: 200,
+    });
+    if (reason?.trim()) void this.command({ kind: 'pause', reason: reason.trim() });
   }
 
   /** Monster Hunt: the running team gives up its run (bots stuck); the other team runs next. */
@@ -1816,9 +1819,12 @@ export class TournamentPage {
     void this.act(this.api.override(this.id(), matchId, winnerId));
   }
 
-  protected abort() {
-    const reason = prompt(this.i18n.t('admin.abortReason'));
-    if (reason) void this.command({ kind: 'abort', reason });
+  protected async abort() {
+    const reason = await this.confirm.prompt(this.i18n.t('admin.abortReason'), {
+      danger: true,
+      maxLength: 200,
+    });
+    if (reason?.trim()) void this.command({ kind: 'abort', reason: reason.trim() });
   }
 
   protected announce() {

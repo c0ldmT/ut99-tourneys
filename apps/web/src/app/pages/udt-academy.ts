@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
@@ -489,6 +490,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
   `,
 })
 export class UdtAcademyPage {
+  private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   protected readonly a = signal<UdtAcademy | null>(null);
@@ -566,7 +568,7 @@ export class UdtAcademyPage {
       this.bpName = '';
       this.grad.set(await this.api.udtGraduation());
       if (v.built?.startTrait)
-        alert(
+        void this.confirm.tell(
           this.i18n.t('udt.academy.startTrait', {
             trait: this.i18n.t(`udt.trait.${v.built.startTrait}`),
           }),
@@ -619,9 +621,9 @@ export class UdtAcademyPage {
       this.a.set(v);
       this.grad.set(await this.api.udtGraduation());
       if (v.apprentice?.signature)
-        alert(this.i18n.t('udt.academy.inheritedSig', { mentor: m.name }));
+        void this.confirm.tell(this.i18n.t('udt.academy.inheritedSig', { mentor: m.name }));
       else if (v.apprentice?.inherited)
-        alert(
+        void this.confirm.tell(
           this.i18n.t('udt.academy.inherited', {
             trait: this.i18n.t(`udt.trait.${v.apprentice.inherited}`),
           }),

@@ -59,11 +59,11 @@ describe('UI tokens (ratchet)', () => {
     ).toBeLessThanOrEqual(126);
   });
 
-  it('asks with the confirm dialog, not the browser', () => {
-    const native = /[^.\w]confirm\(/g;
+  it('asks with the dialog of the website, not the browser', () => {
+    const native = /[^.\w](confirm|prompt|alert)\(/g;
     expect(
       count(
-        code.map((f) => f.text),
+        code.filter((f) => f.name !== 'components/confirm-dialog.ts').map((f) => f.text),
         native,
       ),
     ).toBeLessThanOrEqual(0);

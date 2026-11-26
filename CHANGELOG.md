@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- No browser dialogs left: reasons, team names and academy news in the website's dialog; the +n plaque no longer covers a card's rarity; lineups write NX Nova instead of NXNova (decision 300).
 - The website's own confirm dialog instead of the browser's for buying, selling, deleting and other irreversible steps; destructive ones in red with the focus on Cancel (decision 299, patch note 299).
 - Dates and times written the same way on every page (I18n.when), German dates on the statistics pages, local times in the ledger (decision 298).
 - Design tokens for type sizes and corner radii used everywhere, small text at least about 11px, the faint grey readable (4.5:1); test ui-tokens.test.ts keeps raw values from coming back (decision 297).

@@ -66,12 +66,13 @@ type Team = Extract<Entrant, { kind: 'team' }>;
               </li>
             }
             @for (b of team.bots; track b.name) {
+              @let bn = botName(b.name, team.tag);
               <li class="muted">
                 <span class="nmb">
                   @if (b.id) {
-                    <a [routerLink]="botRoute(b.id, tournament().kind === 'udt')">{{ b.name }}</a>
+                    <a [routerLink]="botRoute(b.id, tournament().kind === 'udt')">{{ bn }}</a>
                   } @else {
-                    <span>{{ b.name }}</span>
+                    <span>{{ bn }}</span>
                   }
                   @if (tournament().kind !== 'udt') {
                     <span class="badge bot">BOT</span>
@@ -146,6 +147,12 @@ type Team = Extract<Entrant, { kind: 'team' }>;
 export class TeamRoster {
   readonly tournament = input.required<TournamentDetail>();
   protected readonly botRoute = botRoute;
+  /** "NX Nova" instead of the game name "NXNova": the team tag apart from the bot's name. */
+  protected botName(name: string, tag: string | null | undefined): string {
+    return tag && name.startsWith(tag) && name.length > tag.length && name[tag.length] !== ' '
+      ? `${tag} ${name.slice(tag.length)}`
+      : name;
+  }
   readonly isAdmin = input(false);
   readonly myUserId = input<string | null>(null);
   readonly changed = output<void>();

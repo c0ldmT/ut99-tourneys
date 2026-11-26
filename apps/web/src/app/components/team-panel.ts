@@ -460,10 +460,16 @@ export class TeamPanel {
     void this.act(this.api.setLineup(this.tournament().id, team.id, next));
   }
 
-  protected rename(team: TeamView) {
-    const name = prompt(this.i18n.t('team.renamePrompt'), team.name);
+  protected async rename(team: TeamView) {
+    const name = await this.confirm.prompt(this.i18n.t('team.renamePrompt'), {
+      value: team.name,
+      maxLength: 40,
+    });
     if (!name?.trim()) return;
-    const tag = prompt(this.i18n.t('team.tagPrompt'), team.tag ?? '');
+    const tag = await this.confirm.prompt(this.i18n.t('team.tagPrompt'), {
+      value: team.tag ?? '',
+      maxLength: 20,
+    });
     void this.act(
       this.api.updateTeam(this.tournament().id, team.id, {
         name: name.trim(),

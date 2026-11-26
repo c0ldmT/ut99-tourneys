@@ -1277,6 +1277,10 @@ main section[id] {
 .udt-card .rar {
   color: var(--rt);
 }
+/* The corner plaque (+n points) sits over the card's top right: the rarity steps aside. */
+.udt-card.plaq .rar {
+  margin-right: 18px;
+}
 .udt-card .lvl {
   color: var(--muted);
 }

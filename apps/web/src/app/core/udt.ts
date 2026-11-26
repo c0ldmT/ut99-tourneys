@@ -189,7 +189,12 @@ export function rosterCard(
     @let b = bot();
     @let v = b.effective?.traits ?? b.traits;
     @let sk = b.effective?.skill ?? b.skill;
-    <div class="udt-card r-{{ b.rarity }}" [class.small]="small()" [class.dim]="dim()">
+    <div
+      class="udt-card r-{{ b.rarity }}"
+      [class.small]="small()"
+      [class.dim]="dim()"
+      [class.plaq]="points() > 0 || prestigeFree() > 0"
+    >
       @if (badge()) {
         <span class="udt-cbadge">{{ badge() }}</span>
       }

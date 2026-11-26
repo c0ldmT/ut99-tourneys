@@ -1,3 +1,4 @@
+import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -348,6 +349,7 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
   `,
 })
 export class ModerationPage {
+  private readonly confirm = inject(Confirm);
   protected readonly i18n = inject(I18n);
   protected readonly auth = inject(Auth);
   private readonly api = inject(Api);
@@ -439,9 +441,14 @@ export class ModerationPage {
     return this.act(() => this.api.modDecide(it.id, action));
   }
 
-  protected sanction(userId: string, action: 'warn' | 'text-ban' | 'ban' | 'unban') {
-    const reason = action === 'unban' ? '' : (prompt(this.i18n.t('mod.reasonPrompt')) ?? undefined);
-    if (reason === undefined) return;
+  protected async sanction(userId: string, action: 'warn' | 'text-ban' | 'ban' | 'unban') {
+    const reason =
+      action === 'unban'
+        ? ''
+        : await this.confirm.prompt(this.i18n.t('mod.reasonPrompt'), {
+            danger: action !== 'warn',
+          });
+    if (reason === null) return;
     const days = action === 'text-ban' ? this.textDays : action === 'ban' ? this.banDays : 0;
     return this.act(() => this.api.modSanction(userId, action, days, reason));
   }
