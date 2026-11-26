@@ -106,7 +106,14 @@ export function nameStyle(color?: string): Record<string, string> {
       line-height: 1.2;
     }
     .aurora {
-      background-image: linear-gradient(90deg, #22d3ee, #a78bfa, #f0468c, #fbbf24, #22d3ee);
+      background-image: linear-gradient(
+        90deg,
+        var(--accent),
+        #a78bfa,
+        var(--hot),
+        #fbbf24,
+        var(--accent)
+      );
       background-size: 300% 100%;
       -webkit-background-clip: text;
       background-clip: text;
@@ -185,20 +192,20 @@ export class NameTag {
     }
     .fr-neon {
       box-shadow:
-        0 0 0 2px #22d3ee,
-        0 0 0 5px #f0468c,
+        0 0 0 2px var(--accent),
+        0 0 0 5px var(--hot),
         0 0 16px rgba(240, 70, 140, 0.5);
     }
     .fr-champion {
       box-shadow:
-        0 0 0 3px #f0468c,
+        0 0 0 3px var(--hot),
         0 0 0 6px #fbbf24,
         0 0 18px rgba(251, 191, 36, 0.5);
     }
     .fr-dreamteam {
       box-shadow:
-        0 0 0 3px #b26bff,
-        0 0 0 6px #22d3ee,
+        0 0 0 3px var(--udt),
+        0 0 0 6px var(--accent),
         0 0 18px rgba(178, 107, 255, 0.6);
     }
     .fr-throne {

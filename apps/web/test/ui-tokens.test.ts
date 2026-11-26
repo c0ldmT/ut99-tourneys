@@ -50,13 +50,13 @@ describe('UI tokens (ratchet)', () => {
 
   it('has no more raw colours than before', () => {
     const hex = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/g;
-    expect(count([globalRules], hex)).toBeLessThanOrEqual(81);
+    expect(count([globalRules], hex)).toBeLessThanOrEqual(64);
     expect(
       count(
         code.map((f) => f.text),
         hex,
       ),
-    ).toBeLessThanOrEqual(126);
+    ).toBeLessThanOrEqual(98);
   });
 
   it('asks with the dialog of the website, not the browser', () => {

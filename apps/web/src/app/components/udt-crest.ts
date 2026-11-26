@@ -35,7 +35,7 @@ const CLIP: Record<string, string> = {
     .crest {
       display: inline-grid;
       place-items: center;
-      color: #07080c;
+      color: var(--bg);
       font-family: var(--font-display);
       font-weight: 800;
       line-height: 1;

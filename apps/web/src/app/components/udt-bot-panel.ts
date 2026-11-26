@@ -554,7 +554,7 @@ const SHORT: Readonly<Record<Stat, string>> = {
       font-weight: 800;
       font-size: var(--fs-xl);
       color: #2a1a00;
-      background: linear-gradient(135deg, #ffe08a, #f5b83d 60%, #d98e1c);
+      background: linear-gradient(135deg, #ffe08a, var(--neuro) 60%, #d98e1c);
     }
     .pts.zero {
       color: var(--muted);

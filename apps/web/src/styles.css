@@ -750,25 +750,25 @@ button.icon.dng:hover:not(:disabled) {
   background:
     linear-gradient(rgba(34, 211, 238, 0.18) 1px, transparent 1px) 0 0 / 22px 22px,
     linear-gradient(90deg, rgba(34, 211, 238, 0.18) 1px, transparent 1px) 0 0 / 22px 22px,
-    linear-gradient(180deg, #0b1420, #07080c);
+    linear-gradient(180deg, #0b1420, var(--bg));
 }
 .bn-lava {
   background:
     radial-gradient(circle at 20% 120%, rgba(255, 77, 94, 0.7), transparent 55%),
     radial-gradient(circle at 75% 110%, rgba(251, 191, 36, 0.55), transparent 50%),
-    linear-gradient(180deg, #1a0a08, #07080c);
+    linear-gradient(180deg, #1a0a08, var(--bg));
 }
 .bn-ice {
   background:
     radial-gradient(circle at 80% -10%, rgba(165, 243, 252, 0.55), transparent 55%),
     radial-gradient(circle at 10% 0%, rgba(96, 165, 250, 0.4), transparent 50%),
-    linear-gradient(180deg, #0a1622, #07080c);
+    linear-gradient(180deg, #0a1622, var(--bg));
 }
 .bn-circuit {
   background:
     repeating-linear-gradient(90deg, rgba(74, 222, 128, 0.14) 0 2px, transparent 2px 38px),
     repeating-linear-gradient(0deg, rgba(74, 222, 128, 0.1) 0 2px, transparent 2px 30px),
-    linear-gradient(135deg, #07140d, #07080c);
+    linear-gradient(135deg, #07140d, var(--bg));
 }
 .bn-sunset {
   background: linear-gradient(160deg, #3b0a45 0%, #a3224f 45%, #f08a3d 80%, #fbbf24 100%);
@@ -781,7 +781,7 @@ button.icon.dng:hover:not(:disabled) {
     radial-gradient(1px 1px at 85% 60%, #fff, transparent),
     radial-gradient(1px 1px at 10% 80%, #cbd5e1, transparent),
     radial-gradient(circle at 80% 0%, rgba(167, 139, 250, 0.35), transparent 50%),
-    linear-gradient(180deg, #0b0f24, #07080c);
+    linear-gradient(180deg, #0b0f24, var(--bg));
 }
 
 /* Victory fanfare: confetti over a banner */
@@ -796,10 +796,10 @@ button.icon.dng:hover:not(:disabled) {
   inset: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(circle, #22d3ee 2px, transparent 2.5px),
-    radial-gradient(circle, #f0468c 2px, transparent 2.5px),
+    radial-gradient(circle, var(--accent) 2px, transparent 2.5px),
+    radial-gradient(circle, var(--hot) 2px, transparent 2.5px),
     radial-gradient(circle, #fbbf24 2px, transparent 2.5px),
-    radial-gradient(circle, #4ade80 1.5px, transparent 2px);
+    radial-gradient(circle, var(--live) 1.5px, transparent 2px);
   background-size:
     60px 70px,
     90px 80px,
@@ -1257,7 +1257,7 @@ main section[id] {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: var(--accent);
-  color: #04151a;
+  color: var(--accent-ink);
 }
 .udt-card.dim {
   filter: grayscale(0.85) brightness(0.85);
@@ -1512,7 +1512,7 @@ main section[id] {
   border-color: rgba(178, 107, 255, 0.5);
 }
 .udt-mark.pres.st-ascended {
-  color: #f5c75e;
+  color: var(--neuro-text);
   border-color: rgba(245, 199, 94, 0.55);
   background: rgba(245, 199, 94, 0.08);
 }
@@ -1841,7 +1841,7 @@ udt-pack-stage .banner {
   line-height: 1;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  background: linear-gradient(90deg, #22d3ee, #8b5cf6, #f0468c, #a3e635, #22d3ee);
+  background: linear-gradient(90deg, var(--accent), #8b5cf6, var(--hot), #a3e635, var(--accent));
   background-size: 200% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -1945,7 +1945,7 @@ udt-pack-stage .stage.lg .rays {
   padding: 0 7px;
   border-radius: var(--radius-pill);
   border: 2px solid #0c0f16;
-  background: linear-gradient(135deg, #ffe08a, #f5b83d 60%, #d98e1c);
+  background: linear-gradient(135deg, #ffe08a, var(--neuro) 60%, #d98e1c);
   color: #2a1a00;
   font-weight: 800;
   font-size: var(--fs-md);
@@ -1954,7 +1954,7 @@ udt-pack-stage .stage.lg .rays {
   animation: udt-plaque 2.2s ease-out infinite;
 }
 .udt-plaque.pres {
-  background: linear-gradient(135deg, #fff3c4, #f5c75e 60%, #c99a2e);
+  background: linear-gradient(135deg, #fff3c4, var(--neuro-text) 60%, #c99a2e);
 }
 /* Prestige chip on a card (decision 265): points set / cap, stars of an ascended bot. */
 .udt-card .udt-pres {
@@ -1970,7 +1970,7 @@ udt-pack-stage .stage.lg .rays {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   white-space: nowrap;
-  color: #f5c75e;
+  color: var(--neuro-text);
   border: 1px solid rgba(245, 199, 94, 0.45);
   background: rgba(245, 199, 94, 0.08);
 }
@@ -2003,7 +2003,7 @@ udt-pack-stage .stage.lg .rays {
   color: var(--muted);
 }
 .udt-card .car.ph-peak {
-  color: #f5c75e;
+  color: var(--neuro-text);
 }
 .udt-card .car.ph-rising {
   color: #86e8b4;

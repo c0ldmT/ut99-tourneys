@@ -349,7 +349,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
       animation: udt-glowup 2s ease-in both;
     }
     .glow.holo {
-      background: radial-gradient(circle, #f0468c, transparent 62%);
+      background: radial-gradient(circle, var(--hot), transparent 62%);
       animation:
         udt-glowup 2s ease-in both,
         udt-hue 1.2s linear infinite;
@@ -504,7 +504,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
     .back {
       transform: rotateY(180deg);
       background: repeating-linear-gradient(45deg, #121624 0 6px, #0e111b 6px 12px);
-      border: 2px solid #2a3242;
+      border: 2px solid var(--line);
       display: flex;
       flex-direction: column;
       align-items: center;

@@ -376,7 +376,14 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
       border: 0;
       color: #0b0614;
       font-weight: 700;
-      background: linear-gradient(90deg, #22d3ee, #8b5cf6, #f0468c, #a3e635, #22d3ee);
+      background: linear-gradient(
+        90deg,
+        var(--accent),
+        #8b5cf6,
+        var(--hot),
+        #a3e635,
+        var(--accent)
+      );
       background-size: 200% 100%;
       animation: udt-holo 4s linear infinite;
     }

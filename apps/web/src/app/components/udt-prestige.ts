@@ -246,7 +246,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       font-size: var(--fs-2xl);
     }
     .gold {
-      color: #f5c75e;
+      color: var(--neuro-text);
       font-weight: 700;
     }
     .stage {
@@ -256,16 +256,16 @@ const STATS: readonly UdtPrestigeStat[] = [
       font-weight: 800;
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #07080c;
+      color: var(--bg);
     }
     .st-mature {
       background: #4f9dff;
     }
     .st-godlike {
-      background: #b26bff;
+      background: var(--udt);
     }
     .st-ascended {
-      background: #f5c75e;
+      background: var(--neuro-text);
     }
     .st-settled {
       background: #4f9dff;
@@ -304,7 +304,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       background: var(--panel-3);
     }
     .pips i.full {
-      background: #f5c75e;
+      background: var(--neuro-text);
     }
     .add {
       min-height: 34px;
@@ -335,7 +335,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       font-family: var(--mono, monospace);
     }
     .starline {
-      color: #f5c75e;
+      color: var(--neuro-text);
       font-size: var(--fs-xl);
       letter-spacing: 3px;
     }
@@ -347,7 +347,7 @@ const STATS: readonly UdtPrestigeStat[] = [
       color: #ff9aa4;
     }
     .req li.ok {
-      color: #4ade80;
+      color: var(--live);
     }
   `,
 })

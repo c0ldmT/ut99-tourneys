@@ -60,8 +60,8 @@ import { TPipe } from '../core/i18n';
       filter: drop-shadow(0 0 3px var(--accent));
     }
     .trace.b {
-      stroke: var(--udt, #b26bff);
-      filter: drop-shadow(0 0 3px var(--udt, #b26bff));
+      stroke: var(--udt);
+      filter: drop-shadow(0 0 3px var(--udt));
       animation-delay: -0.7s;
     }
     .n {

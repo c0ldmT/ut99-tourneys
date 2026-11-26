@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Colours equal to a design token use the token (45 places, no visible change) (decision 303).
 - Empty lists say what comes next (overview, statistics, trades, moderation); tab rows on phones fade out where more tabs are (decision 302, patch note 302).
 - Locked purchases say how much Neuro is missing (shop, club house, packs); shop and club house use quiet buttons, a locked 10-pack is grey (decision 301).
 - No browser dialogs left: reasons, team names and academy news in the website's dialog; the +n plaque no longer covers a card's rarity; lineups write NX Nova instead of NXNova (decision 300).

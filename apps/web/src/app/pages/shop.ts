@@ -439,7 +439,14 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       text-align: center;
     }
     .aurora {
-      background-image: linear-gradient(90deg, #22d3ee, #a78bfa, #f0468c, #fbbf24, #22d3ee);
+      background-image: linear-gradient(
+        90deg,
+        var(--accent),
+        #a78bfa,
+        var(--hot),
+        #fbbf24,
+        var(--accent)
+      );
       background-size: 300% 100%;
       -webkit-background-clip: text;
       background-clip: text;

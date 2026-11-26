@@ -176,7 +176,7 @@ import { UdtNav } from '../core/udt';
       color: var(--live);
     }
     .hs {
-      color: #f5c75e;
+      color: var(--neuro-text);
       border-color: rgba(245, 199, 94, 0.45);
     }
     .rules {
