@@ -616,6 +616,17 @@ export class Api {
   udtBreeders = () => this.call<UdtBreeder[]>('GET', '/udt/breeders');
   udtBot = (botId: string) =>
     this.call<UdtBotPage>('GET', `/udt/bots/${encodeURIComponent(botId)}`);
+  /** The same pages for the hover cards (decision 318): no toast, no loading bar. */
+  udtBotPeek = (botId: string) =>
+    this.call<UdtBotPage>('GET', `/udt/bots/${encodeURIComponent(botId)}`, undefined, {
+      quiet: true,
+      background: true,
+    });
+  udtSquadPeek = (userId: string) =>
+    this.call<UdtSquad>('GET', `/udt/teams/${encodeURIComponent(userId)}`, undefined, {
+      quiet: true,
+      background: true,
+    });
   udtCareer = (botId: string, quiet = false) =>
     this.call<UdtCareer | null>('GET', `/udt/career/${encodeURIComponent(botId)}`, undefined, {
       quiet,

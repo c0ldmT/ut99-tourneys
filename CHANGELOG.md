@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Hover cards for bots and teams: resting the mouse on a linked bot or team name (or reaching it with the keyboard) shows rarity, skill, level, value, team and form of a bot, or manager, size and best bots of a team (decision 318).
 - Two building blocks for choosing: na-tabs (tab rows) and na-segment (segments and filter chips) with one tab stop and arrow keys; settings, statistics, shop, bots, match, player, tournament admin, lineup, moderation, feedback, calendar, market, league, overview filters, league settings and the tournament form use them; league tiers as a segment, moderation and feedback with tab rows (decision 317).
 - Two levels of depth on the Dream Team pages: the sides of a trade, its balance and the own bots of the academy are flat surfaces instead of framed boxes inside a card; token --well for the dark faces inside cards (decision 316).
 - Tints of the token colours (188 rgba values) use color-mix with the token, so they follow it; no visible change; the UI ratchet counts rgba (decision 315).

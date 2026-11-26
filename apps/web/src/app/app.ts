@@ -36,6 +36,7 @@ import { ServerActivity } from './core/activity';
 import { Loader } from './components/loader';
 import { NoticeModal } from './components/notice-modal';
 import { ConfirmDialog } from './components/confirm-dialog';
+import { PeekCard } from './components/peek-card';
 import { PatchNotes } from './components/patch-notes';
 import { Feedback } from './components/feedback';
 
@@ -59,6 +60,7 @@ import { Feedback } from './components/feedback';
     ActivityBar,
     NoticeModal,
     ConfirmDialog,
+    PeekCard,
     PatchNotes,
     Feedback,
     QuickSearch,
@@ -286,6 +288,10 @@ import { Feedback } from './components/feedback';
     @if (auth.me()) {
       <na-notice-modal />
       <na-confirm />
+      <!-- Hover cards for bot and team links (decision 318). -->
+      @defer (on idle) {
+        <na-peek />
+      }
     }
     <na-patch-notes #patchNotes />
     <na-feedback #feedback />
