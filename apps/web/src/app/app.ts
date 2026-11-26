@@ -67,7 +67,12 @@ import { Feedback } from './components/feedback';
   template: `
     <header class="site">
       <div class="bar">
-        <a routerLink="/" class="brand" (click)="menu.set(false)">
+        <a
+          routerLink="/"
+          class="brand"
+          [attr.aria-label]="auth.config().siteName"
+          (click)="menu.set(false)"
+        >
           <na-logo [size]="30" />
           <na-wordmark [name]="auth.config().siteName" />
         </a>
@@ -705,6 +710,26 @@ import { Feedback } from './components/feedback';
         border-top: 1px solid var(--border);
         margin-top: 8px;
         padding: 12px 10px 0;
+      }
+    }
+    /* Phones: the bar holds logo, search, wallet, shop, avatar and burger in one line.
+       The wordmark gives way, and no button shrinks below its size (decision 314). */
+    @media (max-width: 520px) {
+      .bar {
+        gap: 6px;
+        padding: 0 4px 0 12px;
+      }
+      .brand na-wordmark {
+        display: none;
+      }
+      .wallet,
+      .shopbtn,
+      .user,
+      .burger {
+        flex: none;
+      }
+      .shopbtn {
+        margin-left: 0;
       }
     }
   `,

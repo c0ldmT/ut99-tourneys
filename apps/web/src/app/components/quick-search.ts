@@ -133,6 +133,7 @@ const MARK: Readonly<Record<Kind, string>> = {
       display: contents;
     }
     .searchbtn {
+      flex: none;
       color: var(--text-2);
     }
     .searchlabel,
