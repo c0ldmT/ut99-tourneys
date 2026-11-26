@@ -72,7 +72,7 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
   imports: [RouterLink, TPipe, NeuroPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <div class="stage" [class.lg]="dark()" aria-live="polite">
+    <div class="stage" [class.lg]="dark()" [class.compact]="phase() === 'idle'" aria-live="polite">
       <div class="rays" aria-hidden="true">
         <svg viewBox="0 0 200 200">
           <g fill="rgba(178,107,255,.16)">
@@ -98,8 +98,10 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
                 fill="#2a3242"
               />
             </svg>
-            <div class="disp big">{{ 'udt.packs.choose' | t }}</div>
-            <div class="muted">{{ 'udt.packs.chooseText' | t }}</div>
+            <div>
+              <div class="disp big">{{ 'udt.packs.choose' | t }}</div>
+              <div class="muted">{{ 'udt.packs.chooseText' | t }}</div>
+            </div>
           </div>
         }
         @case ('charge') {
@@ -308,6 +310,28 @@ function ring(count: number, rMin: number, rMax: number, seed: number, delayMax:
     }
     .stage.lg {
       background-color: #030306;
+    }
+    /* Waiting for a box: a slim stage (decision 309); it grows when a box opens. */
+    .stage.compact {
+      min-height: 0;
+      padding: 18px 16px;
+      flex-direction: row;
+    }
+    .stage.compact .idle {
+      flex-direction: row;
+      text-align: left;
+      max-width: 640px;
+    }
+    .stage.compact .idle svg {
+      width: 40px;
+      height: 40px;
+      flex: none;
+    }
+    .stage.compact .rays {
+      display: none;
+    }
+    .stage.compact .big {
+      font-size: var(--fs-xl);
     }
     .idle {
       display: flex;

@@ -190,7 +190,10 @@ interface Cell {
                     [class.done]="x.item.state === 'done' || x.item.state === 'cancelled'"
                     [class.mine]="x.item.mine"
                     ><span class="cal-dot" [attr.data-tone]="x.tone"></span
-                    ><span class="mono">{{ x.item.at ? x.time : '' }}</span
+                    ><!-- League chips without the time (always the league's slot, shown in the day panel): their name fits (decision 309). -->
+                    <span class="mono">{{
+                      x.item.at && !leagueKind(x.item.kind) ? x.time : ''
+                    }}</span
                     ><span class="cal-ct">{{ x.short }}</span>
                   </span>
                 }
@@ -520,6 +523,10 @@ export class CalendarPage {
   private time(iso: string | null): string {
     // In the website's time zone (league evenings are planned in it).
     return this.i18n.when(iso, 'time', this.view()?.timeZone);
+  }
+
+  protected leagueKind(kind: string): boolean {
+    return kind === 'leagueEvening' || kind === 'relegation' || kind === 'finalFour';
   }
 
   private show(i: CalendarItem): Shown {

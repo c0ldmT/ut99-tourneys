@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 309,
+    date: '2026-11-26',
+    en: {
+      title: 'League games at a glance',
+      items: [
+        'Matches: your league game sits in its league evening row ("your game …") instead of a second row.',
+        "A league game's page shows a result card - home, score, away - instead of a bracket of two.",
+        'Packs: the stage stays slim until you open a box; the calendar shows league evenings as "League MD 8" in full.',
+      ],
+    },
+    de: {
+      title: 'Ligaspiele auf einen Blick',
+      items: [
+        'Matches: Dein Ligaspiel steht in der Zeile seines Liga-Abends („dein Spiel …“) statt in einer zweiten Zeile.',
+        'Die Seite eines Ligaspiels zeigt eine Ergebnis-Karte - Heim, Ergebnis, Gast - statt eines Turnierbaums mit zwei Teams.',
+        'Packs: Die Bühne bleibt schmal, bis du eine Box öffnest; der Kalender zeigt Liga-Abende vollständig als „Liga ST 8“.',
+      ],
+    },
+  },
+  {
     id: 306,
     date: '2026-11-26',
     en: {
