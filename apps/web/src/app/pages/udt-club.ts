@@ -104,7 +104,6 @@ interface WallItem {
                 <div class="acts">
                   <button
                     type="button"
-                    [class.primary]="!x.top"
                     [class.topped]="x.top"
                     [disabled]="busy() || x.top || (x.b.price ?? 0) > (v.wallet?.spendable ?? 0)"
                     [title]="
@@ -132,6 +131,12 @@ interface WallItem {
                     >
                   }
                 </div>
+                @if (!x.top && (x.b.price ?? 0) > (v.wallet?.spendable ?? 0)) {
+                  <span class="lack">{{
+                    'common.lack'
+                      | t: { n: ((x.b.price ?? 0) - (v.wallet?.spendable ?? 0) | neuro) }
+                  }}</span>
+                }
               </div>
             }
           </div>

@@ -126,12 +126,14 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
                       } @else {
                         <button
                           type="button"
-                          class="primary"
                           (click)="dedOpen.set(true)"
                           [disabled]="busy() || !canBuy(i)"
                         >
                           {{ 'shop.buy' | t }}
                         </button>
+                        @if (lack(i); as n) {
+                          <span class="lack">{{ 'common.lack' | t: { n: neuro(n) } }}</span>
+                        }
                       }
                     } @else if (i.owned) {
                       @if (worn(i)) {
@@ -144,15 +146,18 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
                         </button>
                       }
                     } @else {
+                      <!-- A grid of items: secondary buttons, the missing Neuro under a locked one (decision 301). -->
                       <button
                         type="button"
-                        class="primary"
                         (click)="buy(i)"
                         [disabled]="busy() || !canBuy(i)"
                         [title]="canBuy(i) ? '' : ('shop.tooExpensive' | t)"
                       >
                         {{ 'shop.buy' | t }}
                       </button>
+                      @if (lack(i); as n) {
+                        <span class="lack">{{ 'common.lack' | t: { n: neuro(n) } }}</span>
+                      }
                     }
                   </div>
                 }
@@ -583,6 +588,14 @@ export class ShopPage {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /** Neuro missing for an item (0: affordable or not for sale now). */
+  protected lack(i: ShopItem): number {
+    const v = this.view();
+    if (!v?.enabled || v.wallet.season === null) return 0;
+    const spendable = this.wallet()?.spendable ?? v.wallet.spendable;
+    return Math.max(0, i.price - spendable);
   }
 
   protected canBuy(i: ShopItem): boolean {

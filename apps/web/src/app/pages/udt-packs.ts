@@ -158,6 +158,9 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
                   ><span class="mono small price">{{ b.tenPrice | neuro: false }}</span>
                 </button>
               </div>
+              @if (lack(b.price); as n) {
+                <span class="lack center">{{ 'common.lack' | t: { n: (n | neuro) } }}</span>
+              }
               <div class="muted small center">{{ 'udt.packs.tenNote.' + b.box | t }}</div>
             </div>
           </section>
@@ -276,6 +279,10 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     }
     .buy .holo .price {
       line-height: 1;
+    }
+    /* Locked: grey, so the gradient does not look clickable. */
+    .buy .holo:disabled {
+      filter: grayscale(1);
     }
     :host {
       display: block;
@@ -487,6 +494,13 @@ export class UdtPacksPage {
 
   protected scrapOf(r: UdtRarity) {
     return SCRAP[r];
+  }
+
+  /** Neuro missing for a price (0: affordable, or no team yet). */
+  protected lack(price: number): number {
+    const v = this.view();
+    if (!v?.hasTeam) return 0;
+    return Math.max(0, price - (this.spendable() ?? v.spendable));
   }
 
   protected canBuy(price: number) {

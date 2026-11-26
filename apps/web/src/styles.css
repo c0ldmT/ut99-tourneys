@@ -229,6 +229,14 @@ button:disabled {
   opacity: 0.45;
   cursor: not-allowed;
 }
+/* Why a button is locked, under it (UX audit A5): "230 N short". */
+.lack {
+  display: block;
+  margin-top: 4px;
+  color: var(--danger);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
 button.primary,
 .btn.primary {
   background: var(--accent);
