@@ -119,7 +119,9 @@ export class UdtController {
     return {
       season: n,
       today: this.udt.today(),
+      now: this.udt.nowIso(),
       team: n !== null ? this.udt.hubTeam(user.id, n) : null,
+      onboarding: n !== null ? this.udt.hubOnboarding(user.id, n) : null,
       league: this.league.hubLeague(user.id),
       packs: n !== null ? this.packs.hubPacks(user.id, n) : null,
       cups: n !== null ? this.events.hubCups(user.id, n) : null,

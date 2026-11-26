@@ -8,6 +8,8 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { UdtCrestMark } from '../components/udt-crest';
+import { UdtFirstSteps } from '../components/udt-first-steps';
+import { UdtForYou } from '../components/udt-for-you';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
@@ -41,7 +43,7 @@ interface AreaView {
  */
 @Component({
   selector: 'app-udt-hub',
-  imports: [RouterLink, TPipe, UdtNav, UdtCrestMark],
+  imports: [RouterLink, TPipe, UdtNav, UdtCrestMark, UdtFirstSteps, UdtForYou],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav [bare]="true" (changed)="load()" />
@@ -54,6 +56,11 @@ interface AreaView {
         {{ headLine() }}</span
       >
     </div>
+    <!-- New managers: their first steps; everybody: what needs them (decisions 311, 312). -->
+    @if (hub(); as h) {
+      <udt-first-steps [hub]="h" />
+      <udt-for-you [hub]="h" />
+    }
 
     <!-- Large screens: the shape with the fields of every area. -->
     <div class="hub-stage" [style.aspect-ratio]="ratio">

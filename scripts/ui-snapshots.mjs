@@ -238,7 +238,6 @@ async function shoot(out) {
     await ctx.addCookies([{ name: 'tsid', value: tsid, url: BASE }]);
     await ctx.addInitScript((lang) => {
       localStorage.setItem('tourney.lang', lang);
-      localStorage.setItem('tourney.udtHelpSeen', '1');
     }, values.lang);
     const page = await ctx.newPage();
     const errors = [];

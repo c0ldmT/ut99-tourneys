@@ -574,8 +574,6 @@ export class UdtNav {
     afterNextRender(() => {
       // The hub shows the offers itself (bare: no areas here).
       if (!this.bare()) void this.loadTrades();
-      // New managers see the help once by itself.
-      this.help().openFirstTime();
       // Phones: the tab row scrolls; the page shown in view.
       const row = this.host.nativeElement.querySelector<HTMLElement>('.udt-tabs');
       const tab = row?.querySelector<HTMLElement>('a.active');

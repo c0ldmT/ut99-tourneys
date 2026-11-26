@@ -2,9 +2,6 @@ import { ChangeDetectionStrategy, Component, type ElementRef, viewChild } from '
 import { RouterLink } from '@angular/router';
 import { TPipe } from '../core/i18n';
 
-/** Remembered per browser: the help opened once by itself. */
-const SEEN = 'tourney.udtHelpSeen';
-
 /** The ways to new bots, each with the page that does it. */
 const WAYS = [
   { key: 'market', link: '/udt/market' },
@@ -15,15 +12,15 @@ const WAYS = [
 
 /**
  * "How the Dream Team works": a dialog for new managers (team, the four ways to new bots,
- * lineup, tournaments, Neuro). The Dream Team navigation has its button; it opens by itself the
- * first time a browser shows the Dream Team.
+ * lineup, tournaments, Neuro). The Dream Team navigation and the hub have its button; new
+ * managers get the first steps on the hub instead of this dialog opening by itself (decision 312).
  */
 @Component({
   selector: 'udt-help',
   imports: [RouterLink, TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <dialog #dlg class="help" aria-labelledby="udt-help-title" (close)="closed()">
+    <dialog #dlg class="help" aria-labelledby="udt-help-title">
       <div class="head">
         <h2 id="udt-help-title" class="disp">{{ 'udt.help.title' | t }}</h2>
         <button type="button" class="x" [attr.aria-label]="'toast.close' | t" (click)="close()">
@@ -180,23 +177,5 @@ export class UdtHelp {
 
   close(): void {
     this.dlg().nativeElement.close();
-  }
-
-  /** Opens once per browser by itself (the first Dream Team page a manager sees). */
-  openFirstTime(): void {
-    try {
-      if (localStorage.getItem(SEEN)) return;
-    } catch {
-      return; // no storage: only the button opens it
-    }
-    this.open();
-  }
-
-  protected closed(): void {
-    try {
-      localStorage.setItem(SEEN, '1');
-    } catch {
-      // storage unavailable
-    }
   }
 }

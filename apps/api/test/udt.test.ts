@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { xpForLevel } from '@tourney/udt';
 import type { RunningApi } from '../src/app.js';
 import { DB, type Db } from '../src/db/database.js';
-import { udtBots, udtRoster } from '../src/db/schema.js';
+import { udtBots, udtPity, udtRoster, udtTeams } from '../src/db/schema.js';
 import { BotsService } from '../src/bots/bots.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { Client, startApi, startSeason } from './helpers.js';
@@ -215,6 +215,39 @@ describe('Unreal Dream Team: fully developed bots (decision 256)', () => {
       banked: 0,
     });
     expect((await mario.get('/udt/hub')).body.team.points).toBe(7);
+  });
+});
+
+describe('Unreal Dream Team: first steps in the hub (decision 312)', () => {
+  it('tells a new manager which steps are done; a manager of an earlier season gets none', async () => {
+    ({ api } = await startApi());
+    const admin = await Client.login(api, 'Boss', true);
+    const mario = await Client.login(api, 'Mario');
+    await admin.req('PUT', '/settings/udt', { enabled: true });
+    await startSeason(admin);
+    let hub = (await mario.get('/udt/hub')).body;
+    expect(hub.onboarding).toEqual({ cup: false, market: false, pack: false });
+    expect(hub.team).toBeNull();
+    expect(Date.parse(hub.now)).toBeGreaterThan(0);
+    await mario.post('/udt/team', team());
+    const me = (await mario.get('/me')).body.id as string;
+    const db = api.app.get<Db>(DB);
+    db.insert(udtPity).values({ season: 1, userId: me, box: 'basic', opened: 1 }).run();
+    hub = (await mario.get('/udt/hub')).body;
+    expect(hub.onboarding).toEqual({ cup: false, market: false, pack: true });
+    // A team in an earlier season: no first steps.
+    db.insert(udtTeams)
+      .values({
+        season: 0,
+        userId: me,
+        name: 'Old',
+        nameKey: 'old',
+        tag: 'OLD',
+        tagKey: 'old',
+        createdAt: new Date().toISOString(),
+      })
+      .run();
+    expect((await mario.get('/udt/hub')).body.onboarding).toBeNull();
   });
 });
 

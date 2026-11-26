@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team hub: "For you" with what needs the manager (urgent lineup before a game, trades, cup sign-up, points, market day) and "First steps" for new managers instead of the help opening by itself; the hub sends `now` and `onboarding` (decisions 311, 312, patch note 312).
 - Account page instead of the profile: name as others see it, in-game name, join token (copy, new token after a confirm), language and Discord messages in one column; settings with a section index on wide screens; the shop opens the wardrobe with `?tab=wardrobe` (decision 310, patch note 310).
 - Packs: a slim stage until a box opens; calendar: league chips without the time, their names fit (decision 309, patch note 309).
 - League games: the overview names the own game on its evening's row (no second row), a league game's page shows a result card instead of bracket and table (decisions 307, 308).

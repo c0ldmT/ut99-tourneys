@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 312,
+    date: '2026-11-26',
+    en: {
+      title: 'The hub tells you what is next',
+      items: [
+        'Dream Team: "For you" above the hub collects what needs you - a lineup that is not full before a game, trade offers, a cup with sign-up open, points to give, the market day. "Later" hides a card until tomorrow.',
+        'New managers get "First steps": five steps from founding the team to the first box, ticked off by themselves. The help stays behind the "?" in the middle of the hub.',
+      ],
+    },
+    de: {
+      title: 'Der Hub sagt dir, was als Nächstes dran ist',
+      items: [
+        'Dream Team: „Für dich“ über dem Hub sammelt, was dich braucht – eine unvollständige Aufstellung vor einem Spiel, Tauschangebote, einen Cup mit offener Anmeldung, offene Punkte, den Markttag. „Später“ blendet eine Karte bis morgen aus.',
+        'Neue Manager bekommen „Erste Schritte“: fünf Schritte von der Teamgründung bis zur ersten Box, die sich selbst abhaken. Die Hilfe bleibt hinter dem „?“ in der Mitte des Hubs.',
+      ],
+    },
+  },
+  {
     id: 310,
     date: '2026-11-26',
     en: {

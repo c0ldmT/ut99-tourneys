@@ -52,6 +52,10 @@ export interface PatchNote {
 export interface UdtHub {
   season: number | null;
   today: string;
+  /** The server's time (test mode: with its offset), for "soon" (decision 311). */
+  now: string;
+  /** First steps of a manager new this season; null for managers of earlier seasons (312). */
+  onboarding: { cup: boolean; market: boolean; pack: boolean } | null;
   team: {
     name: string;
     tag: string;

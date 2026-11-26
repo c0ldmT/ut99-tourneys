@@ -69,6 +69,7 @@ import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import {
   bots,
+  tournaments,
   udtSignatures,
   udtAi,
   udtBids,
@@ -614,6 +615,50 @@ export class UdtService {
       /** The trophy room's crest (decision 268: next to the name in the hub). */
       crest: this.crestOf(season, userId),
     };
+  }
+
+  /**
+   * The first steps of a manager new this season (decision 312): a cup entered (not a league
+   * game), a bot bought or loaned on the market, a box opened. Null for managers who had a team
+   * in an earlier season - they know the way.
+   */
+  hubOnboarding(userId: string, season: number) {
+    const earlier = this.db
+      .select({ season: udtTeams.season })
+      .from(udtTeams)
+      .where(and(eq(udtTeams.userId, userId), sql`${udtTeams.season} < ${season}`))
+      .get();
+    if (earlier) return null;
+    const cup = this.db
+      .select({ json: tournaments.udtJson })
+      .from(udtEntries)
+      .innerJoin(tournaments, eq(tournaments.id, udtEntries.tournamentId))
+      .where(and(eq(udtEntries.userId, userId), eq(tournaments.udtSeason, season)))
+      .all()
+      .some((r) => !r.json?.includes('"league":{'));
+    const market = !!this.db
+      .select({ id: neuroLedger.id })
+      .from(neuroLedger)
+      .where(
+        and(
+          eq(neuroLedger.season, season),
+          eq(neuroLedger.userId, userId),
+          inArray(neuroLedger.kind, ['udt_purchase', 'udt_loan']),
+        ),
+      )
+      .get();
+    const opened =
+      this.db
+        .select({ n: sql<number>`coalesce(sum(${udtPity.opened}), 0)` })
+        .from(udtPity)
+        .where(and(eq(udtPity.season, season), eq(udtPity.userId, userId)))
+        .get()?.n ?? 0;
+    return { cup, market, pack: opened > 0 };
+  }
+
+  /** The server's time (test mode: with its offset), for "soon" in the hub. */
+  nowIso(): string {
+    return new Date(this.clock.now()).toISOString();
   }
 
   /** Library ids of a manager's own bots (starter, academy, blueprints; moderation, 283). */
