@@ -114,6 +114,8 @@ import { Feedback } from './components/feedback';
                   </svg>
                 </button>
                 <div class="menu" (click)="closeMenus()">
+                  <!-- Only in the burger menu: the group's name (decision 306). -->
+                  <div class="mhead kpi">{{ 'nav.admin' | t }}</div>
                   <a routerLink="/moderation" routerLinkActive="active"
                     >{{ 'nav.moderation' | t }}
                     @if (modOpen() > 0) {
@@ -140,6 +142,7 @@ import { Feedback } from './components/feedback';
               </a>
             }
             <div class="nav-foot">
+              <a routerLink="/profile" class="footlink">{{ 'nav.profile' | t }}</a>
               <select class="lang" (change)="setLang($event)" aria-label="Language">
                 @for (l of i18n.languages; track l) {
                   <option [value]="l" [selected]="l === i18n.lang()">{{ l.toUpperCase() }}</option>
@@ -167,8 +170,10 @@ import { Feedback } from './components/feedback';
             [title]="'shop.title' | t"
             [attr.aria-label]="'shop.title' | t"
             (click)="menu.set(false)"
-            ><na-icon name="shop" [size]="19"
-          /></a>
+            ><na-icon name="shop" [size]="19" /><span class="shoplabel">{{
+              'shop.title' | t
+            }}</span></a
+          >
           <!-- Profile, language and logout behind the avatar (decision 285). -->
           <div class="usermenu" [class.open]="userOpen()" (click)="$event.stopPropagation()">
             <button
@@ -534,6 +539,24 @@ import { Feedback } from './components/feedback';
     .shopbtn {
       margin-left: -6px;
     }
+    /* Wide screens: the shop with its name (decision 306); narrower ones keep the icon. */
+    .shoplabel {
+      display: none;
+    }
+    @media (min-width: 1240px) {
+      .shopbtn {
+        width: auto;
+        gap: 6px;
+        padding: 0 10px;
+      }
+      .shoplabel {
+        display: inline;
+        font-weight: 600;
+      }
+    }
+    .mhead {
+      display: none;
+    }
     .shopbtn:hover,
     .shopbtn.on {
       color: var(--neuro);
@@ -658,6 +681,14 @@ import { Feedback } from './components/feedback';
         padding: 12px 10px;
         font-size: var(--fs-base);
       }
+      .navmore .mhead {
+        display: block;
+        padding: 6px 10px 2px;
+      }
+      .footlink {
+        padding: 0;
+        margin-right: auto;
+      }
       .uname,
       .user .chev {
         display: none;
@@ -666,6 +697,7 @@ import { Feedback } from './components/feedback';
         display: flex;
         align-items: center;
         justify-content: space-between;
+        gap: 14px;
         border-top: 1px solid var(--border);
         margin-top: 8px;
         padding: 12px 10px 0;

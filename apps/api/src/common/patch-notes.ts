@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 306,
+    date: '2026-11-26',
+    en: {
+      title: 'Small navigation helps',
+      items: [
+        'On wide screens the shop shows its name in the header.',
+        "A bot's page marks the Team tab, so you see where you are.",
+      ],
+    },
+    de: {
+      title: 'Kleine Navigationshilfen',
+      items: [
+        'Auf breiten Bildschirmen steht der Shop mit Namen in der Kopfleiste.',
+        'Die Seite eines Bots markiert den Reiter „Team“ - du siehst, wo du bist.',
+      ],
+    },
+  },
+  {
     id: 305,
     date: '2026-11-26',
     en: {

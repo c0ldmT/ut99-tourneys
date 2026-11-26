@@ -180,6 +180,14 @@ export function rosterCard(
   };
 }
 
+function readTestOpen(): boolean {
+  try {
+    return localStorage.getItem('tourney.testBar') !== '0';
+  } catch {
+    return true;
+  }
+}
+
 /** A bot as a Dream Team card (rarity from the skill): skill, values, value, stamina. */
 @Component({
   selector: 'udt-card',
@@ -465,22 +473,33 @@ export function staminaColor(s: number): string {
         @if (state(); as s) {
           <span class="mono small">{{ s.now | when: 'dayTime' }} (+{{ s.offsetHours }} h)</span>
         }
-        <button type="button" (click)="run('advance', { hours: 1 })">+1 h</button>
-        <button type="button" (click)="run('advance', { hours: 24 })">
-          +1 {{ 'udt.test.day' | t }}
-        </button>
-        <button type="button" (click)="run('advance', { hours: 168 })">
-          +1 {{ 'udt.test.week' | t }}
-        </button>
-        <button type="button" (click)="run('market-day')">{{ 'udt.test.marketDay' | t }}</button>
-        <button type="button" (click)="run('managers', { count: 3 })">
-          +3 {{ 'udt.test.managers' | t }}
-        </button>
-        <button type="button" (click)="run('managers/act')">{{ 'udt.test.act' | t }}</button>
-        <button type="button" (click)="run('league/day')">{{ 'udt.test.leagueDay' | t }}</button>
-        <button type="button" (click)="run('league/end')">{{ 'udt.test.leagueEnd' | t }}</button>
-        <button type="button" class="danger" (click)="endSeason()">
-          {{ 'udt.test.seasonEnd' | t }}
+        @if (testOpen()) {
+          <button type="button" (click)="run('advance', { hours: 1 })">+1 h</button>
+          <button type="button" (click)="run('advance', { hours: 24 })">
+            +1 {{ 'udt.test.day' | t }}
+          </button>
+          <button type="button" (click)="run('advance', { hours: 168 })">
+            +1 {{ 'udt.test.week' | t }}
+          </button>
+          <button type="button" (click)="run('market-day')">{{ 'udt.test.marketDay' | t }}</button>
+          <button type="button" (click)="run('managers', { count: 3 })">
+            +3 {{ 'udt.test.managers' | t }}
+          </button>
+          <button type="button" (click)="run('managers/act')">{{ 'udt.test.act' | t }}</button>
+          <button type="button" (click)="run('league/day')">{{ 'udt.test.leagueDay' | t }}</button>
+          <button type="button" (click)="run('league/end')">{{ 'udt.test.leagueEnd' | t }}</button>
+          <button type="button" class="danger" (click)="endSeason()">
+            {{ 'udt.test.seasonEnd' | t }}
+          </button>
+        }
+        <!-- Folds to one line (decision 306); remembered in this browser. -->
+        <button
+          type="button"
+          class="link fold"
+          [attr.aria-expanded]="testOpen()"
+          (click)="toggleTest()"
+        >
+          {{ (testOpen() ? 'udt.test.hide' : 'udt.test.show') | t }}
         </button>
       </div>
     }
@@ -529,8 +548,23 @@ export class UdtNav {
     const path = rest.split('?')[0]!;
     const same =
       path === i.link ||
-      (i.link === '/udt/league' ? path === '/udt/league/table' : path.startsWith(i.link + '/'));
+      (i.link === '/udt/league' ? path === '/udt/league/table' : path.startsWith(i.link + '/')) ||
+      // A bot's page belongs to the team tab (decision 306).
+      (i.link === '/udt/team' && path.startsWith('/udt/bot/'));
     return same && (i.fragment ?? null) === (fragment ?? null);
+  }
+
+  /** The test bar's buttons shown (folded: one line). */
+  protected readonly testOpen = signal(readTestOpen());
+
+  protected toggleTest(): void {
+    const open = !this.testOpen();
+    this.testOpen.set(open);
+    try {
+      localStorage.setItem('tourney.testBar', open ? '1' : '0');
+    } catch {
+      // storage unavailable
+    }
   }
 
   private readonly host: ElementRef<HTMLElement> = inject(ElementRef);
