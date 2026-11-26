@@ -2379,3 +2379,38 @@ export interface CalendarView {
   udt: boolean;
   items: CalendarItem[];
 }
+
+/** The administration's start page (`GET /admin/overview`, decision 319). */
+export interface AdminOverview {
+  servers: {
+    id: string;
+    name: string;
+    online: boolean;
+    inPool: boolean;
+    lastSeenAt: string | null;
+    playing: { id: string; name: string } | null;
+  }[];
+  moderation: { open: number };
+  season: {
+    number: number;
+    status: 'planned' | 'running' | 'ended';
+    startDate: string;
+    endDate: string;
+  } | null;
+  today: string;
+  tournaments: {
+    live: number;
+    open: number;
+    drafts: number;
+    next: { id: string; name: string; at: string } | null;
+  };
+  users: { total: number; inactive: number; inactiveDays: number };
+  problems: {
+    at: string;
+    kind: 'paused' | 'aborted' | 'offline' | 'error' | 'warn';
+    text: string;
+    tournament: { id: string; name: string } | null;
+    server: { id: string; name: string } | null;
+  }[];
+  problemDays: number;
+}

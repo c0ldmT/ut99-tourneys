@@ -147,6 +147,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tournament-form').then((m) => m.TournamentFormPage),
       },
       {
+        path: 'admin',
+        title: 'adm.title',
+        canActivate: [adminOnly],
+        loadComponent: () => import('./pages/admin-home').then((m) => m.AdminHomePage),
+      },
+      {
         path: 'admin/agents',
         title: 'nav.agents',
         canActivate: [adminOnly],

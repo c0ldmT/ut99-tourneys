@@ -201,6 +201,7 @@ async function routes(admin) {
     ...(cup ? [['t-cup', `/t/${cup.id}`]] : []),
     ...(league ? [['t-league', `/t/${league.id}`]] : []),
     ['new', '/new'],
+    ['admin', '/admin'],
     ['agents', '/admin/agents'],
     ['bots', '/admin/bots'],
     ['settings', '/admin/settings'],

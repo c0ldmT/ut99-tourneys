@@ -125,6 +125,12 @@ import { Feedback } from './components/feedback';
                 <div class="menu" (click)="closeMenus()">
                   <!-- Only in the burger menu: the group's name (decision 306). -->
                   <div class="mhead kpi">{{ 'nav.admin' | t }}</div>
+                  <a
+                    routerLink="/admin"
+                    routerLinkActive="active"
+                    [routerLinkActiveOptions]="{ exact: true }"
+                    >{{ 'nav.overview' | t }}</a
+                  >
                   <a routerLink="/moderation" routerLinkActive="active"
                     >{{ 'nav.moderation' | t }}
                     @if (modOpen() > 0) {

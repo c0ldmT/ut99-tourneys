@@ -45,6 +45,7 @@ export function searchPages(o: {
   if (o.admin) {
     const admin = 'nav.admin';
     out.push(
+      { label: 'nav.overview', group: admin, link: '/admin' },
       { label: 'nav.new', group: admin, link: '/new' },
       { label: 'nav.agents', group: admin, link: '/admin/agents' },
       { label: 'series.title', group: admin, link: '/admin/series' },

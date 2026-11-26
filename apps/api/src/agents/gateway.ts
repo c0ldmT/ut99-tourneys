@@ -13,6 +13,7 @@ import { SettingsService } from '../settings/settings.service.js';
 import { heldBack, LiveHub } from '../tournaments/hub.js';
 import { LiveRecorder } from '../tournaments/live-recorder.js';
 import { ACTIVE_PHASES, TournamentsService } from '../tournaments/tournaments.service.js';
+import { ServerProblems } from '../admin/problems.js';
 import { AgentsService } from './agents.service.js';
 import { AgentConnections } from './connections.js';
 
@@ -35,6 +36,7 @@ export class AgentGateway {
     @Inject(LiveRecorder) private readonly recorder: LiveRecorder,
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(LOGGER) private readonly logger: ApiLogger,
+    @Inject(ServerProblems) private readonly problems: ServerProblems,
   ) {
     this.connections.onChange((agentId, online) => {
       for (const t of this.tournaments.byAgent(agentId)) {
@@ -253,6 +255,8 @@ export class AgentGateway {
         if (msg.payload.level === 'error') this.logger.error(line);
         else if (msg.payload.level === 'warn') this.logger.warn(line);
         else this.logger.debug(line);
+        if (msg.payload.level === 'error' || msg.payload.level === 'warn')
+          this.problems.add(agentId, msg.payload.level, msg.payload.message);
         return;
       }
     }

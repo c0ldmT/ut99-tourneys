@@ -9,6 +9,7 @@ import type { NeuroWallet } from './neuro';
 import { Toasts } from './toast';
 import type { UdtLooks } from '../components/udt-bot-look';
 import type {
+  AdminOverview,
   TraitReport,
   UdtBotLookBody,
   UdtTeam,
@@ -254,6 +255,7 @@ export class Api {
     );
   modQueue = (status: 'open' | 'done') =>
     this.call<ModItem[]>('GET', `/moderation/queue?status=${status}`);
+  adminOverview = () => this.call<AdminOverview>('GET', '/admin/overview');
   modCount = () =>
     this.call<{ open: number }>('GET', '/moderation/count', undefined, {
       quiet: true,
