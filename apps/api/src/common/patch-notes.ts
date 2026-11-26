@@ -22,6 +22,28 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 302,
+    date: '2026-11-26',
+    en: {
+      title: 'Clearer when something is locked or empty',
+      items: [
+        'A purchase you cannot afford yet says how much Neuro is missing (shop, club house, packs).',
+        'Empty lists point to the next step, e.g. the calendar when no tournament is coming up.',
+        'On phones, tab rows fade out where more tabs are - swipe to see them.',
+        "Pausing, aborting and renaming ask in the website's own dialog.",
+      ],
+    },
+    de: {
+      title: 'Klarer, wenn etwas gesperrt oder leer ist',
+      items: [
+        'Ein Kauf, den du dir noch nicht leisten kannst, zeigt, wie viel Neuro fehlt (Shop, Vereinshaus, Packs).',
+        'Leere Listen zeigen den nächsten Schritt, z. B. den Kalender, wenn kein Turnier ansteht.',
+        'Am Handy blenden Reiterleisten aus, wo weitere Reiter kommen - zum Sehen wischen.',
+        'Pausieren, Abbrechen und Umbenennen fragen im Dialog der Website.',
+      ],
+    },
+  },
+  {
     id: 299,
     date: '2026-11-26',
     en: {

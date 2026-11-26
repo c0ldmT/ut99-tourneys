@@ -1,3 +1,4 @@
+import { EmptyState } from '../components/empty-state';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -22,7 +23,7 @@ import { ReportButton } from '../components/report-button';
  */
 @Component({
   selector: 'app-udt-trades',
-  imports: [FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, ReportButton],
+  imports: [EmptyState, FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, ReportButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -129,7 +130,7 @@ import { ReportButton } from '../components/report-button';
             </div>
           </div>
         } @empty {
-          <p class="muted small">{{ 'udt.trades.none' | t }}</p>
+          <na-empty [text]="'udt.trades.none' | t" />
         }
       </section>
 

@@ -1,3 +1,4 @@
+import { EmptyState } from '../components/empty-state';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -64,7 +65,7 @@ function storedFilter(): TournamentFilter {
  */
 @Component({
   selector: 'app-tournament-list',
-  imports: [RouterLink, TPipe, UdtMark, FormsModule, NgTemplateOutlet, LiveList],
+  imports: [EmptyState, RouterLink, TPipe, UdtMark, FormsModule, NgTemplateOutlet, LiveList],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -414,7 +415,7 @@ function storedFilter(): TournamentFilter {
               }
             }
           } @empty {
-            <p class="empty">{{ 'list.nothingNext' | t }}</p>
+            <na-empty [text]="'list.nothingNext' | t" link="/calendar" action="nav.calendar" />
           }
         </div>
       </section>
@@ -549,7 +550,7 @@ function storedFilter(): TournamentFilter {
               <ng-container *ngTemplateOutlet="result; context: { $implicit: t }" />
             }
           } @empty {
-            <p class="empty">{{ 'list.nothingDone' | t }}</p>
+            <na-empty [text]="'list.nothingDone' | t" />
           }
         </div>
       </section>
@@ -580,7 +581,7 @@ function storedFilter(): TournamentFilter {
             }
           } @empty {
             @if (archive()) {
-              <p class="empty">{{ 'list.nothingFound' | t }}</p>
+              <na-empty [text]="'list.nothingFound' | t" />
             }
           }
           @if (archive()?.next) {
@@ -858,12 +859,6 @@ function storedFilter(): TournamentFilter {
     }
     .srv {
       color: var(--accent);
-    }
-    .empty {
-      margin: 0;
-      padding: 22px;
-      text-align: center;
-      color: var(--muted);
     }
     .more {
       display: flex;

@@ -1,3 +1,4 @@
+import { EmptyState } from '../components/empty-state';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -15,7 +16,7 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
  */
 @Component({
   selector: 'app-moderation',
-  imports: [FormsModule, TPipe, RouterLink],
+  imports: [EmptyState, FormsModule, TPipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="spread">
@@ -174,7 +175,7 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
           }
         </article>
       } @empty {
-        <p class="card muted empty">{{ 'mod.empty.' + tab() | t }}</p>
+        <na-empty class="card" [text]="'mod.empty.' + tab() | t" />
       }
     }
 
@@ -339,9 +340,6 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
     }
     .lists textarea {
       font-family: var(--font-mono, monospace);
-    }
-    .empty {
-      text-align: center;
     }
     .nowrap {
       white-space: nowrap;

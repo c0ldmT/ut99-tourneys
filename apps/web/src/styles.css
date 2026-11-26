@@ -592,6 +592,44 @@ a.tcard.udt.done {
   overflow-x: auto;
   scrollbar-width: none;
 }
+/*
+ * Tab rows that scroll (phones) fade out where more tabs are (UX audit B2); browsers without
+ * scroll-driven animations show the row as before.
+ */
+@property --fade-l {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-r {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@keyframes tabs-fade {
+  from {
+    --fade-l: 0px;
+    --fade-r: 32px;
+  }
+  to {
+    --fade-l: 32px;
+    --fade-r: 0px;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  .tabs,
+  .udt-tabs {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--fade-l),
+      black calc(100% - var(--fade-r)),
+      transparent
+    );
+    animation: tabs-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
 .tabs button {
   border: none;
   border-bottom: 2px solid transparent;

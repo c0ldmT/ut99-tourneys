@@ -1,3 +1,4 @@
+import { EmptyState } from '../components/empty-state';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NameTag } from '../core/looks';
 import { RouterLink } from '@angular/router';
@@ -32,7 +33,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 
 @Component({
   selector: 'app-stats',
-  imports: [TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
+  imports: [EmptyState, TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
@@ -141,9 +142,11 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
         </div>
         <div class="table-wrap">
           @if (ratingView().length === 0) {
-            <p class="muted">
-              {{ (ratingRows().length ? 'stats.noMatch' : 'rating.empty') | t }}
-            </p>
+            <na-empty
+              [text]="(ratingRows().length ? 'stats.noMatch' : 'rating.empty') | t"
+              [link]="ratingRows().length ? null : '/calendar'"
+              action="nav.calendar"
+            />
           } @else {
             <table class="stats">
               <thead>
@@ -247,7 +250,11 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
         </div>
         <div class="table-wrap">
           @if (sorted().length === 0) {
-            <p class="muted">{{ (rows().length ? 'stats.noMatch' : 'stats.empty') | t }}</p>
+            <na-empty
+              [text]="(rows().length ? 'stats.noMatch' : 'stats.empty') | t"
+              [link]="rows().length ? null : '/calendar'"
+              action="nav.calendar"
+            />
           } @else {
             <table class="stats">
               <thead>
