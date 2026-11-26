@@ -118,7 +118,7 @@ export class UdtSquadsPage {
       <div class="cards">
         @for (b of s.roster; track b.botId) {
           <div class="slot">
-            <udt-card [bot]="card(b, s.team.tag)" />
+            <udt-card [bot]="card(b, s.team.tag)" fill />
             <div class="small muted tags">
               @if (b.dmSlot) {
                 <span class="udt-mark">DM {{ b.dmSlot }}</span>
@@ -145,9 +145,15 @@ export class UdtSquadsPage {
       gap: 16px;
       margin-top: 16px;
     }
+    /* Card and marks: the card fills the row, so the marks of a row line up. */
     .slot {
       display: grid;
+      grid-template-rows: 1fr auto;
       gap: 6px;
+    }
+    .slot udt-card {
+      display: block;
+      height: 100%;
     }
     .tags {
       display: flex;

@@ -11,6 +11,7 @@ import {
   output,
   signal,
   viewChild,
+  booleanAttribute,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
@@ -193,6 +194,7 @@ function readTestOpen(): boolean {
       class="udt-card r-{{ b.rarity }}"
       [class.small]="small()"
       [class.dim]="dim()"
+      [class.fill]="fill()"
       [class.plaq]="points() > 0 || prestigeFree() > 0"
     >
       @if (badge()) {
@@ -312,20 +314,21 @@ function readTestOpen(): boolean {
           </div>
         }
         @if (b.stamina !== undefined) {
-          <div class="udt-bar" [title]="('udt.stamina' | t) + ' ' + b.stamina">
+          <div class="udt-bar end" [title]="('udt.stamina' | t) + ' ' + b.stamina">
             <i [style.width.%]="b.stamina" [style.background]="staminaColor(b.stamina)"></i>
           </div>
         }
         @if (xpStep(); as x) {
           <div
             class="udt-bar xp"
+            [class.end]="b.stamina === undefined"
             [title]="'udt.points.xpBar' | t: { xp: x.in, need: x.need, lv: (b.level ?? 1) + 1 }"
           >
             <i [style.width.%]="x.pct"></i>
           </div>
         }
         @if (b.value !== undefined || note()) {
-          <div class="foot">
+          <div class="foot" [class.end]="b.stamina === undefined && !xpStep()">
             @if (b.value !== undefined) {
               <span class="neuro"><na-coin [size]="13" /> {{ b.value | neuro: false }}</span>
             }
@@ -343,6 +346,11 @@ export class UdtCard {
   readonly small = input(false);
   /** Not available (e.g. cannot be traded): toned down, the reason in the foot. */
   readonly dim = input(false);
+  /**
+   * Fills its grid cell (the host must be a block of the cell's height): the bars and the foot
+   * sit at the bottom, so cards of different heights (traits, prestige, POT) line up in a row.
+   */
+  readonly fill = input(false, { transform: booleanAttribute });
   /** A short line in the foot (e.g. why the bot cannot be traded). */
   readonly note = input<string | null>(null);
   /** A pill on top of the card (e.g. "Keeper"). */

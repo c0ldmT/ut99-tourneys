@@ -1307,6 +1307,13 @@ main section[id] {
 .udt-card.small {
   width: 150px;
 }
+/* Fills a grid cell: as tall as the row, bars and foot at the bottom (UdtCard `fill`). */
+.udt-card.fill {
+  height: 100%;
+}
+.udt-card.fill .end {
+  margin-top: auto;
+}
 .udt-card .udt-cbadge {
   position: absolute;
   z-index: 2;

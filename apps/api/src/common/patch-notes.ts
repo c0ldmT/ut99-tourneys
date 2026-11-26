@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 321,
+    date: '2026-11-27',
+    en: {
+      title: 'Packs keep their surprise',
+      items: [
+        'Opening a pack no longer gives away the result: the inventory, scrap and crafting list change once the cards are face up.',
+        'Squads: the bot cards of a row are equally tall, their marks line up.',
+      ],
+    },
+    de: {
+      title: 'Packs bleiben spannend',
+      items: [
+        'Beim Öffnen eines Packs verrät die Seite das Ergebnis nicht mehr vorab: Inventar, Schrott und Crafting-Liste ändern sich erst, wenn die Karten aufgedeckt sind.',
+        'Teams: Die Bot-Karten einer Reihe sind gleich hoch, ihre Marken stehen auf einer Linie.',
+      ],
+    },
+  },
+  {
     id: 320,
     date: '2026-11-26',
     en: {

@@ -241,6 +241,8 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Packs: the inventory, scrap and crafting list change only when the cards of a pull are face up (they told the result while the box was charging); bot cards on a squad page are as tall as their row, so their marks line up (decision 321).
+
 - Header on phones (up to 520 px): the logo without the wordmark, no button shrinks, nothing sticks out at 360-430 px (the burger stuck out by 5 px at 390 px) (decision 314).
 - deploy/update.sh ended without a word with a real release bundle (tar died of SIGPIPE behind `head`, `pipefail` ended the script); the same in update-remote.sh on the server. Both now name the failed line on any error, and `sh deploy/update.sh` continues in bash.
 - backup.sh and restore.sh work in /var/tmp instead of /tmp (a small RAM disk on newer systems: the game content may not fit on a Pi 3).

@@ -174,6 +174,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
         [againPrice]="againPrice()"
         [canAgain]="againPrice() !== null && canBuy(againPrice()!)"
         (again)="open($event.box, $event.ten)"
+        (settled)="settle()"
       />
 
       <div class="lower">
@@ -438,6 +439,11 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
 export class UdtPacksPage {
   private readonly api = inject(Api);
   protected readonly view = signal<UdtPacks | null>(null);
+  /**
+   * The state after the last pull, shown once its cards are face up (`settle`): the inventory,
+   * scrap and crafting list would otherwise tell the result while the box is still charging.
+   */
+  private readonly pending = signal<UdtPacks | null>(null);
   /** The last box opened (for "again"). */
   private readonly last = signal<{ box: UdtBox; ten: boolean } | null>(null);
   /** Today's price of the last box again (the index may have moved). */
@@ -486,7 +492,7 @@ export class UdtPacksPage {
 
   async load() {
     try {
-      this.view.set(await this.api.udtPacks());
+      this.show(await this.api.udtPacks());
     } catch {
       // the toast shows the error
     }
@@ -516,7 +522,7 @@ export class UdtPacksPage {
     return (
       !!v &&
       v.hasTeam &&
-      v.blueprintsOver === 0 &&
+      (this.pending() ?? v).blueprintsOver === 0 &&
       !this.busy() &&
       !this.stage()?.animating() &&
       (this.spendable() ?? v.spendable) >= price
@@ -527,13 +533,28 @@ export class UdtPacksPage {
     await this.act(async () => {
       const p = await this.api.udtOpen(box, ten);
       this.last.set({ box, ten });
-      this.view.set(p.view);
+      this.settle();
+      this.pending.set(p.view);
       this.stage()?.play(p);
     });
   }
 
+  /** A state newer than any pull still face down (reload, scrap, craft, workshop). */
+  private show(v: UdtPacks) {
+    this.pending.set(null);
+    this.view.set(v);
+  }
+
+  /** The pull's cards are all face up (or the stage closed): show the new state. */
+  protected settle() {
+    const p = this.pending();
+    if (!p) return;
+    this.pending.set(null);
+    this.view.set(p);
+  }
+
   protected async scrap(c: UdtInventoryCard) {
-    await this.act(async () => this.view.set(await this.api.udtScrap(c.id)));
+    await this.act(async () => this.show(await this.api.udtScrap(c.id)));
   }
 
   protected giftCount(v: UdtPacks): number {
@@ -541,7 +562,7 @@ export class UdtPacksPage {
   }
 
   protected async scrapBlueprint(id: string) {
-    await this.act(async () => this.view.set(await this.api.udtScrapBlueprint(id)));
+    await this.act(async () => this.show(await this.api.udtScrapBlueprint(id)));
   }
 
   /** A workshop step the manager can pay (scrap and Neuro). */
@@ -558,7 +579,7 @@ export class UdtPacksPage {
     const from = this.i18n.t(`udt.trait.${c.code}`);
     await this.act(async () => {
       const r = await this.api.udtWorkshop(c.id, kind);
-      this.view.set(r.view);
+      this.show(r.view);
       this.toasts.success(
         this.i18n.t('ok.udt.workshop', { from, to: this.i18n.t(`udt.trait.${r.card.code}`) }),
       );
@@ -566,7 +587,7 @@ export class UdtPacksPage {
   }
 
   protected async craft(c: UdtCatalogTrait) {
-    await this.act(async () => this.view.set(await this.api.udtCraft(c.code)));
+    await this.act(async () => this.show(await this.api.udtCraft(c.code)));
   }
 
   private async act(fn: () => Promise<void>) {

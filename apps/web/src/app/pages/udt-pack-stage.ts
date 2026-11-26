@@ -16,6 +16,8 @@ import type { UdtBox, UdtCatalogTrait, UdtPull, UdtPullCard, UdtRarity } from '.
 import { RARITIES } from '../core/udt';
 
 type Phase = 'idle' | 'charge' | 'burst' | 'reveal';
+/** Duration of a card's flip (the `.fc-in` transition). */
+const FLIP_S = 0.85;
 
 interface Particle {
   a: string;
@@ -673,6 +675,11 @@ export class UdtPackStage implements OnDestroy {
   readonly canAgain = input(false);
   /** "Again": buy and open the same box (or 10-pull) at once. */
   readonly again = output<{ box: UdtBox; ten: boolean }>();
+  /**
+   * Every card of the pull is face up (its flip has ended) or the stage was closed: the page may
+   * show what the pull brought (inventory, scrap) without spoiling a card still face down.
+   */
+  readonly settled = output<void>();
   protected readonly phase = signal<Phase>('idle');
   protected readonly pull = signal<UdtPull | null>(null);
   /** Flipped cards: index -> flip delay. */
@@ -787,6 +794,11 @@ export class UdtPackStage implements OnDestroy {
       if (cards[i]?.rarity === 'legendary' && lgAt < 0) lgAt = n * step;
     });
     this.up.set(up);
+    // The last card turns: settle when its flip (0.85 s after its delay) has ended.
+    if (Object.keys(up).length >= cards.length) {
+      const last = Math.max(0, ...idx.map((_, n) => n * step));
+      this.later(Math.round((last + FLIP_S) * 1000), () => this.settled.emit());
+    }
     if (lgAt >= 0) {
       this.later(Math.round(lgAt * 1000) + 450, () => {
         this.dark.set(true);
@@ -811,6 +823,7 @@ export class UdtPackStage implements OnDestroy {
 
   protected reset() {
     this.clear();
+    this.settled.emit();
     this.phase.set('idle');
     this.pull.set(null);
     this.up.set({});
