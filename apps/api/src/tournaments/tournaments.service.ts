@@ -339,6 +339,9 @@ export type MoveMember = z.infer<typeof MoveMemberBody>;
 /** Bracket entrant ids of teams made of bots only (the team table uses "t-…"). */
 const botTeamId = (n: number) => `botteam-${n}`;
 
+/** Live telemetry of a match as the bridge sends it (`match.live`). */
+type LiveTelemetry = { matchId: string; phase?: string; scores?: Record<string, number> };
+
 @Injectable()
 export class TournamentsService {
   constructor(
@@ -2570,33 +2573,8 @@ export class TournamentsService {
     const league = this.leagueOf(t, user.id);
     if (league?.mine) mine = 1;
     const live = t.phase === 'running' || t.phase === 'paused';
-    const loaded = live ? this.log.projection(t.id) : undefined;
-    const proj = loaded ? this.withCurrentBotNames(loaded) : undefined;
-    // The main server's match, else one of the extra servers' (parallel matches, decision 291).
-    const playing = live ? Object.values(proj?.liveMatches ?? {}) : [];
-    const cm = live ? (proj?.currentMatch ?? playing[0]) : undefined;
-    const name = (id: string) => proj?.entrants[id]?.displayName ?? id;
-    const nowOf = (m: NonNullable<typeof cm>) => {
-      const tele = this.hub.latestLive(t.id, m.matchId);
-      const wins = (id: string) =>
-        (proj?.games[m.matchId] ?? []).filter((g) => g.winnerId === id).length;
-      return {
-        matchId: m.matchId,
-        game: m.game,
-        ...(m.map ? { map: m.map } : {}),
-        status: m.status,
-        entrants: m.entrants,
-        names: [name(m.entrants[0]), name(m.entrants[1])],
-        wins: [wins(m.entrants[0]), wins(m.entrants[1])],
-        bestOf: proj?.bracket?.byId[m.matchId]?.bestOf ?? 1,
-        /** Monster Hunt: finished runs of the game. */
-        ...(m.runs?.length ? { runs: m.runs } : {}),
-        /** Telemetry of the game in progress (frags, run clock), if any. */
-        ...(tele ? { live: tele } : {}),
-        /** The server playing it (parallel matches). */
-        server: m.server ? (this.agents.get(m.server)?.name ?? m.server) : this.serverName(t),
-      };
-    };
+    // The main server's match first, then the extra servers' (parallel matches, decision 291).
+    const [now, ...alsoNow] = live ? this.playingNow(t) : [];
     return {
       id: t.id,
       name: t.name,
@@ -2621,12 +2599,73 @@ export class TournamentsService {
       /** A game of the Dream Team league: its evening, matchday and clubs. */
       ...(league ? { league } : {}),
       /** The match being played now (running tournaments): names and series score. */
-      ...(cm ? { now: nowOf(cm) } : {}),
+      ...(now ? { now } : {}),
       /** Parallel matches (decision 291): the other matches being played at the same time. */
-      ...(playing.length > 1
-        ? { alsoNow: playing.filter((m) => m.matchId !== cm?.matchId).map(nowOf) }
-        : {}),
+      ...(alsoNow.length ? { alsoNow } : {}),
     };
+  }
+
+  /**
+   * The matches being played: names, series score, telemetry and server, the main server's
+   * first (overview tiles, the league's live list, decision 294).
+   */
+  playingNow(t: TournamentRow) {
+    const loaded = this.log.projection(t.id);
+    if (!loaded) return [];
+    const proj = this.withCurrentBotNames(loaded);
+    const name = (id: string) => proj.entrants[id]?.displayName ?? id;
+    return Object.values(proj.liveMatches)
+      .sort((a, b) => Number(!!a.server) - Number(!!b.server) || a.matchId.localeCompare(b.matchId))
+      .map((m) => {
+        const tele = this.hub.latestLive(t.id, m.matchId) as LiveTelemetry | undefined;
+        const wins = (id: string) =>
+          (proj.games[m.matchId] ?? []).filter((g) => g.winnerId === id).length;
+        return {
+          matchId: m.matchId,
+          game: m.game,
+          ...(m.map ? { map: m.map } : {}),
+          status: m.status,
+          entrants: m.entrants,
+          names: [name(m.entrants[0]), name(m.entrants[1])] as [string, string],
+          wins: [wins(m.entrants[0]), wins(m.entrants[1])] as [number, number],
+          bestOf: proj.bracket?.byId[m.matchId]?.bestOf ?? 1,
+          /** Monster Hunt: finished runs of the game. */
+          ...(m.runs?.length ? { runs: m.runs } : {}),
+          /** Telemetry of the game in progress (frags, run clock), if any. */
+          ...(tele ? { live: tele } : {}),
+          /** The server playing it (parallel matches). */
+          server: m.server ? (this.agents.get(m.server)?.name ?? m.server) : this.serverName(t),
+        };
+      });
+  }
+
+  /**
+   * A league game: every game of its evening that is on now (check-in, running), itself
+   * included, with what is being played (decision 294: the live list of the game's page).
+   */
+  private eveningNow(t: TournamentRow, user: User) {
+    const tag = this.leagueOf(t, user.id);
+    if (!tag) return undefined;
+    return this.db
+      .select()
+      .from(tournaments)
+      .where(inArray(tournaments.phase, ACTIVE_PHASES))
+      .all()
+      .flatMap((x) => {
+        const l = x.id === t.id ? tag : this.leagueOf(x, user.id);
+        if (!l || l.day !== tag.day) return [];
+        const live = x.phase === 'running' || x.phase === 'paused';
+        return [
+          {
+            id: x.id,
+            phase: x.phase,
+            league: l,
+            server: this.serverName(x),
+            now: live ? this.playingNow(x)[0] : undefined,
+          },
+        ];
+      })
+      .sort((a, b) => a.id.localeCompare(b.id));
   }
 
   /** The name of the server a tournament runs on (the agent's name). */
@@ -2738,6 +2777,10 @@ export class TournamentsService {
         hasAccess: inAccess,
       },
       projection: proj ? this.withCurrentBotNames(proj) : null,
+      /** A league game: the games of its evening that are on now (decision 294). */
+      ...(league && ACTIVE_PHASES.includes(t.phase)
+        ? { evening: this.eveningNow(t, user) ?? [] }
+        : {}),
       live: this.hub.latestLive(id, proj?.currentMatch?.matchId) ?? this.hub.latestLive(id) ?? null,
       /** Telemetry of every match being played (parallel matches). */
       lives: this.hub.allLive(id),

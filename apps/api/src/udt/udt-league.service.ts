@@ -313,9 +313,9 @@ export interface LeagueStatus {
 }
 
 /**
- * Estimated server time of a league evening in minutes (played games × 4 min): per matchday
- * the pairings with a manager (expected from the managers per tier), plus a top game or every
- * AI game when they are played.
+ * Estimated server time of a league evening in minutes (played games × 4 min, spread over
+ * `servers` servers playing at once, decision 294): per matchday the pairings with a manager
+ * (expected from the managers per tier), plus a top game or every AI game when they are played.
  */
 export function estimateEvening(o: {
   managers: number;
@@ -323,6 +323,7 @@ export function estimateEvening(o: {
   size: number;
   perEvening: number;
   aiGames: LeagueSettings['aiGames'];
+  servers?: number;
 }): { minutes: number; realPerMatchday: number } {
   let real = 0;
   // Managers fill the tiers from the top (as many per tier as fit).
@@ -338,7 +339,7 @@ export function estimateEvening(o: {
       o.aiGames === 'all' ? pairs : pairs - aiPairs + (o.aiGames === 'topGame' && t === 0 ? 1 : 0);
   }
   return {
-    minutes: Math.round(real * o.perEvening * GAME_MINUTES),
+    minutes: Math.round((real * o.perEvening * GAME_MINUTES) / Math.max(1, o.servers ?? 1)),
     realPerMatchday: Math.round(real * 10) / 10,
   };
 }
@@ -565,6 +566,19 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     return this.agents.pool()[0] ?? null;
   }
 
+  /**
+   * Servers the games of an evening play on at once (decision 294): the pool with automatic
+   * servers (they kick off together), else one after another on the league's server.
+   */
+  private parallelServers(): number {
+    return this.cfg().serverAuto ? Math.max(1, this.servers().length) : 1;
+  }
+
+  /** Minutes an evening of `games` played games keeps its servers busy (4 per game and server). */
+  private eveningMinutes(games: number): number {
+    return Math.ceil(Math.max(1, games) / this.parallelServers()) * GAME_MINUTES;
+  }
+
   /** The servers the league evening keeps free: the pool (automatic games), else its server. */
   private servers(): string[] {
     const own = this.server();
@@ -612,7 +626,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     for (const day of new Set(days)) {
       const start = zonedMs(day, plan.slotTime, this.tz);
       const games = perDay.get(day) || 1;
-      const end = start + games * GAME_MINUTES * 60_000 + BUFFER_MS;
+      const end = start + this.eveningMinutes(games) * 60_000 + BUFFER_MS;
       if (start < to && end > from)
         out.push({
           from: start,
@@ -679,7 +693,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         if (day < from || day > to) return;
         const at = zonedMs(day, plan.slotTime, this.tz);
         const n = games.get(day) ?? 0;
-        const until = at + Math.max(1, n) * GAME_MINUTES * 60_000 + BUFFER_MS;
+        const until = at + this.eveningMinutes(n) * 60_000 + BUFFER_MS;
         out.push({
           kind,
           season,
@@ -2362,6 +2376,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         size: cfg.size,
         perEvening: PER_EVENING[cfg.length],
         aiGames: cfg.aiGames,
+        servers: this.parallelServers(),
       }),
       evenings: eveningsOf(cfg.size, PER_EVENING[cfg.length]),
       server: this.server(),
@@ -2500,6 +2515,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         size,
         perEvening,
         aiGames: q.aiGames ?? cfg.aiGames,
+        servers: this.parallelServers(),
       }),
       evenings: eveningsOf(size, perEvening),
       managers,
@@ -2658,6 +2674,10 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         awayWins: shown ? f.awayWins : null,
         postponed: f.postponed,
         tournament: t ? { id: t.id, phase: t.phase } : null,
+        /** A game on the server now: status, frags and server (the live list, decision 294). */
+        ...(t && (t.phase === 'running' || t.phase === 'paused')
+          ? { live: this.tournaments.playingNow(t)[0] ?? null }
+          : {}),
       };
     };
     // The evening of the conference: the next one with games (today's while it runs), else
@@ -2702,7 +2722,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         slot: new Date(slotStart).toISOString(),
         games: onDay.filter((f) => f.real).length,
         until: new Date(
-          slotStart + Math.max(1, onDay.filter((f) => f.real).length) * GAME_MINUTES * 60_000,
+          slotStart + this.eveningMinutes(onDay.filter((f) => f.real).length) * 60_000,
         ).toISOString(),
         cups,
       },

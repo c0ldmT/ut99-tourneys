@@ -2747,8 +2747,7 @@ nav.udt-nav {
   margin: 0;
 }
 .lg-main.lg-card,
-.lg-q,
-.lg-run {
+.lg-q {
   padding: 0;
   overflow: hidden;
 }
@@ -3008,29 +3007,18 @@ tr[class*='lg-z-'] .pl {
   background: var(--accent);
   box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.18);
 }
-.lg-run {
-  display: block;
-  padding: 16px;
+/* The games on the server now: the shared live list (decision 294). */
+.lg-runlist {
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
-  color: var(--text);
 }
-.lg-runhead {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  color: var(--text-2);
-  margin-bottom: 10px;
+.lg-runlist p {
+  margin: 8px 0 0;
 }
-.lg-runteams {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  font-weight: 700;
-  font-size: 18px;
-  margin-bottom: 8px;
+.lg-livebox {
+  padding: 14px;
+  margin-bottom: 14px;
 }
-.lg-runteams .r,
 .lg-prow .r {
   text-align: right;
 }
@@ -3052,22 +3040,6 @@ tr[class*='lg-z-'] .pl {
 }
 .lg-qteams .lg-win {
   color: var(--text);
-}
-.lg-livelink {
-  display: none;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  margin-bottom: 14px;
-  border-radius: 10px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  color: var(--text);
-}
-.lg-livelink span:nth-child(2) {
-  flex: 1;
-  min-width: 0;
-  font-weight: 600;
 }
 .lg-badge {
   min-width: 74px;
@@ -3325,9 +3297,6 @@ tr[class*='lg-z-'] .pl {
   }
   .lg-top {
     margin-bottom: 12px;
-  }
-  .lg-livelink {
-    display: flex;
   }
   .lg-main .lg-bar {
     display: grid;

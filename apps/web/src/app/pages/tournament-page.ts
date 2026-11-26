@@ -17,6 +17,8 @@ import { Router, RouterLink } from '@angular/router';
 import { BetPanel } from '../components/bet-panel';
 import { BetColumns } from '../components/bet-columns';
 import { LiveMini, type MiniSide } from '../components/live-mini';
+import { LiveList, type LiveListItem } from '../components/live-list';
+import { leagueItem } from '../core/live-items';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
@@ -57,6 +59,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     BetPanel,
     BetColumns,
     LiveMini,
+    LiveList,
     Icon,
     NameTag,
     UdtMark,
@@ -369,41 +372,20 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         @if (current(); as cm) {
           <!-- Live: the matches being played (a list with parallel matches, decision 291) and
                the chosen one with its bets and its server. -->
-          <section class="lhub" [class.multi]="playing().length > 1">
-            @if (playing().length > 1) {
+          <section class="lhub" [class.multi]="listItems().length > 1">
+            @if (listItems().length > 1) {
+              <!-- Parallel matches, or the games of the league evening (decision 294). -->
               <div class="card lh-list">
-                <div class="lh-title">
-                  <span class="badge running">Live</span>
-                  {{ 'tp.liveCount' | t: { n: playing().length } }}
-                </div>
-                <div class="lh-rows" role="tablist" [attr.aria-label]="'tp.parallelTabs' | t">
-                  @for (m of playing(); track m.matchId) {
-                    <button
-                      type="button"
-                      role="tab"
-                      class="lh-row"
-                      [class.on]="m.matchId === cm.matchId"
-                      [attr.aria-selected]="m.matchId === cm.matchId"
-                      (click)="selected.set(m.matchId)"
-                    >
-                      <span class="lr-top">
-                        <span class="mono">{{ m.matchId }}</span>
-                        <span class="lr-srv"
-                          ><span class="dot" [class.on]="isLive(m.matchId)"></span
-                          >{{ serverOf(m) }}</span
-                        >
-                      </span>
-                      <span class="lr-vs">
-                        <span class="lr-n">{{ name(m.entrants[0]) }}</span>
-                        <b class="mono">{{ tabScore(m) || 'vs' }}</b>
-                        <span class="lr-n r">{{ name(m.entrants[1]) }}</span>
-                      </span>
-                    </button>
-                  }
-                </div>
+                <na-live-list
+                  [items]="listItems()"
+                  [selected]="listSelected()"
+                  [title]="listTitle()"
+                  [label]="'tp.parallelTabs' | t"
+                  (pick)="selected.set($event)"
+                />
               </div>
             }
-            <div class="lh-main" [class.duo]="playing().length === 1 && !!betsOf(cm.matchId)">
+            <div class="lh-main" [class.duo]="listItems().length <= 1 && !!betsOf(cm.matchId)">
               <app-live-mini
                 [link]="['/t', t.id, 'm', cm.matchId]"
                 [matchId]="cm.matchId"
@@ -981,61 +963,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       margin: 0;
       padding: 14px;
     }
-    .lh-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 600;
-      margin-bottom: 10px;
-    }
-    .lh-rows {
-      display: grid;
-      gap: 6px;
-    }
-    .lh-row {
-      display: grid;
-      justify-content: stretch;
-      gap: 4px;
-      width: 100%;
-      min-height: 0;
-      padding: 8px 10px;
-      border-radius: 10px;
-      text-align: left;
-      font-weight: 400;
-    }
-    .lh-row.on {
-      border-color: var(--accent);
-      box-shadow: inset 0 0 0 1px var(--accent);
-    }
-    .lr-top {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      font-size: 0.78rem;
-      color: var(--text-2);
-    }
-    .lr-srv {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .lr-vs {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-      gap: 8px;
-      align-items: baseline;
-    }
-    .lr-n {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .lr-n.r {
-      text-align: right;
-    }
     .lh-bets h3 {
       margin: 0;
       font-size: 1rem;
@@ -1049,9 +976,6 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     @media (max-width: 860px) {
       .lhub.multi {
         grid-template-columns: minmax(0, 1fr);
-      }
-      .lh-rows {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
     .lg-vs {
@@ -1310,6 +1234,36 @@ export class TournamentPage {
   protected betsOf(matchId: string): BetMatchView | null {
     return this.runningBets().find((m) => m.matchId === matchId) ?? null;
   }
+  /**
+   * The live list (decision 294): a league game lists the games of its evening (each its own
+   * page), a tournament with parallel matches its matches (picked in place).
+   */
+  protected readonly listItems = computed<LiveListItem[]>(() => {
+    const t = this.t();
+    const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
+    if (t?.evening && t.evening.length > 1) return t.evening.map((g) => leagueItem(g, tr));
+    return this.playing().map((m) => ({
+      key: m.matchId,
+      label: m.matchId,
+      names: [this.name(m.entrants[0]), this.name(m.entrants[1])] as [string, string],
+      score: this.tabScore(m) || null,
+      server: this.serverOf(m),
+      live: this.isLive(m.matchId),
+      status: tr(`list.phase.${this.liveOf(m.matchId)?.phase ?? 'waiting'}`),
+    }));
+  });
+  /** The row of the match shown (a league game: its own). */
+  protected readonly listSelected = computed(() =>
+    this.t()?.evening && this.t()!.evening!.length > 1
+      ? this.t()!.id
+      : (this.current()?.matchId ?? null),
+  );
+  protected readonly listTitle = computed(() => {
+    const n = this.listItems().length;
+    return this.t()?.evening && n > 1
+      ? this.i18n.t('tp.eveningLive', { n })
+      : this.i18n.t('tp.liveCount', { n });
+  });
   /** A game of the match is live right now (its dot in the list). */
   protected isLive(matchId: string): boolean {
     const p = this.liveOf(matchId)?.phase;

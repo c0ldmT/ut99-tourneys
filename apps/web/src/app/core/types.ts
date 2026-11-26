@@ -444,6 +444,8 @@ export interface TournamentDetail {
   live: LiveInfo | null;
   /** Telemetry of every match being played (parallel matches). */
   lives?: LiveInfo[];
+  /** A league game: the games of its evening that are on now, itself included (decision 294). */
+  evening?: { id: string; phase: Phase; league: LeagueTag; server: string; now?: NowMatch }[];
   agent: { online: boolean };
 }
 
@@ -1830,6 +1832,8 @@ export interface LeagueGame {
   awayWins: number | null;
   postponed: number;
   tournament: { id: string; phase: Phase } | null;
+  /** On the server now: status, frags and server (decision 294). */
+  live?: NowMatch | null;
 }
 
 export interface LeaguePlan {

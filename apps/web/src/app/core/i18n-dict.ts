@@ -3,7 +3,7 @@ export type Lang = 'en' | 'de';
 
 const en = {
   'nav.tournaments': 'Matches',
-  'nav.liveCount': '{n} tournaments live now',
+  'nav.liveCount': '{n} matches live now',
   'nav.new': 'New tournament',
   'nav.agents': 'Servers',
   'nav.users': 'Users',
@@ -716,6 +716,7 @@ const en = {
     'You play in this tournament. Connect for the check-in; the server tells you when your match starts.',
   'tp.parallelTabs': 'Matches being played',
   'tp.liveCount': '{n} matches at once',
+  'tp.eveningLive': 'League evening · {n} games on',
   'tp.watchOn': 'Watch on {server}:',
   'tp.lanesTitle': 'More servers ({n}): parallel bot matches',
   'tp.lanesHint':
@@ -2809,7 +2810,9 @@ const en = {
   'league.filter.real': 'On the server',
   'league.filter.sim': 'Conference',
   'league.server': 'On the server',
-  'league.serverHint': 'Games with a manager · played for real · bets open · one after another',
+  'league.serverHint':
+    'Games with a manager · played for real · bets open · at the same time on the free servers',
+  'league.liveNow': '{n} games on the server now',
   'league.badge.done': 'Over',
   'league.badge.doneOt': 'Over · OT',
   'league.badge.live': 'running',
@@ -3118,7 +3121,7 @@ export type TKey = keyof typeof en;
 
 const de: Record<TKey, string> = {
   'nav.tournaments': 'Matches',
-  'nav.liveCount': '{n} Turniere laufen gerade',
+  'nav.liveCount': '{n} Matches laufen gerade',
   'nav.new': 'Neues Turnier',
   'nav.agents': 'Server',
   'nav.users': 'Benutzer',
@@ -3836,6 +3839,7 @@ const de: Record<TKey, string> = {
     'Du spielst mit. Verbinde dich zum Check-in; der Server sagt dir, wann dein Match beginnt.',
   'tp.parallelTabs': 'Laufende Matches',
   'tp.liveCount': '{n} Matches gleichzeitig',
+  'tp.eveningLive': 'Liga-Abend · {n} Spiele laufen',
   'tp.watchOn': 'Zuschauen auf {server}:',
   'tp.lanesTitle': 'Weitere Server ({n}): parallele Bot-Matches',
   'tp.lanesHint':
@@ -5950,7 +5954,9 @@ const de: Record<TKey, string> = {
   'league.filter.real': 'Auf dem Server',
   'league.filter.sim': 'Konferenz',
   'league.server': 'Auf dem Server',
-  'league.serverHint': 'Partien mit Manager · echt gespielt · wettbar · nacheinander',
+  'league.serverHint':
+    'Partien mit Manager · echt gespielt · wettbar · gleichzeitig auf den freien Servern',
+  'league.liveNow': '{n} Spiele gerade auf dem Server',
   'league.badge.done': 'Ende',
   'league.badge.doneOt': 'Ende · OT',
   'league.badge.live': 'läuft',

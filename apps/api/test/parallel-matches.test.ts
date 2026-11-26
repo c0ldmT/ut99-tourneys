@@ -7,6 +7,7 @@ import {
   WebsiteAgent,
 } from '@tourney/bridge';
 import { afterEach, describe, expect, it } from 'vitest';
+import { EventLogService } from '../src/tournaments/event-log.service.js';
 import { LiveHub } from '../src/tournaments/hub.js';
 import { Client, startApi, tournamentBody } from './helpers.js';
 
@@ -109,6 +110,8 @@ describe('parallel matches on extra servers (decision 291)', () => {
     const hub = api.app.get(LiveHub);
     let maxLive = 0;
     let maxTele = 0;
+    let maxCount = 0;
+    const log = api.app.get(EventLogService);
     let lanesDuring = 2;
     const settle = async () => {
       for (let i = 0; i < 3; i++) await new Promise((r) => setImmediate(r));
@@ -123,6 +126,7 @@ describe('parallel matches on extra servers (decision 291)', () => {
         if (d.projection?.liveMatches)
           maxLive = Math.max(maxLive, Object.keys(d.projection.liveMatches).length);
         maxTele = Math.max(maxTele, hub.allLive(id).length);
+        maxCount = Math.max(maxCount, log.liveCount());
         if (d.phase === 'running' && d.projection.results.length >= 4)
           lanesDuring = Math.min(lanesDuring, d.lanes.length);
       }
@@ -137,6 +141,9 @@ describe('parallel matches on extra servers (decision 291)', () => {
     // Round one ran on all three servers; the live data of each match was kept apart.
     expect(maxLive).toBe(3);
     expect(maxTele).toBeGreaterThanOrEqual(2);
+    // The live counter in the header counts matches, not tournaments (decision 294).
+    expect(maxCount).toBe(3);
+    expect(log.liveCount()).toBe(0);
     // Extra servers were released once fewer matches were left than servers, all at the end.
     expect(lanesDuring).toBeLessThan(2);
     expect(d.lanes).toEqual([]);

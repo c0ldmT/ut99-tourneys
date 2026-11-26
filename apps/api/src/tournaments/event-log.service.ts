@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import {
   projectTournament,
   TournamentEventSchema,
@@ -34,6 +34,12 @@ export type AppendResult =
  * only if it was based on the current head, and only if the resulting log still folds into a
  * valid projection.
  */
+/** Matches a running tournament plays now: at least one (between two matches it still runs). */
+function matchesOf(p: TournamentProjection): number {
+  if (p.phase !== 'running' && p.phase !== 'paused') return 0;
+  return Math.max(1, Object.keys(p.liveMatches).length);
+}
+
 @Injectable()
 export class EventLogService {
   private cache = new Map<string, TournamentEvent[]>();
@@ -118,6 +124,7 @@ export class EventLogService {
     });
     // Results settle bets: everybody's Neuro may have changed.
     if (stored.some((e) => SETTLES.has(e.type))) this.neuro.changedAll();
+    this.matchesLive.set(tournamentId, matchesOf(projection));
     this.countLive();
     const before = () => (log.length ? projectTournament(log) : undefined);
     for (const l of this.listeners) {
@@ -140,6 +147,7 @@ export class EventLogService {
         .run();
     });
     this.cache.delete(tournamentId);
+    this.matchesLive.delete(tournamentId);
     for (const l of this.clearListeners) {
       try {
         l(tournamentId);
@@ -152,15 +160,28 @@ export class EventLogService {
     this.countLive();
   }
 
-  /** Running (and paused) tournaments: the live counter in the header (decision 282). */
+  /** Matches being played per running tournament (see `matchesOf`). */
+  private readonly matchesLive = new Map<string, number>();
+
+  /**
+   * Matches being played: the live counter in the header (decision 282; matches instead of
+   * tournaments since decision 294 - a league evening and parallel matches count every game).
+   */
   liveCount(): number {
-    return (
-      this.db
-        .select({ n: sql<number>`count(*)` })
-        .from(tournaments)
-        .where(inArray(tournaments.phase, ['running', 'paused']))
-        .get()?.n ?? 0
-    );
+    const running = this.db
+      .select({ id: tournaments.id })
+      .from(tournaments)
+      .where(inArray(tournaments.phase, ['running', 'paused']))
+      .all();
+    let n = 0;
+    for (const { id } of running) {
+      if (!this.matchesLive.has(id)) {
+        const p = this.projection(id);
+        this.matchesLive.set(id, p ? matchesOf(p) : 0);
+      }
+      n += this.matchesLive.get(id) ?? 0;
+    }
+    return n;
   }
 
   private lastLive = -1;

@@ -12,6 +12,8 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
+import { LiveList, type LiveListItem } from '../components/live-list';
+import { leagueItem, nowItem } from '../core/live-items';
 import { finalMs, raceTime } from '../core/race';
 import { Api } from '../core/api';
 import { Loading } from '../core/loading';
@@ -62,7 +64,7 @@ function storedFilter(): TournamentFilter {
  */
 @Component({
   selector: 'app-tournament-list',
-  imports: [RouterLink, TPipe, UdtMark, FormsModule, NgTemplateOutlet],
+  imports: [RouterLink, TPipe, UdtMark, FormsModule, NgTemplateOutlet, LiveList],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -280,87 +282,100 @@ function storedFilter(): TournamentFilter {
       @if (live().length) {
         <section>
           <h2 class="sec"><span class="badge running">Live</span> {{ 'list.liveTitle' | t }}</h2>
-          <div class="lgrid" [class.multi]="live().length > 1">
-            @for (t of live(); track t.id) {
-              <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
-                <div class="hero-l">
-                  <div class="row">
-                    <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
-                    @if (t.kind === 'udt') {
+          <div class="lgrid" [class.multi]="liveRows().length > 1">
+            @for (row of liveRows(); track row.id) {
+              @if (row.ev; as e) {
+                <!-- A league evening: one tile, its games in the live list (decision 294). -->
+                <div class="hero udt ev">
+                  <div class="hero-l">
+                    <div class="row">
+                      <span class="badge running">{{ 'phase.running' | t }}</span>
                       <span class="badge udt"
-                        ><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span
+                        ><na-udt-mark [size]="16" />{{ 'list.kind.league' | t }}</span
                       >
-                    }
-                    @if (t.seasonal) {
-                      <span class="badge season">Season</span>
-                    }
+                    </div>
+                    <a class="hero-name" routerLink="/udt/league/day">{{ e.label }}</a>
+                    <div class="muted small">
+                      {{ 'league.liveNow' | t: { n: e.games.length } }}
+                    </div>
                   </div>
-                  <div class="hero-name">{{ t.name }}</div>
-                  <div class="muted small">
-                    {{ meta(t) }}
-                    @if (t.server) {
-                      · <span class="srv">{{ t.server }}</span>
-                    }
+                  <div class="hero-r">
+                    <na-live-list [items]="eveningItems(e)" [label]="e.label" />
                   </div>
                 </div>
-                @if (t.now; as n) {
-                  <div class="hero-r">
-                    <div class="kpi">
-                      {{ 'list.now' | t }} · {{ n.matchId }} · {{ 'list.game' | t: { n: n.game } }}
-                      @if (n.live?.map ?? n.map; as map) {
-                        · {{ map }}
+              } @else if (row.t; as t) {
+                <a class="hero" [class.udt]="t.kind === 'udt'" [routerLink]="['/t', t.id]">
+                  <div class="hero-l">
+                    <div class="row">
+                      <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
+                      @if (t.kind === 'udt') {
+                        <span class="badge udt"
+                          ><na-udt-mark [size]="16" />{{ 'udt.title' | t }}</span
+                        >
+                      }
+                      @if (t.seasonal) {
+                        <span class="badge season">Season</span>
                       }
                     </div>
-                    <div class="vs">
-                      <span class="nm a">{{ n.names[0] }}</span>
-                      @if (t.game === 'mh') {
-                        <span class="sc race"
-                          ><b class="sa">{{ runText(n, 0) }}</b
-                          ><i>:</i><b class="sb">{{ runText(n, 1) }}</b></span
-                        >
-                      } @else {
-                        <span class="sc"
-                          ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b
-                          ><i>:</i
-                          ><b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
-                        >
-                      }
-                      <span class="nm b">{{ n.names[1] }}</span>
-                    </div>
-                    <div class="state small">
-                      @if (n.live?.phase === 'live' || n.live?.phase === 'overtime') {
-                        <span class="lv"
-                          ><span class="dot on"></span> {{ 'list.liveNow' | t }}</span
-                        >
-                      } @else {
-                        <span class="muted">{{
-                          'list.phase.' + (n.live?.phase ?? 'waiting') | t
-                        }}</span>
-                      }
-                      @if (n.bestOf > 1) {
-                        <span class="muted"
-                          >· {{ 'list.series' | t }} {{ n.wins[0] }}:{{ n.wins[1] }} (Bo{{
-                            n.bestOf
-                          }})</span
-                        >
+                    <div class="hero-name">{{ t.name }}</div>
+                    <div class="muted small">
+                      {{ meta(t) }}
+                      @if (t.server) {
+                        · <span class="srv">{{ t.server }}</span>
                       }
                     </div>
-                    <!-- Parallel matches (decision 291): the others being played right now. -->
-                    @for (o of t.alsoNow ?? []; track o.matchId) {
-                      <div class="also small">
-                        <span class="muted">{{ o.matchId }} · {{ o.server }}</span>
-                        <span class="an">{{ o.names[0] }}</span>
-                        <b
-                          >{{ o.live?.scores?.[o.entrants[0]] ?? '–' }}:{{
-                            o.live?.scores?.[o.entrants[1]] ?? '–'
-                          }}</b
-                        >
-                        <span class="an">{{ o.names[1] }}</span>
-                      </div>
-                    }
                   </div>
-                }
-              </a>
+                  @if (t.now; as n) {
+                    <div class="hero-r">
+                      <div class="kpi">
+                        {{ 'list.now' | t }} · {{ n.matchId }} ·
+                        {{ 'list.game' | t: { n: n.game } }}
+                        @if (n.live?.map ?? n.map; as map) {
+                          · {{ map }}
+                        }
+                      </div>
+                      <div class="vs">
+                        <span class="nm a">{{ n.names[0] }}</span>
+                        @if (t.game === 'mh') {
+                          <span class="sc race"
+                            ><b class="sa">{{ runText(n, 0) }}</b
+                            ><i>:</i><b class="sb">{{ runText(n, 1) }}</b></span
+                          >
+                        } @else {
+                          <span class="sc"
+                            ><b class="sa">{{ n.live?.scores?.[n.entrants[0]] ?? '–' }}</b
+                            ><i>:</i
+                            ><b class="sb">{{ n.live?.scores?.[n.entrants[1]] ?? '–' }}</b></span
+                          >
+                        }
+                        <span class="nm b">{{ n.names[1] }}</span>
+                      </div>
+                      <div class="state small">
+                        @if (n.live?.phase === 'live' || n.live?.phase === 'overtime') {
+                          <span class="lv"
+                            ><span class="dot on"></span> {{ 'list.liveNow' | t }}</span
+                          >
+                        } @else {
+                          <span class="muted">{{
+                            'list.phase.' + (n.live?.phase ?? 'waiting') | t
+                          }}</span>
+                        }
+                        @if (n.bestOf > 1) {
+                          <span class="muted"
+                            >· {{ 'list.series' | t }} {{ n.wins[0] }}:{{ n.wins[1] }} (Bo{{
+                              n.bestOf
+                            }})</span
+                          >
+                        }
+                      </div>
+                      <!-- Parallel matches (decision 291): the others, as in the live list. -->
+                      @if (t.alsoNow?.length) {
+                        <na-live-list class="also" [items]="alsoItems(t)" [still]="true" />
+                      }
+                    </div>
+                  }
+                </a>
+              }
             }
           </div>
         </section>
@@ -581,17 +596,10 @@ function storedFilter(): TournamentFilter {
   `,
   styles: `
     .also {
-      display: flex;
-      gap: 6px;
-      align-items: baseline;
-      margin-top: 4px;
-      white-space: nowrap;
-      overflow: hidden;
+      margin-top: 10px;
     }
-    .also .an {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 9em;
+    .hero.ev .hero-name {
+      color: inherit;
     }
     .head {
       display: flex;
@@ -1060,6 +1068,22 @@ export class TournamentListPage {
   protected readonly live = computed(() =>
     this.shownActive().filter((t) => RUNNING.includes(t.phase)),
   );
+  /** The live tiles: a league evening's games in one (decision 294). */
+  protected readonly liveRows = computed(() => this.fold(this.live(), 'live', true));
+
+  /** The games of a league evening as rows of the live list. */
+  protected eveningItems(e: LeagueEvening): LiveListItem[] {
+    const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
+    return e.games.map((g) =>
+      leagueItem({ id: g.id, phase: g.phase, league: g.league, server: g.server, now: g.now }, tr),
+    );
+  }
+
+  /** The other matches of a tournament with parallel matches (decision 291). */
+  protected alsoItems(t: TournamentSummary): LiveListItem[] {
+    const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
+    return (t.alsoNow ?? []).map((n) => nowItem(n, tr));
+  }
   /** Everything else not over yet, by start (without one: last). */
   protected readonly upcoming = computed(() =>
     this.shownActive()
@@ -1248,7 +1272,7 @@ export class TournamentListPage {
   }
 
   /** The tournaments as rows, the league's games of an evening folded into one (see rowGroups). */
-  private fold(list: TournamentSummary[], scope: string): ListRow[] {
+  private fold(list: TournamentSummary[], scope: string, withMine = false): ListRow[] {
     // Ids without spaces (aria-controls refers to them).
     const scopeKey = scope.replace(/[^a-z0-9]+/gi, '_');
     const single = this.filter().kind === 'league';
@@ -1256,7 +1280,8 @@ export class TournamentListPage {
     const evenings = new Map<string, LeagueEvening>();
     for (const t of list) {
       const l = t.league;
-      if (!l || l.mine || single) {
+      // Live (withMine): the user's own game stays in its evening, marked in the live list.
+      if (!l || (l.mine && !withMine) || single) {
         rows.push({ id: t.id, t });
         continue;
       }

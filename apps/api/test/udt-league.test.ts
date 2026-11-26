@@ -108,6 +108,17 @@ describe('league plan (pure)', () => {
     expect(sim.realPerMatchday).toBeGreaterThan(4);
     expect(sim.realPerMatchday).toBeLessThan(6);
     expect(sim.minutes).toBe(Math.round(sim.realPerMatchday * 4));
+    // Four servers of the pool play at once (decision 294): a quarter of the time.
+    expect(
+      estimateEvening({
+        managers: 6,
+        tiers: 2,
+        size: 16,
+        perEvening: 1,
+        aiGames: 'all',
+        servers: 4,
+      }).minutes,
+    ).toBe(16);
   });
 });
 
@@ -491,6 +502,35 @@ describe('Dream Team league', () => {
     await anna.post('/udt/team', { name: 'Aces', tag: 'AC', starter: { name: 'ACbot' } });
     const v = (await anna.get('/udt/league')).body;
     expect(v.myClub).toMatchObject({ name: 'Aces', tier: 1 });
+  });
+
+  it("a league game's page lists the games of its evening that are on (decision 294)", async () => {
+    const { admin, mario, db } = await setup();
+    await admin.post('/udt/test/advance', { hours: 3 * 24 + 1 });
+    const games = db
+      .select()
+      .from(tournaments)
+      .all()
+      .filter((t) => t.udtJson?.includes('"league":{'));
+    expect(games.length).toBeGreaterThan(0);
+    // Not on yet: no list.
+    expect((await mario.get(`/tournaments/${games[0]!.id}`)).body.evening).toBeUndefined();
+    // Check-in on every server (the bridges would open it).
+    for (const g of games)
+      db.update(tournaments).set({ phase: 'checkIn' }).where(eq(tournaments.id, g.id)).run();
+    const d = (await mario.get(`/tournaments/${games[0]!.id}`)).body;
+    expect(d.evening).toHaveLength(games.length);
+    expect(d.evening.map((e: { id: string }) => e.id).sort()).toEqual(
+      games.map((g) => g.id).sort(),
+    );
+    for (const e of d.evening) {
+      expect(e).toMatchObject({
+        phase: 'checkIn',
+        server: 'Raspberry',
+        league: { kind: 'league' },
+      });
+      expect(e.now).toBeUndefined();
+    }
   });
 
   it('test mode: "matchday now" plays the next evening, "league season end" the rest', async () => {

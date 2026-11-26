@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 294,
+    date: '2026-11-26',
+    en: {
+      title: 'League evenings like parallel matches',
+      items: [
+        "A league game's page lists the other games of the evening - one click opens them.",
+        'The league page and the overview show the games on the server in the same list: server, score, your game marked.',
+        '"Matches ● n" in the header now counts the matches being played.',
+      ],
+    },
+    de: {
+      title: 'Liga-Abende wie parallele Matches',
+      items: [
+        'Die Seite eines Ligaspiels listet die anderen Spiele des Abends - ein Klick öffnet sie.',
+        'Liga-Seite und Übersicht zeigen die Spiele auf dem Server in derselben Liste: Server, Stand, dein Spiel markiert.',
+        '„Matches ● n“ in der Kopfleiste zählt jetzt die laufenden Matches.',
+      ],
+    },
+  },
+  {
     id: 293,
     date: '2026-11-26',
     en: {

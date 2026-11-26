@@ -17,6 +17,8 @@ import { Loading } from '../core/loading';
 import type { LeagueGame, LeagueHistorySeason, LeagueRow, LeagueView } from '../core/types';
 import { UdtNav } from '../core/udt';
 import { UdtCrestMark } from '../components/udt-crest';
+import { LiveList, type LiveListItem } from '../components/live-list';
+import { leagueItem } from '../core/live-items';
 
 /** A played league game with the pause before the next (as GAME_MINUTES of the API). */
 const GAME_MS = 4 * 60_000;
@@ -29,12 +31,12 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
 
 /**
  * Dream Team league (design "Dream Team Liga"): the table of every tier with its zones and
- * form, the matchday as a conference (games on the server one after another, AI games ticking
+ * form, the matchday as a conference (games on the servers at the same time, AI games ticking
  * in), the fixture list, the season's finale (final four, relegation, moves) and the history.
  */
 @Component({
   selector: 'app-udt-league',
-  imports: [TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark],
+  imports: [TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark, LiveList],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -75,12 +77,15 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
 
         @switch (tab()) {
           @case ('table') {
-            @for (g of runningGames(); track g.id) {
-              <a class="lg-livelink" [routerLink]="['/t', g.tournament!.id]">
-                <b class="lg-up">● LIVE</b>
-                <span>{{ g.home.name }} – {{ g.away.name }}</span>
-                <span aria-hidden="true">›</span>
-              </a>
+            @if (runningItems().length) {
+              <!-- The games on the server now, like everywhere (decision 294). -->
+              <section class="lg-card lg-livebox">
+                <na-live-list
+                  [items]="runningItems()"
+                  [title]="'league.liveNow' | t: { n: runningItems().length }"
+                  [label]="'league.server' | t"
+                />
+              </section>
             }
             <div class="lg-cols">
               <section class="lg-card lg-main" [attr.aria-label]="'league.view.table' | t">
@@ -262,38 +267,11 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                       <h3>{{ 'league.server' | t }}</h3>
                       <span class="muted small">{{ 'league.serverHint' | t }}</span>
                     </div>
-                    @for (g of runningGames(); track g.id) {
-                      <a class="lg-run" [routerLink]="['/t', g.tournament!.id]">
-                        <span class="lg-runhead small">
-                          <b class="lg-up">● {{ 'league.badge.live' | t }}</b>
-                          <span
-                            >{{ g.map ?? '' }} · 5v5 ·
-                            {{ 'league.fragLimit' | t: { n: v.rules?.fragLimit ?? 30 } }}</span
-                          >
-                        </span>
-                        <span class="lg-runteams">
-                          <span class="r"
-                            >{{ g.home.name }}
-                            <span
-                              class="lg-chip"
-                              [class.me]="g.home.me"
-                              [class.mgr]="g.home.manager && !g.home.me"
-                              >{{ chip(g.home) | t }}</span
-                            ></span
-                          >
-                          <span class="mono muted">vs</span>
-                          <span
-                            >{{ g.away.name }}
-                            <span
-                              class="lg-chip"
-                              [class.me]="g.away.me"
-                              [class.mgr]="g.away.manager && !g.away.me"
-                              >{{ chip(g.away) | t }}</span
-                            ></span
-                          >
-                        </span>
-                        <span class="muted small">{{ 'league.runHint' | t }}</span>
-                      </a>
+                    @if (runningItems().length) {
+                      <div class="lg-runlist">
+                        <na-live-list [items]="runningItems()" [label]="'league.server' | t" />
+                        <p class="muted small">{{ 'league.runHint' | t }}</p>
+                      </div>
                     }
                     @for (g of queue(); track g.id) {
                       <div class="lg-q">
@@ -916,6 +894,26 @@ export class UdtLeaguePage implements OnDestroy {
     this.realGames().filter((g) => this.isRunning(g)),
   );
   protected readonly queue = computed(() => this.realGames().filter((g) => !this.isRunning(g)));
+  /** The games on the server now as rows of the live list (decision 294). */
+  protected readonly runningItems = computed<LiveListItem[]>(() =>
+    this.runningGames().map((g) =>
+      leagueItem(
+        {
+          id: g.tournament!.id,
+          phase: g.tournament!.phase,
+          league: {
+            kind: g.kind,
+            matchday: g.matchday,
+            home: g.home.name,
+            away: g.away.name,
+            mine: g.home.me || g.away.me,
+          },
+          now: g.live ?? null,
+        },
+        (k, p) => this.i18n.t(k, p),
+      ),
+    ),
+  );
 
   protected chip(c: { me: boolean; manager: boolean; ai?: boolean }): string {
     return c.me
