@@ -1,6 +1,6 @@
 /**
- * Unreal Dream Team club house (concept section 8, decisions 264 and 266; plan
- * `claude/Plan-Vereinshaus-Scouting.md`): buildings a manager buys for a season (reset at the
+ * Unreal Dream Team club house (concept section 8, decisions 264 and
+ * 266): buildings a manager buys for a season (reset at the
  * season change), some in levels. Prices × the full index (luxury), each level dearer.
  */
 import { roundNeuro } from './economy.js';

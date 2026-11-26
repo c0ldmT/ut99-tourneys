@@ -1,5 +1,5 @@
 /**
- * Signatures (plan P4, `claude/Plan-P4-Markt.md`, decision 271): a library bot earns one small
+ * Signatures (plan P4, decision 271): a library bot earns one small
  * effect of its own from its career - not a trait (no slot, not craftable, never removed). It
  * comes at the season change for bots of age 2 and career level 10 from their lifetime
  * statistics (the strongest mark against the average of their skill), stays with the bot for

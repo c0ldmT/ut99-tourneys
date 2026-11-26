@@ -325,7 +325,7 @@ export function traitOfRarity(rarity: Rarity, rng: () => number): TraitDef {
 /**
  * What a trait did in the games of season 2 (decision 251): frag difference per minute against
  * the other bots of the same game, skill and values controlled (export of 20.11., 7,608 bot
- * games, `claude/Analyse-Scratch.md`), each pulled towards the mean trait (+0.48, empirical
+ * games), each pulled towards the mean trait (+0.48, empirical
  * Bayes, spread 0.4) by its standard error - few games, little weight. A skill step is about
  * +1.7. Traits without data count as the mean trait when the mod plays them, else (manager
  * traits, claudius - its +1 skill counts already - and gun nut) as nothing. Mod 0.19.2 (decision
