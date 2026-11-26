@@ -1,3 +1,4 @@
+import { HelpMore } from './help-more';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -21,7 +22,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
  */
 @Component({
   selector: 'udt-mentor-panel',
-  imports: [TPipe, UdtCard],
+  imports: [HelpMore, TPipe, UdtCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let v = academy();
@@ -37,7 +38,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
           <span class="udt-mark star">{{ 'udt.mentor.ruleXp' | t: { xp: xp() } }}</span>
         </div>
       </div>
-      <p class="muted small">{{ 'udt.mentor.intro' | t }}</p>
+      <na-help id="mentors">{{ 'udt.mentor.intro' | t }}</na-help>
 
       @if (v.mentorships.length) {
         <h3>{{ 'udt.mentor.running' | t }}</h3>

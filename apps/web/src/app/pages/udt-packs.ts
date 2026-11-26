@@ -44,6 +44,7 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
     @if (view(); as v) {
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">{{ 'udt.area.packs' | t }}</div>
           <h1 class="disp">{{ 'udt.packs.title' | t }}</h1>
           <p class="muted">{{ 'udt.packs.intro' | t: { i: v.index.toFixed(2) } }}</p>
         </div>

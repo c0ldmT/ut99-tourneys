@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 305,
+    date: '2026-11-26',
+    en: {
+      title: 'Dream Team pages tidied up',
+      items: [
+        'Every Dream Team page starts the same way: a small violet line with the area, the title, one sentence and the key figures - without the big card, so the content starts higher (on phones too).',
+        'Long rules (trading, market chart, scouting, mentors) are behind "How it works" - open them once and they stay open.',
+        'The club house shows its buildings directly, the next market day reads "tomorrow 04:00".',
+      ],
+    },
+    de: {
+      title: 'Dream-Team-Seiten aufgeräumt',
+      items: [
+        'Jede Dream-Team-Seite beginnt gleich: eine kleine violette Zeile mit dem Bereich, der Titel, ein Satz und die wichtigsten Zahlen - ohne die große Karte, der Inhalt beginnt weiter oben (auch am Handy).',
+        'Lange Regeln (Handel, Markt-Kurve, Scouting, Mentoren) stehen hinter „So funktioniert’s“ - einmal geöffnet, bleiben sie offen.',
+        'Das Vereinshaus zeigt seine Gebäude direkt, der nächste Markttag liest sich „morgen 04:00“.',
+      ],
+    },
+  },
+  {
     id: 302,
     date: '2026-11-26',
     en: {

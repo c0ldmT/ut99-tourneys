@@ -16,6 +16,7 @@ import { UdtNav } from '../core/udt';
     <udt-nav (changed)="load()" />
     <div class="udt-head">
       <div>
+        <div class="kpi udt-kick">{{ 'udt.area.cups' | t }}</div>
         <h1 class="disp">{{ 'udt.events.title' | t }}</h1>
         <p class="muted">{{ 'udt.events.lineupNote' | t }}</p>
       </div>
@@ -263,6 +264,7 @@ export class UdtEventsPage {
     <udt-nav (changed)="load()" />
     <div class="udt-head">
       <div>
+        <div class="kpi udt-kick">{{ 'udt.area.cups' | t }}</div>
         <h1 class="disp">{{ 'udt.table.title' | t }}</h1>
       </div>
     </div>

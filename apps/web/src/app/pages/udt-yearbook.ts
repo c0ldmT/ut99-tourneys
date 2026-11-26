@@ -68,6 +68,7 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
     @if (book(); as y) {
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">{{ 'udt.area.team' | t }}</div>
           <h1 class="disp">{{ 'udt.yearbook.title' | t }}</h1>
           <p class="muted">{{ 'udt.yearbook.intro' | t }}</p>
         </div>

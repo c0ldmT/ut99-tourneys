@@ -51,6 +51,9 @@ import { ReportButton } from '../components/report-button';
       </p>
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">
+            {{ (p.team?.mine ? 'udt.area.team' : 'udt.area.trans') | t }}
+          </div>
           <h1 class="disp">
             @let tn = titleParts(p);
             @if (tn[0]) {

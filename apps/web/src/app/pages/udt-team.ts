@@ -60,7 +60,9 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
       } @else if (!v.team) {
         <div class="udt-head">
           <div>
-            <div class="kpi" style="color: var(--udt)">{{ 'udt.season' | t: { n: v.season } }}</div>
+            <div class="kpi udt-kick">
+              {{ 'udt.area.team' | t }} · {{ 'udt.season' | t: { n: v.season } }}
+            </div>
             <h1 class="disp">{{ 'udt.found.title' | t }}</h1>
             <p class="muted">{{ 'udt.found.intro' | t }}</p>
           </div>
@@ -133,7 +135,9 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
       } @else {
         <div class="udt-head">
           <div>
-            <div class="kpi" style="color: var(--udt)">{{ 'udt.season' | t: { n: v.season } }}</div>
+            <div class="kpi udt-kick">
+              {{ 'udt.area.team' | t }} · {{ 'udt.season' | t: { n: v.season } }}
+            </div>
             <h1 class="disp">
               @if (v.crest; as c) {
                 <udt-crest [crest]="c" [tag]="v.team.tag" [size]="34" />

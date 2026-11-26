@@ -389,6 +389,7 @@ const en = {
   'common.save': 'Save',
   'common.cancel': 'Cancel',
   'confirm.ok': 'Confirm',
+  'help.how': 'How it works',
   'common.lack': '{n} short',
   'common.delete': 'Delete',
   'common.close': 'Close',
@@ -2281,6 +2282,7 @@ const en = {
   'udt.market.cannotAfford': 'Not enough Neuro to spend.',
   'udt.market.full': 'Your roster is full ({max} bots): sell a bot first.',
   'udt.market.roster': 'Roster',
+  'udt.trades.lead': 'Swap bots and Neuro with other managers: a {fee} % fee, offers run {h} h.',
   'udt.trades.rules':
     'Bought bots and the bots you made (also the starter) can be traded, from {lock} days after buying, making or trading; bots you made stay bots of their own at the new team (no salary – blueprint bots 75 % –, they keep developing) and you remain their breeder. Not while a bot plays in a drawn or running tournament or is nominated for the graduation. Fee {fee} % on what you receive · the smaller side is worth at least {bal} % of the other · every roster keeps at least one bot · offers run {h} h.',
   'udt.trades.blocked.nominated': 'nominated for the graduation',
@@ -2358,6 +2360,7 @@ const en = {
   'udt.form.title.normal': 'Form of the day: normal (random every day).',
   'udt.help.lineup.text':
     'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro. Each bot also has a form of the day (Form ▲ / ▼ on the card). In the bot details the training camp gives a bot experience for Neuro, once a day - handy for bots that play little.',
+  'udt.market.legendLink': 'What do the line and % show?',
   'udt.market.legend':
     "Line and % on the right: how the bot's market value moved over the last market days, without the economy index – so form and demand of this bot, not the whole economy.",
   'udt.market.trendTitle':
@@ -3515,6 +3518,7 @@ const de: Record<TKey, string> = {
   'common.save': 'Speichern',
   'common.cancel': 'Abbrechen',
   'confirm.ok': 'Bestätigen',
+  'help.how': 'So funktioniert’s',
   'common.lack': 'Es fehlen {n}',
   'common.delete': 'Löschen',
   'common.close': 'Schließen',
@@ -5428,6 +5432,8 @@ const de: Record<TKey, string> = {
   'udt.market.cannotAfford': 'Nicht genug ausgebbares Neuro.',
   'udt.market.full': 'Dein Kader ist voll ({max} Bots): Verkauf zuerst einen Bot.',
   'udt.market.roster': 'Kader',
+  'udt.trades.lead':
+    'Tausche Bots und Neuro mit anderen Managern: {fee} % Gebühr, Angebote laufen {h} h.',
   'udt.trades.rules':
     'Handelbar sind gekaufte und selbst gemachte Bots (auch der Starter), ab {lock} Tagen nach Kauf, Erstellen oder Tausch; selbst gemachte bleiben beim neuen Team eigene Bots (kein Gehalt – Bauplan-Bots 75 % –, entwickeln sich weiter), du bleibst ihr Züchter. Nicht, solange ein Bot in einem ausgelosten oder laufenden Turnier spielt oder für den Abschluss nominiert ist. Gebühr {fee} % auf das, was du bekommst · die kleinere Seite ist mindestens {bal} % der anderen wert · jeder Kader behält mindestens einen Bot · Angebote laufen {h} h.',
   'udt.trades.blocked.nominated': 'für den Abschluss nominiert',
@@ -5507,6 +5513,7 @@ const de: Record<TKey, string> = {
   'udt.form.title.normal': 'Tagesform: normal (jeden Tag neu ausgewürfelt).',
   'udt.help.lineup.text':
     'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro. Jeder Bot hat außerdem eine Tagesform (Form ▲ / ▼ auf der Karte). In den Bot-Details gibt das Trainingslager einem Bot einmal am Tag Erfahrung gegen Neuro – praktisch für Bots, die wenig spielen.',
+  'udt.market.legendLink': 'Was zeigen Linie und %?',
   'udt.market.legend':
     'Linie und % rechts: wie sich der Marktwert des Bots über die letzten Markttage entwickelt hat, ohne den Wirtschaftsindex – also Form und Nachfrage dieses Bots, nicht die ganze Wirtschaft.',
   'udt.market.trendTitle':

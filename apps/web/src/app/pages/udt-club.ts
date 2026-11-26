@@ -61,27 +61,28 @@ interface WallItem {
           {{ 'udt.packs.noTeam' | t }} <a routerLink="/udt/team">{{ 'udt.nav.team' | t }}</a>
         </p>
       } @else {
-        <section class="card club" aria-labelledby="club-title">
-          <div class="chead">
-            <div class="who">
-              @if (v.crest; as c) {
-                <udt-crest [crest]="c" [tag]="v.team.tag" [size]="52" />
-              }
-              <div>
-                <div class="kpi">
-                  {{ v.team.name }} · {{ 'udt.season' | t: { n: v.season ?? 0 } }}
-                </div>
-                <h1 id="club-title" class="disp">{{ 'udt.club.title' | t }}</h1>
-              </div>
+        <!-- Page head like every Dream Team page, the buildings without a card around them (decision 304). -->
+        <div class="udt-head">
+          <div>
+            <div class="kpi udt-kick">
+              {{ 'udt.area.team' | t }} · {{ 'udt.season' | t: { n: v.season ?? 0 } }}
             </div>
-            <p class="muted intro">
-              {{ 'udt.club.intro' | t: { i: indexText() } }}
-            </p>
-            <div class="spent">
-              <div class="v neuro mono">{{ v.clubSpent ?? 0 | neuro }}</div>
-              <div class="muted small">{{ 'udt.club.spent' | t }}</div>
+            <h1 id="club-title" class="disp">
+              @if (v.crest; as c) {
+                <udt-crest [crest]="c" [tag]="v.team.tag" [size]="34" />
+              }
+              {{ 'udt.club.title' | t }}
+            </h1>
+            <p class="muted">{{ 'udt.club.intro' | t: { i: indexText() } }}</p>
+          </div>
+          <div class="udt-kpis">
+            <div>
+              <div class="kpi">{{ 'udt.club.spent' | t }}</div>
+              <div class="v neuro">{{ v.clubSpent ?? 0 | neuro }}</div>
             </div>
           </div>
+        </div>
+        <section class="club" aria-labelledby="club-title">
           <div class="cgrid">
             @for (x of tiles(); track x.b.kind) {
               <div class="bld" [class.built]="x.built">
@@ -217,30 +218,7 @@ interface WallItem {
       display: flex;
       flex-direction: column;
       gap: 16px;
-    }
-    .chead {
-      display: flex;
-      align-items: flex-end;
-      gap: 12px 18px;
-      flex-wrap: wrap;
-    }
-    .who {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-    .who h1 {
-      margin: 2px 0 0;
-    }
-    .intro {
-      margin: 0;
-      flex: 1 1 340px;
-    }
-    .spent {
-      text-align: right;
-    }
-    .spent .v {
-      font-size: var(--fs-lg);
+      margin-bottom: 18px;
     }
     .cgrid {
       display: grid;

@@ -1,3 +1,4 @@
+import { HelpMore } from '../components/help-more';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -26,6 +27,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
 @Component({
   selector: 'app-udt-academy',
   imports: [
+    HelpMore,
     FormsModule,
     RouterLink,
     TPipe,
@@ -42,6 +44,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     @if (a(); as v) {
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">{{ 'udt.area.team' | t }}</div>
           <h1 class="disp">{{ 'udt.academy.title' | t }}</h1>
           <p class="muted">{{ 'udt.academy.intro' | t }}</p>
         </div>
@@ -144,7 +147,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
           @if (v.rosterFull) {
             <p class="muted small">{{ 'udt.academy.full' | t }}</p>
           }
-          <p class="muted small snote">{{ 'udt.scout.note' | t }}</p>
+          <na-help id="academy-scout">{{ 'udt.scout.note' | t }}</na-help>
         </section>
 
         @if (v.blueprints.length) {
@@ -483,9 +486,6 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     .thalf {
       margin-top: -4px;
       text-align: center;
-    }
-    .snote {
-      margin: 0;
     }
   `,
 })

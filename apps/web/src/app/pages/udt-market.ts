@@ -1,3 +1,4 @@
+import { HelpMore } from '../components/help-more';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Api } from '../core/api';
@@ -14,13 +15,14 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
 /** Dream Team transfer market: today's offers at fixed prices (buy at once), the next market day. */
 @Component({
   selector: 'app-udt-market',
-  imports: [TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
+  imports: [HelpMore, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     @if (market(); as m) {
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">{{ 'udt.area.trans' | t }}</div>
           <h1 class="disp">{{ 'udt.market.title' | t }}</h1>
           <p class="muted">{{ 'udt.market.intro' | t }}</p>
         </div>
@@ -57,7 +59,9 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
                 </button>
               }
             </div>
-            <p class="muted small legend">{{ 'udt.market.legend' | t }}</p>
+            <na-help id="market-legend" label="udt.market.legendLink" class="legend">{{
+              'udt.market.legend' | t
+            }}</na-help>
             @for (o of shown(); track o.botId) {
               <button
                 type="button"
@@ -380,7 +384,7 @@ export class UdtMarketPage {
   protected next(): string {
     const at = this.market()?.nextAt;
     if (!at) return '–';
-    return this.i18n.date(new Date(at).toISOString());
+    return this.i18n.when(new Date(at).toISOString(), 'relShort');
   }
 
   protected pick(o: UdtOffer) {

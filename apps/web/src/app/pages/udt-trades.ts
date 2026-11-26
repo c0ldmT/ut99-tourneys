@@ -1,3 +1,4 @@
+import { HelpMore } from '../components/help-more';
 import { EmptyState } from '../components/empty-state';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
@@ -23,15 +24,29 @@ import { ReportButton } from '../components/report-button';
  */
 @Component({
   selector: 'app-udt-trades',
-  imports: [EmptyState, FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, ReportButton],
+  imports: [
+    HelpMore,
+    EmptyState,
+    FormsModule,
+    TPipe,
+    NeuroPipe,
+    Coin,
+    UdtCard,
+    UdtNav,
+    ReportButton,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     @if (data(); as d) {
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">{{ 'udt.area.trans' | t }}</div>
           <h1 class="disp">{{ 'udt.trades.title' | t }}</h1>
           <p class="muted">
+            {{ 'udt.trades.lead' | t: { fee: d.rules.feePct, h: d.rules.expiryHours } }}
+          </p>
+          <na-help id="trades">
             {{
               'udt.trades.rules'
                 | t
@@ -45,7 +60,7 @@ import { ReportButton } from '../components/report-button';
             @if (d.rules.pairPerWeek) {
               {{ 'udt.trades.pair' | t: { n: d.rules.pairPerWeek } }}
             }
-          </p>
+          </na-help>
         </div>
       </div>
 

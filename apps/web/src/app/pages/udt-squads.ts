@@ -15,6 +15,7 @@ import { rosterCard, UdtCard, UdtNav, type CardBot } from '../core/udt';
     <udt-nav (changed)="load()" />
     <div class="udt-head">
       <div>
+        <div class="kpi udt-kick">{{ 'udt.area.trans' | t }}</div>
         <h1 class="disp">{{ 'udt.squads.title' | t }}</h1>
         <p class="muted">{{ 'udt.squads.intro' | t }}</p>
       </div>
@@ -92,6 +93,7 @@ export class UdtSquadsPage {
     @if (squad(); as s) {
       <div class="udt-head">
         <div>
+          <div class="kpi udt-kick">{{ 'udt.area.trans' | t }}</div>
           <h1 class="disp">
             <span style="color: var(--hot-text)">{{ s.team.tag }}</span> {{ s.team.name }}
           </h1>

@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Dream Team pages share one plain page head with a violet kicker (area), the club house without a card around its buildings; long rules (trading, market legend, scouting, mentors) behind "So funktioniert's" (decisions 304, 305, patch note 305).
 - Colours equal to a design token use the token (45 places, no visible change) (decision 303).
 - Empty lists say what comes next (overview, statistics, trades, moderation); tab rows on phones fade out where more tabs are (decision 302, patch note 302).
 - Locked purchases say how much Neuro is missing (shop, club house, packs); shop and club house use quiet buttons, a locked 10-pack is grey (decision 301).
