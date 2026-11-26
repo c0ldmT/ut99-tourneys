@@ -79,6 +79,7 @@ import type {
   SeriesPreview,
   SeriesView,
   LookView,
+  SearchResult,
   ShopView,
   ShopItem,
   ShopPurchaseView,
@@ -336,6 +337,11 @@ export class Api {
     return v;
   };
   udtHub = () => this.call<UdtHub>('GET', '/udt/hub');
+  search = (q: string) =>
+    this.call<SearchResult>('GET', `/search?q=${encodeURIComponent(q)}`, undefined, {
+      quiet: true,
+      background: true,
+    });
   udtCreateTeam = (body: unknown) =>
     this.call<UdtView>('POST', '/udt/team', body, { ok: 'ok.udt.team' });
   udtLineup = (body: {

@@ -22,6 +22,22 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 313,
+    date: '2026-11-26',
+    en: {
+      title: 'Quick search',
+      items: [
+        'Search in the header or press Ctrl+K (Mac: Cmd+K) anywhere: bots, teams, players, tournaments and pages by name. Arrow keys and Enter open a hit, the last ones you opened show first.',
+      ],
+    },
+    de: {
+      title: 'Schnellsuche',
+      items: [
+        'Suchen im Kopf oder Strg+K (Mac: Cmd+K) auf jeder Seite: Bots, Teams, Spieler, Turniere und Seiten nach Namen. Pfeiltasten und Enter öffnen einen Treffer, zuletzt Geöffnetes steht oben.',
+      ],
+    },
+  },
+  {
     id: 312,
     date: '2026-11-26',
     en: {

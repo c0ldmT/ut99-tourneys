@@ -1,3 +1,4 @@
+import { QuickSearch } from './components/quick-search';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -60,6 +61,7 @@ import { Feedback } from './components/feedback';
     ConfirmDialog,
     PatchNotes,
     Feedback,
+    QuickSearch,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
@@ -154,6 +156,8 @@ import { Feedback } from './components/feedback';
         }
         <span class="grow"></span>
         @if (auth.me(); as me) {
+          <!-- Quick search, also Ctrl+K (decision 313). -->
+          <na-search />
           @if (neuro() !== null) {
             <a
               routerLink="/stats/p/u:{{ me.id }}"

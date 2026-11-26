@@ -116,6 +116,7 @@ const ICONS: Record<string, string> = {
   plus: 'M12 5v14M5 12h14',
   copyToNew: 'M8 8h11v11H8zM4 16V4h12M13.5 11v5M11 13.5h5',
   shop: 'M4 7h16l-1.5 12h-13zM9 7a3 3 0 0 1 6 0',
+  search: 'M11 4a7 7 0 1 0 0 14a7 7 0 1 0 0-14M16 16l4 4',
   logout: 'M14 4h5v16h-5M10 8l-4 4 4 4M6 12h11',
   // badges (Neuro shop)
   crown: 'M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z',

@@ -1,3 +1,4 @@
+import { SKILL_NAMES } from './skill-names';
 import { Confirm } from '../components/confirm-dialog';
 import {
   afterNextRender,
@@ -78,17 +79,8 @@ export function rosterSalary(
   return share ? salaryOf(b, index, share) : 0;
 }
 
-/** UT99 skill names 0..7. */
-export const SKILL_NAMES = [
-  'Novice',
-  'Average',
-  'Experienced',
-  'Skilled',
-  'Adept',
-  'Masterful',
-  'Inhuman',
-  'Godlike',
-];
+// UT99 skill names 0..7 live in their own small module (the header's quick search needs them).
+export { SKILL_NAMES };
 
 /** Values -1..1 shown as 0..100. */
 export const pct = (v: number | undefined) => Math.round(((v ?? 0) + 1) * 50);

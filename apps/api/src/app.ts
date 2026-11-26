@@ -9,6 +9,7 @@ import express from 'express';
 import { AgentsController } from './agents/agents.controller.js';
 import { AgentsService } from './agents/agents.service.js';
 import { ModerationController } from './moderation/moderation.controller.js';
+import { SearchController } from './search/search.controller.js';
 import { ModerationService } from './moderation/moderation.service.js';
 import { AgentConnections } from './agents/connections.js';
 import { AgentGateway } from './agents/gateway.js';
@@ -115,6 +116,7 @@ class AppModule {
         NeuroController,
         FeedbackController,
         ModerationController,
+        SearchController,
       ],
       providers: [
         { provide: CONFIG, useValue: config },

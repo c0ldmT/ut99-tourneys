@@ -49,6 +49,16 @@ export interface PatchNote {
 }
 
 /** The Dream Team hub (`GET /udt/hub`): a short state per area. */
+/** Hits of the quick search (decision 313), at most five per group. */
+export interface SearchResult {
+  udt: boolean;
+  bots: { id: string; name: string; skill: number; team: string | null }[];
+  teams: { userId: string; name: string; tag: string; manager: string | null }[];
+  /** `key` null: a user without statistics (only admins get those). */
+  players: { userId: string; name: string; key: string | null; tournaments: number }[];
+  tournaments: { id: string; name: string; phase: string; at: string }[];
+}
+
 export interface UdtHub {
   season: number | null;
   today: string;
