@@ -104,6 +104,16 @@ export interface UdtHub {
   transfers: { tradesIn: number; marketAt: string | null };
   /** The challenges area (decision 337); null while they are off. */
   challenges?: {
+    /** Today's Monster Hunt showcase, for every manager (decision 338). */
+    showcase: {
+      at: string;
+      from: string;
+      to: string;
+      hardness: ChallengeHardness | null;
+      stake: number;
+      map: string | null;
+      mine: boolean;
+    } | null;
     incoming: number;
     open: number;
     next: { at: string; mode: ChallengeMode; stake: number; opponent: string } | null;
@@ -231,6 +241,38 @@ export interface UdtChallengeOpponent {
 export interface UdtChallengeOpponents {
   me: { strength: number; full: boolean; mh: number } | null;
   teams: UdtChallengeOpponent[];
+}
+
+/** Two managers against each other (decision 338). */
+export interface UdtRivalry {
+  challenges: { won: number; lost: number; net: number };
+  league: { won: number; lost: number };
+  rival: boolean;
+}
+
+export interface UdtChallengeRecord {
+  won: number;
+  lost: number;
+  net: number;
+  records: number;
+  recordNeuro: number;
+  rivals: {
+    userId: string;
+    name: string;
+    tag: string;
+    ai: boolean;
+    won: number;
+    lost: number;
+    net: number;
+    rival: boolean;
+  }[];
+  history: (UdtChallenge & { net: number; record: boolean })[];
+  me: string;
+}
+
+export interface UdtChallengeEvenings {
+  today: string;
+  days: { date: string; main: string | null; items: (UdtChallenge & { record: boolean })[] }[];
 }
 
 /** What the challenge dialog sends (a new one, a counter offer). */
@@ -2397,6 +2439,8 @@ export interface UdtYearbook {
   season: number;
   seasons: number[];
   bots: UdtYearbookEntry[];
+  /** Monster Hunt records set in the season's challenges (decision 338). */
+  challengeRecords?: { team: string; tag: string; map: string; finalMs: number; at: string }[];
 }
 
 export interface UdtBreeder {
@@ -2529,6 +2573,7 @@ export type CalendarKind =
   | 'tournament'
   | 'cup'
   | 'leagueEvening'
+  | 'challengeEvening'
   | 'relegation'
   | 'finalFour'
   | 'payday';

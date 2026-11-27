@@ -548,9 +548,15 @@ export class UdtNav {
   protected isActive(i: UdtAreaItem): boolean {
     const [rest, fragment] = this.url().split('#') as [string, string | undefined];
     const path = rest.split('?')[0]!;
+    // A deeper tab of the area wins (Challenges › Evenings is not Challenges too).
+    const deeper = (this.current()?.items ?? []).some(
+      (o) => o.link !== i.link && o.link.startsWith(i.link + '/') && path.startsWith(o.link),
+    );
     const same =
       path === i.link ||
-      (i.link === '/udt/league' ? path === '/udt/league/table' : path.startsWith(i.link + '/')) ||
+      (i.link === '/udt/league'
+        ? path === '/udt/league/table'
+        : path.startsWith(i.link + '/') && !deeper) ||
       // A bot's page belongs to the team tab (decision 306).
       (i.link === '/udt/team' && path.startsWith('/udt/bot/'));
     return same && (i.fragment ?? null) === (fragment ?? null);

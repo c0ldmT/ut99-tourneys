@@ -439,6 +439,36 @@ describe('challenge matches (decision 335)', () => {
     // The list shows it with its winner.
     const recent = (await mario.get('/udt/challenges')).body.recent;
     expect(recent[0]).toMatchObject({ id, status: 'played', winner, tournamentId: t.id });
+    // Record, rivalry, evenings, calendar, archive, yearbook (decision 338).
+    const rec = (await api!.app.get(UdtChallengesService).record({ id: winner } as never)) as {
+      won: number;
+      lost: number;
+      net: number;
+      rivals: { userId: string; won: number; net: number }[];
+    };
+    expect(rec).toMatchObject({ won: 1, lost: 0, net: 450 });
+    expect(rec.rivals[0]).toMatchObject({ userId: loser, won: 1, net: 450 });
+    const riv = await mario.get(`/udt/rivalry/${timId}`);
+    expect(riv.body.challenges).toEqual({
+      won: winner === marioId ? 1 : 0,
+      lost: winner === marioId ? 0 : 1,
+      net: winner === marioId ? 450 : -500,
+    });
+    expect(riv.body).toMatchObject({ league: { won: 0, lost: 0 }, rival: false });
+    const eve = await mario.get('/udt/challenges/evenings');
+    expect(eve.status, JSON.stringify(eve.body)).toBe(200);
+    expect(eve.body.days[0]).toMatchObject({ main: id, items: [{ id, status: 'played' }] });
+    const cal = await mario.get('/calendar?from=2026-11-26&to=2026-11-28');
+    const items = cal.body.items as { kind: string; link: string; mine: boolean }[];
+    expect(items.find((x) => x.kind === 'challengeEvening')).toMatchObject({ mine: true });
+    expect(items.some((x) => x.link === `/t/${t.id}`)).toBe(false);
+    const archive = await admin.get('/tournaments?scope=done&kind=udt');
+    expect(archive.status).toBe(200);
+    expect(JSON.stringify(archive.body)).not.toContain(t.id);
+    const all = await admin.get('/tournaments?scope=done');
+    expect(JSON.stringify(all.body)).toContain(t.id);
+    const yb = await mario.get('/udt/yearbook');
+    expect(yb.body.challengeRecords).toEqual([]);
   });
 
   it('a team that cannot field its lineup loses without a game; neither: called off', async () => {
@@ -593,6 +623,11 @@ describe('challenge matches (decision 335)', () => {
     const winner = done.winnerUser!;
     expect(free(winner)).toBe(winner === timId ? -500 - bonus : -500);
     expect(free(marioId) + free(timId)).toBe(-bonus);
+    // The yearbook names the record (decision 338).
+    const yb = await mario.get('/udt/yearbook');
+    expect(yb.body.challengeRecords).toEqual([
+      expect.objectContaining({ map: 'MH-Lonely', finalMs: 580_000 }),
+    ]);
   });
 });
 

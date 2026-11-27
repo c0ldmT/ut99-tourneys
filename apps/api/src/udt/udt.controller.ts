@@ -510,6 +510,24 @@ export class UdtController {
     return { incoming: this.challenges.incoming(user.id) };
   }
 
+  /** The manager's challenge record: won, lost, Neuro, rivals, last results (decision 338). */
+  @Get('challenges/record')
+  challengeRecord(@CurrentUser() user: User) {
+    return this.challenges.record(user);
+  }
+
+  /** The season's challenge evenings with their main fight (decision 338). */
+  @Get('challenges/evenings')
+  challengeEvenings(@CurrentUser() user: User) {
+    return this.challenges.evenings(user);
+  }
+
+  /** Two managers against each other: challenges and league games (decision 338). */
+  @Get('rivalry/:userId')
+  rivalry(@CurrentUser() user: User, @Param('userId') userId: string) {
+    return this.challenges.rivalry(user, userId);
+  }
+
   /** Teams to challenge: strength for the format, full lineup, Monster Hunt bots, pair limit. */
   @Get('challenges/opponents')
   challengeOpponents(
@@ -820,7 +838,9 @@ export class UdtController {
   /** The bots the managers made in a season (latest season by default). */
   @Get('yearbook')
   yearbook(@Query('season') season?: string) {
-    return this.career.yearbook(season ? Number(season) || undefined : undefined);
+    const book = this.career.yearbook(season ? Number(season) || undefined : undefined);
+    // Monster Hunt records of the season's challenges (decision 338).
+    return { ...book, challengeRecords: this.challenges.recordsOf(book.season) };
   }
 
   /** Best breeders of all seasons. */

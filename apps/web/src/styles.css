@@ -4477,6 +4477,9 @@ tr[class*='lg-z-'] .pl {
 :is(.cal-card, .cal-dot, .cal-chip, .cal-entry)[data-tone='pay'] {
   --tone: 163, 230, 53;
 }
+:is(.cal-card, .cal-dot, .cal-chip, .cal-entry)[data-tone='chall'] {
+  --tone: 255, 138, 61;
+}
 .cal-next {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));

@@ -11,7 +11,10 @@ import type { UdtLooks } from '../components/udt-bot-look';
 import type {
   AdminOverview,
   UdtChallengeBody,
+  UdtChallengeEvenings,
   UdtChallengeOpponents,
+  UdtChallengeRecord,
+  UdtRivalry,
   UdtChallenges,
   UdtChallengeSlots,
   TraitReport,
@@ -494,6 +497,12 @@ export class Api {
   udtChallengeWithdraw = (id: string) =>
     this.call<UdtChallenges>('DELETE', `/udt/challenges/${encodeURIComponent(id)}`, undefined, {
       ok: 'ok.udt.challengeWithdrawn',
+    });
+  udtChallengeRecord = () => this.call<UdtChallengeRecord>('GET', '/udt/challenges/record');
+  udtChallengeEvenings = () => this.call<UdtChallengeEvenings>('GET', '/udt/challenges/evenings');
+  udtRivalry = (userId: string) =>
+    this.call<UdtRivalry>('GET', `/udt/rivalry/${encodeURIComponent(userId)}`, undefined, {
+      quiet: true,
     });
   udtChallengeRematch = (id: string, at: string) =>
     this.call<UdtChallenges & { id: string }>(

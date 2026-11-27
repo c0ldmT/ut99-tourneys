@@ -471,6 +471,30 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * League games between two managers' clubs (all seasons, decision 338): won and lost from the
+   * first manager's side.
+   */
+  headToHead(a: string, b: string): { won: number; lost: number } {
+    const club = (u: string) =>
+      this.db.select().from(leagueClubs).where(eq(leagueClubs.userId, u)).get()?.id;
+    const ca = club(a);
+    const cb = club(b);
+    if (!ca || !cb) return { won: 0, lost: 0 };
+    let won = 0;
+    let lost = 0;
+    for (const f of this.db
+      .select()
+      .from(leagueFixtures)
+      .where(inArray(leagueFixtures.status, ['played', 'forfeit']))
+      .all())
+      if ((f.home === ca && f.away === cb) || (f.home === cb && f.away === ca)) {
+        if (f.winner === ca) won++;
+        else if (f.winner === cb) lost++;
+      }
+    return { won, lost };
+  }
+
   private clubs(): Map<string, ClubRow> {
     return new Map(
       this.db

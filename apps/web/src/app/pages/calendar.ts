@@ -14,6 +14,8 @@ const GROUP: Record<CalendarKind, Exclude<Group, 'all'>> = {
   tournament: 'tour',
   cup: 'cup',
   leagueEvening: 'league',
+  // Challenges are Dream Team games: with the cups in the filter, in their own orange.
+  challengeEvening: 'cup',
   relegation: 'league',
   finalFour: 'league',
   seasonStart: 'season',
@@ -23,7 +25,9 @@ const GROUP: Record<CalendarKind, Exclude<Group, 'all'>> = {
 };
 
 /** Icons (24 × 24, stroke) per group. */
-const ICON: Record<Exclude<Group, 'all'> | 'pay', string> = {
+const ICON: Record<Exclude<Group, 'all'> | 'pay' | 'chall', string> = {
+  chall:
+    'M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2',
   tour: 'M12 3v4M12 17v4M3 12h4M17 12h4M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z',
   cup: 'M7 4h10v5a5 5 0 0 1-10 0zM5 5H3v2a4 4 0 0 0 4 4M19 5h2v2a4 4 0 0 1-4 4M12 14v4M8 21h8',
   league: 'M4 5h16v14H4zM4 10h16M4 15h16M10 5v14',
@@ -41,7 +45,7 @@ const diffDays = (a: string, b: string) => Math.round((Date.parse(b) - Date.pars
 interface Shown {
   item: CalendarItem;
   /** Colour group (payday has its own colour). */
-  tone: Exclude<Group, 'all'> | 'pay';
+  tone: Exclude<Group, 'all'> | 'pay' | 'chall';
   icon: string;
   time: string;
   title: string;
@@ -528,7 +532,7 @@ export class CalendarPage {
     const t = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
     const m = i.meta as Record<string, unknown>;
     const g = GROUP[i.kind];
-    const tone = i.kind === 'payday' ? 'pay' : g;
+    const tone = i.kind === 'payday' ? 'pay' : i.kind === 'challengeEvening' ? 'chall' : g;
     const mds = (m['matchdays'] as number[] | undefined) ?? [];
     const md = mds.length > 1 ? `${mds[0]}–${mds.at(-1)}` : String(mds[0] ?? '');
     const season = Number(m['season'] ?? 0);
@@ -573,6 +577,14 @@ export class CalendarPage {
         title = short = t('cal.k.payday');
         sub = t('cal.sub.payday');
         break;
+      case 'challengeEvening':
+        title = t(m['showcase'] ? 'cal.k.showcase' : 'cal.k.challenges');
+        short = t('cal.s.challenges');
+        sub = t('cal.sub.challenges', {
+          n: Number(m['games'] ?? 0),
+          until: this.time(i.until),
+        });
+        break;
       default: {
         const size = Number(m['teamSize'] ?? 1);
         const fmt = `${size}v${size} ${m['game'] === 'mh' ? 'MH' : 'DM'}`;
@@ -584,11 +596,14 @@ export class CalendarPage {
       }
     }
     const my = m['myGame'] as { at: string; opponent: string; home: boolean } | null | undefined;
-    const myLine = my
-      ? t(my.home ? 'cal.myHome' : 'cal.myAway', { time: this.time(my.at), o: my.opponent })
-      : i.mine && (i.kind === 'tournament' || i.kind === 'cup')
-        ? t('cal.signedUp')
-        : '';
+    const ch = m['myChallenge'] as { at: string; opponent: string } | null | undefined;
+    const myLine = ch
+      ? t('cal.myChallenge', { time: this.time(ch.at), o: ch.opponent })
+      : my
+        ? t(my.home ? 'cal.myHome' : 'cal.myAway', { time: this.time(my.at), o: my.opponent })
+        : i.mine && (i.kind === 'tournament' || i.kind === 'cup')
+          ? t('cal.signedUp')
+          : '';
     const badges: Shown['badges'] = [];
     if (i.state === 'live') badges.push({ label: t('cal.b.live'), cls: 'live' });
     if (i.state === 'open') badges.push({ label: t('cal.b.open'), cls: 'open' });

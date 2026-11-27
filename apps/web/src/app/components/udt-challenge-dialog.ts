@@ -23,6 +23,7 @@ import type {
   UdtChallengeRules,
   UdtChallenges,
   UdtChallengeSlots,
+  UdtRivalry,
 } from '../core/types';
 import { Segment, type Choice } from './choice';
 
@@ -82,7 +83,7 @@ const clock = (ms: number) => {
                     class="opp"
                     [attr.aria-pressed]="isTeam(o.userId)"
                     [disabled]="!!why(o)"
-                    (click)="target.set({ kind: 'team', userId: o.userId })"
+                    (click)="pickTeam(o.userId)"
                   >
                     <b
                       >{{ o.tag }} {{ o.name }}
@@ -102,7 +103,7 @@ const clock = (ms: number) => {
                   type="button"
                   class="opp"
                   [attr.aria-pressed]="isOpen('all')"
-                  (click)="target.set({ kind: 'open', scope: 'all' })"
+                  (click)="target.set({ kind: 'open', scope: 'all' }); rivalry.set(null)"
                 >
                   <b>{{ 'udt.ch.dlg.openAll' | t }}</b>
                   <span class="meta">{{ 'udt.ch.dlg.openAllHint' | t }}</span>
@@ -112,7 +113,7 @@ const clock = (ms: number) => {
                     type="button"
                     class="opp"
                     [attr.aria-pressed]="isOpen('tier')"
-                    (click)="target.set({ kind: 'open', scope: 'tier' })"
+                    (click)="target.set({ kind: 'open', scope: 'tier' }); rivalry.set(null)"
                   >
                     <b>{{ 'udt.ch.dlg.openTier' | t }}</b>
                     <span class="meta">{{ 'udt.ch.dlg.openTierHint' | t }}</span>
@@ -282,6 +283,24 @@ const clock = (ms: number) => {
             <dd>{{ formatText() }}</dd>
             <dt>{{ 'udt.ch.dlg.when' | t }}</dt>
             <dd>{{ at() ? i18n.when(at(), 'dayTime') : '–' }}</dd>
+            @if (rivalry(); as r) {
+              <dt>{{ 'udt.ch.dlg.h2h' | t }}</dt>
+              <dd>
+                {{
+                  'peek.rivalry'
+                    | t
+                      : {
+                          cw: r.challenges.won,
+                          cl: r.challenges.lost,
+                          lw: r.league.won,
+                          ll: r.league.lost,
+                        }
+                }}
+                @if (r.rival) {
+                  · <span class="riv">{{ 'udt.ch.rival' | t }}</span>
+                }
+              </dd>
+            }
             <dt>{{ 'udt.ch.dlg.stake' | t }}</dt>
             <dd>{{ stake() ? (stake() | neuro) : ('udt.ch.friendly' | t) }}</dd>
           </dl>
@@ -542,6 +561,9 @@ const clock = (ms: number) => {
       text-align: right;
       font-weight: 600;
     }
+    .riv {
+      color: var(--hot-text);
+    }
     .note {
       background: var(--panel-2);
       border-radius: var(--radius-sm);
@@ -599,6 +621,8 @@ export class UdtChallengeDialog {
   protected readonly opps = signal<UdtChallengeOpponents | null>(null);
   protected readonly slots = signal<UdtChallengeSlots | null>(null);
   protected readonly busy = signal(false);
+  /** The two managers against each other (decision 338). */
+  protected readonly rivalry = signal<UdtRivalry | null>(null);
 
   protected readonly modes = computed((): Choice<ChallengeMode>[] =>
     this.rules().modes.map((m) => ({ value: m, label: `udt.ch.mode.${m}` })),
@@ -689,6 +713,7 @@ export class UdtChallengeDialog {
     this.at.set(null);
     this.dayIndex.set(0);
     this.dlg().nativeElement.showModal();
+    void this.loadRivalry(o.to ?? this.fixed()?.userId ?? null);
     if (c) void this.loadSlots();
     else void this.firstSize(o.to ?? null).then(() => this.loadSlots());
   }
@@ -717,6 +742,23 @@ export class UdtChallengeDialog {
 
   close(): void {
     this.dlg().nativeElement.close();
+  }
+
+  protected pickTeam(id: string) {
+    this.target.set({ kind: 'team', userId: id });
+    void this.loadRivalry(id);
+    void this.loadSlots();
+  }
+
+  private async loadRivalry(id: string | null) {
+    this.rivalry.set(null);
+    if (!id) return;
+    try {
+      const r = await this.api.udtRivalry(id);
+      if (this.opponentId() === id) this.rivalry.set(r);
+    } catch {
+      // without the line
+    }
   }
 
   protected isTeam(id: string) {

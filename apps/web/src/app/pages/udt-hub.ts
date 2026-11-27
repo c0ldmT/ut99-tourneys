@@ -766,6 +766,15 @@ export class UdtHubPage {
         if (c.next)
           parts.push(t('udt.hub.chall.next', { when: this.when(c.next.at), opp: c.next.opponent }));
         if (!parts.length && c.open) parts.push(t('udt.hub.chall.open', { n: c.open }));
+        // Today's showcase is news for every manager (decision 338).
+        if (c.showcase && !c.showcase.mine)
+          parts.unshift(
+            t('udt.hub.chall.showcase', {
+              when: this.when(c.showcase.at),
+              a: c.showcase.from,
+              b: c.showcase.to,
+            }),
+          );
         return {
           hint: parts.join(' · ') || t('udt.hub.chall.none'),
           badge: c.incoming

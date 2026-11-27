@@ -38,7 +38,7 @@ import { randomId } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { tournaments, udtChallenges, udtEntries, udtRoster } from '../db/schema.js';
+import { neuroLedger, tournaments, udtChallenges, udtEntries, udtRoster } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { nextDay, today, zonedMs } from '../seasons/season-time.js';
 import {
@@ -1328,6 +1328,228 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   }
 
   // ------------------------------------------------------------------------------------------
+  // Records, rivals, evenings (decision 338)
+  // ------------------------------------------------------------------------------------------
+
+  /** What a decided challenge brought a side: won the stake less the fee, lost the stake. */
+  private net(c: Row, userId: string): number {
+    if (c.status !== 'played' || !c.winnerUser) return 0;
+    const { fee } = challengePot(c.stake, c.feePct);
+    return c.winnerUser === userId ? c.stake - fee : -c.stake;
+  }
+
+  /** A manager's played challenges, all seasons, newest first. */
+  private playedBy(userId: string): Row[] {
+    return this.db
+      .select()
+      .from(udtChallenges)
+      .where(eq(udtChallenges.status, 'played'))
+      .all()
+      .filter((c) => this.involves(c, userId))
+      .sort((a, b) => (b.decidedAt ?? '').localeCompare(a.decidedAt ?? ''));
+  }
+
+  /** Challenges against one other manager are a rivalry from this many on. */
+  static readonly RIVAL_FROM = 3;
+
+  /**
+   * Two managers against each other (all seasons): challenges won, lost and the Neuro they
+   * brought, league games won and lost, rivals from three challenges on.
+   */
+  rivalry(user: User, otherId: string) {
+    const games = this.playedBy(user.id).filter((c) => this.involves(c, otherId));
+    const won = games.filter((c) => c.winnerUser === user.id).length;
+    return {
+      challenges: {
+        won,
+        lost: games.length - won,
+        net: games.reduce((n, c) => n + this.net(c, user.id), 0),
+      },
+      league: this.league.headToHead(user.id, otherId),
+      rival: games.length >= UdtChallengesService.RIVAL_FROM,
+    };
+  }
+
+  /**
+   * A manager's challenge record (all seasons): won, lost, Neuro, record bonuses, the managers
+   * played against (rivals first), the last results.
+   */
+  record(user: User) {
+    this.assertOn();
+    const games = this.playedBy(user.id);
+    const season = this.udt.seasonNumber();
+    const ai = this.udt.aiIds();
+    const by = new Map<string, { won: number; lost: number; net: number; last: string }>();
+    for (const c of games) {
+      const other = c.fromUser === user.id ? c.toUser! : c.fromUser;
+      const r = by.get(other) ?? { won: 0, lost: 0, net: 0, last: c.decidedAt ?? '' };
+      if (c.winnerUser === user.id) r.won++;
+      else r.lost++;
+      r.net += this.net(c, user.id);
+      by.set(other, r);
+    }
+    const nameOf = (u: string) => {
+      for (const s of [season, ...games.map((c) => c.season)])
+        if (s !== null) {
+          const t = this.udt.team(u, s);
+          if (t) return { name: t.name, tag: t.tag };
+        }
+      return { name: '?', tag: '' };
+    };
+    const bonuses = this.db
+      .select()
+      .from(neuroLedger)
+      .where(and(eq(neuroLedger.userId, user.id), eq(neuroLedger.kind, 'udt_challenge_record')))
+      .all();
+    const won = games.filter((c) => c.winnerUser === user.id).length;
+    return {
+      won,
+      lost: games.length - won,
+      net: games.reduce((n, c) => n + this.net(c, user.id), 0),
+      records: bonuses.length,
+      recordNeuro: bonuses.reduce((n, b) => n + b.amount, 0),
+      rivals: [...by.entries()]
+        .map(([userId, r]) => ({
+          userId,
+          ...nameOf(userId),
+          ai: ai.has(userId),
+          won: r.won,
+          lost: r.lost,
+          net: r.net,
+          rival: r.won + r.lost >= UdtChallengesService.RIVAL_FROM,
+        }))
+        .sort((a, b) => b.won + b.lost - (a.won + a.lost) || b.net - a.net),
+      history: games.slice(0, 30).map((c) => ({
+        ...this.item(c, user.id, ai),
+        net: this.net(c, user.id),
+        record: bonuses.some((b) => b.ref === `challenge-record:${c.id}`),
+      })),
+      me: user.id,
+    };
+  }
+
+  /**
+   * Monster Hunt records set in challenges of a season (the yearbook, decision 338): the team,
+   * the map and the time of every record bonus paid.
+   */
+  recordsOf(season: number) {
+    return this.db
+      .select()
+      .from(neuroLedger)
+      .where(and(eq(neuroLedger.season, season), eq(neuroLedger.kind, 'udt_challenge_record')))
+      .all()
+      .map((b) => {
+        const meta = (b.metaJson ? JSON.parse(b.metaJson) : {}) as {
+          map?: string;
+          finalMs?: number;
+        };
+        const team = this.udt.team(b.userId, season);
+        return {
+          team: team?.name ?? '?',
+          tag: team?.tag ?? '',
+          map: meta.map ?? '?',
+          finalMs: meta.finalMs ?? 0,
+          at: b.at,
+        };
+      })
+      .sort((a, b) => a.at.localeCompare(b.at));
+  }
+
+  /**
+   * Challenge evenings for the calendar (decision 338): per day of [from, to] (season time zone)
+   * the first start, the last end, the games, whether the manager's team plays (first own game
+   * and opponent), whether a Monster Hunt showcase is on, and the state.
+   */
+  calendar(from: string, to: string, userId: string) {
+    if (!this.visible()) return [];
+    const now = this.nowIso();
+    const rows = this.db
+      .select()
+      .from(udtChallenges)
+      .where(inArray(udtChallenges.status, ['accepted', 'locked', 'played']))
+      .all()
+      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+    const days = new Map<string, Row[]>();
+    for (const c of rows) {
+      const d = today(Date.parse(c.scheduledAt), this.tz);
+      if (d >= from && d <= to) days.set(d, [...(days.get(d) ?? []), c]);
+    }
+    return [...days.entries()].map(([day, list]) => {
+      const mine = list.find((c) => this.involves(c, userId));
+      const other = mine ? (mine.fromUser === userId ? mine.toUser : mine.fromUser) : null;
+      const until = list.reduce((m, c) => (c.endsAt > m ? c.endsAt : m), list[0]!.endsAt);
+      const state: 'done' | 'live' | 'planned' = list.every((c) => c.status === 'played')
+        ? 'done'
+        : list[0]!.scheduledAt <= now && until > now
+          ? 'live'
+          : 'planned';
+      return {
+        day,
+        at: list[0]!.scheduledAt,
+        until,
+        games: list.length,
+        showcase: list.some((c) => c.mode === 'mh'),
+        state,
+        myGame: mine
+          ? {
+              at: mine.scheduledAt,
+              opponent: (other && this.udt.team(other, mine.season)?.name) || '?',
+            }
+          : null,
+      };
+    });
+  }
+
+  /**
+   * The challenge evenings of the season (decision 338): per day the booked and played
+   * challenges, the main fight first (a Monster Hunt showcase before deathmatch, then the
+   * highest stake).
+   */
+  evenings(user: User) {
+    this.assertOn();
+    const s = this.udt.season();
+    const ai = this.udt.aiIds();
+    const rows = this.db
+      .select()
+      .from(udtChallenges)
+      .where(
+        and(
+          eq(udtChallenges.season, s.number),
+          inArray(udtChallenges.status, ['accepted', 'locked', 'played']),
+        ),
+      )
+      .all()
+      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
+    const days = new Map<string, Row[]>();
+    for (const c of rows) {
+      const d = today(Date.parse(c.scheduledAt), this.tz);
+      days.set(d, [...(days.get(d) ?? []), c]);
+    }
+    const records = new Set(
+      this.db
+        .select({ ref: neuroLedger.ref })
+        .from(neuroLedger)
+        .where(eq(neuroLedger.kind, 'udt_challenge_record'))
+        .all()
+        .map((r) => r.ref),
+    );
+    return {
+      today: today(this.now(), this.tz),
+      days: [...days.entries()].map(([date, list]) => {
+        const main = mainFight(list);
+        return {
+          date,
+          main: main?.id ?? null,
+          items: list.map((c) => ({
+            ...this.item(c, user.id, ai),
+            record: records.has(`challenge-record:${c.id}`),
+          })),
+        };
+      }),
+    };
+  }
+
+  // ------------------------------------------------------------------------------------------
   // Views
   // ------------------------------------------------------------------------------------------
 
@@ -1356,7 +1578,29 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       .filter((c) => c.status !== 'pending' && this.involves(c, userId))
       .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))[0];
     const other = next ? (next.fromUser === userId ? next.toUser : next.fromUser) : null;
+    // Today's Monster Hunt showcase (for every manager, decision 338): the main fight.
+    const day = today(this.now(), this.tz);
+    const show = mainFight(
+      rows.filter(
+        (c) =>
+          c.mode === 'mh' &&
+          c.status !== 'pending' &&
+          today(Date.parse(c.scheduledAt), this.tz) === day,
+      ),
+    );
+    const sideName = (u: string | null) => (u && this.udt.team(u, season)?.name) || '?';
     return {
+      showcase: show
+        ? {
+            at: show.scheduledAt,
+            from: sideName(show.fromUser),
+            to: sideName(show.toUser),
+            hardness: show.hardness,
+            stake: show.stake,
+            map: show.map,
+            mine: this.involves(show, userId),
+          }
+        : null,
       incoming: pending.filter((c) => c.toUser === userId).length,
       open: pending.filter(
         (c) =>
@@ -1550,6 +1794,23 @@ export function challengeIdOf(udtJson: string | null): string | null {
 }
 
 const holdRef = (id: string, userId: string) => `challenge-hold:${id}:${userId}`;
+
+/**
+ * The main fight of an evening (decision 338): a Monster Hunt showcase before deathmatch, then
+ * the highest stake, then the earliest.
+ */
+export function mainFight<C extends { mode: string; stake: number; scheduledAt: string }>(
+  list: readonly C[],
+): C | null {
+  return (
+    [...list].sort(
+      (a, b) =>
+        Number(b.mode === 'mh') - Number(a.mode === 'mh') ||
+        b.stake - a.stake ||
+        a.scheduledAt.localeCompare(b.scheduledAt),
+    )[0] ?? null
+  );
+}
 
 /** Events that decide a challenge's tournament (its match, its end, called off). */
 const decides = (e: TournamentEvent) =>

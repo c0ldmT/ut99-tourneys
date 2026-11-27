@@ -192,6 +192,8 @@ async function routes(admin) {
     ['udt-packs', '/udt/packs'],
     ['udt-trades', '/udt/trades'],
     ['udt-challenges', '/udt/challenges'],
+    ['udt-ch-evenings', '/udt/challenges/evenings'],
+    ['udt-ch-record', '/udt/challenges/record'],
     ['udt-club', '/udt/club'],
     ['udt-academy', '/udt/academy'],
     ['udt-yearbook', '/udt/yearbook'],

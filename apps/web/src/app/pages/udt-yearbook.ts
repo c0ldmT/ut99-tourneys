@@ -146,6 +146,22 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
         }
       </section>
     }
+    <!-- Monster Hunt records of the season's challenges (decision 338). -->
+    @if (book()?.challengeRecords?.length) {
+      <section class="card">
+        <h2>{{ 'udt.yearbook.chRecords' | t }}</h2>
+        <ul class="chrec">
+          @for (r of book()!.challengeRecords!; track r.at) {
+            <li>
+              <span class="mark">{{ 'udt.ch.ev.record' | t }}</span>
+              <b>{{ r.tag }} {{ r.team }}</b>
+              <span>{{ r.map }}</span>
+              <span class="mono">{{ clock(r.finalMs) }}</span>
+            </li>
+          }
+        </ul>
+      </section>
+    }
     <section class="card">
       <h2>{{ 'udt.yearbook.breeders' | t }}</h2>
       <div class="tablepanel">
@@ -179,6 +195,24 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
     </section>
   `,
   styles: `
+    .chrec {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 6px;
+    }
+    .chrec li {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      align-items: baseline;
+    }
+    .chrec .mark {
+      color: var(--chall);
+      font-weight: 700;
+      font-size: var(--fs-xs);
+    }
     /* The breeders table scrolls on small screens instead of widening the page. */
     .tablepanel {
       overflow-x: auto;
@@ -220,6 +254,12 @@ export class UdtYearbookPage {
   private readonly auth = inject(Auth);
   private readonly i18n = inject(I18n);
   protected readonly book = signal<UdtYearbook | null>(null);
+
+  /** "9:58" from milliseconds. */
+  protected clock(ms: number): string {
+    const s = Math.round(ms / 1000);
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  }
   protected readonly breeders = signal<UdtBreeder[]>([]);
   protected readonly nominations = signal<UdtYearbookEntry[]>([]);
   protected readonly hall = signal<UdtHall | null>(null);

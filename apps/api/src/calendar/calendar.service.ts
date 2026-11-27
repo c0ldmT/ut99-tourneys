@@ -12,6 +12,7 @@ import { SeriesService } from '../series/series.service.js';
 import { SettingsService } from '../settings/settings.service.js';
 import { estimateMs } from '../tournaments/server-calendar.js';
 import { TournamentsService } from '../tournaments/tournaments.service.js';
+import { challengeIdOf, UdtChallengesService } from '../udt/udt-challenges.service.js';
 import { UdtLeagueService } from '../udt/udt-league.service.js';
 
 export const CalendarQuery = z.object({
@@ -32,6 +33,7 @@ export type CalendarKind =
   | 'tournament'
   | 'cup'
   | 'leagueEvening'
+  | 'challengeEvening'
   | 'relegation'
   | 'finalFour'
   | 'payday';
@@ -70,6 +72,7 @@ export class CalendarService {
     @Inject(SettingsService) private readonly settings: SettingsService,
     @Inject(TournamentsService) private readonly tournaments: TournamentsService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
+    @Inject(UdtChallengesService) private readonly challenges: UdtChallengesService,
   ) {}
 
   private get tz(): string {
@@ -143,7 +146,13 @@ export class CalendarService {
         ),
       )
       .all()
-      .filter((t) => !this.league.isLeagueTournament(t) && (t.kind !== 'udt' || udt.enabled));
+      // Challenges are their evenings too (decision 338).
+      .filter(
+        (t) =>
+          !this.league.isLeagueTournament(t) &&
+          !challengeIdOf(t.udtJson) &&
+          (t.kind !== 'udt' || udt.enabled),
+      );
     const ids = rows.map((t) => t.id);
     const entered = new Map<string, Set<string>>();
     const note = (tid: string, uid: string) => {
@@ -203,6 +212,22 @@ export class CalendarService {
         link: null,
         meta: { series: p.seriesId, game: p.game, teamSize: p.teamSize, size: p.size },
       });
+
+    // Challenge evenings (decision 338).
+    if (udt.enabled)
+      for (const c of this.challenges.calendar(from, to, user.id))
+        items.push({
+          id: `ch:${c.day}`,
+          kind: 'challengeEvening',
+          day: c.day,
+          at: c.at,
+          until: c.until,
+          title: null,
+          state: c.state,
+          mine: !!c.myGame,
+          link: '/udt/challenges/evenings',
+          meta: { games: c.games, showcase: c.showcase, myChallenge: c.myGame },
+        });
 
     // The league.
     if (udt.enabled)

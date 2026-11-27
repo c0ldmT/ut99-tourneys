@@ -8,7 +8,17 @@ export const SOON_HOURS = 48;
 
 /** One thing for the manager to do (decision 311). */
 export interface ForYouItem {
-  id: 'lineup' | 'trades' | 'cup' | 'points' | 'prestige' | 'squad' | 'market';
+  id:
+    | 'lineup'
+    | 'trades'
+    | 'cup'
+    | 'points'
+    | 'prestige'
+    | 'squad'
+    | 'market'
+    | 'challenges'
+    | 'challengeNext'
+    | 'showcase';
   area: UdtAreaId;
   /** A game is close and the lineup is incomplete: shown first, cannot be put off. */
   urgent: boolean;
@@ -123,6 +133,41 @@ export function forYou(hub: UdtHub): ForYouItem[] {
         m.striking > 0 && m.tired > 0 ? { key: 'udt.fd.tiredToo', params: { n: m.tired } } : null,
       action: 'udt.fd.go.squad',
       link: '/udt/team',
+    });
+  // Challenges (decision 338): answers waiting, the own game within a day, today's showcase.
+  const ch = hub.challenges;
+  if (ch?.incoming)
+    out.push({
+      id: 'challenges',
+      area: 'chall',
+      urgent: false,
+      title: 'udt.fd.challenges',
+      params: { n: ch.incoming },
+      sub: null,
+      action: 'udt.fd.go.challenges',
+      link: '/udt/challenges',
+    });
+  if (ch?.next && hours(ch.next.at) >= -1 && hours(ch.next.at) <= 24)
+    out.push({
+      id: 'challengeNext',
+      area: 'chall',
+      urgent: false,
+      title: 'udt.fd.challengeNext',
+      params: { at: ch.next.at, opp: ch.next.opponent },
+      sub: { key: 'udt.fd.challengeNextSub', params: {} },
+      action: 'udt.fd.go.evenings',
+      link: '/udt/challenges/evenings',
+    });
+  if (ch?.showcase && !ch.showcase.mine)
+    out.push({
+      id: 'showcase',
+      area: 'chall',
+      urgent: false,
+      title: 'udt.fd.showcase',
+      params: { at: ch.showcase.at, a: ch.showcase.from, b: ch.showcase.to },
+      sub: ch.showcase.map ? { key: 'udt.fd.showcaseSub', params: { map: ch.showcase.map } } : null,
+      action: 'udt.fd.go.evenings',
+      link: '/udt/challenges/evenings',
     });
   const market = hub.transfers.marketAt;
   if (market && hours(market) >= 0 && hours(market) <= 24)

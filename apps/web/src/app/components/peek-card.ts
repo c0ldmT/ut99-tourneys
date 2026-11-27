@@ -15,13 +15,14 @@ import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import { SKILL_NAMES } from '../core/skill-names';
 import { formOf, peekTarget, type PeekTarget } from '../core/peek';
-import type { UdtBotPage, UdtSquad } from '../core/types';
+import type { UdtBotPage, UdtRivalry, UdtSquad } from '../core/types';
 
 const SHOW_MS = 450;
 const CACHE_MS = 5 * 60_000;
 const ID = 'na-peek';
 
-type Data = { kind: 'bot'; page: UdtBotPage } | { kind: 'team'; squad: UdtSquad };
+type Data =
+  { kind: 'bot'; page: UdtBotPage } | { kind: 'team'; squad: UdtSquad; rivalry: UdtRivalry | null };
 
 /**
  * Hover cards for bots and teams (UX wave 4, W4.4, decision 318): resting the mouse on a link
@@ -95,6 +96,26 @@ type Data = { kind: 'bot'; page: UdtBotPage } | { kind: 'team'; squad: UdtSquad 
             }
           </div>
           <div class="row">{{ 'peek.bots' | t: { n: s.roster.length } }}</div>
+          <!-- Against you (decision 338): challenges and league games. -->
+          @if (d.rivalry; as r) {
+            @if (r.challenges.won + r.challenges.lost + r.league.won + r.league.lost > 0) {
+              <div class="row">
+                {{
+                  'peek.rivalry'
+                    | t
+                      : {
+                          cw: r.challenges.won,
+                          cl: r.challenges.lost,
+                          lw: r.league.won,
+                          ll: r.league.lost,
+                        }
+                }}
+                @if (r.rival) {
+                  <b class="riv">{{ 'udt.ch.rival' | t }}</b>
+                }
+              </div>
+            }
+          }
           @if (best(s).length) {
             <ul>
               @for (b of best(s); track b.botId) {
@@ -123,6 +144,10 @@ type Data = { kind: 'bot'; page: UdtBotPage } | { kind: 'team'; squad: UdtSquad 
       box-shadow: 0 12px 32px color-mix(in srgb, var(--bg) 80%, transparent);
       font-size: var(--fs-sm);
       pointer-events: none;
+    }
+    .riv {
+      margin-left: 6px;
+      color: var(--hot-text);
     }
     .peek.up {
       transform: translateY(-100%);
@@ -310,7 +335,12 @@ export class PeekCard {
     const data: Promise<Data | null> = (
       t.kind === 'bot'
         ? this.api.udtBotPeek(t.id).then((page) => ({ kind: 'bot', page }) as Data)
-        : this.api.udtSquadPeek(t.id).then((squad) => ({ kind: 'team', squad }) as Data)
+        : Promise.all([
+            this.api.udtSquadPeek(t.id),
+            this.auth.config().udtChallenges && this.auth.me()?.id !== t.id
+              ? this.api.udtRivalry(t.id).catch(() => null)
+              : Promise.resolve(null),
+          ]).then(([squad, rivalry]) => ({ kind: 'team', squad, rivalry }) as Data)
     ).catch(() => null);
     this.cache.set(key, { at: Date.now(), data });
     return data;

@@ -126,8 +126,10 @@ function kindMatches(
   t: TournamentRow,
   kind: NonNullable<ArchiveQuery['kind']>,
   league: boolean,
+  challenge = false,
 ): boolean {
-  if (kind === 'udt') return t.kind === 'udt' && !league;
+  // Dream Team cups: neither league games nor challenges (decision 338).
+  if (kind === 'udt') return t.kind === 'udt' && !league && !challenge;
   if (kind === 'league') return league;
   if (kind === 'season') return t.seasonal;
   return t.kind !== 'udt';
@@ -2502,7 +2504,11 @@ export class TournamentsService {
         const t = r.t;
         if (f.status && t.phase !== f.status) return false;
         if (f.series && t.seriesId !== f.series) return false;
-        if (f.kind && !kindMatches(t, f.kind, !!this.udtRules(t)?.league)) return false;
+        if (
+          f.kind &&
+          !kindMatches(t, f.kind, !!this.udtRules(t)?.league, !!this.udtRules(t)?.challenge)
+        )
+          return false;
         if (f.mode && !modeMatches(this.settings(t), f.mode)) return false;
         if (f.mine && !this.isMine(r, user)) return false;
         if (q && !t.name.toLowerCase().includes(q)) {
