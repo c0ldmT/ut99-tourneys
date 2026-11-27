@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Bot details on My team with tabs Development, Traits, Use and Manage below level, stamina and form; a dot marks what is to do and the dialog opens there; on a team's squad page a click on a card opens the same details read only (decision 326, patch note 326).
 - Tournament presets per admin: save the form's settings under a name, apply them with one click (name and date stay), delete them; GET/POST/DELETE /tournament-presets, migration 61 (decision 325, patch note 325).
 - Tournament form: compact sections (one line each, all open remembered per browser, everything open when editing), the summary leads to the sections, date and flow in one row, section Server and tempo with tiles one after the other / parallel (stepper, estimate each, the pool servers and their state); the duration estimate counts parallel matches (decision 324).
 - Packs: inventory, crafting and workshop in one card with tabs; search over name and effect, category, rarities and craftable only (remembered per browser); traits as tiles, crafting grouped by category with the reason a craft is locked; the workshop shows the chosen card with reroll and upgrade side by side; new cards marked New; Dream Team tab Workshop (decision 323, patch note 323).

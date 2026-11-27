@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 326,
+    date: '2026-11-27',
+    en: {
+      title: 'Bot details in tabs',
+      items: [
+        'My team: level, stamina and form stay on top of the bot details, everything else sits in four tabs – Development, Traits, Use, Manage.',
+        'A dot shows where something is to do (points to spend, a free trait slot); the details open right there.',
+        'Teams: click a bot card of another team to see its details, read only.',
+      ],
+    },
+    de: {
+      title: 'Bot-Details mit Reitern',
+      items: [
+        'Mein Team: Level, Ausdauer und Form stehen in den Bot-Details immer oben, alles andere in vier Reitern – Entwicklung, Traits, Einsatz, Verwalten.',
+        'Ein Punkt zeigt, wo etwas zu tun ist (Punkte zu verteilen, ein freier Trait-Platz); die Details öffnen gleich dort.',
+        'Teams: Ein Klick auf die Bot-Karte eines anderen Teams zeigt seine Details, nur lesend.',
+      ],
+    },
+  },
+  {
     id: 325,
     date: '2026-11-27',
     en: {

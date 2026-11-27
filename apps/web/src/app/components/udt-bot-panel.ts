@@ -1,9 +1,10 @@
-import { type Choice, Segment } from './choice';
+import { type Choice, Segment, Tabs } from './choice';
 import { Confirm } from './confirm-dialog';
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   type ElementRef,
   inject,
@@ -54,15 +55,22 @@ const SHORT: Readonly<Record<Stat, string>> = {
   skill: 'Skill',
 };
 
+type PanelTab = 'dev' | 'traits' | 'use' | 'admin';
+
 /**
- * A roster bot's details on My team (a dialog): the card, level and experience, the development
- * points of own bots with a preview of each step, the traits on it, rest with Neuro, the one free
- * renaming, look and lines, selling a bought bot. Every action reloads the page (`changed`).
+ * A roster bot's details (a dialog, decision 326): the card and its facts on the left; level,
+ * stamina and form always on top; then tabs – development (experience, training camp, points
+ * with a preview of each step, breakthrough, prestige, settling in), traits (slots, signature),
+ * use (lineup place, rest with Neuro, Monster Hunt focus) and manage (loan, renaming, look,
+ * selling). A dot marks a tab with something to do; the dialog opens on the first such tab.
+ * `view`: another team's bot, read only – no potential, no points, no manage tab. Every action
+ * reloads the page (`changed`).
  */
 @Component({
   selector: 'udt-bot-panel',
   imports: [
     Segment,
+    Tabs,
     FormsModule,
     RouterLink,
     TPipe,
@@ -79,354 +87,451 @@ const SHORT: Readonly<Record<Stat, string>> = {
     <dialog #dlg class="panel" aria-labelledby="udt-panel-title" (close)="closed.emit()">
       @if (bot(); as b) {
         <div class="head">
-          <h2 id="udt-panel-title" class="disp">{{ b.gameName }}</h2>
+          <div class="ht">
+            <h2 id="udt-panel-title" class="disp">{{ b.gameName }}</h2>
+            @if (team(); as tm) {
+              <span class="muted small"
+                >{{ tm.tag }} {{ tm.name }} ·
+                {{ 'udt.squads.managedBy' | t: { name: tm.manager } }}</span
+              >
+            }
+          </div>
           <button type="button" class="x" [attr.aria-label]="'toast.close' | t" (click)="close()">
             ×
           </button>
         </div>
         <div class="body">
           <div class="left">
-            <udt-card [bot]="card(b)" />
-            <span class="muted small">
+            <udt-card [bot]="card(b)" [small]="narrow()" />
+            <div class="facts small">
               @if (b.starter) {
-                {{ 'udt.starter' | t }}
+                <span class="muted">{{ 'udt.starter' | t }}</span>
               } @else if (b.own) {
-                {{ 'udt.academy.origin.' + b.own.origin | t }}
+                <span class="muted">{{ 'udt.academy.origin.' + b.own.origin | t }}</span>
               } @else if (b.loan) {
-                {{ 'udt.loan.feePaid' | t }} {{ b.loan.fee | neuro }}
-              } @else {
-                {{ 'udt.paid' | t }} {{ b.price | neuro }}
+                <span class="muted"
+                  >{{ 'udt.loan.feePaid' | t }} {{ b.loan.fee | neuro }} ·
+                  {{ 'udt.loan.until' | t: { at: dayText(b.loan.until) } }}</span
+                >
+              } @else if (!view()) {
+                <span class="muted">{{ 'udt.paid' | t }} {{ b.price | neuro }}</span>
               }
-            </span>
-            @if (salary(b); as sal) {
-              <span class="small muted">
-                {{ 'udt.bot.salary' | t: { amount: (sal | neuro) } }}
-                @if (b.own?.origin === 'blueprint') {
-                  {{ 'udt.bot.salaryBlueprint' | t: { pct: blueprintPct } }}
-                }
-              </span>
-            }
-            @if (b.own?.keptFrom; as kf) {
-              <span class="small"
-                ><span class="udt-mark own">{{ 'udt.keep.badge' | t }}</span>
-                {{ 'udt.keep.kept' | t: { n: kf } }}</span
-              >
-            }
-            @if (b.own?.anlage) {
-              <span class="small"
-                ><span class="udt-mark anlage">{{ 'udt.scout.anlageShort' | t }}</span>
-                {{ 'udt.scout.anlageAt' | t: { n: anlageLevel } }}</span
-              >
-            }
-            @if (b.own?.mentor; as mt) {
-              <span class="small" [class.muted]="!mt.here">
-                {{
-                  (mt.here ? 'udt.academy.mentorHere' : 'udt.academy.mentorAway')
-                    | t: { name: mt.name }
-                }}
-              </span>
-            }
-            <a class="small" [routerLink]="['/udt/bot', b.botId]" (click)="close()">{{
-              'udt.bot.statsLink' | t
-            }}</a>
+              @if (!view() && salary(b); as sal) {
+                <span class="muted">
+                  {{ 'udt.bot.salary' | t: { amount: (sal | neuro) } }}
+                  @if (b.own?.origin === 'blueprint') {
+                    {{ 'udt.bot.salaryBlueprint' | t: { pct: blueprintPct } }}
+                  }
+                </span>
+              }
+              @if (b.own?.keptFrom; as kf) {
+                <span
+                  ><span class="udt-mark own">{{ 'udt.keep.badge' | t }}</span>
+                  {{ 'udt.keep.kept' | t: { n: kf } }}</span
+                >
+              }
+              @if (!view() && b.own?.anlage) {
+                <span
+                  ><span class="udt-mark anlage">{{ 'udt.scout.anlageShort' | t }}</span>
+                  {{ 'udt.scout.anlageAt' | t: { n: anlageLevel } }}</span
+                >
+              }
+              @if (!view() && b.own?.mentor; as mt) {
+                <span [class.muted]="!mt.here">
+                  {{
+                    (mt.here ? 'udt.academy.mentorHere' : 'udt.academy.mentorAway')
+                      | t: { name: mt.name }
+                  }}
+                </span>
+              }
+              <a [routerLink]="['/udt/bot', b.botId]" (click)="close()">{{
+                'udt.bot.statsLink' | t
+              }}</a>
+            </div>
           </div>
           <div class="right">
-            @if (b.loan; as ln) {
-              <!-- A loaned bot (decision 270): until when, buying it now. -->
-              <section class="loan">
-                <b>{{ 'udt.loan.until' | t: { at: dayText(ln.until) } }}</b>
-                <span class="muted small grow">{{ 'udt.loan.text' | t }}</span>
-                <button
-                  type="button"
-                  class="primary"
-                  [disabled]="busy() || tooDear(ln.price)"
-                  (click)="buyLoaned(b, ln.price)"
-                >
-                  {{ 'udt.loan.buy' | t: { price: (ln.price | neuro) } }}
-                </button>
-              </section>
-            }
-            <section>
-              <h3>{{ 'udt.level' | t }} {{ b.level }}</h3>
-              @if (xp(); as x) {
-                <div class="udt-bar xp big"><i [style.width.%]="x.pct"></i></div>
-                <p class="muted small">
-                  {{
-                    'udt.points.xpLine'
-                      | t: { xp: x.in, need: x.need, left: x.need - x.in, lv: b.level + 1 }
-                  }}
-                </p>
-              }
-              @if (camp(); as c) {
-                <div class="camp">
-                  <span class="small"
-                    ><b>{{ 'udt.camp.title' | t }}</b> ·
-                    <span class="muted">{{ 'udt.camp.hint' | t: { xp: c.xp } }}</span></span
-                  >
-                  @if (c.done.includes(b.botId)) {
-                    <span class="muted small">{{ 'udt.camp.done' | t }}</span>
+            <!-- Always on top (decision 326): level, stamina, form. -->
+            <div class="kpis3">
+              <div>
+                <span class="kl">{{ 'udt.level' | t }}</span
+                ><b>{{ b.level }}</b>
+                @if (xp(); as x) {
+                  <div class="udt-bar xp"><i [style.width.%]="x.pct"></i></div>
+                }
+              </div>
+              <div>
+                <span class="kl">{{ 'udt.stamina' | t }}</span
+                ><b>{{ b.stamina }}</b>
+                <div class="udt-bar">
+                  <i [style.width.%]="b.stamina" [style.background]="color(b.stamina)"></i>
+                </div>
+              </div>
+              <div [title]="'udt.form.title.' + form(b) | t">
+                <span class="kl">{{ 'udt.career.form' | t }}</span
+                ><b class="fm {{ form(b) }}">{{ 'udt.panel.form.' + form(b) | t }}</b>
+              </div>
+            </div>
+            <na-tabs
+              class="ptabs"
+              [options]="tabOptions()"
+              [value]="tab()"
+              (valueChange)="pickTab($event)"
+              label="udt.panel.tabs"
+              ids="bp"
+              panel="bp-panel"
+            />
+            <div id="bp-panel" class="tp" role="tabpanel" [attr.aria-labelledby]="'bp-' + tab()">
+              @switch (tab()) {
+                @case ('dev') {
+                  @if (view()) {
+                    <!-- Another team's bot: the values, no potential, no points (decision 326). -->
+                    <div class="vals">
+                      @for (s of stats; track s) {
+                        <div>
+                          <span class="kl">{{
+                            s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t)
+                          }}</span
+                          ><b>{{ stepOf(b, s).now }}</b>
+                        </div>
+                      }
+                    </div>
+                    @if (b.prestige; as pr) {
+                      <p class="small">
+                        <span class="udt-mark star">★{{ pr.stars }}</span>
+                        {{ 'udt.pres.stage.' + pr.stage | t }}
+                      </p>
+                    }
                   } @else {
-                    <button
-                      type="button"
-                      [disabled]="busy() || (spendable() !== null && c.price > spendable()!)"
-                      (click)="train(b)"
-                    >
-                      {{ 'udt.camp.go' | t: { xp: c.xp } }} · {{ c.price | neuro }}
-                    </button>
+                    @if (xp(); as x) {
+                      <p class="muted small">
+                        {{
+                          'udt.points.xpLine'
+                            | t: { xp: x.in, need: x.need, left: x.need - x.in, lv: b.level + 1 }
+                        }}
+                      </p>
+                    }
+                    @if (camp(); as c) {
+                      <div class="camp">
+                        <span class="small"
+                          ><b>{{ 'udt.camp.title' | t }}</b> ·
+                          <span class="muted">{{ 'udt.camp.hint' | t: { xp: c.xp } }}</span></span
+                        >
+                        @if (c.done.includes(b.botId)) {
+                          <span class="muted small">{{ 'udt.camp.done' | t }}</span>
+                        } @else {
+                          <button
+                            type="button"
+                            [disabled]="busy() || (spendable() !== null && c.price > spendable()!)"
+                            (click)="train(b)"
+                          >
+                            {{ 'udt.camp.go' | t: { xp: c.xp } }} · {{ c.price | neuro }}
+                          </button>
+                        }
+                      </div>
+                    }
+                    @if (b.own; as own) {
+                      <section class="dev" [class.has]="own.points > 0">
+                        <div class="row between">
+                          <h3>{{ 'udt.academy.points' | t }}</h3>
+                          <span class="pts" [class.zero]="own.points === 0">{{ own.points }}</span>
+                        </div>
+                        <udt-potential
+                          [skill]="b.skill"
+                          [potential]="own.potential"
+                          [next]="bt(b)?.to ?? null"
+                        />
+                        <p class="muted small">{{ 'udt.points.explain' | t }}</p>
+                        <!-- Development steps as tiles like the prestige menu (decision 268). -->
+                        <div class="steps">
+                          @for (s of stats; track s) {
+                            @let why = whyNot(b, s);
+                            @let st = stepOf(b, s);
+                            <div
+                              class="dtile"
+                              [class.capped]="why === 'potential'"
+                              [class.ready]="why === null"
+                            >
+                              <div class="dhead">
+                                <b>{{ s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t) }}</b>
+                                @if (why !== 'potential') {
+                                  <span class="dcost">{{
+                                    'udt.points.cost' | t: { n: cost[s] }
+                                  }}</span>
+                                }
+                              </div>
+                              <div class="dvals" aria-hidden="true">
+                                <span class="dnow">{{ st.now }}</span>
+                                @if (why !== 'potential') {
+                                  <svg class="darr" viewBox="0 0 16 16">
+                                    <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" />
+                                  </svg>
+                                  <span class="dnext">{{ st.next }}</span>
+                                }
+                              </div>
+                              <div class="dbar" aria-hidden="true">
+                                <i class="have" [style.width.%]="st.pctNow"></i>
+                                @if (why !== 'potential') {
+                                  <i
+                                    class="gain"
+                                    [style.left.%]="st.pctNow"
+                                    [style.width.%]="st.pctNext - st.pctNow"
+                                  ></i>
+                                }
+                              </div>
+                              <button
+                                type="button"
+                                class="add"
+                                [class.primary]="why === null"
+                                [disabled]="busy() || why !== null"
+                                [title]="why ? ('udt.points.why.' + why | t) : ''"
+                                [attr.aria-label]="
+                                  (s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t)) +
+                                  ' ' +
+                                  (why === 'potential'
+                                    ? ('udt.points.skillMax' | t)
+                                    : preview(b, s))
+                                "
+                                (click)="develop(b, s)"
+                              >
+                                {{ why === 'potential' ? ('udt.points.skillMax' | t) : st.add }}
+                              </button>
+                            </div>
+                          }
+                        </div>
+                        @if (bt(b); as x) {
+                          <div class="udt-bt" [class.ready]="x.why === null">
+                            <div class="udt-bt-head">
+                              <b>{{ 'udt.bt.title' | t: { from: x.from, to: x.to } }}</b>
+                              <span class="udt-bt-cost">{{
+                                'udt.points.cost' | t: { n: x.cost }
+                              }}</span>
+                            </div>
+                            <p class="muted small">{{ 'udt.bt.explain' | t: { cut: x.cut } }}</p>
+                            <ul class="udt-bt-req small">
+                              <li [class.ok]="x.levelOk">
+                                {{ 'udt.bt.reqLevel' | t: { n: x.level, now: b.level } }}
+                              </li>
+                              <li [class.ok]="x.valuesOk">
+                                {{ 'udt.bt.reqValues' | t: { n: x.valueMin } }}
+                                @if (!x.valuesOk) {
+                                  <span class="mono">({{ x.missing }})</span>
+                                }
+                              </li>
+                              <li [class.ok]="x.pointsOk">
+                                {{ 'udt.bt.reqPoints' | t: { n: x.cost, have: own.points } }}
+                              </li>
+                            </ul>
+                            <p class="mono small udt-bt-vals">{{ x.preview }}</p>
+                            <button
+                              type="button"
+                              class="primary"
+                              [disabled]="busy() || x.why !== null"
+                              (click)="breakthrough(b, x)"
+                            >
+                              {{ 'udt.bt.button' | t: { to: x.to } }}
+                            </button>
+                          </div>
+                        } @else if (own.maxed) {
+                          <p class="udt-bt-maxed small">
+                            {{ 'udt.bt.maxed' | t }}
+                            @if (own.banked) {
+                              {{ 'udt.bt.banked' | t: { n: own.banked } }}
+                            }
+                          </p>
+                        }
+                        @if (own.breakthrough) {
+                          <p class="small">
+                            <span class="udt-mark star">{{ 'udt.bt.done' | t }}</span>
+                          </p>
+                        }
+                      </section>
+                      @if (own.prestige; as pr) {
+                        <udt-prestige
+                          [bot]="b"
+                          [prestige]="pr"
+                          [spendable]="spendable()"
+                          (changed)="changed.emit()"
+                        />
+                      }
+                    } @else {
+                      @if (b.settle; as st) {
+                        @if (st.prestige; as pr) {
+                          <udt-prestige
+                            [bot]="b"
+                            [prestige]="pr"
+                            [spendable]="spendable()"
+                            (changed)="changed.emit()"
+                          />
+                        } @else {
+                          <!-- Settling in (decision 269): 2 prestige points after its games. -->
+                          <section class="settle">
+                            <div class="row between">
+                              <h3>{{ 'udt.settle.title' | t }}</h3>
+                              <b class="mono">{{
+                                'udt.settle.games' | t: { n: st.games, need: st.need }
+                              }}</b>
+                            </div>
+                            <div class="udt-bar settlebar">
+                              <i [style.width.%]="(100 * st.games) / st.need"></i>
+                            </div>
+                            <p class="muted small">
+                              {{ 'udt.settle.text' | t: { need: st.need } }}
+                            </p>
+                          </section>
+                        }
+                      }
+                      <p class="muted small">{{ 'udt.points.bought' | t }}</p>
+                    }
                   }
-                </div>
-              }
-            </section>
-
-            @if (b.own; as own) {
-              <section class="dev" [class.has]="own.points > 0">
-                <div class="row between">
-                  <h3>{{ 'udt.academy.points' | t }}</h3>
-                  <span class="pts" [class.zero]="own.points === 0">{{ own.points }}</span>
-                </div>
-                <udt-potential
-                  [skill]="b.skill"
-                  [potential]="own.potential"
-                  [next]="bt(b)?.to ?? null"
-                />
-                <p class="muted small">{{ 'udt.points.explain' | t }}</p>
-                <!-- Development steps as tiles like the prestige menu (decision 268). -->
-                <div class="steps">
-                  @for (s of stats; track s) {
-                    @let why = whyNot(b, s);
-                    @let st = stepOf(b, s);
-                    <div
-                      class="dtile"
-                      [class.capped]="why === 'potential'"
-                      [class.ready]="why === null"
-                    >
-                      <div class="dhead">
-                        <b>{{ s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t) }}</b>
-                        @if (why !== 'potential') {
-                          <span class="dcost">{{ 'udt.points.cost' | t: { n: cost[s] } }}</span>
-                        }
-                      </div>
-                      <div class="dvals" aria-hidden="true">
-                        <span class="dnow">{{ st.now }}</span>
-                        @if (why !== 'potential') {
-                          <svg class="darr" viewBox="0 0 16 16">
-                            <path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5" />
-                          </svg>
-                          <span class="dnext">{{ st.next }}</span>
-                        }
-                      </div>
-                      <div class="dbar" aria-hidden="true">
-                        <i class="have" [style.width.%]="st.pctNow"></i>
-                        @if (why !== 'potential') {
-                          <i
-                            class="gain"
-                            [style.left.%]="st.pctNow"
-                            [style.width.%]="st.pctNext - st.pctNow"
-                          ></i>
-                        }
-                      </div>
+                }
+                @case ('traits') {
+                  <div class="slots">
+                    @for (i of slotList(b); track i) {
+                      @if (b.udtTraits[i]; as tr) {
+                        <div class="tslot r-{{ tr.rarity }}">
+                          <span class="udt-trait r-{{ tr.rarity }}">{{
+                            'udt.trait.' + tr.code | t
+                          }}</span>
+                          <span class="muted small">{{ 'udt.traitE.' + tr.code | t }}</span>
+                          @if (!view()) {
+                            <button
+                              type="button"
+                              class="tx"
+                              [attr.aria-label]="'udt.traits.remove' | t"
+                              [title]="'udt.traits.remove' | t"
+                              [disabled]="busy()"
+                              (click)="unassign(tr)"
+                            >
+                              ×
+                            </button>
+                          }
+                        </div>
+                      } @else {
+                        <div class="tslot free muted small">
+                          {{ 'udt.panel.slotFree' | t: { n: i + 1 } }}
+                        </div>
+                      }
+                    }
+                  </div>
+                  @if (!view() && b.udtTraits.length < b.slots) {
+                    <p class="muted small">{{ 'udt.points.noTraits' | t }}</p>
+                  }
+                  @if (b.signature; as sg) {
+                    <udt-signature [signature]="sg" [inherited]="!!b.own" />
+                  } @else {
+                    <p class="muted small">{{ 'udt.panel.noSignature' | t }}</p>
+                  }
+                }
+                @case ('use') {
+                  <section>
+                    <h3>{{ 'udt.panel.lineup' | t }}</h3>
+                    <p class="small">{{ lineupText(b) }}</p>
+                  </section>
+                  @if (!view() && b.stamina < 100) {
+                    <section>
+                      <h3>{{ 'udt.panel.rest' | t }}</h3>
+                      <label class="restslider"
+                        ><span>{{ 'udt.rest.points' | t }}</span>
+                        <input
+                          type="range"
+                          name="rest"
+                          min="1"
+                          [max]="100 - b.stamina"
+                          step="1"
+                          [ngModel]="restPoints()"
+                          (ngModelChange)="restPoints.set(+$event)"
+                        />
+                        <span class="mono">+{{ restPoints() }}</span>
+                      </label>
                       <button
                         type="button"
-                        class="add"
-                        [class.primary]="why === null"
-                        [disabled]="busy() || why !== null"
-                        [title]="why ? ('udt.points.why.' + why | t) : ''"
-                        [attr.aria-label]="
-                          (s === 'skill' ? 'Skill' : ('udt.academy.stat.' + s | t)) +
-                          ' ' +
-                          (why === 'potential' ? ('udt.points.skillMax' | t) : preview(b, s))
+                        [disabled]="
+                          busy() ||
+                          (spendable() !== null &&
+                            restPoints() * (b.restPrice ?? restPrice) > spendable()!)
                         "
-                        (click)="develop(b, s)"
+                        (click)="rest(b)"
                       >
-                        {{ why === 'potential' ? ('udt.points.skillMax' | t) : st.add }}
+                        {{ 'udt.rest.buy' | t }} ·
+                        {{ restPoints() * (b.restPrice ?? restPrice) | neuro }}
                       </button>
-                    </div>
+                    </section>
                   }
-                </div>
-                @if (bt(b); as x) {
-                  <div class="udt-bt" [class.ready]="x.why === null">
-                    <div class="udt-bt-head">
-                      <b>{{ 'udt.bt.title' | t: { from: x.from, to: x.to } }}</b>
-                      <span class="udt-bt-cost">{{ 'udt.points.cost' | t: { n: x.cost } }}</span>
-                    </div>
-                    <p class="muted small">{{ 'udt.bt.explain' | t: { cut: x.cut } }}</p>
-                    <ul class="udt-bt-req small">
-                      <li [class.ok]="x.levelOk">
-                        {{ 'udt.bt.reqLevel' | t: { n: x.level, now: b.level } }}
-                      </li>
-                      <li [class.ok]="x.valuesOk">
-                        {{ 'udt.bt.reqValues' | t: { n: x.valueMin } }}
-                        @if (!x.valuesOk) {
-                          <span class="mono">({{ x.missing }})</span>
-                        }
-                      </li>
-                      <li [class.ok]="x.pointsOk">
-                        {{ 'udt.bt.reqPoints' | t: { n: x.cost, have: own.points } }}
-                      </li>
-                    </ul>
-                    <p class="mono small udt-bt-vals">{{ x.preview }}</p>
-                    <button
-                      type="button"
-                      class="primary"
-                      [disabled]="busy() || x.why !== null"
-                      (click)="breakthrough(b, x)"
-                    >
-                      {{ 'udt.bt.button' | t: { to: x.to } }}
-                    </button>
-                  </div>
-                } @else if (own.maxed) {
-                  <p class="udt-bt-maxed small">
-                    {{ 'udt.bt.maxed' | t }}
-                    @if (own.banked) {
-                      {{ 'udt.bt.banked' | t: { n: own.banked } }}
+                  <section>
+                    <h3>{{ 'udt.mhFocus.title' | t }}</h3>
+                    @if (view()) {
+                      <p class="small">{{ 'udt.mhFocus.' + (b.mhFocus ?? 0) | t }}</p>
+                    } @else {
+                      <na-segment
+                        [options]="focusOptions"
+                        [value]="b.mhFocus ?? 0"
+                        (valueChange)="setFocus(b, $event)"
+                        [disabled]="busy()"
+                        label="udt.mhFocus.title"
+                      />
                     }
-                  </p>
-                }
-                @if (own.breakthrough) {
-                  <p class="small">
-                    <span class="udt-mark star">{{ 'udt.bt.done' | t }}</span>
-                  </p>
-                }
-              </section>
-              @if (own.prestige; as pr) {
-                <udt-prestige
-                  [bot]="b"
-                  [prestige]="pr"
-                  [spendable]="spendable()"
-                  (changed)="changed.emit()"
-                />
-              }
-            } @else {
-              @if (b.settle; as st) {
-                @if (st.prestige; as pr) {
-                  <udt-prestige
-                    [bot]="b"
-                    [prestige]="pr"
-                    [spendable]="spendable()"
-                    (changed)="changed.emit()"
-                  />
-                } @else {
-                  <!-- Settling in (decision 269): 2 prestige points after its games. -->
-                  <section class="settle">
-                    <div class="row between">
-                      <h3>{{ 'udt.settle.title' | t }}</h3>
-                      <b class="mono">{{
-                        'udt.settle.games' | t: { n: st.games, need: st.need }
-                      }}</b>
-                    </div>
-                    <div class="udt-bar settlebar">
-                      <i [style.width.%]="(100 * st.games) / st.need"></i>
-                    </div>
-                    <p class="muted small">{{ 'udt.settle.text' | t: { need: st.need } }}</p>
+                    <p class="muted small">{{ 'udt.mhFocus.hint.' + (b.mhFocus ?? 0) | t }}</p>
                   </section>
                 }
+                @case ('admin') {
+                  @if (b.loan; as ln) {
+                    <!-- A loaned bot (decision 270): until when, buying it now. -->
+                    <section class="loan">
+                      <b>{{ 'udt.loan.until' | t: { at: dayText(ln.until) } }}</b>
+                      <span class="muted small grow">{{ 'udt.loan.text' | t }}</span>
+                      <button
+                        type="button"
+                        class="primary"
+                        [disabled]="busy() || tooDear(ln.price)"
+                        (click)="buyLoaned(b, ln.price)"
+                      >
+                        {{ 'udt.loan.buy' | t: { price: (ln.price | neuro) } }}
+                      </button>
+                    </section>
+                  }
+                  @if (b.own) {
+                    <section>
+                      @if (b.own.canRename) {
+                        <udt-rename [botId]="b.botId" [name]="b.name" (renamed)="changed.emit()" />
+                      } @else {
+                        <p class="muted small">{{ 'udt.points.renamed' | t }}</p>
+                      }
+                    </section>
+                    <section>
+                      @if (look(); as ld) {
+                        <app-udt-bot-look [draft]="ld" [looks]="looks()" />
+                        <span class="row">
+                          <button
+                            type="button"
+                            class="primary"
+                            [disabled]="busy()"
+                            (click)="saveLook(b)"
+                          >
+                            {{ 'common.save' | t }}
+                          </button>
+                          <button type="button" (click)="look.set(null)">
+                            {{ 'common.cancel' | t }}
+                          </button>
+                        </span>
+                      } @else {
+                        <button type="button" [disabled]="busy()" (click)="openLook(b)">
+                          {{ 'udt.look.button' | t }}
+                        </button>
+                      }
+                    </section>
+                  } @else if (!b.starter && !b.loan) {
+                    <section>
+                      <button type="button" class="danger" [disabled]="busy()" (click)="sell(b)">
+                        {{ 'udt.sell' | t }} · {{ sellPrice(b) | neuro }}
+                      </button>
+                      <p class="muted small">{{ 'udt.panel.sellHint' | t }}</p>
+                    </section>
+                  } @else if (b.starter) {
+                    <p class="muted small">{{ 'udt.panel.starterKeep' | t }}</p>
+                  }
+                }
               }
-              <p class="muted small">{{ 'udt.points.bought' | t }}</p>
-            }
-            @if (b.signature; as sg) {
-              <udt-signature [signature]="sg" [inherited]="!!b.own" />
-            }
-
-            <section>
-              <h3>
-                {{ 'udt.traits.title' | t }}
-                <span class="muted small">{{ b.udtTraits.length }} / {{ b.slots }}</span>
-              </h3>
-              <div class="udt-traits">
-                @for (tr of b.udtTraits; track tr.id) {
-                  <span class="udt-trait r-{{ tr.rarity }}" [title]="'udt.traitE.' + tr.code | t"
-                    >{{ 'udt.trait.' + tr.code | t }}
-                    <button
-                      type="button"
-                      class="tx"
-                      [attr.aria-label]="'udt.traits.remove' | t"
-                      [disabled]="busy()"
-                      (click)="unassign(tr)"
-                    >
-                      ×
-                    </button></span
-                  >
-                } @empty {
-                  <span class="muted small">{{ 'udt.points.noTraits' | t }}</span>
-                }
-              </div>
-            </section>
-
-            <section>
-              <h3>{{ 'udt.stamina' | t }} {{ b.stamina }}</h3>
-              <div class="udt-bar">
-                <i [style.width.%]="b.stamina" [style.background]="color(b.stamina)"></i>
-              </div>
-              @if (b.stamina < 100) {
-                <label class="restslider"
-                  ><span>{{ 'udt.rest.points' | t }}</span>
-                  <input
-                    type="range"
-                    name="rest"
-                    min="1"
-                    [max]="100 - b.stamina"
-                    step="1"
-                    [ngModel]="restPoints()"
-                    (ngModelChange)="restPoints.set(+$event)"
-                  />
-                  <span class="mono">+{{ restPoints() }}</span>
-                </label>
-                <button
-                  type="button"
-                  [disabled]="
-                    busy() ||
-                    (spendable() !== null &&
-                      restPoints() * (b.restPrice ?? restPrice) > spendable()!)
-                  "
-                  (click)="rest(b)"
-                >
-                  {{ 'udt.rest.buy' | t }} · {{ restPoints() * (b.restPrice ?? restPrice) | neuro }}
-                </button>
-              }
-            </section>
-
-            <section>
-              <h3>{{ 'udt.mhFocus.title' | t }}</h3>
-              <na-segment
-                [options]="focusOptions"
-                [value]="b.mhFocus ?? 0"
-                (valueChange)="setFocus(b, $event)"
-                [disabled]="busy()"
-                label="udt.mhFocus.title"
-              />
-              <p class="muted small">{{ 'udt.mhFocus.hint.' + (b.mhFocus ?? 0) | t }}</p>
-            </section>
-
-            @if (b.own) {
-              <section>
-                @if (b.own.canRename) {
-                  <udt-rename [botId]="b.botId" [name]="b.name" (renamed)="changed.emit()" />
-                } @else {
-                  <p class="muted small">{{ 'udt.points.renamed' | t }}</p>
-                }
-                @if (look(); as ld) {
-                  <app-udt-bot-look [draft]="ld" [looks]="looks()" />
-                  <span class="row">
-                    <button type="button" class="primary" [disabled]="busy()" (click)="saveLook(b)">
-                      {{ 'common.save' | t }}
-                    </button>
-                    <button type="button" (click)="look.set(null)">
-                      {{ 'common.cancel' | t }}
-                    </button>
-                  </span>
-                } @else {
-                  <button type="button" [disabled]="busy()" (click)="openLook(b)">
-                    {{ 'udt.look.button' | t }}
-                  </button>
-                }
-              </section>
-            } @else if (!b.starter && !b.loan) {
-              <section>
-                <button type="button" class="danger" [disabled]="busy()" (click)="sell(b)">
-                  {{ 'udt.sell' | t }} · {{ sellPrice(b) | neuro }}
-                </button>
-              </section>
-            }
+            </div>
           </div>
         </div>
       }
@@ -498,8 +603,93 @@ const SHORT: Readonly<Record<Stat, string>> = {
       justify-content: space-between;
       align-items: center;
     }
-    .udt-bar.xp.big {
-      height: 8px;
+    .ht {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+    .facts {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      text-align: center;
+      max-width: 200px;
+    }
+    /* Level, stamina, form: on top of every tab (decision 326). */
+    .kpis3,
+    .vals {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .vals {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .kpis3 > div,
+    .vals > div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--panel-2);
+    }
+    .kpis3 b,
+    .vals b {
+      font-family: var(--font-mono);
+      font-size: var(--fs-lg);
+    }
+    .kl {
+      font-size: var(--fs-xs);
+      color: var(--muted);
+    }
+    .kpis3 b.fm {
+      font-family: var(--font);
+      font-size: var(--fs-base);
+      white-space: nowrap;
+    }
+    .fm.hot {
+      color: var(--live);
+    }
+    .fm.cold {
+      color: var(--danger);
+    }
+    .ptabs {
+      margin-bottom: 0;
+    }
+    .tp {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .tp p {
+      margin: 0;
+    }
+    .slots {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .tslot {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      background: var(--panel-2);
+    }
+    .tslot.free {
+      border: 1px dashed var(--line);
+      background: none;
+    }
+    .tslot .tx {
+      margin-left: auto;
+      height: 28px;
+      width: 28px;
+      font-size: var(--fs-lg);
     }
     .loan {
       display: flex;
@@ -640,7 +830,6 @@ const SHORT: Readonly<Record<Stat, string>> = {
     }
     .tx {
       min-height: 0;
-      height: 16px;
       padding: 0 2px;
       border: 0;
       background: transparent;
@@ -663,6 +852,21 @@ const SHORT: Readonly<Record<Stat, string>> = {
     .restslider input {
       flex: 1;
     }
+    /* Phones: the small card and its facts side by side. */
+    @media (max-width: 640px) {
+      .left {
+        flex-direction: row;
+        align-items: flex-start;
+        margin: 0;
+      }
+      .facts {
+        align-items: flex-start;
+        text-align: left;
+      }
+      .vals {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
   `,
 })
 export class UdtBotPanel {
@@ -679,10 +883,50 @@ export class UdtBotPanel {
   readonly index = input(1);
   /** Training camp (decision 254): price, experience, the bots trained today. */
   readonly camp = input<UdtCamp | null>(null);
+  /** Another team's bot: read only (no potential, points or actions). */
+  readonly view = input(false);
+  /** The team of another team's bot (shown under the name). */
+  readonly team = input<{ name: string; tag: string; manager: string } | null>(null);
+  /** Trait cards in the inventory (a free slot then gets a dot). */
+  readonly traitCards = input(0);
   readonly changed = output<void>();
   readonly closed = output<void>();
 
   protected readonly busy = signal(false);
+  protected readonly tab = signal<PanelTab>('dev');
+  /** The manager chose a tab or acted: the tab stays (no jumping when a dot goes). */
+  private picked = false;
+  /** Phones: the small card. */
+  protected readonly narrow = signal(false);
+  /** Tabs with something to do: development points or prestige points, a free slot to fill. */
+  private dots(b: UdtRosterBot): Record<PanelTab, boolean> {
+    const view = this.view();
+    const prestige = b.own?.prestige?.free ?? b.prestige?.free ?? 0;
+    return {
+      dev: !view && ((b.own?.points ?? 0) > 0 || prestige > 0),
+      traits: !view && b.udtTraits.length < b.slots && this.traitCards() > 0,
+      use: false,
+      admin: false,
+    };
+  }
+  protected readonly tabOptions = computed((): Choice<PanelTab>[] => {
+    const b = this.bot();
+    if (!b) return [];
+    const d = this.dots(b);
+    const all: Choice<PanelTab>[] = [
+      { value: 'dev', label: 'udt.panel.tab.dev', dot: d.dev, dotLabel: 'udt.panel.todo' },
+      {
+        value: 'traits',
+        label: 'udt.panel.tab.traits',
+        params: { n: b.udtTraits.length, of: b.slots },
+        dot: d.traits,
+        dotLabel: 'udt.panel.todo',
+      },
+      { value: 'use', label: 'udt.panel.tab.use' },
+      { value: 'admin', label: 'udt.panel.tab.admin' },
+    ];
+    return this.view() ? all.slice(0, 3) : all;
+  });
   protected readonly restPoints = signal(1);
   protected readonly look = signal<LookDraft | null>(null);
   protected readonly stats = STATS;
@@ -702,6 +946,27 @@ export class UdtBotPanel {
   private shownId: string | null = null;
 
   constructor() {
+    const mq = window.matchMedia('(max-width: 640px)');
+    this.narrow.set(mq.matches);
+    const onMq = (e: MediaQueryListEvent) => this.narrow.set(e.matches);
+    mq.addEventListener('change', onMq);
+    inject(DestroyRef).onDestroy(() => mq.removeEventListener('change', onMq));
+    // Opens where something is to do (decision 326), else on development; the inventory may
+    // arrive after the bot, so this follows until the manager picks a tab or acts.
+    let tabFor: string | null = null;
+    effect(() => {
+      const b = this.bot();
+      if (!b) {
+        tabFor = null;
+        return;
+      }
+      const d = this.dots(b);
+      if (b.botId !== tabFor) {
+        tabFor = b.botId;
+        this.picked = false;
+      }
+      if (!this.picked) this.tab.set(d.dev ? 'dev' : d.traits ? 'traits' : 'dev');
+    });
     effect(() => {
       const b = this.bot();
       const d = this.dlg().nativeElement;
@@ -718,6 +983,30 @@ export class UdtBotPanel {
 
   close() {
     this.dlg().nativeElement.close();
+  }
+
+  protected pickTab(t: PanelTab) {
+    this.picked = true;
+    this.tab.set(t);
+  }
+
+  /** Form of the day (the career's), normal without one. */
+  protected form(b: UdtRosterBot): 'hot' | 'normal' | 'cold' {
+    return b.career?.form ?? 'normal';
+  }
+
+  /** The trait slots (also cards over the number of slots, e.g. after a trade). */
+  protected slotList(b: UdtRosterBot): number[] {
+    return Array.from({ length: Math.max(b.slots, b.udtTraits.length) }, (_, i) => i);
+  }
+
+  /** "DM place 2 · MH place 1", "Bench 1" or "not in the lineup". */
+  protected lineupText(b: UdtRosterBot): string {
+    const parts: string[] = [];
+    if (b.dmSlot) parts.push(this.i18n.t('udt.panel.dmSlot', { n: b.dmSlot }));
+    if (b.mhSlot) parts.push(this.i18n.t('udt.panel.mhSlot', { n: b.mhSlot }));
+    if (b.bench) parts.push(this.i18n.t('udt.panel.bench', { n: b.bench }));
+    return parts.length ? parts.join(' · ') : this.i18n.t('udt.panel.noLineup');
   }
 
   protected card(b: UdtRosterBot): CardBot {
@@ -911,6 +1200,7 @@ export class UdtBotPanel {
   }
 
   private async act(fn: () => Promise<unknown>) {
+    this.picked = true;
     this.busy.set(true);
     try {
       await fn();

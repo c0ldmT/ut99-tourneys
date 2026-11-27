@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal, effect } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
+import { UdtBotPanel } from '../components/udt-bot-panel';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { TPipe } from '../core/i18n';
@@ -83,7 +92,7 @@ export class UdtSquadsPage {
 /** One manager's squad: the bots as cards with level, traits, stamina and value. */
 @Component({
   selector: 'app-udt-squad',
-  imports: [RouterLink, TPipe, NeuroPipe, UdtNav, UdtCard],
+  imports: [RouterLink, TPipe, NeuroPipe, UdtNav, UdtCard, UdtBotPanel],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -118,7 +127,15 @@ export class UdtSquadsPage {
       <div class="cards">
         @for (b of s.roster; track b.botId) {
           <div class="slot">
-            <udt-card [bot]="card(b, s.team.tag)" fill />
+            <!-- The card opens the bot's details, read only (decision 326). -->
+            <button
+              type="button"
+              class="cardbtn"
+              [attr.aria-label]="'udt.panel.open' | t: { name: b.name }"
+              (click)="openId.set(b.botId)"
+            >
+              <udt-card [bot]="card(b, s.team.tag)" fill />
+            </button>
             <div class="small muted tags">
               @if (b.dmSlot) {
                 <span class="udt-mark">DM {{ b.dmSlot }}</span>
@@ -136,6 +153,13 @@ export class UdtSquadsPage {
           </div>
         }
       </div>
+      <udt-bot-panel
+        [bot]="openBot()"
+        [tag]="s.team.tag"
+        [view]="true"
+        [team]="teamInfo()"
+        (closed)="openId.set(null)"
+      />
     }
   `,
   styles: `
@@ -151,7 +175,24 @@ export class UdtSquadsPage {
       grid-template-rows: 1fr auto;
       gap: 6px;
     }
-    .slot udt-card {
+    .cardbtn,
+    .cardbtn:hover:not(:disabled) {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      padding: 0;
+      border: 0;
+      background: none;
+      text-align: inherit;
+      font-weight: inherit;
+    }
+    .cardbtn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: var(--radius-lg);
+    }
+    .cardbtn udt-card {
       display: block;
       height: 100%;
     }
@@ -167,6 +208,15 @@ export class UdtSquadPage {
   private readonly api = inject(Api);
   readonly userId = input.required<string>();
   protected readonly squad = signal<UdtSquad | null>(null);
+  /** The bot whose details are open (read only). */
+  protected readonly openId = signal<string | null>(null);
+  protected readonly openBot = computed(
+    () => this.squad()?.roster.find((b) => b.botId === this.openId()) ?? null,
+  );
+  protected readonly teamInfo = computed(() => {
+    const s = this.squad();
+    return s ? { name: s.team.name, tag: s.team.tag, manager: s.manager } : null;
+  });
 
   constructor() {
     effect(() => {

@@ -195,6 +195,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
           [looks]="looks()"
           [index]="v.index"
           [camp]="v.camp ?? null"
+          [traitCards]="inventory().length"
           (changed)="load()"
           (closed)="panelId.set(null)"
         />
