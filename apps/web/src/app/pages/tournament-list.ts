@@ -623,6 +623,7 @@ function storedFilter(): TournamentFilter {
       margin-bottom: 14px;
     }
     .head h1 {
+      flex: 1 1 auto;
       font-size: var(--fs-6xl);
       margin: 0;
     }

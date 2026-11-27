@@ -6,16 +6,18 @@ import { Api } from '../core/api';
 import { copyText, selectText } from '../core/clipboard';
 import { isLocalAddress } from '../core/connect';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import type { AgentView, Inventory } from '../core/types';
 
 @Component({
   selector: 'app-agents',
-  imports: [FormsModule, TPipe, Icon],
+  imports: [Guide, FormsModule, TPipe, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="spread">
       <h1>{{ 'agents.title' | t }}</h1>
       <button (click)="load()">{{ 'common.refresh' | t }}</button>
+      <na-guide page="servers" />
     </div>
     <p class="muted">{{ 'agents.intro' | t }}</p>
     @if (imported()) {
@@ -182,6 +184,10 @@ import type { AgentView, Inventory } from '../core/types';
     </form>
   `,
   styles: `
+    /* The title takes the free space: actions and the guide stay right (decision 329). */
+    .spread > h1 {
+      flex: 1 1 auto;
+    }
     .pool {
       display: inline-flex;
       align-items: center;

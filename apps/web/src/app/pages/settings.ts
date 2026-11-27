@@ -24,6 +24,7 @@ import { SettingsSystem } from '../components/settings-system';
 import { SettingsUdt } from '../components/settings-udt';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 
 const TABS = ['season', 'bets', 'bots', 'udt', 'league', 'system'] as const;
 export type SettingsTab = (typeof TABS)[number];
@@ -37,6 +38,7 @@ export type SettingsTab = (typeof TABS)[number];
 @Component({
   selector: 'app-settings',
   imports: [
+    Guide,
     Tabs,
     TPipe,
     SettingsSeason,
@@ -48,7 +50,10 @@ export type SettingsTab = (typeof TABS)[number];
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>{{ 'settings.title' | t }}</h1>
+    <div class="spread">
+      <h1>{{ 'settings.title' | t }}</h1>
+      <na-guide page="settings" />
+    </div>
 
     <na-tabs
       [options]="tabOptions()"
@@ -108,6 +113,10 @@ export type SettingsTab = (typeof TABS)[number];
     </div>
   `,
   styles: `
+    /* The title takes the free space: actions and the guide stay right (decision 329). */
+    .spread > h1 {
+      flex: 1 1 auto;
+    }
     /* Section index in the free space right of the forms (wide screens, tabs with 2+ cards). */
     .toc {
       display: none;

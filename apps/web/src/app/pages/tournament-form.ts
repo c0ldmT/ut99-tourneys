@@ -17,6 +17,7 @@ import { Api, errorText } from '../core/api';
 import { Auth } from '../core/auth';
 import { Icon, UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide, Guides } from '../components/guide';
 import { isLocalAddress } from '../core/connect';
 import { scheduleText, weekdayNames } from '../core/series-text';
 import { MH_ADAPTER } from '../core/race';
@@ -220,6 +221,7 @@ function toLocalInput(iso: string | null): string {
 @Component({
   selector: 'app-tournament-form',
   imports: [
+    Guide,
     Segment,
     TempoPick,
     FormSectionHead,
@@ -252,6 +254,7 @@ function toLocalInput(iso: string | null): string {
           <na-icon name="copyToNew" [size]="16" /> {{ 'form.manageSeries' | t }}
         </a>
       </div>
+      <na-guide page="form" />
     </div>
     @if (locked()) {
       <p class="notice">{{ 'form.locked' | t }}</p>
@@ -394,7 +397,12 @@ function toLocalInput(iso: string | null): string {
                     </div>
                   }
                 </div>
-                <p class="muted small">{{ 'form.udtHint' | t }} {{ 'form.udtTicketHint' | t }}</p>
+                <p class="muted small">
+                  {{ 'form.udtHint' | t }}
+                  <button type="button" class="link small" (click)="guides.open('form', 'udt')">
+                    {{ 'guide.form.mUdt' | t }}
+                  </button>
+                </p>
                 <div class="optrows">
                   @if (f.udtTicket > 0) {
                     <label class="switch optrow"
@@ -456,7 +464,7 @@ function toLocalInput(iso: string | null): string {
                     (ngModelChange)="touch()" /><span class="tr"></span
                 ></label>
               }
-              <label class="switch optrow" [title]="'form.autoStartHint' | t"
+              <label class="switch optrow"
                 ><span class="ot"
                   ><b>{{ 'form.autoStart' | t }}</b
                   ><span class="muted small">{{ 'form.autoStartShort' | t }}</span></span
@@ -917,7 +925,9 @@ function toLocalInput(iso: string | null): string {
                 </p>
                 @if (f.game === 'mh') {
                   <p class="muted small">
-                    <strong>{{ 'form.botAi' | t }}</strong> {{ 'form.botAiHint' | t }}
+                    <button type="button" class="link small" (click)="guides.open('form', 'botai')">
+                      {{ 'guide.form.mBotAi' | t }}
+                    </button>
                   </p>
                 }
 
@@ -1321,6 +1331,9 @@ function toLocalInput(iso: string | null): string {
       gap: 12px;
       flex-wrap: wrap;
       margin-bottom: 18px;
+    }
+    .head > div:first-child {
+      flex: 1 1 auto;
     }
     .head h1 {
       margin: 0;
@@ -1729,6 +1742,8 @@ export class TournamentFormPage {
   readonly mode = input<string | undefined>(undefined);
   readonly from = input<string | undefined>(undefined);
   private readonly api = inject(Api);
+  /** Long explanations live in the page's guide (decision 329). */
+  protected readonly guides = inject(Guides);
   private readonly router = inject(Router);
   protected readonly auth = inject(Auth);
   protected readonly i18n = inject(I18n);

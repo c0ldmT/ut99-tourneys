@@ -469,6 +469,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
       margin-bottom: 16px;
     }
     .pagehead h1 {
+      flex: 1 1 auto;
       margin: 0;
     }
     .pagehead select {

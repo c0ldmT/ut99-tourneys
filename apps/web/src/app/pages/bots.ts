@@ -8,6 +8,7 @@ import { Api } from '../core/api';
 import { LookPicker } from '../components/look-picker';
 import { assetLabel, COMBAT_STYLES, combatStyleKey } from '../core/bots';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import {
   BOT_LINE_KINDS,
   type AgentView,
@@ -66,11 +67,13 @@ const emptyLines = () =>
 /** Bot control center (admins): the website's bots, clans and team names. */
 @Component({
   selector: 'app-bots',
-  imports: [Tabs, TPipe, FormsModule, RouterLink, Icon, LookPicker],
+  imports: [Guide, Tabs, TPipe, FormsModule, RouterLink, Icon, LookPicker],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>{{ 'bots.title' | t }}</h1>
-    <p class="muted small">{{ 'bots.intro' | t }}</p>
+    <div class="spread">
+      <h1>{{ 'bots.title' | t }}</h1>
+      <na-guide page="bots" />
+    </div>
     <na-tabs [options]="tabOptions()" [(value)]="tab" />
     @if (notice()) {
       <p class="notice">{{ notice() }}</p>
@@ -596,6 +599,10 @@ const emptyLines = () =>
     }
   `,
   styles: `
+    /* The title takes the free space: actions and the guide stay right (decision 329). */
+    .spread > h1 {
+      flex: 1 1 auto;
+    }
     table.botlist td {
       vertical-align: middle;
     }

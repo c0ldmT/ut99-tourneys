@@ -317,6 +317,7 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       flex-wrap: wrap;
     }
     .pagehead h1 {
+      flex: 1 1 auto;
       margin: 0;
     }
     .wallet {

@@ -4,22 +4,23 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import { leadText, scheduleText } from '../core/series-text';
 import type { SeriesView } from '../core/types';
 
 /** Tournament series: weekly templates that create the next tournament by themselves. */
 @Component({
   selector: 'app-series',
-  imports: [RouterLink, TPipe, Icon],
+  imports: [Guide, RouterLink, TPipe, Icon],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="spread">
       <h1>{{ 'series.title' | t }}</h1>
+      <na-guide page="series" />
       <a class="btn primary" routerLink="/new" [queryParams]="{ mode: 'series' }">
         <na-icon name="plus" [size]="16" /> {{ 'series.new' | t }}
       </a>
     </div>
-    <p class="muted small intro">{{ 'series.intro' | t }}</p>
 
     <div class="card tablepanel">
       @if (!list().length) {
@@ -122,8 +123,9 @@ import type { SeriesView } from '../core/types';
     </div>
   `,
   styles: `
-    .intro {
-      margin-top: 0;
+    /* The title takes the free space: actions and the guide stay right (decision 329). */
+    .spread > h1 {
+      flex: 1 1 auto;
     }
     .nm {
       display: flex;

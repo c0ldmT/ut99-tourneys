@@ -47,6 +47,12 @@ describe('guides "How it works" (decisions 327–329)', () => {
     for (const id of play) expect((GUIDES as Record<string, GuideDef>)[id]?.area, id).toBe('play');
   });
 
+  it('has the administration pages (decision 329)', () => {
+    const admin = ['admin', 'form', 'series', 'servers', 'bots', 'settings'];
+    for (const id of admin)
+      expect((GUIDES as Record<string, GuideDef>)[id]?.area, id).toBe('admin');
+  });
+
   it('opens "How betting works" as a section of the tournament guide', () => {
     expect(GUIDES.tournament.more.map((m) => m.id)).toContain('bets');
     expect(GUIDES.tournament.more.find((m) => m.id === 'bets')?.paras.at(-1)?.needs).toBe('floor');

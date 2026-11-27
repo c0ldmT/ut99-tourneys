@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { EmptyState } from '../components/empty-state';
 import { Api } from '../core/api';
 import { I18n, TPipe, WhenPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import type { AdminOverview } from '../core/types';
 
 /** The administration's pages, as in the header menu (decision 285). */
@@ -23,12 +24,13 @@ const PAGES = [
  */
 @Component({
   selector: 'app-admin-home',
-  imports: [RouterLink, TPipe, WhenPipe, EmptyState],
+  imports: [Guide, RouterLink, TPipe, WhenPipe, EmptyState],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
       <h1>{{ 'adm.title' | t }}</h1>
       <a class="btn primary" routerLink="/new">{{ 'nav.new' | t }}</a>
+      <na-guide page="admin" />
     </div>
     <nav class="pages" [attr.aria-label]="'adm.pages' | t">
       @for (p of pages; track p.link) {
@@ -160,6 +162,7 @@ const PAGES = [
       flex-wrap: wrap;
     }
     .head h1 {
+      flex: 1 1 auto;
       margin: 0;
     }
     .pages {

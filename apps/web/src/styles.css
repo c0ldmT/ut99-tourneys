@@ -1247,11 +1247,11 @@ main section[id] {
   font-size: var(--fs-5xl);
   line-height: 0.95;
 }
-.udt-head > div:first-child {
+.udt-head > div:first-of-type {
   min-width: 0;
   flex: 1 1 420px;
 }
-.udt-head > div:first-child > p {
+.udt-head > div:first-of-type > p {
   max-width: 72ch;
   margin: 10px 0 0;
 }

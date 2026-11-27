@@ -224,6 +224,69 @@ export const GUIDES = {
       { id: 'notify', title: 'guide.account.mNotify', paras: [p('profile.notifyDmHint')] },
     ],
   },
+  // --- Administration (decision 329)
+  admin: {
+    ...base('admin', 'admin', 4, 4),
+    more: [{ id: 'pages', title: 'guide.admin.mPages', paras: [p('guide.admin.mPagesd')] }],
+  },
+  form: {
+    ...base('form', 'admin', 4, 5),
+    more: [
+      { id: 'start', title: 'guide.form.mStart', paras: [p('form.autoStartHint')] },
+      { id: 'tempo', title: 'guide.form.mTempo', paras: [p('guide.form.mTempod')] },
+      { id: 'templates', title: 'guide.form.mTemplates', paras: [p('guide.form.mTemplatesd')] },
+      {
+        id: 'udt',
+        title: 'guide.form.mUdt',
+        paras: [p('form.udtHint'), p('form.udtTicketHint'), p('form.udtFinaleHint')],
+      },
+      { id: 'botai', title: 'guide.form.mBotAi', paras: [p('form.botAiHint')] },
+    ],
+  },
+  series: {
+    ...base('series', 'admin', 4, 4),
+    more: [
+      {
+        id: 'auto',
+        title: 'guide.series.mAuto',
+        paras: [p('series.intro'), p('series.leadHint')],
+      },
+      { id: 'names', title: 'guide.series.mNames', paras: [p('series.nameHint')] },
+    ],
+  },
+  servers: {
+    ...base('servers', 'admin', 4, 4, 'agents.intro'),
+    more: [
+      { id: 'pool', title: 'guide.servers.mPool', paras: [p('agents.poolHint')] },
+      { id: 'address', title: 'guide.servers.mAddress', paras: [p('agents.localAddress')] },
+      { id: 'instance', title: 'guide.servers.mInstance', paras: [p('agents.instanceHint')] },
+      { id: 'token', title: 'guide.servers.mToken', paras: [p('guide.servers.mTokend')] },
+    ],
+  },
+  bots: {
+    ...base('bots', 'admin', 4, 4, 'bots.intro'),
+    more: [
+      { id: 'lines', title: 'guide.bots.mLines', paras: [p('bots.linesHint')] },
+      { id: 'rivals', title: 'guide.bots.mRivals', paras: [p('bots.rivalsHint')] },
+      {
+        id: 'clans',
+        title: 'guide.bots.mClans',
+        paras: [p('bots.clanHint'), p('bots.teamNamesHint')],
+      },
+      { id: 'retire', title: 'guide.bots.mRetire', paras: [p('bots.activeHint')] },
+    ],
+  },
+  settings: {
+    ...base('settings', 'admin', 4, 5),
+    more: [
+      {
+        id: 'season',
+        title: 'guide.settings.mSeason',
+        paras: [p('settings.ratingHint'), p('bets.settingsHint')],
+      },
+      { id: 'reset', title: 'guide.settings.mReset', paras: [p('reset.what'), p('reset.keeps')] },
+    ],
+  },
 } satisfies Record<string, GuideDef>;
 
 export type GuideId = keyof typeof GUIDES;

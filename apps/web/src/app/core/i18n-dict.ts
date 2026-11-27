@@ -876,7 +876,6 @@ const en = {
   'form.gameMh': 'Monster Hunt (time race)',
   'form.monsterSkill': 'Monster difficulty (0-7)',
   'form.lives': 'Lives per hunter',
-  'form.botAi': 'Bot AI enhancements (always on):',
   'form.botAiHint':
     'The tournament mod contains bot AI enhancements that fix errors in how bots behave in Monster Hunt. Bots follow the map\'s waypoints in the right order, also use the jumps the map marks for them, keep their distance from moving lifts and gates, find out what opens a closed gate (a monster to kill, a switch) and free themselves when they get stuck (last resort: back to the start without a death). Gates that open only once no longer turn back when touched (map bug, e.g. MH-Canyon). Teams without players get the "Attack" order every 45 s.',
   'form.livesUnlimited': 'Unlimited',
@@ -3640,6 +3639,138 @@ const en = {
   'guide.account.s4d': 'What you bought in the shop you put on under Wardrobe.',
   'guide.account.mToken': 'Your join token',
   'guide.account.mNotify': 'Direct messages',
+  'guide.admin.title': 'How the administration works',
+  'guide.admin.lead':
+    'The state of the website at a glance: servers, the season, tournaments, users and the latest problems, with the way to each page.',
+  'guide.admin.f1': 'Servers online and in the pool',
+  'guide.admin.f2': 'Moderation queue',
+  'guide.admin.f3': 'Live, open and draft tournaments',
+  'guide.admin.f4': 'Problems of the last days',
+  'guide.admin.s1': 'Servers',
+  'guide.admin.s1d':
+    'Who is online, who plays what, who is in the pool. An offline server is a case for the Servers page.',
+  'guide.admin.s2': 'Season',
+  'guide.admin.s2d': 'Running or planned season; dates and rules are under Settings › Season.',
+  'guide.admin.s3': 'Tournaments',
+  'guide.admin.s3d': 'What is live, open for registration or still a draft – and the next start.',
+  'guide.admin.s4': 'Problems',
+  'guide.admin.s4d':
+    'Paused and aborted tournaments and what the servers reported since the last restart.',
+  'guide.admin.mPages': 'The other pages',
+  'guide.admin.mPagesd':
+    'Moderation: names, chat lines and Dream Team texts waiting for a decision. Users: everybody with their last activity, the longest inactive first. Series, Servers, Bots and Settings each have their own guide.',
+  'guide.form.title': 'How a new tournament works',
+  'guide.form.lead':
+    'Six sections: basics, game, rules, server and tempo, Discord, advanced. A new tournament opens the first one; the others show one line each with Change, and the summary on the right jumps to them.',
+  'guide.form.f1': 'Templates per admin',
+  'guide.form.f2': 'Empty slots get bots',
+  'guide.form.f3': 'Start by itself or by hand',
+  'guide.form.f4': 'Fixed once drawn',
+  'guide.form.s1': 'Name and date',
+  'guide.form.s1d':
+    'Kind (classic, season or Dream Team), once or as a series, start time, registration open, start by itself.',
+  'guide.form.s2': 'Game and bracket',
+  'guide.form.s2d': 'Mode, format, size and best of; the length estimate follows.',
+  'guide.form.s3': 'Rules and maps',
+  'guide.form.s3d': 'Frag and time limits and the maps.',
+  'guide.form.s4': 'Server and tempo',
+  'guide.form.s4d':
+    'A fixed server or one from the pool; one match after another or several at once.',
+  'guide.form.s5': 'Discord and more',
+  'guide.form.s5d':
+    'Messages in the tournament’s channel; under Advanced check-in, reconnects, map vote and bot games.',
+  'guide.form.mStart': 'Start by itself',
+  'guide.form.mTempo': 'Several matches at once',
+  'guide.form.mTempod':
+    'With the pool on, free servers of the pool join at the start. They play bot matches side by side; matches with players stay on the main server. The estimate counts one round as its matches divided by the servers, times best of.',
+  'guide.form.mTemplates': 'Templates',
+  'guide.form.mTemplatesd':
+    'Save the form as a template under a name; one click fills it in again (name, date and series plan stay). Every admin has their own, up to 20.',
+  'guide.form.mUdt': 'Dream Team cups',
+  'guide.form.mBotAi': 'Bot AI in Monster Hunt',
+  'guide.series.title': 'How series work',
+  'guide.series.lead':
+    'A series repeats a tournament on a schedule and creates each one by itself ahead of time.',
+  'guide.series.f1': 'Weekly or every few hours',
+  'guide.series.f2': 'Created ahead, registration open',
+  'guide.series.f3': 'Announced in Discord',
+  'guide.series.f4': 'Pause any time',
+  'guide.series.s1': 'Make one',
+  'guide.series.s1d':
+    'New tournament › Repeating series, or from a tournament: organizer panel › Make a series.',
+  'guide.series.s2': 'Schedule',
+  'guide.series.s2d':
+    'Weekdays and times, every n weeks or every n hours, and how far ahead each tournament is created.',
+  'guide.series.s3': 'Run',
+  'guide.series.s3d':
+    'The next tournament appears with registration open; with Start by itself it also starts on its own.',
+  'guide.series.s4': 'Steer',
+  'guide.series.s4d':
+    'Pause or resume, create the next one now, edit the settings – they count for the tournaments created after.',
+  'guide.series.mAuto': 'What a series creates',
+  'guide.series.mNames': 'Names',
+  'guide.servers.title': 'How servers work',
+  'guide.servers.f1': 'Token shown once',
+  'guide.servers.f2': 'Pool: automatic tournaments and league',
+  'guide.servers.f3': 'Address for players',
+  'guide.servers.f4': 'More servers per machine',
+  'guide.servers.s1': 'Add',
+  'guide.servers.s1d':
+    'Id and name; the token appears once – into bridge.json on the server machine.',
+  'guide.servers.s2': 'Connect',
+  'guide.servers.s2d':
+    'Once the bridge runs, the server is online with its mod version and players.',
+  'guide.servers.s3': 'Scan',
+  'guide.servers.s3d':
+    'Maps, models, skins and bots of the server come to the website; scan again after changes.',
+  'guide.servers.s4': 'Pool and address',
+  'guide.servers.s4d':
+    'Pool on: tournaments with Server: automatic and the league may use it. The address is what players connect to.',
+  'guide.servers.mPool': 'Server pool',
+  'guide.servers.mAddress': 'Address for players',
+  'guide.servers.mInstance': 'Another server on the same machine',
+  'guide.servers.mToken': 'Token',
+  'guide.servers.mTokend':
+    'The token is shown only when it is made. A new token disconnects the bridge until it is in its bridge.json.',
+  'guide.bots.title': 'How bots work',
+  'guide.bots.f1': 'No limit of 32',
+  'guide.bots.f2': 'Statistics follow the bot',
+  'guide.bots.f3': 'Retired: kept, not offered',
+  'guide.bots.f4': 'Clans and team names',
+  'guide.bots.s1': 'Create',
+  'guide.bots.s1d': 'One by hand, a few random ones, or import those of a scanned server.',
+  'guide.bots.s2': 'Look and style',
+  'guide.bots.s2d': 'Model, skin, face and voice like in UT; play style as in UT’s bot setup.',
+  'guide.bots.s3': 'Lines and rivals',
+  'guide.bots.s3d': 'Chat lines for the game and rivals the bot goes after.',
+  'guide.bots.s4': 'Clans and teams',
+  'guide.bots.s4d':
+    'Clans put their tag before the names; team names are for bot teams in team tournaments.',
+  'guide.bots.mLines': 'Chat lines',
+  'guide.bots.mRivals': 'Rivals',
+  'guide.bots.mClans': 'Clans and team names',
+  'guide.bots.mRetire': 'Retire or delete',
+  'guide.settings.title': 'How the settings work',
+  'guide.settings.lead':
+    'Everything the website does by itself, in tabs; the table of contents on the right jumps within a tab.',
+  'guide.settings.f1': 'Season values: running and planned',
+  'guide.settings.f2': 'Ended seasons keep theirs',
+  'guide.settings.f3': 'Save per section',
+  'guide.settings.f4': 'Reset only under System',
+  'guide.settings.s1': 'Season',
+  'guide.settings.s1d': 'Seasons with their dates and the ratings.',
+  'guide.settings.s2': 'Bets & shop',
+  'guide.settings.s2d':
+    'Neuro: start balance, rescue floor, betting bots; the shop’s items and prices.',
+  'guide.settings.s3': 'Bots & live',
+  'guide.settings.s3d': 'Bot AI help and the live data of the games.',
+  'guide.settings.s4': 'Dream Team and league',
+  'guide.settings.s4d':
+    'The Dream Team’s economy, trait report and survey; schedule, server, money and start of the league.',
+  'guide.settings.s5': 'System',
+  'guide.settings.s5d': 'The danger zone: reset the website (cannot be undone).',
+  'guide.settings.mSeason': 'Season values',
+  'guide.settings.mReset': 'Resetting the website',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -4526,7 +4657,6 @@ const de: Record<TKey, string> = {
   'form.gameMh': 'Monster Hunt (Zeitrennen)',
   'form.monsterSkill': 'Monster-Stärke (0-7)',
   'form.lives': 'Leben pro Jäger',
-  'form.botAi': 'Bot-KI-Verbesserungen (immer aktiv):',
   'form.botAiHint':
     'Der Turnier-Mod enthält Verbesserungen der Bot-KI, die Fehler im Verhalten der Bots in Monster Hunt beheben. Bots laufen die Wegpunkte der Map in der richtigen Reihenfolge ab, nutzen auch die Sprünge, die die Map für sie markiert, halten Abstand zu fahrenden Liften und Gittern, finden heraus, was ein geschlossenes Tor öffnet (ein Monster, ein Schalter), und befreien sich, wenn sie hängen bleiben (zuletzt: zurück zum Start ohne Tod). Tore, die sich nur einmal öffnen, kehren bei Berührung nicht mehr um (Map-Bug, z. B. MH-Canyon). Teams ohne Spieler bekommen alle 45 s den Befehl „Attack“.',
   'form.livesUnlimited': 'Unendlich',
@@ -7324,6 +7454,141 @@ const de: Record<TKey, string> = {
   'guide.account.s4d': 'Was du im Shop gekauft hast, legst du unter „Garderobe“ an.',
   'guide.account.mToken': 'Dein Beitritts-Token',
   'guide.account.mNotify': 'Direktnachrichten',
+  'guide.admin.title': 'So funktioniert die Verwaltung',
+  'guide.admin.lead':
+    'Der Zustand der Website auf einen Blick: Server, Season, Turniere, Benutzer und die letzten Probleme, mit dem Weg zur jeweiligen Seite.',
+  'guide.admin.f1': 'Server online und im Pool',
+  'guide.admin.f2': 'Moderations-Warteschlange',
+  'guide.admin.f3': 'Live, offene und Entwürfe',
+  'guide.admin.f4': 'Probleme der letzten Tage',
+  'guide.admin.s1': 'Server',
+  'guide.admin.s1d':
+    'Wer online ist, wer was spielt, wer im Pool ist. Ein Server offline ist ein Fall für die Seite Server.',
+  'guide.admin.s2': 'Season',
+  'guide.admin.s2d':
+    'Laufende oder geplante Season; Daten und Regeln stehen unter Einstellungen › Season.',
+  'guide.admin.s3': 'Turniere',
+  'guide.admin.s3d': 'Was live ist, zur Anmeldung offen oder noch Entwurf – und der nächste Start.',
+  'guide.admin.s4': 'Probleme',
+  'guide.admin.s4d':
+    'Pausierte und abgebrochene Turniere und was die Server seit dem letzten Neustart gemeldet haben.',
+  'guide.admin.mPages': 'Die anderen Seiten',
+  'guide.admin.mPagesd':
+    'Moderation: Namen, Sprüche und Dream-Team-Texte, die auf eine Entscheidung warten. Benutzer: alle mit ihrer letzten Aktivität, die am längsten Inaktiven zuerst. Serien, Server, Bots und Einstellungen haben je eine eigene Anleitung.',
+  'guide.form.title': 'So funktioniert ein neues Turnier',
+  'guide.form.lead':
+    'Sechs Abschnitte: Grundlagen, Spiel, Regeln, Server und Tempo, Discord, Erweitert. Ein neues Turnier öffnet den ersten; die anderen zeigen je eine Zeile mit „Ändern“, und die Zusammenfassung rechts springt dorthin.',
+  'guide.form.f1': 'Vorlagen pro Admin',
+  'guide.form.f2': 'Freie Plätze bekommen Bots',
+  'guide.form.f3': 'Automatisch oder von Hand starten',
+  'guide.form.f4': 'Fest nach der Auslosung',
+  'guide.form.s1': 'Name und Termin',
+  'guide.form.s1d':
+    'Art (Klassisch, Season oder Dream Team), einmalig oder als Serie, Startzeit, Anmeldung offen, automatisch starten.',
+  'guide.form.s2': 'Spiel und Turnierbaum',
+  'guide.form.s2d': 'Modus, Format, Größe und Best of; die Längenschätzung folgt.',
+  'guide.form.s3': 'Regeln und Maps',
+  'guide.form.s3d': 'Frag- und Zeitlimit und die Maps.',
+  'guide.form.s4': 'Server und Tempo',
+  'guide.form.s4d':
+    'Ein fester Server oder einer aus dem Pool; ein Match nach dem anderen oder mehrere gleichzeitig.',
+  'guide.form.s5': 'Discord und mehr',
+  'guide.form.s5d':
+    'Nachrichten im Channel des Turniers; unter „Erweitert“ Check-in, Reconnects, Map-Abstimmung und Bot-Spiele.',
+  'guide.form.mStart': 'Automatisch starten',
+  'guide.form.mTempo': 'Mehrere Matches gleichzeitig',
+  'guide.form.mTempod':
+    'Mit Pool kommen beim Start freie Server des Pools dazu. Sie spielen Bot-Matches nebeneinander; Matches mit Spielern bleiben auf dem Hauptserver. Die Schätzung rechnet eine Runde als ihre Matches geteilt durch die Server, mal Best of.',
+  'guide.form.mTemplates': 'Vorlagen',
+  'guide.form.mTemplatesd':
+    'Speichere das Formular als Vorlage unter einem Namen; ein Klick füllt es wieder aus (Name, Termin und Serienplan bleiben). Jeder Admin hat eigene, bis zu 20.',
+  'guide.form.mUdt': 'Dream-Team-Cups',
+  'guide.form.mBotAi': 'Bot-KI in Monster Hunt',
+  'guide.series.title': 'So funktionieren Serien',
+  'guide.series.lead':
+    'Eine Serie wiederholt ein Turnier nach Plan und legt jedes selbst im Voraus an.',
+  'guide.series.f1': 'Wöchentlich oder alle paar Stunden',
+  'guide.series.f2': 'Im Voraus angelegt, Anmeldung offen',
+  'guide.series.f3': 'Angekündigt in Discord',
+  'guide.series.f4': 'Jederzeit pausieren',
+  'guide.series.s1': 'Anlegen',
+  'guide.series.s1d':
+    '„Neues Turnier“ › „Wiederkehrende Serie“, oder aus einem Turnier: Veranstalter-Bereich › „Als Serie“.',
+  'guide.series.s2': 'Plan',
+  'guide.series.s2d':
+    'Wochentage und Zeiten, alle n Wochen oder alle n Stunden, und wie weit im Voraus jedes Turnier angelegt wird.',
+  'guide.series.s3': 'Laufen lassen',
+  'guide.series.s3d':
+    'Das nächste Turnier erscheint mit offener Anmeldung; mit „Automatisch starten“ startet es auch selbst.',
+  'guide.series.s4': 'Steuern',
+  'guide.series.s4d':
+    'Pausieren oder fortsetzen, das nächste jetzt anlegen, die Einstellungen ändern – sie gelten für die danach angelegten Turniere.',
+  'guide.series.mAuto': 'Was eine Serie anlegt',
+  'guide.series.mNames': 'Namen',
+  'guide.servers.title': 'So funktionieren Server',
+  'guide.servers.f1': 'Token nur einmal sichtbar',
+  'guide.servers.f2': 'Pool: automatische Turniere und Liga',
+  'guide.servers.f3': 'Adresse für Spieler',
+  'guide.servers.f4': 'Mehrere Server pro Maschine',
+  'guide.servers.s1': 'Hinzufügen',
+  'guide.servers.s1d':
+    'Id und Name; der Token erscheint einmal – in die bridge.json auf der Server-Maschine.',
+  'guide.servers.s2': 'Verbinden',
+  'guide.servers.s2d':
+    'Sobald die Bridge läuft, ist der Server online, mit Mod-Version und Spielern.',
+  'guide.servers.s3': 'Einlesen',
+  'guide.servers.s3d':
+    'Maps, Modelle, Skins und Bots des Servers kommen auf die Website; nach Änderungen neu einlesen.',
+  'guide.servers.s4': 'Pool und Adresse',
+  'guide.servers.s4d':
+    'Pool an: Turniere mit „Server: automatisch“ und die Liga dürfen ihn nehmen. Die Adresse ist das, womit sich Spieler verbinden.',
+  'guide.servers.mPool': 'Server-Pool',
+  'guide.servers.mAddress': 'Adresse für Spieler',
+  'guide.servers.mInstance': 'Ein weiterer Server auf derselben Maschine',
+  'guide.servers.mToken': 'Token',
+  'guide.servers.mTokend':
+    'Der Token ist nur beim Erstellen zu sehen. Ein neuer Token trennt die Bridge, bis er in ihrer bridge.json steht.',
+  'guide.bots.title': 'So funktionieren Bots',
+  'guide.bots.f1': 'Kein Limit von 32',
+  'guide.bots.f2': 'Statistiken folgen dem Bot',
+  'guide.bots.f3': 'Im Ruhestand: bleibt, wird nicht angeboten',
+  'guide.bots.f4': 'Clans und Teamnamen',
+  'guide.bots.s1': 'Anlegen',
+  'guide.bots.s1d':
+    'Einzeln von Hand, ein paar zufällige oder die eines eingelesenen Servers importieren.',
+  'guide.bots.s2': 'Aussehen und Stil',
+  'guide.bots.s2d':
+    'Modell, Skin, Gesicht und Stimme wie in UT; Spielstil wie im Bot-Setup von UT.',
+  'guide.bots.s3': 'Sprüche und Rivalen',
+  'guide.bots.s3d': 'Chat-Sprüche fürs Spiel und Rivalen, auf die der Bot losgeht.',
+  'guide.bots.s4': 'Clans und Teams',
+  'guide.bots.s4d':
+    'Clans setzen ihr Kürzel vor die Namen; Teamnamen sind für Bot-Teams in Team-Turnieren.',
+  'guide.bots.mLines': 'Sprüche',
+  'guide.bots.mRivals': 'Rivalen',
+  'guide.bots.mClans': 'Clans und Teamnamen',
+  'guide.bots.mRetire': 'Ruhestand oder löschen',
+  'guide.settings.title': 'So funktionieren die Einstellungen',
+  'guide.settings.lead':
+    'Alles, was die Website selbst tut, in Reitern; das Inhaltsverzeichnis rechts springt innerhalb eines Reiters.',
+  'guide.settings.f1': 'Season-Werte: laufende und geplante',
+  'guide.settings.f2': 'Beendete Seasons behalten ihre',
+  'guide.settings.f3': 'Speichern pro Abschnitt',
+  'guide.settings.f4': 'Zurücksetzen nur unter System',
+  'guide.settings.s1': 'Season',
+  'guide.settings.s1d': 'Seasons mit ihren Daten und die Ratings.',
+  'guide.settings.s2': 'Wetten & Shop',
+  'guide.settings.s2d':
+    'Neuro: Startguthaben, Rettungsgrenze, wettende Bots; Artikel und Preise des Shops.',
+  'guide.settings.s3': 'Bots & Live',
+  'guide.settings.s3d': 'Bot-KI-Hilfe und die Live-Daten der Spiele.',
+  'guide.settings.s4': 'Dream Team und Liga',
+  'guide.settings.s4d':
+    'Die Ökonomie des Dream Teams, Trait-Report und Umfrage; Spielplan, Server, Geld und Start der Liga.',
+  'guide.settings.s5': 'System',
+  'guide.settings.s5d': 'Die Gefahrenzone: die Website zurücksetzen (nicht rückgängig zu machen).',
+  'guide.settings.mSeason': 'Season-Werte',
+  'guide.settings.mReset': 'Die Website zurücksetzen',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };
