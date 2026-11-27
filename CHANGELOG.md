@@ -9,6 +9,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 - How it works on the administration pages (overview, new tournament, series, servers, bots, settings); long hints of the tournament form, series and bots pages moved into the guides (decision 329, patch note 331).
 - League team names link to the team's squad (table, matchday, Final Four, next game) and the hub's league card has All teams (decision 330, patch note 331).
+- Other teams' bots show their potential in the read-only details (decision 331, patch note 331).
 - How it works on the player pages: Matches, tournament, match, calendar, statistics, shop and account get the guide button (cyan) with their own guide; How betting works in the bet panel opens the tournament guide at its bets section instead of a fold-out (decision 328, patch note 328).
 - How it works on every Dream Team page: a ? button in the page head opens a short guide (one sentence, facts, steps, details to unfold) instead of the fold-outs and the one Dream Team help; links like Stamina or The rules in detail open it at the right place (decision 327, patch note 327).
 - Bot details on My team with tabs Development, Traits, Use and Manage below level, stamina and form; a dot marks what is to do and the dialog opens there; on a team's squad page a click on a card opens the same details read only (decision 326, patch note 326).

@@ -63,7 +63,7 @@ type PanelTab = 'dev' | 'traits' | 'use' | 'admin';
  * with a preview of each step, breakthrough, prestige, settling in), traits (slots, signature),
  * use (lineup place, rest with Neuro, Monster Hunt focus) and manage (loan, renaming, look,
  * selling). A dot marks a tab with something to do; the dialog opens on the first such tab.
- * `view`: another team's bot, read only – no potential, no points, no manage tab. Every action
+ * `view`: another team's bot, read only – potential but no points, no manage tab. Every action
  * reloads the page (`changed`).
  */
 @Component({
@@ -184,7 +184,10 @@ type PanelTab = 'dev' | 'traits' | 'use' | 'admin';
               @switch (tab()) {
                 @case ('dev') {
                   @if (view()) {
-                    <!-- Another team's bot: the values, no potential, no points (decision 326). -->
+                    <!-- Another team's bot: values and potential, no points (decisions 326, 331). -->
+                    @if (b.own; as own) {
+                      <udt-potential [skill]="b.skill" [potential]="own.potential" />
+                    }
                     <div class="vals">
                       @for (s of stats; track s) {
                         <div>
@@ -883,7 +886,7 @@ export class UdtBotPanel {
   readonly index = input(1);
   /** Training camp (decision 254): price, experience, the bots trained today. */
   readonly camp = input<UdtCamp | null>(null);
-  /** Another team's bot: read only (no potential, points or actions). */
+  /** Another team's bot: read only (the potential, no points or actions). */
   readonly view = input(false);
   /** The team of another team's bot (shown under the name). */
   readonly team = input<{ name: string; tag: string; manager: string } | null>(null);

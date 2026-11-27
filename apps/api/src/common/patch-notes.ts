@@ -22,6 +22,28 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 331,
+    date: '2026-11-27',
+    en: {
+      title: 'Team links, potential and the last guides',
+      items: [
+        'League: team names in the table, on the matchday and in the Final Four lead to the team’s squad; the hub’s league card has "All teams".',
+        'Another team’s bot details show its potential (a range until level 5).',
+        'The administration pages have their "How it works" guide too.',
+        'Page heads: key figures, the season select and the balance stay at the right again.',
+      ],
+    },
+    de: {
+      title: 'Team-Links, Potenzial und die letzten Anleitungen',
+      items: [
+        'Liga: Teamnamen in der Tabelle, am Spieltag und im Final Four führen zum Kader des Teams; die Liga-Karte im Hub hat „Alle Teams“.',
+        'Die Bot-Details anderer Teams zeigen das Potenzial (bis Level 5 als Spanne).',
+        'Auch die Verwaltungsseiten haben ihre Anleitung „So funktioniert’s“.',
+        'Seitenköpfe: Kennzahlen, Season-Auswahl und Guthaben stehen wieder rechts.',
+      ],
+    },
+  },
+  {
     id: 328,
     date: '2026-11-27',
     en: {
