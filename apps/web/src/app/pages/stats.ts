@@ -7,6 +7,7 @@ import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { BetBoardView } from '../components/bet-board';
 import { TPipe, WhenPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import { raceTime } from '../core/race';
 import { defaultScope, parseScope, startedSeasons } from '../core/season';
 import { percent, playerLink, playTime, recordValue } from '../core/stats-format';
@@ -34,11 +35,12 @@ const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,
 
 @Component({
   selector: 'app-stats',
-  imports: [Tabs, EmptyState, TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
+  imports: [Guide, Tabs, EmptyState, TPipe, WhenPipe, RouterLink, BetBoardView, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
       <h1>{{ 'stats.title' | t }}</h1>
+      <na-guide page="stats" />
       <select
         class="auto"
         [attr.aria-label]="'season.scope' | t"

@@ -41,4 +41,14 @@ describe('guides "How it works" (decisions 327–329)', () => {
       ]),
     );
   });
+
+  it('has the player pages, in cyan (decision 328)', () => {
+    const play = ['overview', 'tournament', 'match', 'calendar', 'stats', 'shop', 'account'];
+    for (const id of play) expect((GUIDES as Record<string, GuideDef>)[id]?.area, id).toBe('play');
+  });
+
+  it('opens "How betting works" as a section of the tournament guide', () => {
+    expect(GUIDES.tournament.more.map((m) => m.id)).toContain('bets');
+    expect(GUIDES.tournament.more.find((m) => m.id === 'bets')?.paras.at(-1)?.needs).toBe('floor');
+  });
 });

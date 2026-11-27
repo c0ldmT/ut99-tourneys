@@ -7,6 +7,7 @@ import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { Coin, Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import { Avatar, Looks, nameStyle } from '../core/looks';
 import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
 import type { ShopItem, ShopPurchaseView, ShopSlot, ShopView } from '../core/types';
@@ -26,11 +27,12 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
 /** The Neuro shop: cosmetics for Neuro, the wardrobe, and (admins) prices and approvals. */
 @Component({
   selector: 'app-shop',
-  imports: [Tabs, FormsModule, RouterLink, TPipe, NeuroPipe, Coin, Icon, Avatar],
+  imports: [Guide, Tabs, FormsModule, RouterLink, TPipe, NeuroPipe, Coin, Icon, Avatar],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="pagehead">
       <h1>{{ 'shop.title' | t }}</h1>
+      <na-guide page="shop" />
       @if (view(); as v) {
         @let w = wallet() ?? v.wallet;
         <div class="wallet">
@@ -321,6 +323,17 @@ const WEAR_SLOTS = ['title', 'color', 'frame', 'badge', 'banner', 'fanfare'] as 
       display: flex;
       flex-direction: column;
       align-items: flex-end;
+    }
+    @media (max-width: 640px) {
+      /* Title, balance and the guide in one row (decision 328). */
+      .pagehead {
+        flex-wrap: nowrap;
+      }
+      .wallet {
+        flex: 1;
+        min-width: 0;
+        text-align: right;
+      }
     }
     .wallet b {
       display: inline-flex;

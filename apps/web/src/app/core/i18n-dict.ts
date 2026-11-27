@@ -1142,8 +1142,6 @@ const en = {
   'bets.balance': 'Neuro',
   'bets.staked': 'staked',
   'bets.free': 'free',
-  'bets.hint':
-    "Bet Neuro (N) on the winner. Pools stay hidden until the first game starts; the winners share the losers' pool in proportion to their stakes. If a lost bet leaves you below {floor}, you get up to {floor} right away (Neuro in your Dream Team bots count towards it).",
   'bets.closed.notSeasonal': 'No bets: this is not a season tournament.',
   'bets.closed.noSeason': 'No bets: no season is running (Neuro exist per season).',
   'bets.closed.phase': 'Bets are closed in this tournament.',
@@ -3485,6 +3483,163 @@ const en = {
     "After the season you approve your bots' graduation; they join the library with their breeder.",
   'guide.yearbook.s3': 'Best breeders',
   'guide.yearbook.s3d': 'The ranking of the managers by graduates and honours.',
+  'guide.overview.title': 'How the overview works',
+  'guide.overview.lead':
+    'Everything that is on: live matches at the top, then what comes up next and what just finished. The archive keeps every result.',
+  'guide.overview.f1': 'Live matches at the top',
+  'guide.overview.f2': 'Filters for kind and mode',
+  'guide.overview.f3': 'Only mine: your tournaments',
+  'guide.overview.f4': 'Archive: search by name or winner',
+  'guide.overview.s1': 'Find a tournament',
+  'guide.overview.s1d':
+    'Under Coming up you see what is planned; Registration open marks the ones you can still join.',
+  'guide.overview.s2': 'Register',
+  'guide.overview.s2d': 'Open the tournament and click Register. Empty slots are filled with bots.',
+  'guide.overview.s3': 'Play',
+  'guide.overview.s3d':
+    'When it starts, connect to the game server with the command on the tournament page.',
+  'guide.overview.s4': 'Look back',
+  'guide.overview.s4d':
+    'In the archive every finished tournament keeps its bracket, match pages and statistics.',
+  'guide.overview.mKinds': 'Classic, DT cups and league',
+  'guide.overview.mKindsd':
+    'Classic tournaments you play yourself. In Dream Team cups the managers’ bot teams play and you watch; on league evenings the Dream Team league plays its matchday.',
+  'guide.overview.mSeries': 'Series',
+  'guide.overview.mSeriesd':
+    'A series repeats a tournament on fixed dates. Its card shows the next date and the history; the archive filter shows all tournaments of the series.',
+  'guide.tournament.title': 'How a tournament works',
+  'guide.tournament.lead':
+    'Here you register, connect to the game server, follow the bracket and bet on the matches.',
+  'guide.tournament.f1': 'Empty slots are filled with bots',
+  'guide.tournament.f2': 'Connect with your personal token',
+  'guide.tournament.f3': 'No-show: forfeit',
+  'guide.tournament.f4': 'Bets until the first game',
+  'guide.tournament.s1': 'Register',
+  'guide.tournament.s1d':
+    'While registration is open: Register. You can withdraw until the bracket is drawn.',
+  'guide.tournament.s2': 'Connect',
+  'guide.tournament.s2d':
+    'At the start, copy the connect command from this page into the UT99 console. Being on the server is your check-in.',
+  'guide.tournament.s3': 'Play your match',
+  'guide.tournament.s3d':
+    'The server calls your match: map vote, ready check, countdown. Stay on the server between your matches.',
+  'guide.tournament.s4': 'Follow',
+  'guide.tournament.s4d':
+    'Bracket and live bar show what is running; Match details has every game with its statistics.',
+  'guide.tournament.s5': 'Bet',
+  'guide.tournament.s5d':
+    'In season tournaments you can bet Neuro on the winner of a match until its first game starts.',
+  'guide.tournament.mConnect': 'Connect and check-in',
+  'guide.tournament.mConnectd':
+    'Open the console in UT99 (~ key), paste the connect command and press Enter. On Linux the page also gives you a terminal command that starts UT and connects.',
+  'guide.tournament.mMatch': 'How a match runs',
+  'guide.tournament.mMatchd':
+    'Called → map vote (missing votes are drawn at random) → the map loads → ready check → countdown → game. A side with nobody on the server when the ready check times out forfeits. Bo3 and longer: the games follow one another on the same server.',
+  'guide.tournament.mBetsd':
+    'Pick the winner and your stake. The pools stay hidden until the first game starts; then betting closes and the winners share the losers’ pool in proportion to their stakes.',
+  'guide.tournament.mBetsBack':
+    'Stakes come back when no game is played (no-show, simulated bot match, decided by the organizer), when the match is called off or when one side has no bets.',
+  'guide.tournament.mBetsFloor':
+    'If a lost bet leaves you below {floor}, you get up to {floor} right away (Neuro in your Dream Team bots count towards it).',
+  'guide.tournament.mWatchd':
+    'Spectators connect with their own command and watch without playing. You need your personal token for it, so you have to be logged in.',
+  'guide.match.title': 'How the match page works',
+  'guide.match.lead':
+    'One match: the score of the series, every game and the statistics of every player.',
+  'guide.match.f1': 'Big number: games won',
+  'guide.match.f2': 'Statistics after each game',
+  'guide.match.f3': 'MVP per game',
+  'guide.match.f4': 'Bets while they are open',
+  'guide.match.s1': 'Score',
+  'guide.match.s1d': 'The big number counts the games won; in a Bo3 two wins decide the match.',
+  'guide.match.s2': 'Games',
+  'guide.match.s2d': 'Each game with its map, how it ended and the score of both sides.',
+  'guide.match.s3': 'Statistics',
+  'guide.match.s3d':
+    'Frags, deaths, sprees and items per player. They arrive when the game is over.',
+  'guide.match.s4': 'Players',
+  'guide.match.s4d': 'Click a name to open the player’s page with the season statistics.',
+  'guide.match.mMvp': 'MVP and share',
+  'guide.match.mOutcome': 'Forfeits and corrections',
+  'guide.match.mOutcomed':
+    'Not every match is played: a no-show is a forfeit, a bot match can be simulated, and the organizer can set a result. The page says so; only games really played on the server count for the statistics and the rating.',
+  'guide.calendar.title': 'How the calendar works',
+  'guide.calendar.lead':
+    'Every date of the season in one place: tournaments, series, Dream Team cups, league evenings and the season’s milestones.',
+  'guide.calendar.f1': 'Month or list',
+  'guide.calendar.f2': 'Dashed: planned',
+  'guide.calendar.f3': 'Only mine',
+  'guide.calendar.f4': 'Up next at the top',
+  'guide.calendar.s1': 'Choose the view',
+  'guide.calendar.s1d':
+    'Month shows the grid, List the dates one below the other. Arrows and Today move through the months.',
+  'guide.calendar.s2': 'Filter',
+  'guide.calendar.s2d':
+    'Kind narrows it down to tournaments, DT cups, league or season; Only mine keeps what you are in.',
+  'guide.calendar.s3': 'Open a date',
+  'guide.calendar.s3d': 'Click an entry to go to its tournament, cup or matchday.',
+  'guide.calendar.s4': 'Up next',
+  'guide.calendar.s4d':
+    'The next dates that concern you: your league game, open sign-ups and the end of the season.',
+  'guide.calendar.mPlanned': 'Planned dates',
+  'guide.calendar.mPlannedd':
+    'Dashed entries are not set up yet: the next dates of a series or the league plan. The league plan is fixed once the league starts.',
+  'guide.stats.title': 'How the statistics work',
+  'guide.stats.lead':
+    'Who plays how well: ratings, player statistics, records and the betting table – per season or for all time.',
+  'guide.stats.f1': 'One rating per mode, start 1500',
+  'guide.stats.f2': 'Provisional until 5 games',
+  'guide.stats.f3': 'Counts from mod 0.6.0',
+  'guide.stats.f4': 'Records per season',
+  'guide.stats.s1': 'Choose the season',
+  'guide.stats.s1d':
+    'Top right: a season, or Lifetime for every tournament (without ratings, records and bets).',
+  'guide.stats.s2': 'Ranking',
+  'guide.stats.s2d': 'Ratings per mode and their curve over the season.',
+  'guide.stats.s3': 'Players',
+  'guide.stats.s3d': 'Frags, K/D and more; click a column to sort, a name for the player’s page.',
+  'guide.stats.s4': 'Records',
+  'guide.stats.s4d': 'The best values of the season and the fastest runs per map.',
+  'guide.stats.s5': 'Bets',
+  'guide.stats.s5d': 'The season’s betting table: everyone who placed a bet.',
+  'guide.shop.title': 'How the shop works',
+  'guide.shop.f1': 'Looks only',
+  'guide.shop.f2': 'Paid with season Neuro',
+  'guide.shop.f3': 'Kept for good',
+  'guide.shop.f4': 'Down to the rescue floor',
+  'guide.shop.s1': 'Buy',
+  'guide.shop.s1d':
+    'Pick an item; the price comes off your balance at once. What you can spend is shown at the top.',
+  'guide.shop.s2': 'Wear',
+  'guide.shop.s2d': 'Under Wardrobe you put on one item per place and change it any time.',
+  'guide.shop.s3': 'Dedications',
+  'guide.shop.s3d':
+    'Write your own lines for the website bots. An admin approves them first; rejected ones are refunded.',
+  'guide.shop.s4': 'Season end',
+  'guide.shop.s4d':
+    'Your items stay. Awards such as the champion frame are handed out at the end of the season.',
+  'guide.shop.mSlots': 'Where items show',
+  'guide.shop.mDedication': 'Writing a dedication',
+  'guide.account.title': 'How your account works',
+  'guide.account.lead':
+    'Your name on the server, your key to the game server, messages from the tournament bot and the language.',
+  'guide.account.f1': 'Name up to 20 characters',
+  'guide.account.f2': 'Token: keep it to yourself',
+  'guide.account.f3': 'DMs from the tournament bot',
+  'guide.account.f4': 'Language per browser',
+  'guide.account.s1': 'Name',
+  'guide.account.s1d':
+    'Shown on the server and in the bracket. A change counts for tournaments drawn afterwards.',
+  'guide.account.s2': 'Join token',
+  'guide.account.s2d':
+    'Part of your connect command. Copy the command on the tournament page, not the token on its own.',
+  'guide.account.s3': 'Notifications',
+  'guide.account.s3d':
+    'Check-in, your next match, reminders and your placing as direct messages – on or off.',
+  'guide.account.s4': 'Looks',
+  'guide.account.s4d': 'What you bought in the shop you put on under Wardrobe.',
+  'guide.account.mToken': 'Your join token',
+  'guide.account.mNotify': 'Direct messages',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -4641,8 +4796,6 @@ const de: Record<TKey, string> = {
   'bets.balance': 'Neuro',
   'bets.staked': 'gesetzt',
   'bets.free': 'frei',
-  'bets.hint':
-    'Setze Neuro (N) auf den Sieger. Die Pools bleiben bis zum Start des ersten Spiels verdeckt; die Gewinner teilen sich den Pool der Verlierer im Verhältnis ihrer Einsätze. Fällst du nach einer verlorenen Wette unter {floor}, bekommst du sofort bis zu {floor} (Neuro in deinen Dream-Team-Bots zählen mit).',
   'bets.closed.notSeasonal': 'Keine Wetten: Das ist kein Season-Turnier.',
   'bets.closed.noSeason': 'Keine Wetten: Es läuft keine Season (Neuro gibt es pro Season).',
   'bets.closed.phase': 'Die Wetten in diesem Turnier sind geschlossen.',
@@ -7011,6 +7164,166 @@ const de: Record<TKey, string> = {
     'Nach der Season gibst du den Abschluss deiner Bots frei; sie gehen mit ihrem Züchter in die Bibliothek.',
   'guide.yearbook.s3': 'Beste Züchter',
   'guide.yearbook.s3d': 'Die Rangliste der Manager nach Absolventen und Auszeichnungen.',
+  'guide.overview.title': 'So funktioniert die Übersicht',
+  'guide.overview.lead':
+    'Alles, was läuft: oben die Live-Matches, darunter, was als Nächstes kommt und was gerade fertig wurde. Das Archiv bewahrt jedes Ergebnis.',
+  'guide.overview.f1': 'Live-Matches oben',
+  'guide.overview.f2': 'Filter für Art und Modus',
+  'guide.overview.f3': 'Nur meine: deine Turniere',
+  'guide.overview.f4': 'Archiv: Suche nach Name oder Sieger',
+  'guide.overview.s1': 'Turnier finden',
+  'guide.overview.s1d':
+    'Unter „Als Nächstes“ steht, was geplant ist; „Anmeldung offen“ markiert, wo du noch mitmachen kannst.',
+  'guide.overview.s2': 'Anmelden',
+  'guide.overview.s2d': 'Turnier öffnen und auf „Anmelden“ klicken. Freie Plätze bekommen Bots.',
+  'guide.overview.s3': 'Spielen',
+  'guide.overview.s3d':
+    'Zum Start verbindest du dich mit dem Befehl von der Turnierseite mit dem Gameserver.',
+  'guide.overview.s4': 'Zurückblicken',
+  'guide.overview.s4d':
+    'Im Archiv behält jedes fertige Turnier seinen Turnierbaum, die Match-Seiten und die Statistiken.',
+  'guide.overview.mKinds': 'Klassisch, DT-Cups und Liga',
+  'guide.overview.mKindsd':
+    'Klassische Turniere spielst du selbst. In Dream-Team-Cups spielen die Bot-Teams der Manager und du schaust zu; an Ligaabenden spielt die Dream-Team-Liga ihren Spieltag.',
+  'guide.overview.mSeries': 'Serien',
+  'guide.overview.mSeriesd':
+    'Eine Serie wiederholt ein Turnier zu festen Terminen. Ihre Karte zeigt den nächsten Termin und den Verlauf; der Archiv-Filter zeigt alle Turniere der Serie.',
+  'guide.tournament.title': 'So funktioniert ein Turnier',
+  'guide.tournament.lead':
+    'Hier meldest du dich an, verbindest dich mit dem Gameserver, verfolgst den Turnierbaum und wettest auf die Matches.',
+  'guide.tournament.f1': 'Freie Plätze bekommen Bots',
+  'guide.tournament.f2': 'Verbinden mit deinem Token',
+  'guide.tournament.f3': 'Nicht da: Forfeit',
+  'guide.tournament.f4': 'Wetten bis zum ersten Spiel',
+  'guide.tournament.s1': 'Anmelden',
+  'guide.tournament.s1d':
+    'Solange die Anmeldung offen ist: „Anmelden“. Abmelden kannst du dich bis zur Auslosung.',
+  'guide.tournament.s2': 'Verbinden',
+  'guide.tournament.s2d':
+    'Zum Start den Connect-Befehl von dieser Seite in die UT99-Konsole kopieren. Auf dem Server zu sein ist dein Check-in.',
+  'guide.tournament.s3': 'Dein Match spielen',
+  'guide.tournament.s3d':
+    'Der Server ruft dein Match auf: Map-Abstimmung, Bereitschaftscheck, Countdown. Bleib zwischen deinen Matches auf dem Server.',
+  'guide.tournament.s4': 'Mitverfolgen',
+  'guide.tournament.s4d':
+    'Turnierbaum und Live-Leiste zeigen, was läuft; unter „Zum Match“ steht jedes Spiel mit seinen Statistiken.',
+  'guide.tournament.s5': 'Wetten',
+  'guide.tournament.s5d':
+    'In Season-Turnieren setzt du Neuro auf den Sieger eines Matches, bis sein erstes Spiel beginnt.',
+  'guide.tournament.mConnect': 'Verbinden und Check-in',
+  'guide.tournament.mConnectd':
+    'In UT99 die Konsole öffnen (Taste ~), den Connect-Befehl einfügen und Enter drücken. Unter Linux gibt dir die Seite zusätzlich einen Terminal-Befehl, der UT startet und verbindet.',
+  'guide.tournament.mMatch': 'So läuft ein Match',
+  'guide.tournament.mMatchd':
+    'Aufgerufen → Map-Abstimmung (fehlende Stimmen werden gelost) → die Map lädt → Bereitschaftscheck → Countdown → Spiel. Eine Seite, von der beim Ablauf des Bereitschaftschecks niemand auf dem Server ist, verliert kampflos. Bei Bo3 und länger folgen die Spiele auf demselben Server aufeinander.',
+  'guide.tournament.mBetsd':
+    'Wähle den Sieger und deinen Einsatz. Die Pools bleiben verdeckt, bis das erste Spiel beginnt; dann schließen die Wetten und die Gewinner teilen sich den Pool der Verlierer im Verhältnis ihrer Einsätze.',
+  'guide.tournament.mBetsBack':
+    'Die Einsätze gibt es zurück, wenn kein Spiel gespielt wird (nicht erschienen, simuliertes Bot-Match, vom Veranstalter entschieden), wenn das Match abgesagt wird oder eine Seite keine Wetten hat.',
+  'guide.tournament.mBetsFloor':
+    'Fällst du nach einer verlorenen Wette unter {floor}, bekommst du sofort bis zu {floor} (Neuro in deinen Dream-Team-Bots zählen mit).',
+  'guide.tournament.mWatchd':
+    'Zuschauer verbinden sich mit einem eigenen Befehl und schauen zu, ohne mitzuspielen. Dafür brauchst du deinen persönlichen Token, also musst du angemeldet sein.',
+  'guide.match.title': 'So funktioniert die Match-Seite',
+  'guide.match.lead':
+    'Ein Match: der Stand der Serie, jedes Spiel und die Statistiken jedes Spielers.',
+  'guide.match.f1': 'Große Zahl: gewonnene Spiele',
+  'guide.match.f2': 'Statistiken nach jedem Spiel',
+  'guide.match.f3': 'MVP pro Spiel',
+  'guide.match.f4': 'Wetten, solange offen',
+  'guide.match.s1': 'Stand',
+  'guide.match.s1d':
+    'Die große Zahl zählt die gewonnenen Spiele; bei Bo3 entscheiden zwei Siege das Match.',
+  'guide.match.s2': 'Spiele',
+  'guide.match.s2d': 'Jedes Spiel mit Map, Spielende und dem Ergebnis beider Seiten.',
+  'guide.match.s3': 'Statistiken',
+  'guide.match.s3d':
+    'Frags, Tode, Serien und Items pro Spieler. Sie kommen, wenn das Spiel vorbei ist.',
+  'guide.match.s4': 'Spieler',
+  'guide.match.s4d':
+    'Ein Klick auf einen Namen öffnet die Spielerseite mit den Season-Statistiken.',
+  'guide.match.mMvp': 'MVP und Anteil',
+  'guide.match.mOutcome': 'Forfeits und Korrekturen',
+  'guide.match.mOutcomed':
+    'Nicht jedes Match wird gespielt: Wer nicht erscheint, verliert kampflos, ein Bot-Match kann simuliert werden und der Veranstalter kann ein Ergebnis setzen. Die Seite sagt das dazu; für Statistiken und Rating zählen nur Spiele, die wirklich auf dem Server gespielt wurden.',
+  'guide.calendar.title': 'So funktioniert der Kalender',
+  'guide.calendar.lead':
+    'Alle Termine der Season an einem Ort: Turniere, Serien, Dream-Team-Cups, Ligaabende und die Meilensteine der Season.',
+  'guide.calendar.f1': 'Monat oder Liste',
+  'guide.calendar.f2': 'Gestrichelt: geplant',
+  'guide.calendar.f3': 'Nur meine',
+  'guide.calendar.f4': 'Als Nächstes oben',
+  'guide.calendar.s1': 'Ansicht wählen',
+  'guide.calendar.s1d':
+    '„Monat“ zeigt das Raster, „Liste“ die Termine untereinander. Pfeile und „Heute“ blättern durch die Monate.',
+  'guide.calendar.s2': 'Filtern',
+  'guide.calendar.s2d':
+    '„Art“ grenzt auf Turniere, DT-Cups, Liga oder Season ein; „Nur meine“ behält, wo du dabei bist.',
+  'guide.calendar.s3': 'Termin öffnen',
+  'guide.calendar.s3d': 'Ein Klick auf einen Eintrag führt zu seinem Turnier, Cup oder Spieltag.',
+  'guide.calendar.s4': 'Als Nächstes',
+  'guide.calendar.s4d':
+    'Die nächsten Termine, die dich betreffen: dein Ligaspiel, offene Anmeldungen und das Season-Ende.',
+  'guide.calendar.mPlanned': 'Geplante Termine',
+  'guide.calendar.mPlannedd':
+    'Gestrichelte Einträge sind noch nicht angelegt: die nächsten Termine einer Serie oder der Liga-Plan. Der Liga-Plan steht fest, sobald die Liga startet.',
+  'guide.stats.title': 'So funktionieren die Statistiken',
+  'guide.stats.lead':
+    'Wer wie gut spielt: Ratings, Spielerstatistiken, Rekorde und die Wett-Tabelle – pro Season oder über alle Zeiten.',
+  'guide.stats.f1': 'Ein Rating pro Modus, Start 1500',
+  'guide.stats.f2': 'Vorläufig bis 5 Spiele',
+  'guide.stats.f3': 'Zählt ab Mod 0.6.0',
+  'guide.stats.f4': 'Rekorde pro Season',
+  'guide.stats.s1': 'Season wählen',
+  'guide.stats.s1d':
+    'Oben rechts: eine Season oder „Lifetime“ für alle Turniere (ohne Ratings, Rekorde und Wetten).',
+  'guide.stats.s2': 'Rangliste',
+  'guide.stats.s2d': 'Ratings pro Modus und ihr Verlauf über die Season.',
+  'guide.stats.s3': 'Spieler',
+  'guide.stats.s3d':
+    'Frags, K/D und mehr; Klick auf eine Spalte sortiert, auf einen Namen öffnet die Spielerseite.',
+  'guide.stats.s4': 'Rekorde',
+  'guide.stats.s4d': 'Die Bestwerte der Season und die schnellsten Läufe pro Map.',
+  'guide.stats.s5': 'Wetten',
+  'guide.stats.s5d': 'Die Wett-Tabelle der Season: alle, die gewettet haben.',
+  'guide.shop.title': 'So funktioniert der Shop',
+  'guide.shop.f1': 'Nur Optik',
+  'guide.shop.f2': 'Bezahlt mit Season-Neuro',
+  'guide.shop.f3': 'Gekauft ist gekauft',
+  'guide.shop.f4': 'Bis zur Rettungsgrenze',
+  'guide.shop.s1': 'Kaufen',
+  'guide.shop.s1d':
+    'Artikel wählen; der Preis geht sofort von deinem Guthaben ab. Was du ausgeben kannst, steht oben.',
+  'guide.shop.s2': 'Tragen',
+  'guide.shop.s2d': 'Unter „Garderobe“ legst du pro Platz ein Teil an und wechselst es jederzeit.',
+  'guide.shop.s3': 'Widmungen',
+  'guide.shop.s3d':
+    'Schreib eigene Sprüche für die Website-Bots. Ein Admin gibt sie vorher frei; abgelehnte werden erstattet.',
+  'guide.shop.s4': 'Season-Ende',
+  'guide.shop.s4d':
+    'Deine Teile bleiben. Auszeichnungen wie der Champion-Rahmen werden am Ende der Season vergeben.',
+  'guide.shop.mSlots': 'Wo die Teile erscheinen',
+  'guide.shop.mDedication': 'Eine Widmung schreiben',
+  'guide.account.title': 'So funktioniert dein Konto',
+  'guide.account.lead':
+    'Dein Name auf dem Server, dein Schlüssel zum Gameserver, Nachrichten vom Turnier-Bot und die Sprache.',
+  'guide.account.f1': 'Name bis 20 Zeichen',
+  'guide.account.f2': 'Token: nicht weitergeben',
+  'guide.account.f3': 'DMs vom Turnier-Bot',
+  'guide.account.f4': 'Sprache pro Browser',
+  'guide.account.s1': 'Name',
+  'guide.account.s1d':
+    'Steht auf dem Server und im Turnierbaum. Eine Änderung gilt für Turniere, die danach ausgelost werden.',
+  'guide.account.s2': 'Beitritts-Token',
+  'guide.account.s2d':
+    'Teil deines Connect-Befehls. Kopier den Befehl auf der Turnierseite, nicht den Token allein.',
+  'guide.account.s3': 'Benachrichtigungen',
+  'guide.account.s3d':
+    'Check-in, dein nächstes Match, Erinnerungen und deine Platzierung als Direktnachricht – an oder aus.',
+  'guide.account.s4': 'Aussehen',
+  'guide.account.s4d': 'Was du im Shop gekauft hast, legst du unter „Garderobe“ an.',
+  'guide.account.mToken': 'Dein Beitritts-Token',
+  'guide.account.mNotify': 'Direktnachrichten',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

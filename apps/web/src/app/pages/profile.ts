@@ -7,6 +7,7 @@ import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { copyText } from '../core/clipboard';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import type { Lang } from '../core/i18n-dict';
 import { Avatar, NameTag } from '../core/looks';
 
@@ -20,10 +21,13 @@ const NATIVE: Readonly<Record<string, string>> = { de: 'Deutsch', en: 'English' 
  */
 @Component({
   selector: 'app-profile',
-  imports: [Segment, FormsModule, RouterLink, TPipe, Avatar, NameTag],
+  imports: [Guide, Segment, FormsModule, RouterLink, TPipe, Avatar, NameTag],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
-    <h1>{{ 'profile.title' | t }}</h1>
+    <div class="phead">
+      <h1>{{ 'profile.title' | t }}</h1>
+      <na-guide page="account" />
+    </div>
     @if (auth.me(); as me) {
       <div class="acct">
         <section class="card who" [attr.aria-label]="'profile.who' | t">
@@ -143,6 +147,16 @@ const NATIVE: Readonly<Record<string, string>> = { de: 'Deutsch', en: 'English' 
     }
   `,
   styles: `
+    .phead {
+      max-width: 760px;
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      margin-bottom: 0.35rem;
+    }
+    .phead h1 {
+      margin: 0;
+    }
     .acct {
       max-width: 760px;
       display: grid;

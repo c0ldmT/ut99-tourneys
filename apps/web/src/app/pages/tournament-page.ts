@@ -21,6 +21,8 @@ import { BetColumns } from '../components/bet-columns';
 import { LiveMini, type MiniSide } from '../components/live-mini';
 import { LiveList, type LiveListItem } from '../components/live-list';
 import { LiveBar } from '../components/live-bar';
+import { Guide } from '../components/guide';
+import { formatNeuro, NeuroStore } from '../core/neuro';
 import { leagueItem } from '../core/live-items';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
@@ -65,6 +67,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     LiveMini,
     LiveList,
     LiveBar,
+    Guide,
     Icon,
     NameTag,
     UdtMark,
@@ -118,20 +121,24 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
             }
           </div>
         </div>
-        @if (isAdmin()) {
-          <div class="head-r">
-            <div class="kpi">Server</div>
-            <div class="srv">
-              <span class="dot" [class.on]="t.agent.online"></span> {{ t.serverName || t.agentId }}
-            </div>
-            @for (l of t.lanes ?? []; track l.agentId) {
-              <!-- Parallel matches (decision 291): its extra servers. -->
-              <div class="srv small">
-                <span class="dot" [class.on]="l.online"></span> + {{ l.name || l.agentId }}
+        <div class="head-x">
+          @if (isAdmin()) {
+            <div class="head-r">
+              <div class="kpi">Server</div>
+              <div class="srv">
+                <span class="dot" [class.on]="t.agent.online"></span>
+                {{ t.serverName || t.agentId }}
               </div>
-            }
-          </div>
-        }
+              @for (l of t.lanes ?? []; track l.agentId) {
+                <!-- Parallel matches (decision 291): its extra servers. -->
+                <div class="srv small">
+                  <span class="dot" [class.on]="l.online"></span> + {{ l.name || l.agentId }}
+                </div>
+              }
+            </div>
+          }
+          <na-guide page="tournament" [params]="guideParams()" />
+        </div>
       </div>
 
       @if (t.phase === 'paused' && t.projection?.pausedReason) {
@@ -1093,6 +1100,12 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       padding: 4px 0 22px;
       border-bottom: 1px solid var(--border);
     }
+    .head-x {
+      display: flex;
+      align-items: flex-end;
+      gap: 24px;
+      margin-left: auto;
+    }
     .head-l {
       display: flex;
       flex-direction: column;
@@ -1284,6 +1297,12 @@ export class TournamentPage {
     ),
   );
   protected readonly router = inject(Router);
+  private readonly neuroStore = inject(NeuroStore);
+  /** The guide's numbers: the rescue floor while a season runs (decision 328). */
+  protected readonly guideParams = computed((): Record<string, string> => {
+    const w = this.neuroStore.wallet();
+    return w?.running && w.floor ? { floor: formatNeuro(w.floor, this.i18n.lang()) } : {};
+  });
 
   protected readonly t = signal<TournamentDetail | null>(null);
   protected readonly busy = signal(false);

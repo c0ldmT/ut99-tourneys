@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- How it works on the player pages: Matches, tournament, match, calendar, statistics, shop and account get the guide button (cyan) with their own guide; How betting works in the bet panel opens the tournament guide at its bets section instead of a fold-out (decision 328, patch note 328).
 - How it works on every Dream Team page: a ? button in the page head opens a short guide (one sentence, facts, steps, details to unfold) instead of the fold-outs and the one Dream Team help; links like Stamina or The rules in detail open it at the right place (decision 327, patch note 327).
 - Bot details on My team with tabs Development, Traits, Use and Manage below level, stamina and form; a dot marks what is to do and the dialog opens there; on a team's squad page a click on a card opens the same details read only (decision 326, patch note 326).
 - Tournament presets per admin: save the form's settings under a name, apply them with one click (name and date stay), delete them; GET/POST/DELETE /tournament-presets, migration 61 (decision 325, patch note 325).

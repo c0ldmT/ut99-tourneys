@@ -22,6 +22,7 @@ import { Loading } from '../core/loading';
 import { Auth } from '../core/auth';
 import { UdtMark } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import { scheduleText } from '../core/series-text';
 import type {
   SeriesOverview,
@@ -67,6 +68,7 @@ function storedFilter(): TournamentFilter {
 @Component({
   selector: 'app-tournament-list',
   imports: [
+    Guide,
     Segment,
     EmptyState,
     RouterLink,
@@ -80,6 +82,7 @@ function storedFilter(): TournamentFilter {
   template: `
     <div class="head">
       <h1>{{ 'list.title' | t }}</h1>
+      <na-guide page="overview" />
       @if (auth.me()?.isAdmin) {
         <div class="row">
           <a class="btn hide-sm" routerLink="/admin/series">{{ 'series.title' | t }}</a>

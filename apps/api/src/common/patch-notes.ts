@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 328,
+    date: '2026-11-27',
+    en: {
+      title: 'How it works, on the player pages too',
+      items: [
+        'Matches, tournament, match, calendar, statistics, shop and account now have the "How it works" button as well – in cyan.',
+        'The tournament guide explains registering, connecting, how a match runs and betting; "How betting works" in the bets opens it right there.',
+      ],
+    },
+    de: {
+      title: 'So funktioniert’s – jetzt auch auf den Spielerseiten',
+      items: [
+        'Matches, Turnier, Match, Kalender, Statistiken, Shop und Konto haben jetzt auch den Knopf „So funktioniert’s“ – in Cyan.',
+        'Die Turnier-Anleitung erklärt Anmelden, Verbinden, den Ablauf eines Matches und das Wetten; „So funktionieren Wetten“ bei den Wetten öffnet sie gleich dort.',
+      ],
+    },
+  },
+  {
     id: 327,
     date: '2026-11-27',
     en: {

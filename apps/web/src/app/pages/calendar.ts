@@ -4,6 +4,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import type { CalendarItem, CalendarKind, CalendarView } from '../core/types';
 
 type Group = 'all' | 'tour' | 'cup' | 'league' | 'season';
@@ -73,7 +74,7 @@ interface Cell {
  */
 @Component({
   selector: 'app-calendar',
-  imports: [Segment, NgTemplateOutlet, RouterLink, TPipe],
+  imports: [Guide, Segment, NgTemplateOutlet, RouterLink, TPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="cal-head">
@@ -84,6 +85,7 @@ interface Cell {
         <h1>{{ 'cal.title' | t }}</h1>
       </div>
       <span class="grow"></span>
+      <na-guide page="calendar" />
       <na-segment [options]="modeOptions" [(value)]="mode" label="cal.view" />
       <div class="cal-nav">
         <button type="button" class="btn" [attr.aria-label]="'cal.prev' | t" (click)="move(-1)">

@@ -150,6 +150,80 @@ export const GUIDES = {
       },
     ],
   },
+  // --- Player pages (decision 328)
+  overview: {
+    ...base('overview', 'play', 4, 4),
+    more: [
+      { id: 'kinds', title: 'guide.overview.mKinds', paras: [p('guide.overview.mKindsd')] },
+      { id: 'series', title: 'guide.overview.mSeries', paras: [p('guide.overview.mSeriesd')] },
+    ],
+  },
+  tournament: {
+    ...base('tournament', 'play', 4, 5),
+    more: [
+      {
+        id: 'connect',
+        title: 'guide.tournament.mConnect',
+        paras: [p('guide.tournament.mConnectd'), p('profile.tokenHint')],
+      },
+      { id: 'match', title: 'guide.tournament.mMatch', paras: [p('guide.tournament.mMatchd')] },
+      {
+        id: 'bets',
+        title: 'bets.howTo',
+        paras: [
+          p('guide.tournament.mBetsd'),
+          p('guide.tournament.mBetsBack'),
+          p('guide.tournament.mBetsFloor', undefined, 'floor'),
+        ],
+      },
+      { id: 'watch', title: 'tp.watch', paras: [p('guide.tournament.mWatchd')] },
+    ],
+  },
+  match: {
+    ...base('match', 'play', 4, 4),
+    more: [
+      { id: 'mvp', title: 'guide.match.mMvp', paras: [p('match.mvpHint'), p('match.mvpHintMh')] },
+      { id: 'outcome', title: 'guide.match.mOutcome', paras: [p('guide.match.mOutcomed')] },
+    ],
+  },
+  calendar: {
+    ...base('calendar', 'play', 4, 4),
+    more: [
+      { id: 'planned', title: 'guide.calendar.mPlanned', paras: [p('guide.calendar.mPlannedd')] },
+    ],
+  },
+  stats: {
+    ...base('stats', 'play', 4, 5),
+    more: [
+      { id: 'rating', title: 'rating.title', paras: [p('rating.hint')] },
+      { id: 'players', title: 'stats.players', paras: [p('stats.playersHint')] },
+      { id: 'records', title: 'stats.records', paras: [p('stats.mapRecordsHint')] },
+    ],
+  },
+  shop: {
+    ...base('shop', 'play', 4, 4, 'shop.intro'),
+    more: [
+      {
+        id: 'slots',
+        title: 'guide.shop.mSlots',
+        paras: (['title', 'fanfare', 'dedication'] as const).map((x) =>
+          p(`shop.slotHint.${x}`, `shop.slot.${x}`),
+        ),
+      },
+      { id: 'dedication', title: 'guide.shop.mDedication', paras: [p('shop.dedicationHint')] },
+    ],
+  },
+  account: {
+    ...base('account', 'play', 4, 4),
+    more: [
+      {
+        id: 'token',
+        title: 'guide.account.mToken',
+        paras: [p('profile.tokenHint'), p('profile.rotateHint')],
+      },
+      { id: 'notify', title: 'guide.account.mNotify', paras: [p('profile.notifyDmHint')] },
+    ],
+  },
 } satisfies Record<string, GuideDef>;
 
 export type GuideId = keyof typeof GUIDES;

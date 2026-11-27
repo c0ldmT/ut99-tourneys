@@ -24,6 +24,7 @@ import { Api } from '../core/api';
 import { botRoute } from '../core/bots';
 import { Loading } from '../core/loading';
 import { I18n, TPipe } from '../core/i18n';
+import { Guide } from '../components/guide';
 import { MH_ADAPTER, raceTime } from '../core/race';
 import { TraitLog } from '../components/trait-log';
 import { playTime } from '../core/stats-format';
@@ -78,6 +79,7 @@ const SUM_KEYS = [
 @Component({
   selector: 'app-match-page',
   imports: [
+    Guide,
     Tabs,
     TPipe,
     RouterLink,
@@ -97,13 +99,16 @@ const SUM_KEYS = [
       <a [routerLink]="['/t', t.id]">← {{ t.name }}</a>
     }
     @if (d(); as d) {
-      <h1>
-        {{ d.matchId }}
-        @if (d.bestOf > 1) {
-          <span class="muted small">· Bo{{ d.bestOf }}</span>
-        }
-        <span class="pill" [class]="state()">{{ 'match.state.' + state() | t }}</span>
-      </h1>
+      <div class="mhead">
+        <h1>
+          {{ d.matchId }}
+          @if (d.bestOf > 1) {
+            <span class="muted small">· Bo{{ d.bestOf }}</span>
+          }
+          <span class="pill" [class]="state()">{{ 'match.state.' + state() | t }}</span>
+        </h1>
+        <na-guide page="match" />
+      </div>
 
       <div class="versus">
         @for (s of d.entrants; track s.id; let i = $index) {
@@ -397,12 +402,19 @@ const SUM_KEYS = [
     </ng-template>
   `,
   styles: `
+    .mhead {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 8px 0 0.35rem;
+    }
     h1 {
       display: flex;
       align-items: center;
       gap: 10px;
       flex-wrap: wrap;
-      margin-top: 8px;
+      margin: 0;
     }
     .pill {
       font-family: var(--font);

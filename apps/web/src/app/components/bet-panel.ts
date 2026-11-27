@@ -14,6 +14,7 @@ import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
+import { Guides } from './guide';
 import { Coin } from '../core/brand';
 import type { BetMatchView, Entrant, TournamentBets, TournamentDetail } from '../core/types';
 
@@ -161,12 +162,11 @@ interface Draft {
             </p>
           }
           @if (v.open) {
-            <details class="how">
-              <summary class="small">{{ 'bets.howTo' | t }}</summary>
-              <p class="muted small">
-                {{ 'bets.hint' | t: { floor: neuro(wallet()?.floor ?? 0) } }}
-              </p>
-            </details>
+            <p class="how">
+              <button type="button" class="link small" (click)="guides.open('tournament', 'bets')">
+                {{ 'bets.howTo' | t }}
+              </button>
+            </p>
           }
         </div>
       }
@@ -323,13 +323,9 @@ interface Draft {
       margin-top: 12px;
     }
     .how {
-      margin-top: 12px;
+      margin: 12px 0 0;
       border-top: 1px solid var(--border);
       padding-top: 8px;
-    }
-    .how summary {
-      cursor: pointer;
-      color: var(--text-2);
     }
     .next h2 {
       margin-bottom: 8px;
@@ -404,6 +400,8 @@ export class BetPanel {
   protected readonly view = signal<TournamentBets | null>(null);
   protected readonly busy = signal(false);
   private readonly store = inject(NeuroStore);
+  /** "How betting works" opens the tournament guide (decision 328). */
+  protected readonly guides = inject(Guides);
   /**
    * The own wallet: the shared Neuro state (the same as in the navbar) while a season runs,
    * else what the bets view brought.
