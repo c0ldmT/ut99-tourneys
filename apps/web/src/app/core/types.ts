@@ -2214,6 +2214,8 @@ export interface UdtGraduation {
   honours: number;
   perSeason: number;
   left: number;
+  /** The first day an admin can approve this season's nominations (decision 333). */
+  approveFrom?: string;
   bots: UdtGraduationBot[];
 }
 
@@ -2228,6 +2230,8 @@ export interface UdtYearbookEntry {
   honours: boolean;
   /** Nominations: approvable once the bot's season is over. */
   approvable?: boolean;
+  /** Nominations of the running season: the first day they can be approved (decision 333). */
+  from?: string | null;
   /** Null while the season runs and the bot is below level 5 (hidden like in the roster). */
   potential: number | null;
   games: number;
@@ -2418,6 +2422,8 @@ export interface AdminOverview {
     playing: { id: string; name: string } | null;
   }[];
   moderation: { open: number };
+  /** Library nominations: waiting, approvable now, approvable from (decision 333). */
+  graduations: { waiting: number; approvable: number; from: string | null };
   season: {
     number: number;
     status: 'planned' | 'running' | 'ended';

@@ -9,6 +9,8 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Api } from '../core/api';
+import { Auth } from '../core/auth';
+import { nominationNote } from '../core/graduations';
 import { Icon } from '../core/brand';
 import { I18n, TPipe } from '../core/i18n';
 import type { Season, SeasonsOverview } from '../core/types';
@@ -222,6 +224,7 @@ export class SettingsSeason {
   private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
+  private readonly auth = inject(Auth);
   /** A form was saved (the page drops its "unsaved" mark). */
   readonly saved = output<SettingsForm>();
   protected readonly botGames = signal(true);
@@ -308,8 +311,11 @@ export class SettingsSeason {
   }
 
   protected async end(s: Season) {
+    const note = await nominationNote(this.api, this.auth, this.i18n);
     if (
-      !(await this.confirm.ask(this.i18n.t('season.endConfirm', { n: s.number }), { danger: true }))
+      !(await this.confirm.ask(this.i18n.t('season.endConfirm', { n: s.number }) + note, {
+        danger: true,
+      }))
     )
       return;
     void this.run(() => this.api.endSeason(s.number));

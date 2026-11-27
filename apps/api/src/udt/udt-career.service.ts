@@ -38,6 +38,13 @@ import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { marksOf, UdtService } from './udt.service.js';
 
+/** The day after `date` (YYYY-MM-DD). */
+function dayAfter(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 /** Graduation: this many Dream Team games in the season and this level. */
 export const GRADUATE_GAMES = 15;
 export const GRADUATE_LEVEL = 5;
@@ -143,7 +150,8 @@ export class UdtCareerService implements OnModuleInit {
   /** The manager's own bots of the season with what the graduation still needs. */
   graduation(user: User) {
     this.udt.assertOn();
-    const season = this.udt.season().number;
+    const running = this.udt.season();
+    const season = running.number;
     const own = this.udt.ownBots(season, user.id);
     const rows = new Map(
       this.db
@@ -163,6 +171,7 @@ export class UdtCareerService implements OnModuleInit {
       honours: HONOURS_LEVEL,
       perSeason: GRADUATES_PER_SEASON,
       left: Math.max(0, GRADUATES_PER_SEASON - taken),
+      approveFrom: dayAfter(running.endDate),
       bots: [...own.values()].map((b) => {
         const r = rows.get(b.botId);
         const level = levelOf(r?.xp ?? 0);
@@ -227,11 +236,30 @@ export class UdtCareerService implements OnModuleInit {
     return this.graduation(user);
   }
 
-  /** Nominations waiting for an admin (all seasons); approvable once their season is over. */
+  /**
+   * Nominations waiting for an admin (all seasons); approvable once their season is over (`from`:
+   * the first day, for the running season's). They stay until an admin decides, also over the
+   * season's end and into the next season (decision 333).
+   */
   nominations() {
     const rows = this.db.select().from(udtBots).where(eq(udtBots.status, 'nominated')).all();
-    const running = this.seasons.current()?.number;
-    return rows.map((b) => ({ ...this.entry(b), approvable: b.season !== running }));
+    const running = this.seasons.current();
+    const from = running ? dayAfter(running.endDate) : null;
+    return rows.map((b) => {
+      const approvable = b.season !== running?.number;
+      return { ...this.entry(b), approvable, from: approvable ? null : from };
+    });
+  }
+
+  /** For the administration's counters: waiting, approvable now, approvable from (decision 333). */
+  nominationCount(): { waiting: number; approvable: number; from: string | null } {
+    if (!this.udt.enabled()) return { waiting: 0, approvable: 0, from: null };
+    const list = this.nominations();
+    return {
+      waiting: list.length,
+      approvable: list.filter((n) => n.approvable).length,
+      from: list.find((n) => !n.approvable)?.from ?? null,
+    };
   }
 
   /** An admin approves: the bot becomes a library bot (inactive) with its breeder. */

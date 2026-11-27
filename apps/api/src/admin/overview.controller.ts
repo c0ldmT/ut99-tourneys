@@ -7,6 +7,7 @@ import { CLOCK, type ApiClock } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { events, tournaments } from '../db/schema.js';
 import { ModerationService } from '../moderation/moderation.service.js';
+import { UdtCareerService } from '../udt/udt-career.service.js';
 import { SeasonsService } from '../seasons/seasons.service.js';
 import { ACTIVE_PHASES } from '../tournaments/tournaments.service.js';
 import { ServerProblems } from './problems.js';
@@ -33,6 +34,7 @@ export class AdminOverviewController {
     @Inject(CLOCK) private readonly clock: ApiClock,
     @Inject(AgentsService) private readonly agents: AgentsService,
     @Inject(ModerationService) private readonly mod: ModerationService,
+    @Inject(UdtCareerService) private readonly career: UdtCareerService,
     @Inject(SeasonsService) private readonly seasons: SeasonsService,
     @Inject(UsersService) private readonly users: UsersService,
     @Inject(ServerProblems) private readonly problems: ServerProblems,
@@ -131,6 +133,8 @@ export class AdminOverviewController {
     return {
       servers,
       moderation: { open: this.mod.openCount() },
+      /** Bots nominated for the library (decision 333). */
+      graduations: this.career.nominationCount(),
       season: season
         ? {
             number: season.number,

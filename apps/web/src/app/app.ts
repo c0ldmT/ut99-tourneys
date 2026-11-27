@@ -786,7 +786,8 @@ export class App {
       const me = this.auth.me();
       if (!me || !(me.isAdmin || me.isModerator)) return this.modOpen.set(0);
       this.api.modCount().then(
-        (r) => this.modOpen.set(r.open),
+        // Admins: plus the library nominations approvable now (decision 333).
+        (r) => this.modOpen.set(r.open + (r.graduations ?? 0)),
         () => undefined,
       );
     };

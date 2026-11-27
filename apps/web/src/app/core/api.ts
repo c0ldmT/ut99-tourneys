@@ -259,7 +259,7 @@ export class Api {
     this.call<ModItem[]>('GET', `/moderation/queue?status=${status}`);
   adminOverview = () => this.call<AdminOverview>('GET', '/admin/overview');
   modCount = () =>
-    this.call<{ open: number }>('GET', '/moderation/count', undefined, {
+    this.call<{ open: number; graduations?: number }>('GET', '/moderation/count', undefined, {
       quiet: true,
       background: true,
     });

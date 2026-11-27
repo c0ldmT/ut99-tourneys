@@ -299,6 +299,11 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
                       }
                       @case ('nominated') {
                         <span class="udt-mark own">{{ 'udt.academy.st.nominated' | t }}</span>
+                        @if (grad()?.approveFrom; as d) {
+                          <span class="muted small">{{
+                            'udt.academy.waitsFor' | t: { d: i18n.whenDay(d, 'dayMonth') }
+                          }}</span>
+                        }
                         <button type="button" [disabled]="busy()" (click)="unnominate(gb.botId)">
                           {{ 'udt.trades.withdraw' | t }}
                         </button>
@@ -495,7 +500,7 @@ export class UdtAcademyPage {
   protected readonly guides = inject(Guides);
   private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
-  private readonly i18n = inject(I18n);
+  protected readonly i18n = inject(I18n);
   protected readonly a = signal<UdtAcademy | null>(null);
   protected readonly grad = signal<UdtGraduation | null>(null);
   protected readonly busy = signal(false);

@@ -30,6 +30,7 @@ import {
 } from '@tourney/udt';
 import { Api } from './api';
 import { Auth } from './auth';
+import { nominationNote } from './graduations';
 import { Coin } from './brand';
 import { I18n, TPipe, WhenPipe } from './i18n';
 import { NeuroPipe } from './neuro';
@@ -612,7 +613,8 @@ export class UdtNav {
   }
 
   protected async endSeason() {
-    if (await this.confirm.ask(this.i18n.t('udt.test.seasonEndConfirm'), { danger: true }))
-      void this.run('season-end');
+    const note = await nominationNote(this.api, this.auth, this.i18n);
+    const q = this.i18n.t('udt.test.seasonEndConfirm') + note;
+    if (await this.confirm.ask(q, { danger: true })) void this.run('season-end');
   }
 }

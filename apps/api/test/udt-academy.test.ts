@@ -306,11 +306,32 @@ describe('Unreal Dream Team: academy', () => {
     expect(n).toMatchObject([
       { name: 'Mira', team: 'Nexus', breeder: 'Mario', level: 10, approvable: false },
     ]);
+    // Decision 333: the day it becomes approvable, the counters of the administration.
+    const end = (await admin.get('/seasons')).body.seasons[0].endDate as string;
+    const next = new Date(`${end}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const from = next.toISOString().slice(0, 10);
+    expect(n[0].from).toBe(from);
+    expect((await mario.get('/udt/graduation')).body.approveFrom).toBe(from);
+    expect((await admin.get('/admin/overview')).body.graduations).toEqual({
+      waiting: 1,
+      approvable: 0,
+      from,
+    });
+    expect((await admin.get('/moderation/count')).body).toMatchObject({ graduations: 0 });
     // Approved only when the season is over.
     const early = await admin.post(`/udt/nominations/${mira}/approve`, { name: 'Mirabelle' });
     expect(early.status).toBe(409);
     expect((await admin.post('/seasons/1/end')).status).toBeLessThan(300);
-    expect((await admin.get('/udt/nominations')).body[0].approvable).toBe(true);
+    expect((await admin.get('/udt/nominations')).body[0]).toMatchObject({
+      approvable: true,
+      from: null,
+    });
+    expect((await admin.get('/admin/overview')).body.graduations).toMatchObject({
+      waiting: 1,
+      approvable: 1,
+    });
+    expect((await admin.get('/moderation/count')).body).toMatchObject({ graduations: 1 });
     const ok = await admin.post(`/udt/nominations/${mira}/approve`, { name: 'Mirabelle' });
     expect(ok.status, JSON.stringify(ok.body)).toBe(200);
     expect(ok.body).toEqual([]);

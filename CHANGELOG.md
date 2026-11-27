@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Library nominations in the administration: own tab Nominations in the moderation (approve, rename, reject; before the season end with the day it becomes possible), counter in the Administration menu, state on the admin start page, a note when ending a season, and for managers the day of the approval in the academy (decision 333, patch note 333).
 - Settings › Dream Team league: keeper choice window (last days of the season) as a field, On this page like the other tabs, server choice as One server or Server pool with the pool's servers and their switches, automatic map pool as chips, money table and cup bonus aligned (decision 332, patch note 332).
 - How it works on the administration pages (overview, new tournament, series, servers, bots, settings); long hints of the tournament form, series and bots pages moved into the guides (decision 329, patch note 331).
 - League team names link to the team's squad (table, matchday, Final Four, next game) and the hub's league card has All teams (decision 330, patch note 331).

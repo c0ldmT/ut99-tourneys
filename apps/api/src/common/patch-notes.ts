@@ -22,6 +22,24 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 333,
+    date: '2026-11-27',
+    en: {
+      title: 'Bot library: approvals in sight',
+      items: [
+        'Academy: a nominated bot says from which day an admin can approve it (the day after the season ends).',
+        'Admins: nominations have their own tab in the moderation with a counter in the Administration menu; they stay over the season’s end until an admin decides.',
+      ],
+    },
+    de: {
+      title: 'Bot-Bibliothek: Freigaben im Blick',
+      items: [
+        'Akademie: Ein angemeldeter Bot zeigt, ab welchem Tag ein Admin ihn freigeben kann (der Tag nach dem Season-Ende).',
+        'Admins: Nominierungen haben einen eigenen Reiter in der Moderation mit Zähler im Verwaltungsmenü; sie bleiben über das Season-Ende hinaus erhalten, bis ein Admin entscheidet.',
+      ],
+    },
+  },
+  {
     id: 332,
     date: '2026-11-27',
     en: {

@@ -5,6 +5,7 @@ import { AdminOnly, CurrentUser, ModOnly } from '../auth/guard.js';
 import type { User } from '../auth/users.service.js';
 import { ModerationSettingsSchema } from '../settings/settings.service.js';
 import { MOD_KINDS, ModerationService } from './moderation.service.js';
+import { UdtCareerService } from '../udt/udt-career.service.js';
 
 const ReportBody = z.object({
   kind: z.enum(MOD_KINDS),
@@ -28,7 +29,10 @@ const SanctionBody = z.object({
 /** Moderation (decision 283): reports by every player, the rest for moderators and admins. */
 @Controller('moderation')
 export class ModerationController {
-  constructor(@Inject(ModerationService) private readonly mod: ModerationService) {}
+  constructor(
+    @Inject(ModerationService) private readonly mod: ModerationService,
+    @Inject(UdtCareerService) private readonly career: UdtCareerService,
+  ) {}
 
   /** A player reports a name, team, bot name, chat lines or a trade message. */
   @Post('reports')
@@ -43,10 +47,14 @@ export class ModerationController {
     return this.mod.queue(status === 'done' ? 'done' : 'open');
   }
 
+  /** The queue's counter; for admins also the library nominations approvable now (decision 333). */
   @ModOnly()
   @Get('count')
-  count() {
-    return { open: this.mod.openCount() };
+  count(@CurrentUser() user: User) {
+    return {
+      open: this.mod.openCount(),
+      ...(user.isAdmin ? { graduations: this.career.nominationCount().approvable } : {}),
+    };
   }
 
   @ModOnly()

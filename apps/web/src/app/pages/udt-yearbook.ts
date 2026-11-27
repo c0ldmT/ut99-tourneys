@@ -27,44 +27,11 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
   template: `
     <udt-nav (changed)="load()" />
     @if (isAdmin() && nominations().length) {
-      <section class="card">
-        <h2>{{ 'udt.yearbook.nominations' | t }} ({{ nominations().length }})</h2>
-        <p class="muted small">{{ 'udt.yearbook.nominationsText' | t }}</p>
-        @for (n of nominations(); track n.botId) {
-          <div class="nrow">
-            <span class="grow"
-              ><b>{{ n.name }}</b>
-              <span class="muted small"
-                >{{ n.tag }} {{ n.team }} · {{ n.breeder }} · {{ 'udt.level' | t }} {{ n.level }} ·
-                {{ n.games }} {{ 'udt.academy.games' | t }}</span
-              >
-              @if (n.honours) {
-                <span class="udt-mark star">{{ 'udt.yearbook.honours' | t }}</span>
-              }
-            </span>
-            <input
-              type="text"
-              maxlength="20"
-              [name]="'r' + n.botId"
-              [placeholder]="'udt.yearbook.rename' | t"
-              [ngModel]="renames()[n.botId] ?? ''"
-              (ngModelChange)="setRename(n.botId, $event)"
-            />
-            <button type="button" [disabled]="busy()" (click)="reject(n)">
-              {{ 'udt.trades.decline' | t }}
-            </button>
-            <button
-              type="button"
-              class="primary"
-              [disabled]="busy() || n.approvable === false"
-              [title]="n.approvable === false ? ('udt.yearbook.afterSeason' | t) : ''"
-              (click)="approve(n)"
-            >
-              {{ 'udt.yearbook.approve' | t }}
-            </button>
-          </div>
-        }
-      </section>
+      <!-- Approving moved to the moderation (decision 333). -->
+      <p class="notice small">
+        {{ 'udt.yearbook.toQueue' | t: { n: nominations().length } }}
+        <a routerLink="/moderation" [queryParams]="{ tab: 'grads' }">{{ 'mod.tab.grads' | t }} →</a>
+      </p>
     }
     @if (book(); as y) {
       <div class="udt-head">
@@ -256,7 +223,6 @@ export class UdtYearbookPage {
   protected readonly breeders = signal<UdtBreeder[]>([]);
   protected readonly nominations = signal<UdtYearbookEntry[]>([]);
   protected readonly hall = signal<UdtHall | null>(null);
-  protected readonly renames = signal<Partial<Record<string, string>>>({});
   protected readonly busy = signal(false);
   protected readonly isAdmin = computed(() => !!this.auth.me()?.isAdmin);
 
@@ -310,22 +276,6 @@ export class UdtYearbookPage {
       await this.api.udtRetire(id);
       this.hall.set(await this.api.udtHall());
     });
-  }
-
-  protected setRename(id: string, v: string) {
-    this.renames.update((r) => ({ ...r, [id]: v }));
-  }
-
-  protected async approve(n: UdtYearbookEntry) {
-    const name = (this.renames()[n.botId] ?? '').trim();
-    await this.act(async () => {
-      this.nominations.set(await this.api.udtApprove(n.botId, name || undefined));
-      await this.load(this.book()?.season);
-    });
-  }
-
-  protected async reject(n: UdtYearbookEntry) {
-    await this.act(async () => this.nominations.set(await this.api.udtReject(n.botId)));
   }
 
   private async act(fn: () => Promise<void>) {

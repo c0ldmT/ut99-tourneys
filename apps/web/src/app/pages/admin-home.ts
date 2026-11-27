@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { Auth } from '../core/auth';
 import { RouterLink } from '@angular/router';
 import { EmptyState } from '../components/empty-state';
 import { Api } from '../core/api';
@@ -71,11 +72,43 @@ const PAGES = [
           }
         </section>
 
-        <section class="card mod" [class.due]="o.moderation.open > 0">
+        @let g = o.graduations;
+        <!-- The queue and, with the Dream Team, the library nominations (decision 333). -->
+        <section class="card mod" [class.due]="o.moderation.open > 0 || g.approvable > 0">
           <h2>{{ 'nav.moderation' | t }}</h2>
-          <div class="big">{{ o.moderation.open }}</div>
-          <p class="muted">{{ 'adm.modOpen' | t: { n: o.moderation.open } }}</p>
-          <a routerLink="/moderation">{{ 'adm.toQueue' | t }} →</a>
+          <dl class="nums">
+            <div>
+              <dt>{{ 'mod.tab.open' | t }}</dt>
+              <dd [class.live]="o.moderation.open > 0">{{ o.moderation.open }}</dd>
+            </div>
+            @if (auth.config().udt) {
+              <div>
+                <dt>{{ 'mod.tab.grads' | t }}</dt>
+                <dd [class.live]="g.approvable > 0">{{ g.waiting }}</dd>
+              </div>
+            }
+          </dl>
+          <p class="muted">
+            @if (auth.config().udt) {
+              {{
+                g.approvable
+                  ? ('adm.gradsReady' | t: { n: g.approvable })
+                  : g.from
+                    ? ('adm.gradsFrom' | t: { d: i18n.whenDay(g.from, 'dayMonth') })
+                    : ('adm.gradsNone' | t)
+              }}
+            } @else {
+              {{ 'adm.modOpen' | t: { n: o.moderation.open } }}
+            }
+          </p>
+          <div class="links">
+            <a routerLink="/moderation">{{ 'adm.toQueue' | t }} →</a>
+            @if (auth.config().udt) {
+              <a routerLink="/moderation" [queryParams]="{ tab: 'grads' }"
+                >{{ 'adm.toGrads' | t }} →</a
+              >
+            }
+          </div>
         </section>
 
         <section class="card">
@@ -190,9 +223,15 @@ const PAGES = [
     .card h2 {
       margin: 0;
     }
-    .card > a:last-child {
+    .card > a:last-child,
+    .links {
       margin-top: auto;
       font-weight: 600;
+    }
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 16px;
     }
     .servers,
     .wide {
@@ -229,7 +268,8 @@ const PAGES = [
     .mod.due {
       border-color: color-mix(in srgb, var(--hot) 45%, transparent);
     }
-    .mod.due .big {
+    .mod.due .big,
+    .mod.due .nums dd.live {
       color: var(--hot-text);
     }
     .card p {
@@ -284,6 +324,7 @@ const PAGES = [
 export class AdminHomePage {
   private readonly api = inject(Api);
   protected readonly i18n = inject(I18n);
+  protected readonly auth = inject(Auth);
   protected readonly pages = PAGES;
   protected readonly o = signal<AdminOverview | null>(null);
   protected readonly online = computed(() => this.o()?.servers.filter((s) => s.online).length ?? 0);

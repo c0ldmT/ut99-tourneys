@@ -3789,6 +3789,21 @@ const en = {
   'guide.settings.s5d': 'The danger zone: reset the website (cannot be undone).',
   'guide.settings.mSeason': 'Season values',
   'guide.settings.mReset': 'Resetting the website',
+  'mod.tab.grads': 'Nominations',
+  'mod.grads.keep': 'Nominations stay over the season’s end until you decide.',
+  'mod.grads.reject': 'Reject',
+  'mod.grads.rejectConfirm': 'Reject {name}? The manager cannot nominate the bot again.',
+  'mod.grads.from': 'Approvable from {d}',
+  'mod.grads.empty':
+    'No nominations. Managers nominate own bots with 15 Dream Team games and level 5 in the academy.',
+  'adm.gradsReady': 'Nominations: {n} approvable now',
+  'adm.gradsFrom': 'Nominations: approvable from {d}',
+  'adm.gradsNone': 'No nominations waiting',
+  'adm.toGrads': 'To the approval',
+  'udt.academy.waitsFor': 'An admin approves it from {d}.',
+  'udt.yearbook.toQueue': '{n} {n|nomination waits|nominations wait} for approval:',
+  'season.endNominations':
+    '{n} {n|nomination|nominations} for the bot library {n|waits|wait}: {n|it stays|they stay} and can be approved afterwards under Moderation › Nominations.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -7624,6 +7639,23 @@ const de: Record<TKey, string> = {
   'guide.settings.s5d': 'Die Gefahrenzone: die Website zurücksetzen (nicht rückgängig zu machen).',
   'guide.settings.mSeason': 'Season-Werte',
   'guide.settings.mReset': 'Die Website zurücksetzen',
+  'mod.tab.grads': 'Nominierungen',
+  'mod.grads.keep':
+    'Nominierungen bleiben über das Season-Ende hinaus erhalten, bis du entscheidest.',
+  'mod.grads.reject': 'Ablehnen',
+  'mod.grads.rejectConfirm':
+    '{name} ablehnen? Der Manager kann den Bot danach nicht erneut anmelden.',
+  'mod.grads.from': 'Freigabe ab {d}',
+  'mod.grads.empty':
+    'Keine Nominierungen. Manager melden eigene Bots mit 15 Dream-Team-Spielen und Level 5 in der Akademie an.',
+  'adm.gradsReady': 'Nominierungen: {n} jetzt freigebbar',
+  'adm.gradsFrom': 'Nominierungen: Freigabe ab {d}',
+  'adm.gradsNone': 'Keine Nominierungen offen',
+  'adm.toGrads': 'Zur Freigabe',
+  'udt.academy.waitsFor': 'Ein Admin gibt ihn ab {d} frei.',
+  'udt.yearbook.toQueue': '{n} {n|Nominierung wartet|Nominierungen warten} auf Freigabe:',
+  'season.endNominations':
+    '{n} {n|Nominierung|Nominierungen} für die Bot-Bibliothek {n|wartet|warten}: Sie bleiben erhalten und lassen sich danach unter Moderation › Nominierungen freigeben.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

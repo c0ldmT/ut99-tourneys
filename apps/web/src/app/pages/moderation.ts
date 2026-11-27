@@ -1,15 +1,23 @@
 import { type Choice, Tabs } from '../components/choice';
 import { EmptyState } from '../components/empty-state';
+import { GraduationQueue } from '../components/graduation-queue';
 import { Confirm } from '../components/confirm-dialog';
-import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import type { ModItem, ModLogEntry, ModSettings } from '../core/types';
 
-type Tab = 'open' | 'done' | 'lists' | 'log';
+type Tab = 'open' | 'done' | 'grads' | 'lists' | 'log';
 
 /**
  * Moderation (decision 283): the queue of flagged and reported texts with reset and sanctions,
@@ -17,7 +25,7 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
  */
 @Component({
   selector: 'app-moderation',
-  imports: [Tabs, EmptyState, FormsModule, TPipe, RouterLink],
+  imports: [Tabs, EmptyState, FormsModule, TPipe, RouterLink, GraduationQueue],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="spread">
@@ -32,6 +40,10 @@ type Tab = 'open' | 'done' | 'lists' | 'log';
       label="mod.title"
     />
 
+    @if (tab() === 'grads') {
+      <!-- Library nominations (decision 333): admins only. -->
+      <na-grad-queue (changed)="gradCount.set($event)" />
+    }
     @if (tab() === 'open' || tab() === 'done') {
       @for (it of items(); track it.id) {
         <article class="card item" [class.rep]="it.reports > 0">
@@ -332,15 +344,26 @@ export class ModerationPage {
   protected readonly i18n = inject(I18n);
   protected readonly auth = inject(Auth);
   private readonly api = inject(Api);
-  protected readonly tabs: Tab[] = ['open', 'done', 'lists', 'log'];
-  protected readonly tab = signal<Tab>('open');
+  /** Library nominations: a tab for admins while the Dream Team is on (decision 333). */
+  private readonly grads = this.auth.me()?.isAdmin === true && !!this.auth.config().udt;
+  protected readonly tabs: Tab[] = this.grads
+    ? ['open', 'done', 'grads', 'lists', 'log']
+    : ['open', 'done', 'lists', 'log'];
+  protected readonly tab = signal<Tab>(
+    this.grads && inject(ActivatedRoute).snapshot.queryParamMap.get('tab') === 'grads'
+      ? 'grads'
+      : 'open',
+  );
+  private readonly queue = viewChild(GraduationQueue);
+  /** Nominations approvable now (the tab's badge). */
+  protected readonly gradCount = signal(0);
   protected readonly items = signal<ModItem[]>([]);
   protected readonly openCount = signal(0);
   protected readonly tabOptions = computed<Choice<Tab>[]>(() =>
     this.tabs.map((t) => ({
       value: t,
       label: 'mod.tab.' + t,
-      badge: t === 'open' ? this.openCount() : null,
+      badge: t === 'open' ? this.openCount() : t === 'grads' ? this.gradCount() : null,
     })),
   );
   protected readonly lists = signal<ModSettings | null>(null);
@@ -393,11 +416,15 @@ export class ModerationPage {
         const items = await this.api.modQueue(t);
         this.items.set(items);
         if (t === 'open') this.openCount.set(items.length);
+      } else if (t === 'grads') {
+        await this.queue()?.load();
       } else if (t === 'lists') {
         const l = await this.api.modSettings();
         this.fill(l);
       } else this.log.set(await this.api.modLog());
-      if (t !== 'open') this.openCount.set((await this.api.modCount()).open);
+      const c = await this.api.modCount();
+      if (t !== 'open') this.openCount.set(c.open);
+      if (t !== 'grads') this.gradCount.set(c.graduations ?? 0);
     } catch {
       // the toast shows the error
     }
