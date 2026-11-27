@@ -202,6 +202,8 @@ const SUM_KEYS = [
                 [race]="liveRace()"
                 [state]="liveState()"
                 [names]="names()"
+                [splits]="firstSplits()"
+                [record]="raceRecord()"
               />
             }
             @if (liveState(); as st) {
@@ -757,6 +759,19 @@ export class MatchPage {
   private readonly liveGame = computed(() => {
     const g = this.current()?.game;
     return g?.live ? g : null;
+  });
+  /** Monster Hunt: the finished run's objectives with their split times (decision 340). */
+  protected readonly firstSplits = computed(() => {
+    const g = this.liveGame();
+    const lr = this.liveRace();
+    if (!g || !lr) return [];
+    return this.gameReplays(g.game).find((r) => r.run && r.run !== lr.run)?.objectives ?? [];
+  });
+  /** Monster Hunt: the season record of the map being run (decision 340). */
+  protected readonly raceRecord = computed(() => {
+    const map = this.liveGame()?.map?.toLowerCase();
+    const r = map ? this.d()?.records?.find((x) => x.map.toLowerCase() === map) : undefined;
+    return r ? { finalMs: r.finalMs, team: r.team } : null;
   });
   /** Monster Hunt: the run on the server (telemetry). */
   protected readonly liveRace = computed(() => {

@@ -226,6 +226,35 @@ export interface LeagueTag {
 }
 
 /**
+ * A Dream Team challenge's tournament (decision 340): the two teams, the format and stake, its
+ * evening (the day) and whether it is the evening's main fight.
+ */
+export interface ChallengeTag {
+  id: string;
+  season: number;
+  /** The challenge evening (the season's day, YYYY-MM-DD). */
+  day: string;
+  at: string;
+  mode: 'dm' | 'mh';
+  teamSize: number;
+  bestOf: number;
+  /** Monster Hunt only. */
+  hardness: string | null;
+  /** null: map vote. */
+  map: string | null;
+  stake: number;
+  pot: number;
+  prize: number;
+  /** The challenger's team. */
+  home: string;
+  away: string;
+  /** The user's team plays. */
+  mine: boolean;
+  /** The main fight of an evening with several challenges. */
+  main: boolean;
+}
+
+/**
  * Who signs up for an add-on's kind of tournament (Dream Team: managers enter their teams).
  * The tournament page's register and withdraw go through it, and its entries are the
  * registrations everybody sees (with a label, e.g. the team name).
@@ -934,6 +963,8 @@ export class TournamentsService {
    * whether the user's club plays. Null for every other tournament.
    */
   leagueOf: (t: TournamentRow, userId: string) => LeagueTag | null = () => null;
+  /** A challenge of the Dream Team (set by UdtChallengesService, decision 340). */
+  challengeOf: (t: TournamentRow, userId: string) => ChallengeTag | null = () => null;
   /** Winner names of finished tournaments by log head (the list and the archive search). */
   private readonly champions = new Map<
     string,
@@ -1791,7 +1822,27 @@ export class TournamentsService {
     }
     for (const g of d.games)
       for (const p of g.players) if (p.botId && names.has(p.botId)) p.name = names.get(p.botId)!;
+    const records = this.raceRecords(t);
+    if (records.length) d.records = records;
     return d;
+  }
+
+  /** Monster Hunt: the season's map records at its monster skill, without its own runs. */
+  private raceRecords(t: TournamentRow): NonNullable<MatchDetail['records']> {
+    const s = this.settings(t);
+    if (s.game.adapter !== 'ut99-mh') return [];
+    try {
+      const season = this.seasonOf(t);
+      if (season === undefined) return [];
+      const skill = Number((s.game.rules as { monsterSkill?: number }).monsterSkill ?? 5);
+      return this.stats
+        .mapRecords(season, t.id)
+        .filter((r) => r.monsterSkill === skill)
+        .map((r) => ({ map: r.map, finalMs: r.finalMs, team: r.team }));
+    } catch (err) {
+      this.logger.warn(`records of ${t.id}: ${String(err)}`);
+      return [];
+    }
   }
 
   ratings(id: string): RatedGame[] {
@@ -2532,6 +2583,7 @@ export class TournamentsService {
   /** Whether the user plays in the tournament (registration, Dream Team entry, league club). */
   private isMine(r: { t: TournamentRow; mine: number }, user: User): boolean {
     if (this.leagueOf(r.t, user.id)?.mine) return true;
+    if (this.challengeOf(r.t, user.id)?.mine) return true;
     const provider = this.signupProviders.get(r.t.kind);
     return provider ? provider.entries(r.t.id).some((e) => e.userId === user.id) : r.mine > 0;
   }
@@ -2586,6 +2638,8 @@ export class TournamentsService {
     }
     const league = this.leagueOf(t, user.id);
     if (league?.mine) mine = 1;
+    const challenge = league ? null : this.challengeOf(t, user.id);
+    if (challenge?.mine) mine = 1;
     const live = t.phase === 'running' || t.phase === 'paused';
     // The main server's match first, then the extra servers' (parallel matches, decision 291).
     const [now, ...alsoNow] = live ? this.playingNow(t) : [];
@@ -2612,6 +2666,8 @@ export class TournamentsService {
       kind: t.kind,
       /** A game of the Dream Team league: its evening, matchday and clubs. */
       ...(league ? { league } : {}),
+      /** A challenge of the Dream Team: its teams, format, stake and evening (decision 340). */
+      ...(challenge ? { challenge } : {}),
       /** The match being played now (running tournaments): names and series score. */
       ...(now ? { now } : {}),
       /** Parallel matches (decision 291): the other matches being played at the same time. */
@@ -2659,7 +2715,7 @@ export class TournamentsService {
    */
   private eveningNow(t: TournamentRow, user: User) {
     const tag = this.leagueOf(t, user.id);
-    if (!tag) return undefined;
+    if (!tag) return this.challengeEveningNow(t, user);
     return this.db
       .select()
       .from(tournaments)
@@ -2680,6 +2736,35 @@ export class TournamentsService {
         ];
       })
       .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  /**
+   * A challenge: every challenge of its evening that is on now (check-in, running), itself
+   * included (the live list of its page, decision 340).
+   */
+  private challengeEveningNow(t: TournamentRow, user: User) {
+    const tag = this.challengeOf(t, user.id);
+    if (!tag) return undefined;
+    return this.db
+      .select()
+      .from(tournaments)
+      .where(inArray(tournaments.phase, ACTIVE_PHASES))
+      .all()
+      .flatMap((x) => {
+        const c = x.id === t.id ? tag : this.challengeOf(x, user.id);
+        if (!c || c.day !== tag.day) return [];
+        const live = x.phase === 'running' || x.phase === 'paused';
+        return [
+          {
+            id: x.id,
+            phase: x.phase,
+            challenge: c,
+            server: this.serverName(x),
+            now: live ? this.playingNow(x)[0] : undefined,
+          },
+        ];
+      })
+      .sort((a, b) => a.challenge.at.localeCompare(b.challenge.at) || a.id.localeCompare(b.id));
   }
 
   /** The name of the server a tournament runs on (the agent's name). */
@@ -2714,6 +2799,7 @@ export class TournamentsService {
         ? this.access(t).some((a) => a.userId === user.id)
         : false;
     const league = this.leagueOf(t, user.id);
+    const challenge = league ? null : this.challengeOf(t, user.id);
     return {
       id: t.id,
       name: t.name,
@@ -2791,8 +2877,10 @@ export class TournamentsService {
         hasAccess: inAccess,
       },
       projection: proj ? this.withCurrentBotNames(proj) : null,
-      /** A league game: the games of its evening that are on now (decision 294). */
-      ...(league && ACTIVE_PHASES.includes(t.phase)
+      /** A challenge: its teams, format, stake and evening (decision 340). */
+      ...(challenge ? { challenge } : {}),
+      /** A league game or a challenge: the games of its evening that are on now (294, 340). */
+      ...((league || challenge) && ACTIVE_PHASES.includes(t.phase)
         ? { evening: this.eveningNow(t, user) ?? [] }
         : {}),
       live: this.hub.latestLive(id, proj?.currentMatch?.matchId) ?? this.hub.latestLive(id) ?? null,

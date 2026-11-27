@@ -22,8 +22,9 @@ import { LiveMini, type MiniSide } from '../components/live-mini';
 import { LiveList, type LiveListItem } from '../components/live-list';
 import { LiveBar } from '../components/live-bar';
 import { Guide } from '../components/guide';
-import { formatNeuro, NeuroStore } from '../core/neuro';
-import { leagueItem } from '../core/live-items';
+import { formatNeuro, NeuroPipe, NeuroStore } from '../core/neuro';
+import { UDT_AREAS } from '../core/udt-areas';
+import { eveningItem } from '../core/live-items';
 import { BracketView } from '../bracket/bracket-view';
 import { SeedingEditor } from '../components/seeding-editor';
 import { TeamPanel } from '../components/team-panel';
@@ -41,6 +42,7 @@ import { botRoute } from '../core/bots';
 import { mmss } from '../core/live';
 import type {
   BetMatchView,
+  ChallengeTag,
   LiveInfo,
   LiveSnapshot,
   RatedGame,
@@ -71,6 +73,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
     Icon,
     NameTag,
     UdtMark,
+    NeuroPipe,
   ],
   providers: [TournamentStream],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -80,7 +83,26 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         <div class="head-l">
           <div class="row">
             <span class="badge" [class]="t.phase">{{ 'phase.' + t.phase | t }}</span>
-            @if (leagueMode()) {
+            @if (t.challenge; as ch) {
+              <!-- A challenge of the Dream Team (decision 340): orange like its area. -->
+              <a class="badge chall" routerLink="/udt/challenges/evenings"
+                ><svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    [attr.d]="swords"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  /></svg
+                >{{ 'tp.ch.badge' | t }}
+                @if (ch.main) {
+                  · {{ 'udt.ch.ev.main' | t }}
+                } @else if (ch.mode === 'mh') {
+                  · {{ 'udt.ch.showcase' | t }}
+                }
+              </a>
+            } @else if (leagueMode()) {
               <a class="badge udt" routerLink="/udt/league/day"
                 ><na-udt-mark [size]="16" />{{ 'league.title' | t }}
                 @if (t.league; as lg) {
@@ -101,7 +123,7 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
           </div>
           <h1>{{ t.name }}</h1>
           <div class="muted small">
-            {{ 'format.' + t.settings.format | t }} ·
+            {{ (t.challenge ? 'tp.ch.badge' : 'format.' + t.settings.format) | t }} ·
             @if (race()) {
               {{ 'race.mode' | t }} ·
             }
@@ -141,6 +163,43 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
         </div>
       </div>
 
+      @if (t.challenge; as ch) {
+        <!-- The challenge: its teams, format and what is at stake (decision 340). -->
+        <div class="card ch-strip" [class.mine]="ch.mine">
+          <div class="ch-vs">
+            <b>{{ ch.home }}</b> <span class="muted">vs</span> <b>{{ ch.away }}</b>
+          </div>
+          <div class="ch-facts">
+            <span
+              ><span class="kpi">{{ 'tp.ch.format' | t }}</span
+              >{{ chFormat(ch) }}</span
+            >
+            <span
+              ><span class="kpi">{{ 'tp.ch.map' | t }}</span
+              >{{ ch.map ?? ('tp.ch.vote' | t) }}</span
+            >
+            @if (ch.stake > 0) {
+              <span
+                ><span class="kpi">{{ 'tp.ch.stake' | t }}</span
+                ><b class="nv">{{ ch.stake | neuro }}</b></span
+              >
+              <span
+                ><span class="kpi">{{ 'tp.ch.prize' | t }}</span
+                ><b class="nv">{{ ch.prize | neuro }}</b>
+                <small class="muted">{{ 'tp.ch.pot' | t: { n: (ch.pot | neuro) } }}</small></span
+              >
+            } @else {
+              <span
+                ><span class="kpi">{{ 'tp.ch.stake' | t }}</span
+                >{{ 'udt.ch.friendly' | t }}</span
+              >
+            }
+          </div>
+          @if (ch.mine) {
+            <p class="small ch-mine">{{ 'tp.ch.mine' | t }}</p>
+          }
+        </div>
+      }
       @if (t.phase === 'paused' && t.projection?.pausedReason) {
         <p class="notice">{{ 'tp.paused' | t: { reason: t.projection!.pausedReason! } }}</p>
       }
@@ -187,7 +246,22 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
       <!-- The taking-part card: in the grid before the start, in the side column while live. -->
       <ng-template #partCard>
         <div class="card" [class.udt-signup]="udtMode() && t.phase === 'draft'">
-          @if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
+          @if (t.challenge && (t.phase === 'draft' || t.phase === 'seeded')) {
+            <!-- A challenge: both lineups are fixed at the lock, it starts by itself (340). -->
+            <h2>{{ 'tp.ch.title' | t }}</h2>
+            <p class="small">
+              {{ (t.challenge.mine ? 'tp.ch.textMine' : 'tp.ch.text') | t }}
+            </p>
+            @if (t.scheduledAt) {
+              <p class="muted small">{{ 'tp.ch.start' | t: { at: i18n.date(t.scheduledAt) } }}</p>
+            }
+            <div class="row">
+              @if (t.challenge.mine) {
+                <a class="btn" routerLink="/udt/team">{{ 'tp.udtLineup' | t }}</a>
+              }
+              <a class="btn" routerLink="/udt/challenges/evenings">{{ 'tp.ch.toEvening' | t }}</a>
+            </div>
+          } @else if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
             <!-- League games: the league sets both clubs, draws and starts (decision 234). -->
             <h2><na-udt-mark [size]="24" /> {{ 'tp.league.title' | t }}</h2>
             @if (t.league; as lg) {
@@ -781,7 +855,9 @@ const ACTIVE = ['checkIn', 'running', 'paused'];
                 }
               </div>
               @if (leagueMode() && (t.phase === 'draft' || t.phase === 'seeded')) {
-                <p class="muted small">{{ 'tp.league.admin' | t }}</p>
+                <p class="muted small">
+                  {{ (t.challenge ? 'tp.ch.admin' : 'tp.league.admin') | t }}
+                </p>
               }
               @if ((t.phase === 'draft' || t.phase === 'seeded') && udtMode() && !leagueMode()) {
                 <div class="udt-seed">
@@ -1353,7 +1429,7 @@ export class TournamentPage {
   protected readonly listItems = computed<LiveListItem[]>(() => {
     const t = this.t();
     const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
-    if (t?.evening && t.evening.length > 1) return t.evening.map((g) => leagueItem(g, tr));
+    if (t?.evening && t.evening.length > 1) return t.evening.map((g) => eveningItem(g, tr));
     return this.playing().map((m) => ({
       key: m.matchId,
       label: m.matchId,
@@ -1373,7 +1449,7 @@ export class TournamentPage {
   protected readonly listTitle = computed(() => {
     const n = this.listItems().length;
     return this.t()?.evening && n > 1
-      ? this.i18n.t('tp.eveningLive', { n })
+      ? this.i18n.t(this.t()?.challenge ? 'tp.chEveningLive' : 'tp.eveningLive', { n })
       : this.i18n.t('tp.liveCount', { n });
   });
   /** A game of the match is live right now (its dot in the list). */
@@ -1510,6 +1586,15 @@ export class TournamentPage {
   /** Dream Team: managers enter their teams, the lineups play. */
   protected readonly udtMode = computed(() => this.t()?.kind === 'udt');
   /** A game of the Dream Team league: no sign-up, no draw, no start by hand (decision 234). */
+  /** The crossed swords of the challenges area (decision 340). */
+  protected readonly swords = UDT_AREAS.find((a) => a.id === 'chall')!.icon;
+  /** "3v3 Deathmatch · Bo3", "Monster Hunt 5v5 · Hard". */
+  protected chFormat(c: ChallengeTag): string {
+    const tr = (k: string) => this.i18n.t(k);
+    return c.mode === 'mh'
+      ? `${tr('udt.ch.mode.mh')} 5v5 · ${tr(`udt.ch.hard.${c.hardness ?? 'normal'}`)}`
+      : `${c.teamSize}v${c.teamSize} ${tr('udt.ch.mode.dm')} · Bo${c.bestOf}`;
+  }
   protected readonly leagueMode = computed(
     () => !!this.t()?.league || this.t()?.settings.format === 'fixtures',
   );

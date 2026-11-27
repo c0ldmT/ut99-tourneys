@@ -653,6 +653,37 @@ describe('website + bridge + simulated UT server', () => {
     recorder.finishMatch(id, 'X1');
     expect(recorder.replays(id, 'X1')[0]!.feed).toHaveLength(2);
 
+    // Monster Hunt split times (decision 340): the second each objective was first seen done.
+    const ob = (sec: number, a: number, b: number) =>
+      recorder.state(id, {
+        tournamentId: id,
+        matchId: 'X2',
+        game: 1,
+        run: 1,
+        at: sec,
+        sec,
+        humans: false,
+        players: [],
+        objectives: [
+          { text: 'Gate', state: a },
+          { text: 'Titan', state: b },
+        ],
+      });
+    expect(ob(10, 1, 0).objectives).toEqual([
+      { text: 'Gate', state: 1 },
+      { text: 'Titan', state: 0 },
+    ]);
+    expect(ob(95, 2, 1).objectives![0]).toEqual({ text: 'Gate', state: 2, at: 95 });
+    expect(ob(140, 2, 2).objectives).toEqual([
+      { text: 'Gate', state: 2, at: 95 },
+      { text: 'Titan', state: 2, at: 140 },
+    ]);
+    recorder.finishMatch(id, 'X2');
+    expect(recorder.replays(id, 'X2')[0]!.objectives).toEqual([
+      { text: 'Gate', state: 2, at: 95 },
+      { text: 'Titan', state: 2, at: 140 },
+    ]);
+
     // Kept for the set days (default 60), then deleted; 0 keeps them for good.
     const settings = env.api.app.get(SettingsService);
     env.clock.advance(59 * 86_400_000);

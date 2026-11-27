@@ -423,6 +423,26 @@ describe('challenge matches (decision 335)', () => {
     expect(t.agentId).toBe(c.agentId);
     expect(JSON.parse(t.udtJson!).challenge).toEqual({ id });
     expect(tours.settings(t)).toMatchObject({ format: 'fixtures', size: 2, teamSize: 1 });
+    // Its page and the lists name the challenge (decision 340).
+    const page = (await mario.get(`/tournaments/${t.id}`)).body;
+    expect(page.challenge).toMatchObject({
+      id,
+      day: '2026-11-27',
+      mode: 'dm',
+      teamSize: 1,
+      stake: 500,
+      pot: 1000,
+      prize: 950,
+      home: 'Nexus',
+      away: 'Iron',
+      mine: true,
+      main: false,
+    });
+    expect(page.league).toBeUndefined();
+    const listed = (
+      (await ana.get('/tournaments')).body as { id: string; challenge?: unknown }[]
+    ).find((x) => x.id === t.id);
+    expect(listed?.challenge).toMatchObject({ id, mine: false });
     // Not among the cups (decision 337).
     const cups = (await mario.get('/udt/events')).body as { id: string }[];
     expect(cups.map((x) => x.id)).not.toContain(t.id);

@@ -453,6 +453,27 @@ export interface LeagueTag {
   mine: boolean;
 }
 
+/** A challenge of the Dream Team on its tournament (decision 340). */
+export interface ChallengeTag {
+  id: string;
+  season: number;
+  /** The challenge evening (YYYY-MM-DD). */
+  day: string;
+  at: string;
+  mode: 'dm' | 'mh';
+  teamSize: number;
+  bestOf: number;
+  hardness: 'normal' | 'hard' | 'nightmare' | null;
+  map: string | null;
+  stake: number;
+  pot: number;
+  prize: number;
+  home: string;
+  away: string;
+  mine: boolean;
+  main: boolean;
+}
+
 export interface TournamentSummary {
   id: string;
   name: string;
@@ -478,6 +499,8 @@ export interface TournamentSummary {
   seriesId?: string | null;
   /** A game of the Dream Team league: its evening (server day), matchday and clubs. */
   league?: LeagueTag;
+  /** A challenge of the Dream Team (decision 340). */
+  challenge?: ChallengeTag;
   /** The match being played now (running tournaments). */
   now?: NowMatch;
   /** Parallel matches (decision 291): the other matches being played at the same time. */
@@ -582,6 +605,8 @@ export interface TournamentDetail {
   udt?: UdtEventRules | null;
   /** A game of the Dream Team league (the league sets the clubs, draws and starts it). */
   league?: LeagueTag;
+  /** A challenge of the Dream Team (decision 340). */
+  challenge?: ChallengeTag;
   /** Dream Team: whether AI managers play (and how many); where the viewer's bots play. */
   signup?: { aiOn?: boolean; aiCount?: number; busyIn?: string[] };
   /** Answer of a Dream Team draw: teams that signed up but are not in the bracket. */
@@ -646,8 +671,18 @@ export interface TournamentDetail {
   live: LiveInfo | null;
   /** Telemetry of every match being played (parallel matches). */
   lives?: LiveInfo[];
-  /** A league game: the games of its evening that are on now, itself included (decision 294). */
-  evening?: { id: string; phase: Phase; league: LeagueTag; server: string; now?: NowMatch }[];
+  /**
+   * A league game or a challenge: the games of its evening that are on now, itself included
+   * (decisions 294, 340).
+   */
+  evening?: {
+    id: string;
+    phase: Phase;
+    league?: LeagueTag;
+    challenge?: ChallengeTag;
+    server: string;
+    now?: NowMatch;
+  }[];
   agent: { online: boolean };
 }
 
@@ -1251,6 +1286,8 @@ export interface MatchDetailView {
   entrants: MatchSideView[];
   games: MatchGameView[];
   wins: Partial<Record<string, number>>;
+  /** Monster Hunt in a season: the map records to beat (decision 340). */
+  records?: { map: string; finalMs: number; team: string }[];
 }
 
 // --- Tournament series ------------------------------------------------------------------------
@@ -1391,7 +1428,7 @@ export interface LiveStateView {
   players: LivePlayer[];
   monsters?: { alive: number; total: number; bosses: number };
   /** Monster Hunt (mod 0.17.0): the map's objectives, 0 open, 1 active, 2 done. */
-  objectives?: { text: string; state: number }[];
+  objectives?: { text: string; state: number; at?: number }[];
 }
 
 /** Timeline of the game in progress: `[sec, scoreA, scoreB]`; a race: `[sec, points, deaths, monstersAlive]`. */
@@ -1420,6 +1457,8 @@ export interface ReplayView {
   feed: Omit<KillFeedEntry, 'tournamentId' | 'matchId' | 'game' | 'run'>[];
   players: LivePlayer[];
   monsters?: { alive: number; total: number; bosses: number };
+  /** Monster Hunt: the objectives with the second each was done (split times, decision 340). */
+  objectives?: { text: string; state: number; at?: number }[];
 }
 
 // --- Neuro shop -------------------------------------------------------------------------------

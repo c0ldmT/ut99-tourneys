@@ -48,6 +48,7 @@ import {
   type UdtSettings,
 } from '../settings/settings.service.js';
 import type { CalendarTournament, Reservation } from '../tournaments/server-calendar.js';
+import type { ChallengeTag } from '../tournaments/tournaments.service.js';
 import { estimateMs } from '../tournaments/server-calendar.js';
 import { StatsService } from '../stats/stats.service.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
@@ -197,6 +198,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       return c ? this.deadline(c) : null;
     });
     this.events.challengeLineup = (t, settings) => this.lineup(t, settings);
+    this.tournaments.challengeOf = (t, userId) => this.tagOf(t, userId);
     this.events.challengeClash = (userId, from, to) => this.clash(userId, from, to);
     // The match decides the challenge; a called-off tournament voids it.
     this.eventLog.onAppend((id, stored) => {
@@ -1711,6 +1713,48 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
           })),
         };
       }),
+    };
+  }
+
+  /**
+   * The challenge of a tournament for its page and the lists (decision 340): teams, format,
+   * stake, its evening and whether it is the evening's main fight.
+   */
+  private tagOf(t: { udtJson: string | null }, userId: string): ChallengeTag | null {
+    const id = challengeIdOf(t.udtJson);
+    const c = id ? this.find(id) : undefined;
+    if (!c?.toUser) return null;
+    const day = today(Date.parse(c.scheduledAt), this.tz);
+    const evening = this.db
+      .select()
+      .from(udtChallenges)
+      .where(
+        and(
+          eq(udtChallenges.season, c.season),
+          inArray(udtChallenges.status, ['accepted', 'locked', 'played']),
+        ),
+      )
+      .all()
+      .filter((x) => today(Date.parse(x.scheduledAt), this.tz) === day);
+    const name = (u: string) => this.udt.team(u, c.season)?.name ?? '?';
+    const { pot, prize } = challengePot(c.stake, c.feePct);
+    return {
+      id: c.id,
+      season: c.season,
+      day,
+      at: c.scheduledAt,
+      mode: c.mode as ChallengeMode,
+      teamSize: c.teamSize,
+      bestOf: c.bestOf,
+      hardness: c.mode === 'mh' ? (c.hardness ?? 'normal') : null,
+      map: c.map,
+      stake: c.stake,
+      pot,
+      prize,
+      home: name(c.fromUser),
+      away: name(c.toUser),
+      mine: this.involves(c, userId),
+      main: evening.length > 1 && mainFight(evening)?.id === c.id,
     };
   }
 

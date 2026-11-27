@@ -1,5 +1,5 @@
 import type { LiveListItem } from '../components/live-list';
-import type { LeagueTag, NowMatch, Phase } from './types';
+import type { ChallengeTag, LeagueTag, NowMatch, Phase } from './types';
 
 type T = (key: string, params?: Record<string, string | number>) => string;
 
@@ -61,4 +61,51 @@ export function leagueItem(
     link,
     ...(g.league.mine ? { mine: true } : {}),
   };
+}
+
+/** The name of a challenge in lists: main fight, the showcase, else its format (decision 340). */
+export function challengeLabel(
+  c: Pick<ChallengeTag, 'main' | 'mode' | 'teamSize' | 'bestOf'>,
+  t: T,
+): string {
+  if (c.main) return t('udt.ch.ev.main');
+  if (c.mode === 'mh') return t('udt.ch.showcase');
+  return `${c.teamSize}v${c.teamSize} · Bo${c.bestOf}`;
+}
+
+/** A challenge of an evening as a row: live when on the server, else its phase. */
+export function challengeItem(
+  g: { id: string; phase: Phase; challenge: ChallengeTag; server?: string; now?: NowMatch | null },
+  t: T,
+): LiveListItem {
+  const link = ['/t', g.id];
+  const label = challengeLabel(g.challenge, t);
+  if (g.now) return nowItem(g.now, t, { key: g.id, label, link, mine: g.challenge.mine });
+  return {
+    key: g.id,
+    label,
+    names: [g.challenge.home, g.challenge.away],
+    score: null,
+    server: g.server ?? '',
+    live: false,
+    status: t(`phase.${g.phase}`),
+    link,
+    ...(g.challenge.mine ? { mine: true } : {}),
+  };
+}
+
+/** A game of an evening (league or challenges) as a row of the live list. */
+export function eveningItem(
+  g: {
+    id: string;
+    phase: Phase;
+    league?: LeagueRef;
+    challenge?: ChallengeTag;
+    server?: string;
+    now?: NowMatch | null;
+  },
+  t: T,
+): LiveListItem {
+  if (g.challenge) return challengeItem({ ...g, challenge: g.challenge }, t);
+  return leagueItem({ ...g, league: g.league! }, t);
 }

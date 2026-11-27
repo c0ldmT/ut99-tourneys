@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 340,
+    date: '2026-11-27',
+    en: {
+      title: 'Challenge evenings everywhere, Monster Hunt splits',
+      items: [
+        'Matches: the challenges of a day fold into one challenge evening (with its main fight), live as one tile with all its games.',
+        'A challenge’s page shows both teams, the format, the map, the stake and what the winner gets; while it runs, the other challenges of the evening are in the live list and the live bar.',
+        'Monster Hunt live: every objective shows the split against the other run (green faster, red slower), and the run shows what is left to beat the season record of the map.',
+      ],
+    },
+    de: {
+      title: 'Challenge-Abende überall, Zwischenzeiten im Monster Hunt',
+      items: [
+        'Matches: Die Challenges eines Tages werden zu einem Challenge-Abend zusammengefasst (mit seinem Hauptkampf), live als eine Kachel mit allen Spielen.',
+        'Die Seite einer Challenge zeigt beide Teams, Format, Map, Einsatz und was der Sieger bekommt; während sie läuft, stehen die anderen Challenges des Abends in der Live-Liste und der Live-Leiste.',
+        'Monster Hunt live: Jedes Ziel zeigt die Zwischenzeit gegen den anderen Lauf (grün schneller, rot langsamer), und der Lauf zeigt, was zum Season-Rekord der Map fehlt.',
+      ],
+    },
+  },
+  {
     id: 339,
     date: '2026-11-27',
     en: {

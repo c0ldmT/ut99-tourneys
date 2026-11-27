@@ -650,9 +650,18 @@ export const LiveStateSchema = z.object({
       bosses: z.number().int().nonnegative(),
     })
     .optional(),
-  /** Monster Hunt (mod 0.17.0): the map's objectives in their order, 0 open, 1 active, 2 done. */
+  /**
+   * Monster Hunt (mod 0.17.0): the map's objectives in their order, 0 open, 1 active, 2 done;
+   * `at`: the second of the run it was done (the website adds it, decision 340: split times).
+   */
   objectives: z
-    .array(z.object({ text: z.string().max(160), state: z.number().int().min(0).max(2) }))
+    .array(
+      z.object({
+        text: z.string().max(160),
+        state: z.number().int().min(0).max(2),
+        at: z.number().min(0).optional(),
+      }),
+    )
     .max(32)
     .optional(),
 });

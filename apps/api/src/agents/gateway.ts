@@ -245,9 +245,10 @@ export class AgentGateway {
       case 'match.state': {
         const t = this.tournaments.get(msg.payload.tournamentId);
         if (!t || !this.tournaments.servesTournament(t, agentId)) return;
-        this.recorder.state(t.id, msg.payload);
-        const delay = msg.payload.humans ? this.delayMs() : 0;
-        this.hub.publish(t.id, { type: 'state', data: msg.payload }, delay);
+        // With the split times of Monster Hunt objectives (decision 340).
+        const state = this.recorder.state(t.id, msg.payload);
+        const delay = state.humans ? this.delayMs() : 0;
+        this.hub.publish(t.id, { type: 'state', data: state }, delay);
         return;
       }
       case 'agent.log': {

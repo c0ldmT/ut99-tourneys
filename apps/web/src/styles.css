@@ -164,7 +164,7 @@ code,
   gap: 16px;
 }
 .grid.two {
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
 }
 .row {
   display: flex;
@@ -2285,6 +2285,48 @@ a.badge.udt:hover {
   color: #fff;
 }
 
+/* Dream Team challenges (decision 340): their badge and the strip on a challenge's page. */
+.badge.chall {
+  color: var(--chall);
+  border-color: color-mix(in srgb, var(--chall) 50%, transparent);
+  background: color-mix(in srgb, var(--chall) 12%, transparent);
+  padding-left: 6px;
+}
+a.badge.chall:hover {
+  color: var(--text);
+}
+.card.ch-strip {
+  display: grid;
+  gap: 10px;
+  border-color: color-mix(in srgb, var(--chall) 40%, transparent);
+  box-shadow: inset 3px 0 0 var(--chall);
+}
+.ch-vs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  font-size: var(--fs-lg);
+}
+.ch-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+}
+.ch-facts > span {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+}
+.ch-facts .nv {
+  color: var(--neuro-text);
+  font-family: var(--font-mono);
+}
+.ch-mine {
+  margin: 0;
+  color: var(--chall);
+}
+
 /* Dream Team: look and chat lines of own bots */
 details.look > summary {
   cursor: pointer;
@@ -2434,6 +2476,22 @@ details.help ul {
 }
 .trow.udt {
   box-shadow: inset 3px 0 0 var(--udt);
+}
+.trow.udt.chall {
+  box-shadow: inset 3px 0 0 var(--chall);
+}
+/* A challenge evening's live tile (decision 340): orange instead of violet. */
+.hero.udt.ev.chall {
+  border-color: color-mix(in srgb, var(--chall) 55%, transparent);
+}
+.hero.udt.ev.chall .hero-l {
+  background:
+    radial-gradient(
+      120% 120% at 0% 0%,
+      color-mix(in srgb, var(--chall) 16%, transparent),
+      transparent 60%
+    ),
+    var(--panel);
 }
 .trow .when {
   font-family: var(--font-mono);

@@ -59,6 +59,11 @@ export interface MatchDetail {
   games: MatchGame[];
   /** Series score: games won per entrant. */
   wins: Record<string, number>;
+  /**
+   * Monster Hunt in a season: the season's map records at the tournament's monster skill before
+   * this tournament (the pace of a run against the record, decision 340).
+   */
+  records?: { map: string; finalMs: number; team: string }[];
 }
 
 function side(id: string, proj: TournamentProjection): MatchSide {

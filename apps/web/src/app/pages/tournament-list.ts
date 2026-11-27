@@ -15,7 +15,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { LiveList, type LiveListItem } from '../components/live-list';
-import { leagueItem, nowItem } from '../core/live-items';
+import { challengeLabel, eveningItem, nowItem } from '../core/live-items';
 import { finalMs, raceTime } from '../core/race';
 import { Api } from '../core/api';
 import { Loading } from '../core/loading';
@@ -31,18 +31,20 @@ import type {
   TournamentSummary,
 } from '../core/types';
 
-type LeagueGame = TournamentSummary & { league: NonNullable<TournamentSummary['league']> };
-
-/** The league's games of one evening (one row of the list). */
-interface LeagueEvening {
+/**
+ * The games of one evening (one row of the list): the league's, or the challenges' of a day
+ * (decision 340).
+ */
+interface Evening {
   id: string;
   at: string;
   label: string;
-  games: LeagueGame[];
+  type: 'league' | 'challenge';
+  games: TournamentSummary[];
 }
 
-/** A row of the list: a tournament, or a league evening. */
-type ListRow = { id: string; t?: TournamentSummary; ev?: LeagueEvening };
+/** A row of the list: a tournament, or an evening. */
+type ListRow = { id: string; t?: TournamentSummary; ev?: Evening };
 
 /** The filters are kept per browser (not the series: that one is a jump from its card). */
 const STORE = 'tourney.listFilter';
@@ -161,7 +163,9 @@ function storedFilter(): TournamentFilter {
     </div>
 
     <ng-template #badges let-t>
-      @if (t.league) {
+      @if (t.challenge) {
+        <span class="badge chall">{{ 'list.kind.challenge' | t }}</span>
+      } @else if (t.league) {
         <span class="badge udt"><na-udt-mark [size]="14" />{{ 'list.kind.league' | t }}</span>
       } @else if (t.kind === 'udt') {
         <span class="badge udt"><na-udt-mark [size]="14" />DT</span>
@@ -211,6 +215,7 @@ function storedFilter(): TournamentFilter {
         <button
           type="button"
           class="trow tl-evhead udt"
+          [class.chall]="e.type === 'challenge'"
           [class.done]="done"
           [attr.aria-expanded]="isOpen(e.id)"
           [attr.aria-controls]="e.id + '-list'"
@@ -224,17 +229,23 @@ function storedFilter(): TournamentFilter {
           </span>
           <span class="what">
             <span class="ttl"
-              ><span class="nm">{{ 'list.ev.title' | t }}</span
-              ><span class="badge udt"
-                ><na-udt-mark [size]="14" />{{ 'list.kind.league' | t }}</span
-              ></span
-            >
+              ><span class="nm">{{
+                (e.type === 'challenge' ? 'list.ev.chTitle' : 'list.ev.title') | t
+              }}</span>
+              @if (e.type === 'challenge') {
+                <span class="badge chall">{{ 'list.kind.challenge' | t }}</span>
+              } @else {
+                <span class="badge udt"
+                  ><na-udt-mark [size]="14" />{{ 'list.kind.league' | t }}</span
+                >
+              }
+            </span>
             <span class="meta"
               >{{ e.label }}
               @if (mineOf(e); as m) {
                 ·
                 <span class="me">{{
-                  'list.ev.yours' | t: { vs: m.league.home + ' – ' + m.league.away }
+                  'list.ev.yours' | t: { vs: vs(m).home + ' – ' + vs(m).away }
                 }}</span>
                 @if (m.champion) {
                   <ng-container *ngTemplateOutlet="trophy" />{{ m.champion }}
@@ -257,22 +268,26 @@ function storedFilter(): TournamentFilter {
         <div class="tl-evlist" [id]="e.id + '-list'" [attr.inert]="isOpen(e.id) ? null : ''">
           <div>
             @for (g of e.games; track g.id) {
-              <a class="h" [class.me]="g.league.mine" [routerLink]="['/t', g.id]">
+              <a class="h" [class.me]="vs(g).mine" [routerLink]="['/t', g.id]">
                 <span class="d">{{ time(at(g)) }}</span>
-                <span class="tl-evvs">{{ g.league.home }} – {{ g.league.away }}</span>
+                <span class="tl-evvs">{{ vs(g).home }} – {{ vs(g).away }}</span>
                 @if (g.phase === 'aborted') {
                   <span class="badge aborted">{{ 'phase.aborted' | t }}</span>
                 } @else if (g.champion) {
                   <span class="champ"
                     ><ng-container *ngTemplateOutlet="trophy" />{{ g.champion }}</span
                   >
-                } @else if (g.league.kind !== 'league') {
-                  <span class="muted">{{ 'league.kind.' + g.league.kind | t }}</span>
+                } @else if (vs(g).note; as n) {
+                  <span class="muted">{{ n }}</span>
                 }
               </a>
             }
             @if (!done) {
-              <a class="all" routerLink="/udt/league/day">{{ 'list.ev.conference' | t }} →</a>
+              @if (e.type === 'challenge') {
+                <a class="all" routerLink="/udt/challenges/evenings">{{ 'list.ev.chAll' | t }} →</a>
+              } @else {
+                <a class="all" routerLink="/udt/league/day">{{ 'list.ev.conference' | t }} →</a>
+              }
             }
           </div>
         </div>
@@ -298,16 +313,26 @@ function storedFilter(): TournamentFilter {
           <div class="lgrid" [class.multi]="liveRows().length > 1">
             @for (row of liveRows(); track row.id) {
               @if (row.ev; as e) {
-                <!-- A league evening: one tile, its games in the live list (decision 294). -->
-                <div class="hero udt ev">
+                <!-- A league or challenge evening: one tile, its games in the live list (294, 340). -->
+                <div class="hero udt ev" [class.chall]="e.type === 'challenge'">
                   <div class="hero-l">
                     <div class="row">
                       <span class="badge running">{{ 'phase.running' | t }}</span>
-                      <span class="badge udt"
-                        ><na-udt-mark [size]="16" />{{ 'list.kind.league' | t }}</span
-                      >
+                      @if (e.type === 'challenge') {
+                        <span class="badge chall">{{ 'list.ev.chTitle' | t }}</span>
+                      } @else {
+                        <span class="badge udt"
+                          ><na-udt-mark [size]="16" />{{ 'list.kind.league' | t }}</span
+                        >
+                      }
                     </div>
-                    <a class="hero-name" routerLink="/udt/league/day">{{ e.label }}</a>
+                    <a
+                      class="hero-name"
+                      [routerLink]="
+                        e.type === 'challenge' ? '/udt/challenges/evenings' : '/udt/league/day'
+                      "
+                      >{{ e.label }}</a
+                    >
                     <div class="muted small">
                       {{ 'league.liveNow' | t: { n: e.games.length } }}
                     </div>
@@ -417,7 +442,7 @@ function storedFilter(): TournamentFilter {
                     <span class="meta">{{ meta(t) }}</span>
                   </span>
                   <span class="fill">
-                    @if (!t.league) {
+                    @if (!t.league && !t.challenge) {
                       <span class="mono">{{ fill(t) }}</span>
                       <span class="meter"><span [style.width.%]="fillPct(t)"></span></span>
                     }
@@ -1086,11 +1111,47 @@ export class TournamentListPage {
   protected readonly liveRows = computed(() => this.fold(this.live(), 'live'));
 
   /** The games of a league evening as rows of the live list. */
-  protected eveningItems(e: LeagueEvening): LiveListItem[] {
+  protected eveningItems(e: Evening): LiveListItem[] {
     const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
     return e.games.map((g) =>
-      leagueItem({ id: g.id, phase: g.phase, league: g.league, server: g.server, now: g.now }, tr),
+      eveningItem(
+        {
+          id: g.id,
+          phase: g.phase,
+          ...(g.league ? { league: g.league } : {}),
+          ...(g.challenge ? { challenge: g.challenge } : {}),
+          server: g.server,
+          now: g.now,
+        },
+        tr,
+      ),
     );
+  }
+
+  /** The two teams of an evening's game, the user's own, and a note (league round, main fight). */
+  protected vs(g: TournamentSummary): {
+    home: string;
+    away: string;
+    mine: boolean;
+    note: string | null;
+  } {
+    const tr = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
+    if (g.challenge) {
+      const c = g.challenge;
+      return {
+        home: c.home,
+        away: c.away,
+        mine: c.mine,
+        note: c.main || c.mode === 'mh' ? challengeLabel(c, tr) : null,
+      };
+    }
+    const l = g.league!;
+    return {
+      home: l.home,
+      away: l.away,
+      mine: l.mine,
+      note: l.kind !== 'league' ? tr(`league.kind.${l.kind}`) : null,
+    };
   }
 
   /** The other matches of a tournament with parallel matches (decision 291). */
@@ -1255,7 +1316,7 @@ export class TournamentListPage {
   private matches(t: TournamentSummary, f: TournamentFilter): boolean {
     // Without Dream Team the kind filter is hidden (a stored one does not count).
     if (!this.auth.config().udt) f = { ...f, kind: undefined };
-    if (f.kind === 'udt' && (t.kind !== 'udt' || t.league)) return false;
+    if (f.kind === 'udt' && (t.kind !== 'udt' || t.league || t.challenge)) return false;
     if (f.kind === 'league' && !t.league) return false;
     if (f.kind === 'classic' && t.kind === 'udt') return false;
     if (f.mode && f.mode !== this.modeOf(t.game, t.teamSize)) return false;
@@ -1291,27 +1352,30 @@ export class TournamentListPage {
     const scopeKey = scope.replace(/[^a-z0-9]+/gi, '_');
     const single = this.filter().kind === 'league';
     const rows: ListRow[] = [];
-    const evenings = new Map<string, LeagueEvening>();
+    const evenings = new Map<string, Evening>();
     for (const t of list) {
-      const l = t.league;
+      // A league game, or a challenge (its evening is the day, decision 340).
+      const tag = t.league ?? t.challenge;
+      const type = t.league ? 'league' : 'challenge';
       // The user's own game stays in its evening, named on the evening's row (decision 307).
-      if (!l || single) {
+      if (!tag || (single && t.league)) {
         rows.push({ id: t.id, t });
         continue;
       }
-      const key = `${l.season}:${l.day}`;
+      const key = `${type}:${tag.season}:${tag.day}`;
       let e = evenings.get(key);
       if (!e) {
-        e = { id: `ev-${l.season}-${l.day}-${scopeKey}`, at: this.at(t), label: '', games: [] };
+        const id = `${type === 'league' ? 'ev' : 'cev'}-${tag.season}-${tag.day}-${scopeKey}`;
+        e = { id, at: this.at(t), label: '', type, games: [] };
         evenings.set(key, e);
         rows.push({ id: e.id, ev: e });
       }
-      e.games.push(t as LeagueGame);
+      e.games.push(t);
     }
     for (const e of evenings.values()) {
       e.games.sort((a, b) => this.at(a).localeCompare(this.at(b)));
       e.at = this.at(e.games[0]!);
-      e.label = this.eveningLabel(e.games);
+      e.label = e.type === 'league' ? this.eveningLabel(e.games) : this.chEveningLabel(e.games);
     }
     // An evening of one game is that game.
     return rows.map((r) =>
@@ -1320,13 +1384,21 @@ export class TournamentListPage {
   }
 
   /** The user's own game of an evening (named on its row). */
-  protected mineOf(e: LeagueEvening): LeagueGame | null {
-    return e.games.find((g) => g.league.mine) ?? null;
+  protected mineOf(e: Evening): TournamentSummary | null {
+    return e.games.find((g) => this.vs(g).mine) ?? null;
+  }
+
+  /** "Main fight: Nexus – Iron" (or the number of challenges). */
+  private chEveningLabel(games: TournamentSummary[]): string {
+    const main = games.find((g) => g.challenge?.main) ?? null;
+    return main
+      ? this.i18n.t('list.ev.chMain', { vs: `${main.challenge!.home} – ${main.challenge!.away}` })
+      : this.i18n.t('udt.ch.ev.games', { n: games.length });
   }
 
   /** "Matchdays 12–13 · Relegation" */
-  private eveningLabel(games: LeagueGame[]): string {
-    const days = games.map((g) => g.league.matchday).filter((d): d is number => d !== null);
+  private eveningLabel(games: TournamentSummary[]): string {
+    const days = games.map((g) => g.league!.matchday).filter((d): d is number => d !== null);
     const parts: string[] = [];
     if (days.length) {
       const a = Math.min(...days);
@@ -1337,7 +1409,7 @@ export class TournamentListPage {
           : this.i18n.t('list.ev.matchdays', { a, b }),
       );
     }
-    for (const k of new Set(games.map((g) => g.league.kind)))
+    for (const k of new Set(games.map((g) => g.league!.kind)))
       if (k !== 'league') parts.push(this.i18n.t(`league.kind.${k}`));
     return parts.join(' · ');
   }
@@ -1393,7 +1465,13 @@ export class TournamentListPage {
         cls: 'me',
         text:
           '✓ ' +
-          tr(t.league ? 'list.yourGame' : t.kind === 'udt' ? 'list.youEntered' : 'list.youPlay'),
+          tr(
+            t.league || t.challenge
+              ? 'list.yourGame'
+              : t.kind === 'udt'
+                ? 'list.youEntered'
+                : 'list.youPlay',
+          ),
       };
     if (t.phase === 'seeded') return { cls: 'closed', text: tr('phase.seeded') };
     if (t.registrationOpen) return { cls: '', text: tr('list.open') };

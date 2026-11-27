@@ -35,6 +35,8 @@ export interface Replay {
   /** Players at the end (last live state); empty without live data (older mods). */
   players: LivePlayer[];
   monsters?: LiveState['monsters'];
+  /** Monster Hunt: the objectives at the end with the second each was done (split times). */
+  objectives?: LiveState['objectives'];
 }
 
 interface Telemetry {
@@ -56,6 +58,8 @@ interface Open {
   state?: LiveState;
   scores?: Record<string, number>;
   race?: { points: number; deaths: number };
+  /** Second of the run each objective was first seen done (Monster Hunt split times). */
+  splits: (number | undefined)[];
 }
 
 const keyOf = (matchId: string, game: number, run?: number) => `${matchId}/${game}/${run ?? 0}`;
@@ -104,15 +108,31 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  state(tournamentId: string, s: LiveState): void {
+  /**
+   * A live state of the game (run) in progress; returns it with the second each Monster Hunt
+   * objective was done (`at`, split times – the mod sends only the states, decision 340).
+   */
+  state(tournamentId: string, s: LiveState): LiveState {
     const o = this.game(tournamentId, s.matchId, s.game, s.run);
-    if (!o) return;
+    if (!o) return s;
     // The game started again under its number (organizer restart): start over.
     if (o.state && s.sec + 10 < o.state.sec)
-      Object.assign(o, { feed: [], samples: [], sides: [], lastSample: -SAMPLE_SEC });
+      Object.assign(o, { feed: [], samples: [], sides: [], lastSample: -SAMPLE_SEC, splits: [] });
+    if (s.objectives?.length) {
+      s.objectives.forEach((x, i) => {
+        if (x.state === 2 && o.splits[i] === undefined) o.splits[i] = s.sec;
+      });
+      s = {
+        ...s,
+        objectives: s.objectives.map((x, i) =>
+          o.splits[i] !== undefined ? { ...x, at: o.splits[i] } : x,
+        ),
+      };
+    }
     o.state = s;
     for (const p of s.players) if (p.side && !o.sides.includes(p.side)) o.sides.push(p.side);
     if (s.sec - o.lastSample >= SAMPLE_SEC || !o.samples.length) this.sample(o, s.sec);
+    return s;
   }
 
   /** Telemetry (`match.live`): frags per side; a race: points and deaths of the run. */
@@ -243,6 +263,7 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
       samples: [],
       sides: [],
       lastSample: -SAMPLE_SEC,
+      splits: [],
     };
     this.open.set(k, o);
     return o;
@@ -308,6 +329,7 @@ export class LiveRecorder implements OnModuleInit, OnModuleDestroy {
       feed: o.feed,
       players: o.state?.players ?? [],
       ...(o.state?.monsters ? { monsters: o.state.monsters } : {}),
+      ...(o.state?.objectives?.length ? { objectives: o.state.objectives } : {}),
     };
     const data = zlib.deflateSync(Buffer.from(JSON.stringify(replay), 'utf8'));
     this.db

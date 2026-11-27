@@ -68,7 +68,25 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
               <ol class="olist small">
                 @for (x of o.list; track $index) {
                   <li [class]="'s' + x.state">
-                    {{ x.text || ('live.objectiveN' | t: { n: $index + 1 }) }}
+                    <span class="otext">{{
+                      x.text || ('live.objectiveN' | t: { n: $index + 1 })
+                    }}</span>
+                    <!-- Split times against the finished run (decision 340). -->
+                    @if (split($index, x.at); as sp) {
+                      @if (sp.delta !== null) {
+                        <span
+                          class="split mono"
+                          [class.ahead]="sp.delta < 0"
+                          [class.slower]="sp.delta > 0"
+                          [title]="'live.splitTitle' | t: { t: clock(sp.first) }"
+                          >{{ signed(sp.delta) }}</span
+                        >
+                      } @else {
+                        <span class="split mono muted" [title]="'live.splitFirst' | t">{{
+                          'live.splitRun1' | t: { t: clock(sp.first) }
+                        }}</span>
+                      }
+                    }
                   </li>
                 }
               </ol>
@@ -88,6 +106,17 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
                 {{ 'live.toBeat' | t }} <b>{{ time(tg.ms, false) }}</b>
               } @else {
                 {{ 'live.behind' | t }} <b class="behind">{{ time(-tg.ms, false) }}</b>
+              }
+            </div>
+          }
+          @if (pace(); as p) {
+            <!-- The season record of the map (decision 340): what is left to beat it. -->
+            <div class="target small rec">
+              {{ 'live.record' | t: { t: time(p.record, true), team: p.team } }} ·
+              @if (p.ms >= 0) {
+                {{ 'live.recordLeft' | t }} <b>{{ time(p.ms, false) }}</b>
+              } @else {
+                <b class="behind">{{ 'live.recordGone' | t }}</b>
               }
             </div>
           }
@@ -187,9 +216,27 @@ import type { LiveInfo, LiveStateView, MatchRunView } from '../core/types';
       color: var(--text);
       font-weight: 600;
     }
-    .olist .s2 {
+    .olist .s2 .otext {
       color: var(--muted);
       text-decoration: line-through;
+    }
+    .olist li {
+      display: flex;
+      gap: 8px;
+      justify-content: space-between;
+    }
+    .split {
+      flex: none;
+      font-size: var(--fs-xs);
+    }
+    .split.ahead {
+      color: var(--live);
+    }
+    .split.slower {
+      color: var(--danger);
+    }
+    .rec {
+      margin-top: 4px;
     }
     .target {
       margin-top: 10px;
@@ -216,6 +263,10 @@ export class RacePanel {
   readonly race = input<LiveInfo['race'] | null>(null);
   readonly state = input<LiveStateView | null>(null);
   readonly names = input.required<Record<string, string>>();
+  /** The finished run's objectives with the second each was done (its replay, decision 340). */
+  readonly splits = input<readonly { at?: number }[]>([]);
+  /** The season record of the map at this monster skill (decision 340). */
+  readonly record = input<{ finalMs: number; team: string } | null>(null);
 
   protected readonly done = computed(() => {
     const live = this.race();
@@ -233,6 +284,37 @@ export class RacePanel {
     if (!d || !l || !d.finished) return null;
     return { ms: finalMs(d) - (l.timeMs + l.penaltyMs) };
   });
+
+  /** The season record against the run on the server, penalty included. */
+  protected readonly pace = computed(() => {
+    const r = this.record();
+    const l = this.race();
+    if (!r || !l) return null;
+    return { record: r.finalMs, team: r.team, ms: r.finalMs - (l.timeMs + l.penaltyMs) };
+  });
+
+  /**
+   * An objective against the finished run: the difference once both are done (seconds, negative
+   * = faster), else the finished run's time to aim at; null without a split of the finished run.
+   */
+  protected split(
+    i: number,
+    at: number | undefined,
+  ): { first: number; delta: number | null } | null {
+    const first = this.splits()[i]?.at;
+    if (first === undefined || !this.done()) return null;
+    return { first, delta: at === undefined ? null : at - first };
+  }
+
+  /** "1:05" from seconds. */
+  protected clock(sec: number): string {
+    return raceTime(sec * 1000, false);
+  }
+
+  /** "−0:12" / "+0:08" from seconds. */
+  protected signed(sec: number): string {
+    return (sec < 0 ? '−' : sec > 0 ? '+' : '±') + raceTime(Math.abs(sec) * 1000, false);
+  }
 
   protected name(id: string): string {
     return this.names()[id] ?? '?';
