@@ -99,6 +99,8 @@ export class UdtRewardsService implements OnModuleInit {
     try {
       const t = this.db.select().from(tournaments).where(eq(tournaments.id, id)).get();
       if (!t || t.kind !== 'udt') return;
+      // Challenges settle themselves (decision 335): the pot, stamina, no money or experience.
+      if (this.tournaments.udtRules(t)?.challenge) return;
       // Everything books into the tournament's season, also when it ends after that season (or
       // the next one runs already): its rosters, index and table.
       const season = this.tournaments.udtSeason(t) ?? this.seasons.current()?.number;
@@ -402,6 +404,8 @@ export class UdtRewardsService implements OnModuleInit {
       .all()) {
       // Only the season's own tournaments (not the next season's, decision 110).
       if (this.tournaments.udtSeason(t) !== season) continue;
+      // Challenges neither (decision 335).
+      if (this.tournaments.udtRules(t)?.challenge) continue;
       const proj = this.events.projection(t.id);
       // League matchdays do not count for the cup ranking (L-E10, risk R5).
       if (!proj || isLeague(proj)) continue;

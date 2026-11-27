@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  brokenRecord,
   challengeMinutes,
   challengePot,
   leagueClashDays,
@@ -7,6 +8,8 @@ import {
   stakeProblem,
   weekdayOf,
   windowStarts,
+  hardnessOfSkill,
+  type RecordRun,
 } from '../src/challenge.js';
 
 describe('challenges (decision 334)', () => {
@@ -60,5 +63,34 @@ describe('challenges (decision 334)', () => {
   it('counts weekdays from Monday', () => {
     expect(weekdayOf('2026-11-30')).toBe(0); // Monday
     expect(weekdayOf('2026-11-29')).toBe(6); // Sunday
+  });
+});
+
+describe('brokenRecord (decision 335)', () => {
+  const run = (finalMs: number, over: Partial<RecordRun> = {}): RecordRun => ({
+    entrantId: 'a',
+    map: 'MH-Lonely',
+    monsterSkill: 5,
+    finalMs,
+    finished: true,
+    ...over,
+  });
+  const held = [{ map: 'mh-lonely', monsterSkill: 5, finalMs: 600_000 }];
+
+  it('finds the best finished run that beats the record of its map and skill', () => {
+    const fast = run(590_000, { entrantId: 'b' });
+    expect(brokenRecord([run(610_000), fast], held)).toBe(fast);
+    expect(brokenRecord([run(600_000)], held)).toBeNull();
+    // Unfinished and forfeited runs, other skills and a map without a record break none.
+    expect(brokenRecord([run(500_000, { finished: false })], held)).toBeNull();
+    expect(brokenRecord([run(500_000, { forfeit: true })], held)).toBeNull();
+    expect(brokenRecord([run(500_000, { monsterSkill: 6 })], held)).toBeNull();
+    expect(brokenRecord([run(500_000, { map: 'MH-Canyon' })], held)).toBeNull();
+  });
+
+  it('names the difficulty of a monster skill', () => {
+    expect(hardnessOfSkill(5)).toBe('normal');
+    expect(hardnessOfSkill(7)).toBe('nightmare');
+    expect(hardnessOfSkill(3)).toBeNull();
   });
 });

@@ -405,8 +405,13 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     this.market.afterDay((season, day) => this.marketDay(season, day));
     this.rewards.leagueChampion = (season) => this.champion(season);
     this.tournaments.leagueOf = (t, userId) => this.tagOf(t, userId);
-    this.bets.botsPerMatchOf = (t) =>
-      t.kind === 'udt' && t.udtJson && this.rulesOf(t.udtJson)?.league ? this.cfg().betBots : null;
+    // League games and challenges bring their own number of betting bots.
+    this.bets.botsPerMatchOf = (t) => {
+      const r = t.kind === 'udt' && t.udtJson ? this.rulesOf(t.udtJson) : null;
+      if (r?.league) return this.cfg().betBots;
+      if (r?.challenge) return this.settings.get().udt.challenge.betBots;
+      return null;
+    };
     this.udt.onFounded((userId, season) => {
       try {
         this.newcomer(userId, season);
@@ -599,7 +604,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       .where(eq(tournaments.kind, 'udt'))
       .orderBy(desc(tournaments.createdAt))
       .all()
-      .find((x) => !this.isLeagueTournament(x));
+      .find((x) => !this.isOwnGame(x));
     return t ? { agentId: t.agentId, profileId: t.profileId } : null;
   }
 
@@ -775,6 +780,13 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
   /** A league game's tournament (its rules name the fixture). */
   isLeagueTournament(t: { kind: string; udtJson: string | null }): boolean {
     return t.kind === 'udt' && !!t.udtJson && !!this.rulesOf(t.udtJson)?.league;
+  }
+
+  /** A game the Dream Team makes itself (a league game or a challenge), not a cup. */
+  private isOwnGame(t: { kind: string; udtJson: string | null }): boolean {
+    if (t.kind !== 'udt' || !t.udtJson) return false;
+    const r = this.rulesOf(t.udtJson);
+    return !!r?.league || !!r?.challenge;
   }
 
   /** The league shows in Dream Team (setting on, or a league in the running season). */
@@ -1525,6 +1537,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
         minTeams: 4,
         finale: false,
         league: null,
+        challenge: null,
       };
       const l = this.events.lineup(userId, settings, rules);
       const s = l.bots.reduce(
@@ -1682,7 +1695,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       .where(eq(tournaments.kind, 'udt'))
       .orderBy(asc(tournaments.createdAt))
       .all()
-      .filter((x) => !this.isLeagueTournament(x))
+      .filter((x) => !this.isOwnGame(x))
       .reverse()) {
       try {
         const s = this.tournaments.settings(t);
@@ -1752,6 +1765,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
             minTeams: 2,
             finale: false,
             league: { season: run.season, fixture: f.id, kind },
+            challenge: null,
           },
         },
         this.admin(),
@@ -2706,7 +2720,7 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       .filter(
         (t) =>
           t.scheduledAt &&
-          !this.isLeagueTournament(t) &&
+          !this.isOwnGame(t) &&
           ['draft', 'seeded'].includes(t.phase) &&
           this.udt.today() <= conferenceDay &&
           Math.abs(Date.parse(t.scheduledAt) - slotStart) < DAY / 2,

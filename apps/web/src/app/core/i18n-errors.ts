@@ -488,6 +488,14 @@ export const ERRORS_DE: Record<string, string> = {
   'only the challenger can withdraw': 'Nur wer gefordert hat, kann zurückziehen.',
   'the challenge is {status}': 'Die Challenge ist nicht mehr offen ({status}).',
   'the challenge was answered meanwhile': 'Die Challenge wurde inzwischen beantwortet.',
+  'there are no maps for this mode': 'Für diesen Modus gibt es keine Maps.',
+  'the map {map} is not in the pool': 'Die Map {map} ist nicht im Map-Pool.',
+  'only a played challenge has a rematch':
+    'Eine Revanche gibt es nur nach einer gespielten Challenge.',
+  'only the two teams can ask for a rematch': 'Nur die beiden Teams können eine Revanche fordern.',
+  'the challenge is of another season': 'Die Challenge gehört zu einer anderen Season.',
+  'a rematch of this challenge is booked already': 'Die Revanche ist schon gebucht.',
+  'your team plays a challenge then': 'Dein Team spielt zu dieser Zeit eine Challenge.',
   'at most {n} rounds of counter offers': 'Höchstens {n} Runden mit Gegenvorschlägen.',
 };
 

@@ -53,9 +53,11 @@ import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.servi
 import {
   ChallengeBody,
   CounterBody,
+  RematchBody,
   SlotsQuery,
   UdtChallengesService,
   type ChallengeInput,
+  type RematchInput,
   type SlotsInput,
 } from './udt-challenges.service.js';
 import {
@@ -534,6 +536,19 @@ export class UdtController {
   ) {
     if (body.message) this.moderation.screen(user, [body.message]);
     const out = this.challenges.counter(user, id, body);
+    if (body.message) this.moderation.review('challenge', out.id);
+    return out;
+  }
+
+  /** A rematch of a played challenge: the same one the other way round at a new start. */
+  @Post('challenges/:id/rematch')
+  rematchChallenge(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(RematchBody)) body: RematchInput,
+  ) {
+    if (body.message) this.moderation.screen(user, [body.message]);
+    const out = this.challenges.rematch(user, id, body);
     if (body.message) this.moderation.review('challenge', out.id);
     return out;
   }

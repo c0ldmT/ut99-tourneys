@@ -42,6 +42,7 @@ import { gameName, UdtService, type RosterBot } from './udt.service.js';
 import { pickTeamNames } from '../common/names.js';
 import { EventLogService } from '../tournaments/event-log.service.js';
 import { botsOf, lockedTournaments, playingIn, type LockedTournament } from './udt-playing.js';
+import { estimateMs } from '../tournaments/server-calendar.js';
 import { ServerActivity } from '../common/activity.js';
 
 export interface Lineup {
@@ -182,6 +183,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         minTeams: 4,
         finale: false,
         league: null,
+        challenge: null,
       }
     );
   }
@@ -198,17 +200,62 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
   };
 
   /**
+   * Whether a manager's team plays a booked challenge (or has its lineup locked for one) while
+   * the cup runs (set by the challenges).
+   */
+  challengeClash: (userId: string, from: number, to: number) => boolean = () => false;
+
+  /** The cup's time (its start and the estimate) collides with a challenge of the manager. */
+  playsChallenge(userId: string, tournamentId: string): boolean {
+    const t = this.row(tournamentId);
+    const from = Date.parse(t.scheduledAt ?? '');
+    if (!Number.isFinite(from)) return false;
+    return this.challengeClash(userId, from, from + estimateMs(this.settingsOf(t)));
+  }
+
+  /** Challenges (rules.challenge) are seeded by the challenges: the two lineups. */
+  challengeLineup: (
+    t: TournamentRow,
+    settings: TournamentSettings,
+  ) => { entrants: Entrant[]; fill: Entrant[]; slots: string[] } = () => {
+    throw conflict('challenges are switched off');
+  };
+
+  /**
    * A manager's club in a league game: the deathmatch lineup (bench for tired and striking
    * bots; no value cap or star limit), weak base bots in the places it cannot fill (L-E18);
    * bots playing in another drawn or running Dream Team tournament stay out (one at a time).
    */
   leagueTeam(userId: string, settings: TournamentSettings, entrantId: string): Entrant | null {
+    return this.clubTeam(userId, settings, entrantId, true)?.entrant ?? null;
+  }
+
+  /**
+   * A manager's team in a challenge (decision 335): the lineup of the mode as in a league game,
+   * but no base bots for missing places - `problems` says why it cannot play (it loses without a
+   * game).
+   */
+  challengeTeam(
+    userId: string,
+    settings: TournamentSettings,
+    entrantId: string,
+  ): { entrant: Entrant; problems: string[] } | null {
+    return this.clubTeam(userId, settings, entrantId, false);
+  }
+
+  private clubTeam(
+    userId: string,
+    settings: TournamentSettings,
+    entrantId: string,
+    fill: boolean,
+  ): { entrant: Entrant; problems: string[] } | null {
     const season = this.udt.season().number;
     const team = this.udt.team(userId, season);
     if (!team) return null;
     const rules = { ...this.rules({ kind: 'standard' } as TournamentRow), valueCap: null };
-    // The manager's other league games run one after another on the same server: their bots
-    // are free for this one (cups in the league slot are kept out by the server calendar).
+    // The manager's other league games (and challenges) run one after another on the same
+    // server: their bots are free for this one (cups in the league slot are kept out by the server
+    // calendar, cups at a challenge's start by its booking).
     const busy = botsOf(
       lockedTournaments(this.db, this.log)
         .map((l) => l.projection)
@@ -223,15 +270,19 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const specs: BotSpec[] = l.bots
       .map((r) => this.spec(r, team.tag, lib, careers, club))
       .map((s) => ({ ...s, name: named(s.name) }));
-    for (let i = specs.length; i < settings.teamSize; i++)
-      specs.push({ name: named(gameName(team.tag, `Rookie${i + 1}`)), skill: 1 });
+    if (fill)
+      for (let i = specs.length; i < settings.teamSize; i++)
+        specs.push({ name: named(gameName(team.tag, `Rookie${i + 1}`)), skill: 1 });
     return {
-      id: entrantId,
-      kind: 'team',
-      displayName: team.name,
-      tag: team.tag,
-      members: [],
-      bots: specs,
+      entrant: {
+        id: entrantId,
+        kind: 'team',
+        displayName: team.name,
+        tag: team.tag,
+        members: [],
+        bots: specs,
+      },
+      problems: specs.length < settings.teamSize ? l.problems : [],
     };
   }
 
@@ -545,6 +596,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     }
     const rules = this.rules(t);
     if (rules.league) return this.leagueLineup(t, settings);
+    if (rules.challenge) return this.challengeLineup(t, settings);
     const season = this.udt.season().number;
     // Career phases change the accuracy of every bot in Dream Team games.
     const careers = this.career.careers();
@@ -840,6 +892,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
     const season = this.udt.season().number;
     if (!this.udt.team(user.id, season)) throw conflict('found your team first');
     const s = this.settingsOf(t);
+    // A challenge booked then keeps the team's bots (from its lock on): no cup at that time.
+    if (this.playsChallenge(user.id, id)) throw conflict('your team plays a challenge then');
     const l = this.lineup(user.id, s, this.rules(t));
     if (l.problems.length)
       throw conflict('your team cannot play: {list}', { list: l.problems.join('; ') });

@@ -134,3 +134,38 @@ export function leagueClashDays(
   if (to <= start || from >= end) return [];
   return w.days.filter((d) => league.slotDays.includes(d)).sort((a, b) => a - b);
 }
+
+/** A Monster Hunt run as the record check needs it. */
+export interface RecordRun {
+  entrantId: string;
+  map: string;
+  monsterSkill: number;
+  finalMs: number;
+  finished: boolean;
+  forfeit?: boolean;
+}
+
+/**
+ * The run of a Monster Hunt challenge that broke a season map record (decision 335): its best
+ * finished run beats the record of the same map and monster skill held before (maps compared
+ * case-insensitively). A first run on a map without a record breaks none (the bonus is for
+ * beating someone). Null: no record broken.
+ */
+export function brokenRecord<R extends RecordRun>(
+  runs: readonly R[],
+  before: readonly { map: string; monsterSkill: number; finalMs: number }[],
+): R | null {
+  const best = runs
+    .filter((r) => r.finished && !r.forfeit)
+    .sort((a, b) => a.finalMs - b.finalMs)[0];
+  if (!best) return null;
+  const held = before.find(
+    (r) => r.map.toLowerCase() === best.map.toLowerCase() && r.monsterSkill === best.monsterSkill,
+  );
+  return held && best.finalMs < held.finalMs ? best : null;
+}
+
+/** The Monster Hunt difficulty of a monster skill (null: none of the three). */
+export function hardnessOfSkill(skill: number): MhHardness | null {
+  return MH_HARDNESS_IDS.find((h) => MH_HARDNESS[h].monsterSkill === skill) ?? null;
+}

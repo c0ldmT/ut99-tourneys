@@ -139,6 +139,7 @@ export class UdtAiService implements OnModuleInit {
       if (e.lineup?.busyIn.length) continue; // its bots play elsewhere (decision 200)
       if (cfg.aiStrength === 'calm' && createRng(`ai-fill-${tournamentId}-${m.n}`)() > 0.5)
         continue;
+      if (this.events.playsChallenge(m.user.id, tournamentId)) continue;
       try {
         this.events.signUp(m.user, tournamentId);
         n++;

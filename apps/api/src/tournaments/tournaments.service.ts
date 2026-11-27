@@ -165,6 +165,14 @@ export const UdtEventRulesSchema = z.object({
     })
     .nullable()
     .default(null),
+  /**
+   * A challenge between two managers (made by the challenges at the lock, decision 335): the two
+   * lineups play, no sign-up; no game money, experience, place reward or cup ranking points.
+   */
+  challenge: z
+    .object({ id: z.string().min(1).max(40) })
+    .nullable()
+    .default(null),
 });
 export type UdtEventRules = z.infer<typeof UdtEventRulesSchema>;
 

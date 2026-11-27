@@ -43,6 +43,18 @@ interface Loaded {
   head: number;
   /** Season of a season tournament: the one in which its first game was played. */
   season?: number;
+  /** A Dream Team challenge (decision 335): no wins for the careers. */
+  challenge: boolean;
+}
+
+/** Whether Dream Team rules name a challenge (decision 335). */
+function isChallenge(udtJson: string | null): boolean {
+  if (!udtJson) return false;
+  try {
+    return !!(JSON.parse(udtJson) as { challenge?: unknown }).challenge;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -106,7 +118,9 @@ export class StatsService {
    * careers (cached until a Dream Team log or the seasons change).
    */
   udtWins(): Map<string, number> {
-    const all = this.load(true);
+    // Challenges do not count for the careers (decision 335: like their games, which the rosters
+    // do not count either).
+    const all = this.load(true).filter((x) => !x.challenge);
     const sig = `${JSON.stringify(this.seasons.list())}|${all.map((x) => `${x.facts.tournamentId}:${x.head}`).join(',')}`;
     if (this.udtWinsCache?.sig === sig) return this.udtWinsCache.wins;
     const wins = new Map<string, number>();
@@ -139,6 +153,7 @@ export class StatsService {
         seasonal: tournaments.seasonal,
         kind: tournaments.kind,
         udtSeason: tournaments.udtSeason,
+        udtJson: tournaments.udtJson,
       })
       .from(tournaments)
       .all()
@@ -178,6 +193,7 @@ export class StatsService {
         facts,
         seasonal: r.seasonal,
         head: r.headSeq,
+        challenge: isChallenge(r.udtJson),
         ...(season !== undefined ? { season } : {}),
       });
     }
@@ -338,8 +354,11 @@ export class StatsService {
    * Monster Hunt map records of a season (per map and monster skill), for the in-game HUD and
    * the records page: every season game counts, Dream Team games too (Mario 31.10.).
    */
-  mapRecords(season: number): MapRecord[] {
-    return mapRecords([...this.facts(season), ...this.udtFacts(season)], this.names());
+  mapRecords(season: number, except?: string): MapRecord[] {
+    return mapRecords(
+      [...this.facts(season), ...this.udtFacts(season)].filter((t) => t.tournamentId !== except),
+      this.names(),
+    );
   }
 }
 

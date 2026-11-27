@@ -3,11 +3,16 @@ import { FakeClock } from '@tourney/bridge';
 import type { RunningApi } from '../src/app.js';
 import { AgentsService } from '../src/agents/agents.service.js';
 import { DB, type Db } from '../src/db/database.js';
-import { eq } from 'drizzle-orm';
-import { settings } from '../src/db/schema.js';
+import { and, eq } from 'drizzle-orm';
+import { vi } from 'vitest';
+import { neuroLedger, settings, udtChallenges, udtRoster } from '../src/db/schema.js';
 import { SettingsService } from '../src/settings/settings.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { TournamentsService } from '../src/tournaments/tournaments.service.js';
+import { EventLogService } from '../src/tournaments/event-log.service.js';
+import { StatsService } from '../src/stats/stats.service.js';
+import { UdtChallengesService } from '../src/udt/udt-challenges.service.js';
+import { UdtRewardsService } from '../src/udt/udt-rewards.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -30,9 +35,9 @@ const profile = (port: number) => ({
   manage: true,
 });
 
-async function setup(servers = 2) {
+async function setup(servers = 2, env: Record<string, string> = {}) {
   const clock = new FakeClock(NOW);
-  ({ api } = await startApi({}, { clock }));
+  ({ api } = await startApi(env, { clock }));
   const admin = await Client.login(api, 'Boss', true);
   const agents = api.app.get(AgentsService);
   for (let i = 1; i <= servers; i++) {
@@ -308,5 +313,272 @@ describe('challenge window and league', () => {
     expect(r.body.key).toBe(
       'the challenge window {from} - {to} runs into the league evening at {time}',
     );
+  });
+});
+
+describe('challenge matches (decision 335)', () => {
+  /** Setup with the test mode (simulated games) and library bots for the rosters. */
+  async function played() {
+    const ctx = await setup(2, { TEST_MODE: 'true' });
+    for (let i = 1; i <= 12; i++)
+      await ctx.admin.post('/bots', { name: `Lib${i}`, skill: 1 + (i % 6) });
+    const svc = api!.app.get(UdtChallengesService);
+    const tours = api!.app.get(TournamentsService);
+    const row = (id: string) =>
+      ctx.db.select().from(udtChallenges).where(eq(udtChallenges.id, id)).get()!;
+    const roster = (u: string) =>
+      ctx.db
+        .select()
+        .from(udtRoster)
+        .where(and(eq(udtRoster.season, 1), eq(udtRoster.userId, u)))
+        .all();
+    /** Gives a manager `n` more library bots in the lineup of a mode (from place 2, or 1). */
+    const libs = ((await ctx.admin.get('/bots')).body.bots as { id: string }[]).map((b) => b.id);
+    let next = 0;
+    const give = (u: string, n: number, slot: 'dmSlot' | 'mhSlot', from = 2) => {
+      for (let i = 0; i < n; i++)
+        ctx.db
+          .insert(udtRoster)
+          .values({
+            season: 1,
+            botId: libs[next++]!,
+            userId: u,
+            price: 100,
+            acquiredAt: 'x',
+            [slot]: from + i,
+          })
+          .run();
+    };
+    /** Books and accepts a challenge, moves the clock to its lock and ticks. */
+    const book = async (over: Record<string, unknown> = {}) => {
+      const sent = await ctx.mario.post('/udt/challenges', body({ to: ctx.timId, ...over }));
+      expect(sent.status, JSON.stringify(sent.body)).toBe(201);
+      const acc = await ctx.tim.post(`/udt/challenges/${sent.body.id}/accept`);
+      expect(acc.status, JSON.stringify(acc.body)).toBe(200);
+      return sent.body.id as string;
+    };
+    const toLock = (id: string) => {
+      ctx.clock.advance(Date.parse(row(id).scheduledAt) - 60 * 60_000 - ctx.clock.now());
+      svc.tick();
+      return row(id);
+    };
+    return { ...ctx, svc, tours, row, roster, give, book, toLock };
+  }
+
+  it('locks the lineups, opens the bets, pays the pot and tires the bots (no money, no XP)', async () => {
+    const { admin, mario, ana, marioId, timId, free, svc, tours, row, roster, book, toLock, db } =
+      await played();
+    const id = await book({ teamSize: 1, stake: 500 });
+    // Before the lock: nothing to play yet.
+    svc.tick();
+    expect(row(id).status).toBe('accepted');
+    const c = toLock(id);
+    expect(c.status).toBe('locked');
+    const t = tours.get(c.tournamentId!)!;
+    expect(t.phase).toBe('seeded');
+    expect(t.agentId).toBe(c.agentId);
+    expect(JSON.parse(t.udtJson!).challenge).toEqual({ id });
+    expect(tours.settings(t)).toMatchObject({ format: 'fixtures', size: 2, teamSize: 1 });
+    const proj = api!.app.get(EventLogService).projection(t.id)!;
+    expect(proj.bracket?.definition.slots).toEqual([`udt-${marioId}`, `udt-${timId}`]);
+    // Bets are open: the two managers cannot bet on their own match, Ana can.
+    const match = proj.bracket!.matches[0]!.id;
+    const own = await mario.req('PUT', `/bets/tournaments/${t.id}/${match}`, {
+      pick: `udt-${marioId}`,
+      amount: 50,
+    });
+    expect(own.status).toBe(403);
+    const bet = await ana.req('PUT', `/bets/tournaments/${t.id}/${match}`, {
+      pick: `udt-${timId}`,
+      amount: 50,
+    });
+    expect(bet.status, JSON.stringify(bet.body)).toBe(200);
+    const before = new Map(
+      [...roster(marioId), ...roster(timId)].map((r) => [r.botId, r] as const),
+    );
+    // Played (the test mode decides it by strength).
+    const sim = await admin.post(`/udt/test/simulate/${t.id}`);
+    expect(sim.status, JSON.stringify(sim.body)).toBe(200);
+    const done = row(id);
+    expect(done.status).toBe('played');
+    const winner = done.winnerUser!;
+    const loser = winner === marioId ? timId : marioId;
+    // The pot of 1000 less 5 %: the winner is 450 up, the loser 500 down.
+    expect(free(winner)).toBe(-450);
+    expect(free(loser)).toBe(500);
+    // Stamina as in a cup, no experience, no games counted; no game money or place reward.
+    for (const r of [...roster(marioId), ...roster(timId)]) {
+      const b = before.get(r.botId)!;
+      expect(r.stamina).toBeLessThan(b.stamina);
+      expect(r.xp).toBe(b.xp);
+      expect(r.games).toBe(b.games);
+    }
+    const paid = db
+      .select()
+      .from(neuroLedger)
+      .all()
+      .filter((l) => (l.metaJson ?? '').includes(t.id));
+    expect(paid.filter((l) => l.kind !== 'bet').map((l) => l.kind)).toEqual([]);
+    expect(api!.app.get(UdtRewardsService).table(1)).toEqual([]);
+    // Settled once: another tick changes nothing.
+    svc.tick();
+    expect(free(winner)).toBe(-450);
+    // The list shows it with its winner.
+    const recent = (await mario.get('/udt/challenges')).body.recent;
+    expect(recent[0]).toMatchObject({ id, status: 'played', winner, tournamentId: t.id });
+  });
+
+  it('a team that cannot field its lineup loses without a game; neither: called off', async () => {
+    const { marioId, timId, free, give, book, toLock } = await played();
+    // 3v3: Mario has three bots, Tim only his starter.
+    give(marioId, 2, 'dmSlot');
+    const id = await book({ teamSize: 3, stake: 300 });
+    const c = toLock(id);
+    expect(c).toMatchObject({ status: 'played', reason: 'forfeit', winnerUser: marioId });
+    expect(c.tournamentId).toBeNull();
+    expect(free(marioId)).toBe(-270); // 600 less 5 %, his 300 back with it
+    expect(free(timId)).toBe(300);
+    // 5v5: nobody has five bots.
+    const two = await book({ teamSize: 5, stake: 200, at: at('20:00') });
+    expect(toLock(two)).toMatchObject({ status: 'void', reason: 'lineups' });
+    expect(free(marioId)).toBe(-270);
+    expect(free(timId)).toBe(300);
+  });
+
+  it('calls a challenge off when its tournament cannot start in time, stakes back', async () => {
+    const { marioId, timId, free, svc, tours, row, book, toLock, clock } = await played();
+    const id = await book({ teamSize: 1, stake: 400 });
+    const c = toLock(id);
+    expect(free(marioId)).toBe(400);
+    // The servers are offline: it waits while the game would still end in the window (by 22:00,
+    // a quarter of an hour at least), then it is called off.
+    clock.advance(Date.parse(at('20:45')) - clock.now());
+    svc.tick();
+    expect(row(id).status).toBe('locked');
+    clock.advance(60_000);
+    svc.tick();
+    expect(tours.get(c.tournamentId!)!.phase).toBe('aborted');
+    expect(row(id)).toMatchObject({ status: 'void', reason: 'aborted' });
+    expect(free(marioId)).toBe(0);
+    expect(free(timId)).toBe(0);
+  });
+
+  it('offers a rematch: the other way round, same stake, once', async () => {
+    const { admin, mario, tim, marioId, timId, row, book, toLock } = await played();
+    const id = await book({ teamSize: 1, stake: 200 });
+    const c = toLock(id);
+    expect((await mario.post(`/udt/challenges/${id}/rematch`, { at: at('20:30') })).status).toBe(
+      409,
+    );
+    await admin.post(`/udt/test/simulate/${c.tournamentId}`);
+    expect(row(id).status).toBe('played');
+    const re = await tim.post(`/udt/challenges/${id}/rematch`, { at: at('20:30') });
+    expect(re.status, JSON.stringify(re.body)).toBe(201);
+    expect(row(re.body.id)).toMatchObject({
+      fromUser: timId,
+      toUser: marioId,
+      stake: 200,
+      teamSize: 1,
+      rematchOf: id,
+    });
+    const again = await mario.post(`/udt/challenges/${id}/rematch`, { at: at('20:45') });
+    expect(again.body.key).toBe('a rematch of this challenge is booked already');
+  });
+
+  it('keeps a team with a booked challenge out of a cup at that time (from the lock)', async () => {
+    const { admin, mario, tim, ana, book } = await played();
+    await book({ teamSize: 1, stake: 0 }); // 19:30 Berlin, locked from 18:30
+    // A cup of four (three games, about 18 minutes) at 18:20 runs into the lock.
+    const cup = (scheduledAt: string) =>
+      admin.post(
+        '/tournaments',
+        tournamentBody(
+          { name: `Cup ${scheduledAt}`, botPool: [], kind: 'udt', scheduledAt, agentId: 's2' },
+          { size: 4, format: 'single', teamSize: 1 },
+        ),
+      );
+    const late = await cup(at('17:20'));
+    expect(late.status, JSON.stringify(late.body)).toBe(201);
+    const r = await mario.post(`/udt/events/${late.body.id}/enter`);
+    expect(r.status).toBe(409);
+    expect(r.body.key).toBe('your team plays a challenge then');
+    expect((await tim.post(`/udt/events/${late.body.id}/enter`)).status).toBe(409);
+    expect((await ana.post(`/udt/events/${late.body.id}/enter`)).status).toBe(200);
+    // One that ends before the lock is fine.
+    const early = await cup(at('17:05'));
+    expect((await mario.post(`/udt/events/${early.body.id}/enter`)).status).toBe(200);
+  });
+
+  it('checks the map against the pool', async () => {
+    const { mario, timId, svc } = await played();
+    const pool = svc.mapPool('dm');
+    const bad = await mario.post('/udt/challenges', body({ to: timId, map: 'DM-Nowhere' }));
+    expect(bad.status).toBe(409);
+    expect(bad.body.key).toBe('the map {map} is not in the pool');
+    const ok = await mario.post(
+      '/udt/challenges',
+      body({ to: timId, map: pool[1]!.toLowerCase(), teamSize: 1 }),
+    );
+    expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+    expect(ok.body.outgoing[0].map).toBe(pool[1]); // the pool's spelling
+    expect(ok.body.rules.maps.dm).toEqual(pool);
+  });
+
+  it('Monster Hunt: five bots each, no fee, the record bonus for beating the season record', async () => {
+    const { admin, mario, marioId, timId, free, svc, tours, row, give, book, toLock, db } =
+      await played();
+    for (const u of [marioId, timId]) {
+      db.update(udtRoster).set({ mhSlot: null }).where(eq(udtRoster.userId, u)).run();
+      give(u, 5, 'mhSlot', 1);
+    }
+    vi.spyOn(svc, 'mapPool').mockImplementation((m) =>
+      m === 'mh' ? ['MH-Lonely'] : ['DM-Deck16]['],
+    );
+    const id = await book({ mode: 'mh', map: 'MH-Lonely', hardness: 'hard', stake: 500 });
+    const c = toLock(id);
+    expect(c.status).toBe('locked');
+    const t = tours.get(c.tournamentId!)!;
+    expect(tours.settings(t)).toMatchObject({
+      teamSize: 5,
+      game: {
+        adapter: 'ut99-mh',
+        rules: { monsterSkill: 6, lives: 3, penaltySec: 8, mapPool: ['MH-Lonely'] },
+      },
+    });
+    // The statistics: the challenge's best run beat the season record of MH-Lonely on skill 6.
+    const stats = api!.app.get(StatsService);
+    vi.spyOn(stats, 'mapRecords').mockReturnValue([
+      { map: 'MH-Lonely', monsterSkill: 6, finalMs: 600_000 } as never,
+    ]);
+    vi.spyOn(stats, 'udtFacts').mockReturnValue([
+      {
+        tournamentId: t.id,
+        runs: [
+          {
+            entrantId: `udt-${timId}`,
+            map: 'MH-Lonely',
+            monsterSkill: 6,
+            finalMs: 580_000,
+            finished: true,
+            forfeit: false,
+          },
+        ],
+      } as never,
+    ]);
+    await admin.post(`/udt/test/simulate/${t.id}`);
+    const done = row(id);
+    expect(done.status).toBe('played');
+    // The bonus: 300 at the index (Tim's run); no fee, the winner takes the whole pot.
+    const bonus = (await mario.get('/udt/challenges')).body.rules.mh.recordBonus as number;
+    const rows = db
+      .select()
+      .from(neuroLedger)
+      .all()
+      .filter((l) => l.kind === 'udt_challenge_record');
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ userId: timId, amount: bonus });
+    const winner = done.winnerUser!;
+    expect(free(winner)).toBe(winner === timId ? -500 - bonus : -500);
+    expect(free(marioId) + free(timId)).toBe(-bonus);
   });
 });

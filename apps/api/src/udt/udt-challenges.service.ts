@@ -1,12 +1,23 @@
 import { Inject, Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import { and, eq, inArray, isNotNull } from 'drizzle-orm';
-import { ADAPTER_MH } from '@tourney/adapter-ut99';
-import type { TournamentSettings } from '@tourney/protocol';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
+import { ADAPTER_ID, ADAPTER_MH, defaultLimits } from '@tourney/adapter-ut99';
 import {
+  udtEntrantId,
+  udtManagerOf,
+  type TournamentEvent,
+  type TournamentSettings,
+} from '@tourney/protocol';
+import {
+  brokenRecord,
   challengeMinutes,
   challengePot,
+  DEFAULT_ECONOMY,
+  hardnessOfSkill,
   isWindowStart,
   leagueClashDays,
+  managerEffects,
+  MH_HARDNESS,
+  MH_RUN_MIN,
   MH_TEAM_SIZE,
   PER_EVENING,
   stakeCap,
@@ -14,17 +25,18 @@ import {
   weekdayOf,
   windowStarts,
   type ChallengeMode,
+  type MhHardness,
 } from '@tourney/udt';
 import { z } from 'zod';
 import { AgentsService } from '../agents/agents.service.js';
-import type { User } from '../auth/users.service.js';
+import { UsersService, type User } from '../auth/users.service.js';
 import { ServerActivity } from '../common/activity.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
 import { randomId } from '../common/ids.js';
 import { LOGGER, type ApiLogger } from '../common/logger.js';
 import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
-import { tournaments, udtChallenges, udtEntries } from '../db/schema.js';
+import { tournaments, udtChallenges, udtEntries, udtRoster } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
 import { nextDay, today, zonedMs } from '../seasons/season-time.js';
 import {
@@ -34,7 +46,13 @@ import {
 } from '../settings/settings.service.js';
 import type { CalendarTournament, Reservation } from '../tournaments/server-calendar.js';
 import { estimateMs } from '../tournaments/server-calendar.js';
-import { TournamentsService, UdtEventRulesSchema } from '../tournaments/tournaments.service.js';
+import { StatsService } from '../stats/stats.service.js';
+import { EventLogService } from '../tournaments/event-log.service.js';
+import {
+  TournamentsService,
+  UdtEventRulesSchema,
+  type TournamentRow,
+} from '../tournaments/tournaments.service.js';
 import { UdtEventsService } from './udt-events.service.js';
 import { estimateEvening, UdtLeagueService } from './udt-league.service.js';
 import { UdtService } from './udt.service.js';
@@ -76,6 +94,13 @@ export const SlotsQuery = z.object({
 });
 export type SlotsInput = z.infer<typeof SlotsQuery>;
 
+/** A rematch: the same challenge the other way round, only the start is new. */
+export const RematchBody = z.object({
+  at: z.iso.datetime(),
+  message: z.string().trim().max(120).optional(),
+});
+export type RematchInput = z.infer<typeof RematchBody>;
+
 type Row = typeof udtChallenges.$inferSelect;
 type Status =
   | 'pending'
@@ -116,8 +141,9 @@ const overlaps = (a: number, b: number, c: number, d: number) => a < d && c < b;
  * challenge window. The start keeps a server of the pool from the moment it is sent (the server
  * calendar keeps cups out); the challenger's stake is held until the answer, the taker's on
  * accepting. Brakes as for trades: a limit per pair and week, stakes only above the rescue floor,
- * a cap at the index. The match itself (lineups at the lock, bets, the pot) follows in the next
- * step.
+ * a cap at the index. At the lock (start − lockMin) both lineups are fixed in a tournament of
+ * its own on the booked server (bets open), the autostart plays it at the start; the winner takes
+ * the pot less the fee, the bots lose stamina but gain no experience (decision 335).
  */
 @Injectable()
 export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
@@ -138,17 +164,40 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     @Inject(UdtService) private readonly udt: UdtService,
     @Inject(UdtEventsService) private readonly events: UdtEventsService,
     @Inject(UdtLeagueService) private readonly league: UdtLeagueService,
+    @Inject(EventLogService) private readonly eventLog: EventLogService,
+    @Inject(StatsService) private readonly stats: StatsService,
+    @Inject(UsersService) private readonly users: UsersService,
   ) {}
 
   onModuleInit(): void {
     this.tournaments.calendar.registerSource((agentId, from, to) =>
       this.reservations(agentId, from, to),
     );
+    // A challenge's tournament waits for its server until its deadline, then it is called off.
+    this.tournaments.calendar.registerDeadline((t) => {
+      const c = this.find(challengeIdOf(t.udtJson));
+      return c ? this.deadline(c) : null;
+    });
+    this.events.challengeLineup = (t, settings) => this.lineup(t, settings);
+    this.events.challengeClash = (userId, from, to) => this.clash(userId, from, to);
+    // The match decides the challenge; a called-off tournament voids it.
+    this.eventLog.onAppend((id, stored) => {
+      if (stored.some(decides))
+        try {
+          this.settle(id);
+        } catch (e) {
+          this.log.error(`challenge result ${id}: ${(e as Error).message}`);
+        }
+    });
+    this.tournaments.onRemove((t) => {
+      const c = this.find(challengeIdOf(t.udtJson));
+      if (c?.status === 'locked') this.close(c, 'void', 'removed');
+    });
     this.settings.checkUdt((next, sent) => {
       if (sent.challenge || sent.league) this.checkWindow(next);
     });
     this.timer = setInterval(
-      () => void this.activity.task('challenges', () => this.sweep()),
+      () => void this.activity.task('challenges', () => this.tick()),
       30_000,
     );
     this.timer.unref();
@@ -362,6 +411,18 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     return c.fromUser === userId || c.toUser === userId;
   }
 
+  /** A booked challenge of the manager keeps its bots from its lock to its end within [from, to). */
+  private clash(userId: string, from: number, to: number): boolean {
+    const season = this.udt.seasonNumber();
+    if (season === null) return false;
+    const lock = this.cfg().lockMin * MIN;
+    return this.active(season).some(
+      (c) =>
+        this.involves(c, userId) &&
+        overlaps(Date.parse(c.scheduledAt) - lock, Date.parse(c.endsAt), from, to),
+    );
+  }
+
   /** Why a team cannot play a challenge then (null: it can). */
   private teamProblem(ctx: DayContext, userId: string, from: number, to: number) {
     if (
@@ -568,6 +629,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       if (to !== null && this.mhBots(to) < MH_TEAM_SIZE)
         throw conflict('Monster Hunt needs {n} bots in the other lineup', { n: MH_TEAM_SIZE });
     }
+    const map = this.poolMap(f.mode, body.map);
     const tier = body.open === 'tier' ? this.tierOf(user.id) : null;
     if (to === null && body.open === 'tier' && tier === null)
       throw conflict('your team plays in no league tier');
@@ -584,7 +646,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       mode: f.mode,
       teamSize: f.teamSize,
       bestOf: f.bestOf,
-      map: body.map,
+      map,
       hardness: f.hardness,
       stake: body.stake,
       feePct: this.feePct(f.mode),
@@ -651,13 +713,12 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     const done = this.db
       .update(udtChallenges)
       .set({ status, reason, decidedAt: this.nowIso() })
-      .where(
-        and(eq(udtChallenges.id, c.id), inArray(udtChallenges.status, ['pending', 'accepted'])),
-      )
+      .where(and(eq(udtChallenges.id, c.id), inArray(udtChallenges.status, ACTIVE)))
       .run();
     if (!done.changes) return false;
+    // Only stakes that were held come back (the refund goes by the hold's ref).
     this.refund(c, c.fromUser);
-    if (c.toUser && c.status === 'accepted') this.refund(c, c.toUser);
+    if (c.toUser) this.refund(c, c.toUser);
     return true;
   }
 
@@ -763,9 +824,14 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     for (const c of this.db
       .select()
       .from(udtChallenges)
-      .where(eq(udtChallenges.status, 'pending'))
+      .where(inArray(udtChallenges.status, ['pending', 'accepted']))
       .all())
-      if (c.expiresAt <= now || c.season !== season) if (this.close(c, 'expired')) n++;
+      if (c.status === 'pending' && (c.expiresAt <= now || c.season !== season)) {
+        if (this.close(c, 'expired')) n++;
+      } else if (c.status === 'accepted' && c.season !== season) {
+        // Booked for a season that is over (its last day): never played.
+        if (this.close(c, 'void', 'season')) n++;
+      }
     return n;
   }
 
@@ -786,6 +852,410 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       )
       .all()
       .filter((c) => c.expiresAt > now).length;
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Maps
+  // ------------------------------------------------------------------------------------------
+
+  /**
+   * The maps of a mode: deathmatch the league's pool; Monster Hunt the newest Dream Team Monster
+   * Hunt cup's pool, else the Monster Hunt maps the pool's servers have.
+   */
+  mapPool(mode: ChallengeMode): string[] {
+    if (mode === 'dm') return this.league.mapPool();
+    for (const t of this.db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.kind, 'udt'))
+      .orderBy(desc(tournaments.createdAt))
+      .all()) {
+      if (challengeIdOf(t.udtJson)) continue;
+      try {
+        const s = this.tournaments.settings(t);
+        const pool = (s.game.rules as { mapPool?: string[] }).mapPool;
+        if (s.game.adapter === ADAPTER_MH && pool?.length) return pool;
+      } catch {
+        // broken settings: the next
+      }
+    }
+    const maps = new Map<string, string>();
+    for (const p of this.agents.pool()) {
+      const inv = Inventory.safeParse(this.agents.inventory(p.agentId, p.profileId));
+      if (inv.success)
+        for (const m of inv.data.maps)
+          if (m.id.toUpperCase().startsWith('MH-')) maps.set(m.id.toLowerCase(), m.id);
+    }
+    return [...maps.values()].sort((a, b) => a.localeCompare(b));
+  }
+
+  /** A chosen map checked against the mode's pool (its spelling there); null: the vote. */
+  private poolMap(mode: ChallengeMode, map: string | null): string | null {
+    const pool = this.mapPool(mode);
+    if (map === null) {
+      if (!pool.length) throw conflict('there are no maps for this mode');
+      return null;
+    }
+    const hit = pool.find((m) => m.toLowerCase() === map.toLowerCase());
+    if (!hit) throw conflict('the map {map} is not in the pool', { map });
+    return hit;
+  }
+
+  /** The season's Monster Hunt map records per difficulty (what a showcase can beat). */
+  private mhRecords(season: number) {
+    try {
+      return this.stats.mapRecords(season).flatMap((r) => {
+        const hardness = hardnessOfSkill(r.monsterSkill);
+        return hardness ? [{ map: r.map, hardness, finalMs: r.finalMs, team: r.team }] : [];
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // The match: lock, tournament, result
+  // ------------------------------------------------------------------------------------------
+
+  private find(id: string | null): Row | undefined {
+    if (!id) return undefined;
+    return this.db.select().from(udtChallenges).where(eq(udtChallenges.id, id)).get();
+  }
+
+  /**
+   * The latest start of a challenge's tournament: a quarter of an hour after its start, or later
+   * while the game still ends in the window. Not started by then, it is called off.
+   */
+  private deadline(c: Row): number {
+    const start = Date.parse(c.scheduledAt);
+    const end = zonedMs(today(start, this.tz), this.cfg().to, this.tz);
+    return Math.max(start + 15 * MIN, end - (Date.parse(c.endsAt) - start));
+  }
+
+  /**
+   * Every 30 seconds: answers that came too late, the lock of accepted challenges (lineups fixed,
+   * the tournament seeded, bets open), tournaments that never started or got lost.
+   */
+  tick(): void {
+    this.sweep();
+    const season = this.udt.seasonNumber();
+    if (season === null) return;
+    const now = this.now();
+    const lock = this.cfg().lockMin * MIN;
+    for (const c of this.active(season))
+      try {
+        if (c.status === 'accepted' && Date.parse(c.scheduledAt) - lock <= now) this.lock(c);
+        else if (c.status === 'locked') this.watch(c, now);
+      } catch (e) {
+        this.log.error(`challenge ${c.id}: ${(e as Error).message}`);
+      }
+  }
+
+  /** Who makes the tournaments: an admin, else the challenger. */
+  private maker(c: Row): User | undefined {
+    return this.users.list().find((u) => u.isAdmin) ?? this.users.byId(c.fromUser);
+  }
+
+  /** The game of a challenge: a fixtures bracket of two, its mode, length, map and rules. */
+  gameSettings(c: Pick<Row, 'mode' | 'teamSize' | 'bestOf' | 'map' | 'hardness'>) {
+    const mh = c.mode === 'mh';
+    const maps = c.map ? [c.map] : this.mapPool(c.mode as ChallengeMode);
+    const league = this.settings.get().udt.league;
+    const h = MH_HARDNESS[(c.hardness ?? 'normal') as MhHardness] ?? MH_HARDNESS.normal;
+    // Deathmatch 5v5 as the league plays it, smaller teams with the usual limits.
+    const limits = mh
+      ? { fragLimit: 0, timeLimitMin: MH_RUN_MIN }
+      : c.teamSize === 5
+        ? { fragLimit: league.fragLimit, timeLimitMin: league.timeLimitMin }
+        : defaultLimits(c.teamSize);
+    return {
+      format: 'fixtures',
+      size: 2,
+      teamSize: c.teamSize,
+      grandFinalReset: false,
+      bestOf: { default: c.bestOf },
+      checkInWindowMin: 10,
+      noShowSec: 180,
+      reconnectGraceSec: 180,
+      maxReconnects: 2,
+      botMatchMode: 'watch',
+      botPlacement: 'byes',
+      clanTeams: false,
+      postTournamentShutdownSec: 30,
+      game: {
+        adapter: mh ? ADAPTER_MH : ADAPTER_ID,
+        rules: {
+          ...limits,
+          // A map picked: every game there; else the vote (best of: the loser picks).
+          mapMode: maps.length === 1 ? 'random' : 'vote',
+          mapPool: maps,
+          ...(mh ? { monsterSkill: h.monsterSkill, lives: h.lives, penaltySec: h.penaltySec } : {}),
+        },
+      },
+    } as TournamentSettings;
+  }
+
+  /**
+   * The lock (start − lockMin): both lineups are fixed. A team that cannot field one loses
+   * without a game (both: called off); else the challenge's tournament is made on its server and
+   * seeded - the bets open, the betting bots bet, the autostart runs it at the start.
+   */
+  private lock(c: Row): void {
+    const to = c.toUser!;
+    if (this.now() > this.deadline(c)) {
+      this.close(c, 'void', 'late');
+      return;
+    }
+    const settings = this.gameSettings(c);
+    const ready = (u: string) => {
+      const team = this.events.challengeTeam(u, settings, udtEntrantId(u));
+      return !!team && !team.problems.length;
+    };
+    const okFrom = ready(c.fromUser);
+    const okTo = ready(to);
+    if (!okFrom && !okTo) {
+      this.close(c, 'void', 'lineups');
+      return;
+    }
+    if (!okFrom || !okTo) {
+      this.decide(c, okFrom ? c.fromUser : to, 'forfeit');
+      return;
+    }
+    const by = this.maker(c);
+    const server = this.agents.pool().find((p) => p.agentId === c.agentId);
+    if (!by || !server) {
+      this.log.warn(`challenge ${c.id}: ${by ? 'its server left the pool' : 'nobody to make it'}`);
+      this.close(c, 'void', 'server');
+      return;
+    }
+    const name = (u: string) => this.udt.team(u, c.season)?.name ?? '?';
+    let t: TournamentRow;
+    try {
+      t = this.tournaments.create(
+        {
+          name: `Challenge${c.mode === 'mh' ? ' · Monster Hunt' : ''} · ${name(c.fromUser)} – ${name(to)}`.slice(
+            0,
+            100,
+          ),
+          agentId: server.agentId,
+          profileId: server.profileId,
+          serverAuto: false,
+          settings,
+          // Not used (the two lineups play), but a team tournament needs two teams of bots.
+          botPool: Array.from({ length: 10 }, (_, i) => ({ name: `Challenge${i + 1}`, skill: 3 })),
+          registrationOpen: false,
+          scheduledAt: c.scheduledAt,
+          autoStart: true,
+          kind: 'udt',
+          udt: {
+            valueCap: null,
+            starLimit: null,
+            ticket: null,
+            ticketIndexed: true,
+            minTeams: 2,
+            finale: false,
+            league: null,
+            challenge: { id: c.id },
+          },
+        },
+        by,
+      );
+    } catch (e) {
+      this.log.warn(`challenge ${c.id}: no tournament (${(e as Error).message})`);
+      this.close(c, 'void', 'server');
+      return;
+    }
+    const locked = this.db
+      .update(udtChallenges)
+      .set({ status: 'locked', tournamentId: t.id })
+      .where(and(eq(udtChallenges.id, c.id), eq(udtChallenges.status, 'accepted')))
+      .run();
+    if (!locked.changes) {
+      this.tournaments.remove(t.id);
+      return;
+    }
+    try {
+      this.tournaments.seed(t.id, { mode: 'auto', humanOrder: 'random' }, by);
+    } catch (e) {
+      this.log.warn(`challenge ${c.id}: not seeded (${(e as Error).message})`);
+      this.tournaments.remove(t.id); // voids it (onRemove)
+    }
+  }
+
+  /** The two lineups of a challenge's tournament in their slots (the challenger first). */
+  private lineup(t: TournamentRow, settings: TournamentSettings) {
+    const c = this.find(this.tournaments.udtRules(t)?.challenge?.id ?? null);
+    if (!c?.toUser) throw notFound('challenge');
+    const entrants = [c.fromUser, c.toUser].map((u) => {
+      const team = this.events.challengeTeam(u, settings, udtEntrantId(u));
+      if (!team) throw notFound('team of that manager');
+      return team.entrant;
+    });
+    return { entrants, fill: [], slots: entrants.map((e) => e.id) };
+  }
+
+  /** A locked challenge: its tournament is gone, decided, or never started by its deadline. */
+  private watch(c: Row, now: number): void {
+    const t = c.tournamentId ? this.tournaments.get(c.tournamentId) : undefined;
+    if (!t) {
+      this.close(c, 'void', 'removed');
+      return;
+    }
+    if (t.phase === 'finished' || t.phase === 'aborted') {
+      this.settle(t.id);
+      return;
+    }
+    if (t.phase === 'seeded' && now > this.deadline(c)) {
+      const by = this.maker(c);
+      if (by) this.tournaments.cancelSeeded(t.id, 'the challenge could not start in time', by);
+    }
+  }
+
+  /**
+   * A challenge's tournament got its result (or was called off): the winner takes the pot (less
+   * the fee), the bots that played lose stamina (no experience, no game money); a Monster Hunt
+   * run that beat the season's map record earns the record bonus. Called off: the stakes go back,
+   * the bets were refunded by the bets themselves.
+   */
+  private settle(tournamentId: string): void {
+    const t = this.tournaments.get(tournamentId);
+    const c = this.find(challengeIdOf(t?.udtJson ?? null));
+    if (!c || c.status !== 'locked') return;
+    const p = this.eventLog.projection(tournamentId);
+    if (!p) return;
+    if (p.phase === 'aborted') {
+      this.close(c, 'void', 'aborted');
+      return;
+    }
+    const r = p.results[0];
+    const winner = r ? udtManagerOf(r.winnerId) : undefined;
+    if (!r || !winner) {
+      // Over without a result (ended by hand): nobody won, the stakes go back.
+      if (p.phase === 'finished') this.close(c, 'void', 'aborted');
+      return;
+    }
+    const games = Math.max(1, p.games[r.matchId]?.length ?? 0);
+    const played = this.decide(c, winner, r.outcome === 'forfeit' ? 'forfeit' : null, () => {
+      // Stamina as in a cup (per game, the fatigue traits), nothing else.
+      const onBots = this.udt.traitsOnBots(c.season);
+      for (const userId of [c.fromUser, c.toUser!]) {
+        const e = p.entrants[udtEntrantId(userId)];
+        const ids =
+          e?.kind === 'team'
+            ? e.bots.flatMap((b) => (b.id ? [b.id] : []))
+            : e?.kind === 'bot' && e.bot.id
+              ? [e.bot.id]
+              : [];
+        if (!ids.length) continue;
+        for (const row of this.db
+          .select()
+          .from(udtRoster)
+          .where(
+            and(
+              eq(udtRoster.season, c.season),
+              eq(udtRoster.userId, userId),
+              inArray(udtRoster.botId, ids),
+            ),
+          )
+          .all()) {
+          const fx = managerEffects(onBots.get(row.botId) ?? []);
+          const lost = Math.round(games * DEFAULT_ECONOMY.stamina.perGame * fx.fatigue);
+          this.db
+            .update(udtRoster)
+            .set({ stamina: Math.max(0, row.stamina - lost) })
+            .where(and(eq(udtRoster.season, c.season), eq(udtRoster.botId, row.botId)))
+            .run();
+        }
+      }
+    });
+    if (played && c.mode === 'mh') this.recordBonus(c, tournamentId);
+  }
+
+  /** Decides a challenge for `winner`: the pot less the fee (once, by its refs). */
+  private decide(c: Row, winner: string, reason: string | null, also?: () => void): boolean {
+    return this.db.transaction(() => {
+      const done = this.db
+        .update(udtChallenges)
+        .set({ status: 'played', winnerUser: winner, reason, decidedAt: this.nowIso() })
+        .where(
+          and(eq(udtChallenges.id, c.id), inArray(udtChallenges.status, ['accepted', 'locked'])),
+        )
+        .run();
+      if (!done.changes) return false;
+      const { pot, fee } = challengePot(c.stake, c.feePct);
+      const meta = { challengeId: c.id };
+      this.ledger.book({
+        season: c.season,
+        userId: winner,
+        kind: 'udt_challenge',
+        amount: pot,
+        ref: `challenge-win:${c.id}`,
+        meta,
+      });
+      this.ledger.book({
+        season: c.season,
+        userId: winner,
+        kind: 'udt_challenge_fee',
+        amount: -fee,
+        ref: `challenge-fee:${c.id}`,
+        meta,
+      });
+      also?.();
+      return true;
+    });
+  }
+
+  /** Monster Hunt: the bonus for a run that beat the season's record of its map and skill. */
+  private recordBonus(c: Row, tournamentId: string): void {
+    try {
+      const facts = this.stats.udtFacts(c.season).find((f) => f.tournamentId === tournamentId);
+      const run = facts && brokenRecord(facts.runs, this.stats.mapRecords(c.season, tournamentId));
+      const userId = run ? udtManagerOf(run.entrantId) : undefined;
+      if (!run || !userId) return;
+      this.ledger.book({
+        season: c.season,
+        userId,
+        kind: 'udt_challenge_record',
+        amount: stakeCap(this.cfg().mh.recordBonus, this.udt.index(c.season)),
+        ref: `challenge-record:${c.id}`,
+        meta: { challengeId: c.id, map: run.map, finalMs: run.finalMs },
+      });
+    } catch (e) {
+      this.log.error(`challenge record ${c.id}: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * A rematch of a played challenge: the same format and stake, the other team challenges, only
+   * the start is new (it counts for the pair limit).
+   */
+  rematch(user: User, id: string, body: RematchInput) {
+    this.assertOn();
+    const c = this.get(id);
+    if (c.status !== 'played' || !c.toUser) throw conflict('only a played challenge has a rematch');
+    if (!this.involves(c, user.id)) throw forbidden('only the two teams can ask for a rematch');
+    if (c.season !== this.udt.seasonNumber()) throw conflict('the challenge is of another season');
+    const booked = this.db
+      .select()
+      .from(udtChallenges)
+      .where(and(eq(udtChallenges.rematchOf, c.id), inArray(udtChallenges.status, ACTIVE)))
+      .get();
+    if (booked) throw conflict('a rematch of this challenge is booked already');
+    return this.create(
+      user,
+      {
+        to: c.fromUser === user.id ? c.toUser : c.fromUser,
+        mode: c.mode as ChallengeMode,
+        teamSize: c.teamSize as 1 | 3 | 5,
+        bestOf: c.bestOf as 1 | 3 | 5,
+        map: c.map,
+        ...(c.hardness ? { hardness: c.hardness as MhHardness } : {}),
+        stake: c.stake,
+        at: body.at,
+        ...(body.message ? { message: body.message } : {}),
+      },
+      c.id,
+    );
   }
 
   // ------------------------------------------------------------------------------------------
@@ -823,6 +1293,8 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       rematchOf: c.rematchOf,
       message: c.message,
       reason: c.reason,
+      tournamentId: c.tournamentId,
+      winner: c.winnerUser,
       from: this.side(c.fromUser, c.season, ai)!,
       to: this.side(c.toUser, c.season, ai),
       open: c.toUser === null ? { scope: c.openScope ?? 'all', tier: c.openTier } : null,
@@ -887,7 +1359,9 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
           feePct: c.mh.feePct,
           recordBonus: stakeCap(c.mh.recordBonus, this.udt.index(s.number)),
           hardness: c.mh.hardness,
+          records: this.mhRecords(s.number),
         },
+        maps: { dm: this.mapPool('dm'), mh: this.mapPool('mh') },
         pairPerWeek: c.pairPerWeek,
         perDay: c.perDay,
         maxOpen: c.maxOpen,
@@ -913,6 +1387,12 @@ export function challengeIdOf(udtJson: string | null): string | null {
 }
 
 const holdRef = (id: string, userId: string) => `challenge-hold:${id}:${userId}`;
+
+/** Events that decide a challenge's tournament (its match, its end, called off). */
+const decides = (e: TournamentEvent) =>
+  e.type === 'match.result' || e.type === 'tournament.finished' || e.type === 'tournament.aborted';
+
+const Inventory = z.object({ maps: z.array(z.object({ id: z.string() })) });
 
 /** Throws when a team cannot play then (its own challenges, its day, a cup it entered). */
 function teamError(p: 'busy' | 'day' | 'cup' | null, own: boolean, n: number): void {
