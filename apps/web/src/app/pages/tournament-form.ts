@@ -1,4 +1,6 @@
 import { type Choice, Segment } from '../components/choice';
+import { TempoPick } from '../components/tempo-pick';
+import { FormSectionHead } from '../components/form-section-head';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -17,6 +19,7 @@ import { I18n, TPipe } from '../core/i18n';
 import { isLocalAddress } from '../core/connect';
 import { scheduleText, weekdayNames } from '../core/series-text';
 import { MH_ADAPTER } from '../core/race';
+import { hoursText, maxGames, maxMinutes } from '../core/bracket-time';
 import { Toasts } from '../core/toast';
 import type {
   AgentView,
@@ -92,9 +95,6 @@ function lengthLimits(l: Length, teamSize: number): { fragLimit: number; timeLim
     timeLimitMin: Math.round((x.minutes * base.timeLimitMin) / one.timeLimitMin),
   };
 }
-
-/** Minutes between two games of a match (map change, countdown, vote). */
-const BETWEEN_GAMES_MIN = 3;
 
 /** One tournament, or a series that creates one every n weeks. */
 type When = 'once' | 'series';
@@ -191,6 +191,16 @@ const UNIT_MIN = { min: 1, h: 60, d: 1440 } as const;
 
 /** Servers a tournament may use at once (decision 291, as the API). */
 const MAX_PARALLEL = 8;
+/** "All sections open" instead of compact (decision 324), per browser. */
+const OPEN_KEY = 'tourney.form.open';
+
+function readAllOpen(): boolean {
+  try {
+    return localStorage.getItem(OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -206,7 +216,7 @@ function toLocalInput(iso: string | null): string {
  */
 @Component({
   selector: 'app-tournament-form',
-  imports: [Segment, FormsModule, RouterLink, TPipe, Icon, UdtMark],
+  imports: [Segment, TempoPick, FormSectionHead, FormsModule, RouterLink, TPipe, Icon, UdtMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -214,9 +224,21 @@ function toLocalInput(iso: string | null): string {
         <h1>{{ title() | t }}</h1>
         <p class="muted sub">{{ subtitle() | t }}</p>
       </div>
-      <a class="btn" routerLink="/admin/series">
-        <na-icon name="copyToNew" [size]="16" /> {{ 'form.manageSeries' | t }}
-      </a>
+      <div class="hacts">
+        @if (!editing()) {
+          <!-- Compact is the default; "all open" is remembered in this browser (decision 324). -->
+          <label class="switch"
+            ><input
+              type="checkbox"
+              [checked]="allOpen()"
+              (change)="setAllOpen($any($event.target).checked)"
+            /><span class="tr"></span>{{ 'form.allOpen' | t }}</label
+          >
+        }
+        <a class="btn" routerLink="/admin/series">
+          <na-icon name="copyToNew" [size]="16" /> {{ 'form.manageSeries' | t }}
+        </a>
+      </div>
     </div>
     @if (locked()) {
       <p class="notice">{{ 'form.locked' | t }}</p>
@@ -225,8 +247,8 @@ function toLocalInput(iso: string | null): string {
       <form class="layout" (ngSubmit)="save()">
         <div class="main">
           <!-- 1 Basics and date -->
-          <section class="card sec">
-            <header class="sh"><span class="no">1</span>{{ 'form.secBasics' | t }}</header>
+          <section class="card sec" id="sec-1">
+            <na-sec-head [n]="1" title="form.secBasics" />
             <label for="fname">{{
               (f.when === 'series' ? 'form.seriesName' : 'form.name') | t
             }}</label>
@@ -269,6 +291,14 @@ function toLocalInput(iso: string | null): string {
                 <na-icon name="crown" [size]="22" />
                 <b>{{ 'form.kindSeason' | t }}</b>
                 <span class="muted small">{{ 'form.kindSeasonHint' | t }}</span>
+                <!-- Whether a season runs (season and Dream Team tournaments need one). -->
+                @if (currentSeason(); as n) {
+                  <span class="ok small">{{ 'form.seasonRunning' | t: { n } }}</span>
+                } @else if (f.when === 'series') {
+                  <span class="small">{{ 'form.seasonalSeriesShort' | t }}</span>
+                } @else {
+                  <span class="err small">{{ 'form.seasonNoneShort' | t }}</span>
+                }
               </button>
               @if (auth.config().udt || f.udt) {
                 <button
@@ -285,18 +315,6 @@ function toLocalInput(iso: string | null): string {
                 </button>
               }
             </div>
-            <p class="muted small">
-              {{
-                (f.udt ? 'form.udtSeason' : f.seasonal ? 'form.seasonHint' : 'form.classicHint') | t
-              }}
-              @if (currentSeason(); as n) {
-                <span class="ok">{{ 'form.seasonRunning' | t: { n } }}</span>
-              } @else if (f.when === 'series') {
-                {{ 'form.seasonalSeries' | t }}
-              } @else {
-                <span class="err">{{ 'form.seasonNone' | t }}</span>
-              }
-            </p>
             @if (f.udt) {
               <fieldset class="plain udtbox" [disabled]="locked()">
                 <legend>{{ 'form.udtRules' | t }}</legend>
@@ -381,30 +399,57 @@ function toLocalInput(iso: string | null): string {
               </fieldset>
             }
 
-            @if (canChooseWhen()) {
-              <na-segment
-                class="when"
-                [options]="whenOptions"
-                [value]="f.when"
-                (valueChange)="setWhen($event)"
-                label="form.when"
-              />
-            }
-
-            @if (f.when === 'once') {
-              <div class="fields">
-                <div class="field">
-                  <label for="fsched">{{ 'form.scheduledAt' | t }}</label>
+            <!-- Date and flow in one row (decision 324). -->
+            <div class="lbl">{{ 'form.when' | t }}</div>
+            <div class="when-row">
+              <div class="wcol">
+                @if (canChooseWhen()) {
+                  <na-segment
+                    [options]="whenOptions"
+                    [value]="f.when"
+                    (valueChange)="setWhen($event)"
+                    label="form.when"
+                  />
+                }
+                @if (f.when === 'once') {
                   <input
                     id="fsched"
                     name="sched"
                     type="datetime-local"
                     [(ngModel)]="f.scheduledAt"
                     (ngModelChange)="touch()"
+                    [attr.aria-label]="'form.scheduledAt' | t"
                   />
-                </div>
+                }
               </div>
-            } @else {
+              @if (f.when === 'once') {
+                <label class="switch optrow"
+                  ><span class="ot"
+                    ><b>{{ 'form.registrationOpen' | t }}</b
+                    ><span class="muted small">{{ 'form.registrationOpenShort' | t }}</span></span
+                  ><input
+                    type="checkbox"
+                    name="reg"
+                    [(ngModel)]="f.registrationOpen"
+                    (ngModelChange)="touch()" /><span class="tr"></span
+                ></label>
+              }
+              <label class="switch optrow" [title]="'form.autoStartHint' | t"
+                ><span class="ot"
+                  ><b>{{ 'form.autoStart' | t }}</b
+                  ><span class="muted small">{{ 'form.autoStartShort' | t }}</span></span
+                ><input
+                  type="checkbox"
+                  name="autoStart"
+                  [(ngModel)]="f.autoStart"
+                  (ngModelChange)="touch()"
+                  [disabled]="f.when === 'once' && !f.scheduledAt && !f.autoStart" /><span
+                  class="tr"
+                ></span
+              ></label>
+            </div>
+
+            @if (f.when === 'series') {
               <div class="sched">
                 <div>
                   <label>{{ 'series.repeat' | t }}</label>
@@ -572,634 +617,663 @@ function toLocalInput(iso: string | null): string {
                 <p class="error small">{{ previewError() }}</p>
               }
             }
-
-            <div class="lbl">{{ 'form.flow' | t }}</div>
-            <div class="optrows">
-              @if (f.when === 'once') {
-                <label class="switch optrow"
-                  ><span class="ot"
-                    ><b>{{ 'form.registrationOpen' | t }}</b
-                    ><span class="muted small">{{ 'form.registrationOpenHint' | t }}</span></span
-                  ><input
-                    type="checkbox"
-                    name="reg"
-                    [(ngModel)]="f.registrationOpen"
-                    (ngModelChange)="touch()" /><span class="tr"></span
-                ></label>
-              }
-              <label class="switch optrow"
-                ><span class="ot"
-                  ><b>{{ 'form.autoStart' | t }}</b
-                  ><span class="muted small">{{ 'form.autoStartHint' | t }}</span></span
-                ><input
-                  type="checkbox"
-                  name="autoStart"
-                  [(ngModel)]="f.autoStart"
-                  (ngModelChange)="touch()"
-                  [disabled]="f.when === 'once' && !f.scheduledAt && !f.autoStart" /><span
-                  class="tr"
-                ></span
-              ></label>
-            </div>
           </section>
 
           <!-- 2 Game and bracket -->
-          <section class="card sec" [class.lock]="locked()">
-            <header class="sh"><span class="no">2</span>{{ 'form.secGame' | t }}</header>
-            <div class="tiles" role="group" [attr.aria-label]="'form.game' | t">
-              <button
-                type="button"
-                class="tile"
-                [class.on]="f.game === 'dm'"
-                [disabled]="locked()"
-                (click)="onGame('dm')"
-              >
-                <na-icon name="target" [size]="26" />
-                <b>{{ 'form.gameDm' | t }}</b>
-                <span class="muted small">{{ 'form.gameDmHint' | t }}</span>
-              </button>
-              <button
-                type="button"
-                class="tile"
-                [class.on]="f.game === 'mh'"
-                [disabled]="locked()"
-                (click)="onGame('mh')"
-              >
-                <na-icon name="skull" [size]="26" />
-                <b>{{ 'form.gameMh' | t }}</b>
-                <span class="muted small">{{ 'form.gameMhHint' | t }}</span>
-              </button>
-            </div>
-
-            <div class="lbl">{{ 'form.length' | t }}</div>
-            <div class="seg len" role="group" [attr.aria-label]="'form.length' | t">
-              @for (l of lengths; track l) {
+          <section class="card sec" id="sec-2">
+            <na-sec-head
+              [n]="2"
+              title="form.secGame"
+              [line]="lines()[2] ?? ''"
+              [compact]="compact()"
+              [open]="isOpen(2)"
+              [locked]="locked()"
+              controls="sb-2"
+              (toggle)="toggle(2)"
+            />
+            <div class="sb" id="sb-2" [hidden]="!isOpen(2)">
+              <div class="tiles" role="group" [attr.aria-label]="'form.game' | t">
                 <button
                   type="button"
-                  [class.on]="lengthNow() === l"
-                  [attr.aria-pressed]="lengthNow() === l"
+                  class="tile"
+                  [class.on]="f.game === 'dm'"
                   [disabled]="locked()"
-                  (click)="setLength(l)"
+                  (click)="onGame('dm')"
                 >
-                  <b>{{ 'form.len.' + l | t }}</b>
-                  <small>{{ lengthText(l) }}</small>
+                  <na-icon name="target" [size]="26" />
+                  <b>{{ 'form.gameDm' | t }}</b>
+                  <span class="muted small">{{ 'form.gameDmHint' | t }}</span>
                 </button>
-              }
-              <button
-                type="button"
-                [class.on]="lengthNow() === 'custom'"
-                [attr.aria-pressed]="lengthNow() === 'custom'"
-                [disabled]="locked()"
-                (click)="customOpen.set(!customOpen())"
-              >
-                <b>{{ 'form.len.custom' | t }}</b>
-                <small>{{ 'form.lenCustomHint' | t }}</small>
-              </button>
-            </div>
-            <p class="muted small">{{ durationText() }}</p>
+                <button
+                  type="button"
+                  class="tile"
+                  [class.on]="f.game === 'mh'"
+                  [disabled]="locked()"
+                  (click)="onGame('mh')"
+                >
+                  <na-icon name="skull" [size]="26" />
+                  <b>{{ 'form.gameMh' | t }}</b>
+                  <span class="muted small">{{ 'form.gameMhHint' | t }}</span>
+                </button>
+              </div>
 
-            <div class="opts">
-              <div>
-                <label>{{ 'form.mode' | t }}</label>
-                <na-segment
-                  [options]="f.game === 'mh' ? teamSizeOptionsMh : teamSizeOptions"
-                  [value]="f.teamSize"
-                  (valueChange)="onTeamSize($event)"
+              <div class="lbl">{{ 'form.length' | t }}</div>
+              <div class="seg len" role="group" [attr.aria-label]="'form.length' | t">
+                @for (l of lengths; track l) {
+                  <button
+                    type="button"
+                    [class.on]="lengthNow() === l"
+                    [attr.aria-pressed]="lengthNow() === l"
+                    [disabled]="locked()"
+                    (click)="setLength(l)"
+                  >
+                    <b>{{ 'form.len.' + l | t }}</b>
+                    <small>{{ lengthText(l) }}</small>
+                  </button>
+                }
+                <button
+                  type="button"
+                  [class.on]="lengthNow() === 'custom'"
+                  [attr.aria-pressed]="lengthNow() === 'custom'"
                   [disabled]="locked()"
-                  label="form.mode"
-                />
+                  (click)="customOpen.set(!customOpen())"
+                >
+                  <b>{{ 'form.len.custom' | t }}</b>
+                  <small>{{ 'form.lenCustomHint' | t }}</small>
+                </button>
               </div>
-              <div>
-                <label>{{ 'form.format' | t }}</label>
-                <na-segment
-                  [options]="formatOptions"
-                  [value]="f.format"
-                  (valueChange)="f.format = $event; touch()"
-                  [disabled]="locked()"
-                  label="form.format"
-                />
+              <p class="muted small">{{ durationText() }}</p>
+
+              <div class="opts">
+                <div>
+                  <label>{{ 'form.mode' | t }}</label>
+                  <na-segment
+                    [options]="f.game === 'mh' ? teamSizeOptionsMh : teamSizeOptions"
+                    [value]="f.teamSize"
+                    (valueChange)="onTeamSize($event)"
+                    [disabled]="locked()"
+                    label="form.mode"
+                  />
+                </div>
+                <div>
+                  <label>{{ 'form.format' | t }}</label>
+                  <na-segment
+                    [options]="formatOptions"
+                    [value]="f.format"
+                    (valueChange)="f.format = $event; touch()"
+                    [disabled]="locked()"
+                    label="form.format"
+                  />
+                </div>
+                <div>
+                  <label>{{ (f.teamSize > 1 ? 'form.sizeTeams' : 'form.size') | t }}</label>
+                  <na-segment
+                    [options]="f.teamSize > 1 ? sizeOptionsTeams : sizeOptions"
+                    [value]="f.size"
+                    (valueChange)="f.size = $event; touch()"
+                    [disabled]="locked()"
+                    [label]="f.teamSize > 1 ? 'form.sizeTeams' : 'form.size'"
+                  />
+                </div>
+                <div>
+                  <label>{{ 'form.boDefault' | t }}</label>
+                  <na-segment
+                    [options]="boOptions"
+                    [value]="f.boDefault"
+                    (valueChange)="f.boDefault = $event; touch()"
+                    [disabled]="locked()"
+                    label="form.boDefault"
+                  />
+                </div>
               </div>
-              <div>
-                <label>{{ (f.teamSize > 1 ? 'form.sizeTeams' : 'form.size') | t }}</label>
-                <na-segment
-                  [options]="f.teamSize > 1 ? sizeOptionsTeams : sizeOptions"
-                  [value]="f.size"
-                  (valueChange)="f.size = $event; touch()"
-                  [disabled]="locked()"
-                  [label]="f.teamSize > 1 ? 'form.sizeTeams' : 'form.size'"
-                />
-              </div>
-              <div>
-                <label>{{ 'form.boDefault' | t }}</label>
-                <na-segment
-                  [options]="boOptions"
-                  [value]="f.boDefault"
-                  (valueChange)="f.boDefault = $event; touch()"
-                  [disabled]="locked()"
-                  label="form.boDefault"
-                />
-              </div>
-            </div>
-            <div class="optrows">
-              @if (f.format === 'double') {
-                <label class="switch optrow"
-                  ><span class="ot"
-                    ><b>{{ 'form.gfReset' | t }}</b></span
-                  ><input
-                    type="checkbox"
-                    name="gfr"
-                    [(ngModel)]="f.grandFinalReset"
-                    (ngModelChange)="touch()"
-                    [disabled]="locked()" /><span class="tr"></span
-                ></label>
-              }
-              @if (f.teamSize > 1) {
-                <label class="switch optrow"
-                  ><span class="ot"
-                    ><b>{{ 'form.clanTeams' | t }}</b
-                    ><span class="muted small">{{ 'form.clanTeamsHint' | t }}</span></span
-                  ><input
-                    type="checkbox"
-                    name="clanTeams"
-                    [(ngModel)]="f.clanTeams"
-                    [disabled]="locked()" /><span class="tr"></span
-                ></label>
-              }
-            </div>
-            @if (tooFewBots()) {
-              <p class="error small">{{ 'form.botsTooFew' | t: { n: f.teamSize * 2 } }}</p>
-            }
-            @if (ownPool()) {
-              <p class="notice small">{{ 'form.botsLegacy' | t }}</p>
-            }
-            <details
-              class="more"
-              [open]="lengthNow() === 'custom' || customOpen()"
-              (toggle)="customOpen.set($any($event.target).open)"
-            >
-              <summary>{{ 'form.boCustom' | t }}</summary>
-              <div class="fields">
-                @for (k of boKeys(); track k.key) {
-                  <div class="field">
-                    <label [for]="k.key">{{ k.label | t }}</label>
-                    <select
-                      [id]="k.key"
-                      [name]="k.key"
-                      [(ngModel)]="f[k.key]"
+              <div class="optrows">
+                @if (f.format === 'double') {
+                  <label class="switch optrow"
+                    ><span class="ot"
+                      ><b>{{ 'form.gfReset' | t }}</b></span
+                    ><input
+                      type="checkbox"
+                      name="gfr"
+                      [(ngModel)]="f.grandFinalReset"
                       (ngModelChange)="touch()"
-                      [disabled]="locked()"
-                    >
-                      <option [ngValue]="0">{{ 'form.boSame' | t }}</option>
-                      @for (b of bestOf; track b) {
-                        <option [ngValue]="b">Bo{{ b }}</option>
-                      }
-                    </select>
-                  </div>
+                      [disabled]="locked()" /><span class="tr"></span
+                  ></label>
+                }
+                @if (f.teamSize > 1) {
+                  <label class="switch optrow"
+                    ><span class="ot"
+                      ><b>{{ 'form.clanTeams' | t }}</b
+                      ><span class="muted small">{{ 'form.clanTeamsHint' | t }}</span></span
+                    ><input
+                      type="checkbox"
+                      name="clanTeams"
+                      [(ngModel)]="f.clanTeams"
+                      [disabled]="locked()" /><span class="tr"></span
+                  ></label>
                 }
               </div>
-            </details>
+              @if (tooFewBots()) {
+                <p class="error small">{{ 'form.botsTooFew' | t: { n: f.teamSize * 2 } }}</p>
+              }
+              @if (ownPool()) {
+                <p class="notice small">{{ 'form.botsLegacy' | t }}</p>
+              }
+              <details
+                class="more"
+                [open]="lengthNow() === 'custom' || customOpen()"
+                (toggle)="customOpen.set($any($event.target).open)"
+              >
+                <summary>{{ 'form.boCustom' | t }}</summary>
+                <div class="fields">
+                  @for (k of boKeys(); track k.key) {
+                    <div class="field">
+                      <label [for]="k.key">{{ k.label | t }}</label>
+                      <select
+                        [id]="k.key"
+                        [name]="k.key"
+                        [(ngModel)]="f[k.key]"
+                        (ngModelChange)="touch()"
+                        [disabled]="locked()"
+                      >
+                        <option [ngValue]="0">{{ 'form.boSame' | t }}</option>
+                        @for (b of bestOf; track b) {
+                          <option [ngValue]="b">Bo{{ b }}</option>
+                        }
+                      </select>
+                    </div>
+                  }
+                </div>
+              </details>
+            </div>
           </section>
 
           <!-- 3 Match rules and maps -->
-          <section class="card sec" [class.lock]="locked()">
-            <header class="sh"><span class="no">3</span>{{ 'form.secRules' | t }}</header>
-            <fieldset class="plain" [disabled]="locked()">
-              <div class="fields">
-                @if (f.game === 'mh') {
-                  <div class="field">
-                    <label for="ftl">{{ 'form.runTimeLimit2' | t }}</label>
-                    <div class="unit">
-                      <input
-                        id="ftl"
-                        type="number"
-                        name="tl"
-                        min="1"
-                        max="60"
-                        [(ngModel)]="f.timeLimitMin"
-                        (ngModelChange)="touch()"
-                      /><span>min</span>
-                    </div>
-                  </div>
-                  <div class="field">
-                    <label for="fpen">{{ 'form.penalty2' | t }}</label>
-                    <div class="unit">
-                      <input
-                        id="fpen"
-                        type="number"
-                        name="pen"
-                        min="0"
-                        max="60"
-                        [(ngModel)]="f.penaltySec"
-                      /><span>s</span>
-                    </div>
-                  </div>
-                  <div class="field">
-                    <label for="flives">{{ 'form.lives' | t }}</label>
-                    <select id="flives" name="lives" [(ngModel)]="f.lives">
-                      @for (n of livesChoices; track n) {
-                        <option [ngValue]="n">
-                          {{ n === 0 ? ('form.livesUnlimited' | t) : n }}
-                        </option>
-                      }
-                    </select>
-                  </div>
-                  <div class="field">
-                    <label for="fmsk">{{ 'form.monsterSkill' | t }}</label>
-                    <select id="fmsk" name="msk" [(ngModel)]="f.monsterSkill">
-                      @for (s of skills; track s) {
-                        <option [ngValue]="s">{{ s }} – {{ 'skill.' + s | t }}</option>
-                      }
-                    </select>
-                  </div>
-                } @else {
-                  <div class="field">
-                    <label for="ffl">{{ 'form.fragLimit2' | t }}</label>
-                    <div class="unit">
-                      <input
-                        id="ffl"
-                        type="number"
-                        name="fl"
-                        min="0"
-                        max="200"
-                        [(ngModel)]="f.fragLimit"
-                        (ngModelChange)="touch()"
-                      /><span>{{ 'form.uFrags' | t }}</span>
-                    </div>
-                  </div>
-                  <div class="field">
-                    <label for="ftl2">{{ 'form.timeLimit2' | t }}</label>
-                    <div class="unit">
-                      <input
-                        id="ftl2"
-                        type="number"
-                        name="tl"
-                        min="0"
-                        max="60"
-                        [(ngModel)]="f.timeLimitMin"
-                        (ngModelChange)="touch()"
-                      /><span>min</span>
-                    </div>
-                  </div>
-                  @if (f.teamSize > 1) {
+          <section class="card sec" id="sec-3">
+            <na-sec-head
+              [n]="3"
+              title="form.secRules"
+              [line]="lines()[3] ?? ''"
+              [compact]="compact()"
+              [open]="isOpen(3)"
+              [locked]="locked()"
+              controls="sb-3"
+              (toggle)="toggle(3)"
+            />
+            <div class="sb" id="sb-3" [hidden]="!isOpen(3)">
+              <fieldset class="plain" [disabled]="locked()">
+                <div class="fields">
+                  @if (f.game === 'mh') {
                     <div class="field">
-                      <label>{{ 'form.friendlyFire' | t }}</label>
-                      <na-segment
-                        [options]="ffOptions"
-                        [value]="f.friendlyFirePct"
-                        (valueChange)="f.friendlyFirePct = $event"
-                        label="form.friendlyFire"
-                      />
+                      <label for="ftl">{{ 'form.runTimeLimit2' | t }}</label>
+                      <div class="unit">
+                        <input
+                          id="ftl"
+                          type="number"
+                          name="tl"
+                          min="1"
+                          max="60"
+                          [(ngModel)]="f.timeLimitMin"
+                          (ngModelChange)="touch()"
+                        /><span>min</span>
+                      </div>
                     </div>
+                    <div class="field">
+                      <label for="fpen">{{ 'form.penalty2' | t }}</label>
+                      <div class="unit">
+                        <input
+                          id="fpen"
+                          type="number"
+                          name="pen"
+                          min="0"
+                          max="60"
+                          [(ngModel)]="f.penaltySec"
+                        /><span>s</span>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="flives">{{ 'form.lives' | t }}</label>
+                      <select id="flives" name="lives" [(ngModel)]="f.lives">
+                        @for (n of livesChoices; track n) {
+                          <option [ngValue]="n">
+                            {{ n === 0 ? ('form.livesUnlimited' | t) : n }}
+                          </option>
+                        }
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="fmsk">{{ 'form.monsterSkill' | t }}</label>
+                      <select id="fmsk" name="msk" [(ngModel)]="f.monsterSkill">
+                        @for (s of skills; track s) {
+                          <option [ngValue]="s">{{ s }} – {{ 'skill.' + s | t }}</option>
+                        }
+                      </select>
+                    </div>
+                  } @else {
+                    <div class="field">
+                      <label for="ffl">{{ 'form.fragLimit2' | t }}</label>
+                      <div class="unit">
+                        <input
+                          id="ffl"
+                          type="number"
+                          name="fl"
+                          min="0"
+                          max="200"
+                          [(ngModel)]="f.fragLimit"
+                          (ngModelChange)="touch()"
+                        /><span>{{ 'form.uFrags' | t }}</span>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="ftl2">{{ 'form.timeLimit2' | t }}</label>
+                      <div class="unit">
+                        <input
+                          id="ftl2"
+                          type="number"
+                          name="tl"
+                          min="0"
+                          max="60"
+                          [(ngModel)]="f.timeLimitMin"
+                          (ngModelChange)="touch()"
+                        /><span>min</span>
+                      </div>
+                    </div>
+                    @if (f.teamSize > 1) {
+                      <div class="field">
+                        <label>{{ 'form.friendlyFire' | t }}</label>
+                        <na-segment
+                          [options]="ffOptions"
+                          [value]="f.friendlyFirePct"
+                          (valueChange)="f.friendlyFirePct = $event"
+                          label="form.friendlyFire"
+                        />
+                      </div>
+                    }
                   }
-                }
-              </div>
-              <p class="muted small">
-                {{ (f.game === 'mh' ? 'form.limitHintMh' : 'form.limitHint') | t }}
-              </p>
-              @if (f.game === 'mh') {
-                <p class="muted small">
-                  <strong>{{ 'form.botAi' | t }}</strong> {{ 'form.botAiHint' | t }}
-                </p>
-              }
-
-              <div class="maphead">
-                <div>
-                  <label>{{ 'form.maps' | t }}</label>
-                  <na-segment
-                    [options]="mapModeOptions"
-                    [value]="f.mapMode"
-                    (valueChange)="f.mapMode = $event; touch()"
-                    label="form.maps"
-                  />
                 </div>
-                <span class="grow"></span>
-                <input
-                  class="mapsearch"
-                  name="msearch"
-                  [ngModel]="mapFilter()"
-                  (ngModelChange)="mapFilter.set($event)"
-                  [placeholder]="'form.mapSearch' | t"
-                  [attr.aria-label]="'form.mapSearch' | t"
-                />
-                <button type="button" (click)="allMaps(true)">{{ 'form.mapAll' | t }}</button>
-                <button type="button" (click)="allMaps(false)">{{ 'form.mapNone' | t }}</button>
-              </div>
-              <div class="maps">
-                @for (map of shownMaps(); track map.id) {
-                  <label
-                    class="map"
-                    [class.on]="f.mapPool.includes(map.id)"
-                    [title]="map.title || map.id"
-                  >
-                    <input
-                      type="checkbox"
-                      [checked]="f.mapPool.includes(map.id)"
-                      (change)="toggleMap(map.id)"
-                    />
-                    <span class="mid">{{ map.id }}</span>
-                    @if (map.title && map.title !== map.id) {
-                      <span class="mt">{{ map.title }}</span>
-                    }
-                    @if (map.stock === false) {
-                      <span class="cust" [title]="'form.customMapHint' | t">*</span>
-                    }
-                  </label>
-                } @empty {
-                  <p class="muted small">{{ 'form.noMaps' | t }}</p>
-                }
-              </div>
-              <div class="addmap">
-                <input
-                  name="newmap"
-                  [(ngModel)]="newMap"
-                  [placeholder]="f.game === 'mh' ? 'MH-Example' : 'DM-Example'"
-                  [attr.aria-label]="'form.addMap' | t"
-                />
-                <button type="button" (click)="addMap()" [disabled]="!newMap.trim()">
-                  <na-icon name="plus" [size]="15" /> {{ 'form.addMap' | t }}
-                </button>
-              </div>
-              @if (!inventoryMaps().length) {
                 <p class="muted small">
-                  {{ (f.game === 'mh' ? 'form.noInventoryMh' : 'form.noInventory') | t }}
+                  {{ (f.game === 'mh' ? 'form.limitHintMh' : 'form.limitHint') | t }}
                 </p>
-              }
-            </fieldset>
+                @if (f.game === 'mh') {
+                  <p class="muted small">
+                    <strong>{{ 'form.botAi' | t }}</strong> {{ 'form.botAiHint' | t }}
+                  </p>
+                }
+
+                <div class="maphead">
+                  <div>
+                    <label>{{ 'form.maps' | t }}</label>
+                    <na-segment
+                      [options]="mapModeOptions"
+                      [value]="f.mapMode"
+                      (valueChange)="f.mapMode = $event; touch()"
+                      label="form.maps"
+                    />
+                  </div>
+                  <span class="grow"></span>
+                  <input
+                    class="mapsearch"
+                    name="msearch"
+                    [ngModel]="mapFilter()"
+                    (ngModelChange)="mapFilter.set($event)"
+                    [placeholder]="'form.mapSearch' | t"
+                    [attr.aria-label]="'form.mapSearch' | t"
+                  />
+                  <button type="button" (click)="allMaps(true)">{{ 'form.mapAll' | t }}</button>
+                  <button type="button" (click)="allMaps(false)">{{ 'form.mapNone' | t }}</button>
+                </div>
+                <div class="maps">
+                  @for (map of shownMaps(); track map.id) {
+                    <label
+                      class="map"
+                      [class.on]="f.mapPool.includes(map.id)"
+                      [title]="map.title || map.id"
+                    >
+                      <input
+                        type="checkbox"
+                        [checked]="f.mapPool.includes(map.id)"
+                        (change)="toggleMap(map.id)"
+                      />
+                      <span class="mid">{{ map.id }}</span>
+                      @if (map.title && map.title !== map.id) {
+                        <span class="mt">{{ map.title }}</span>
+                      }
+                      @if (map.stock === false) {
+                        <span class="cust" [title]="'form.customMapHint' | t">*</span>
+                      }
+                    </label>
+                  } @empty {
+                    <p class="muted small">{{ 'form.noMaps' | t }}</p>
+                  }
+                </div>
+                <div class="addmap">
+                  <input
+                    name="newmap"
+                    [(ngModel)]="newMap"
+                    [placeholder]="f.game === 'mh' ? 'MH-Example' : 'DM-Example'"
+                    [attr.aria-label]="'form.addMap' | t"
+                  />
+                  <button type="button" (click)="addMap()" [disabled]="!newMap.trim()">
+                    <na-icon name="plus" [size]="15" /> {{ 'form.addMap' | t }}
+                  </button>
+                </div>
+                @if (!inventoryMaps().length) {
+                  <p class="muted small">
+                    {{ (f.game === 'mh' ? 'form.noInventoryMh' : 'form.noInventory') | t }}
+                  </p>
+                }
+              </fieldset>
+            </div>
           </section>
 
-          <!-- 4 Server -->
-          <section class="card sec" [class.lock]="locked()">
-            <header class="sh"><span class="no">4</span>{{ 'form.secServer' | t }}</header>
-            @if (!agents().length) {
-              <p class="notice">
-                {{ 'form.noAgents' | t }} <a routerLink="/admin/agents">{{ 'nav.agents' | t }}</a>
-              </p>
-            }
-            <fieldset class="plain" [disabled]="locked()">
-              <label class="switch optrow"
-                ><span class="ot"
-                  ><b>{{ 'form.serverAuto' | t }}</b
-                  ><span class="muted small">{{
-                    'form.serverAutoHint' | t: { n: poolSize() }
-                  }}</span></span
-                ><input
-                  type="checkbox"
-                  name="serverAuto"
-                  [(ngModel)]="f.serverAuto"
-                  (ngModelChange)="touch()" /><span class="tr"></span
-              ></label>
-              <div class="fields">
-                <div class="field">
-                  <label for="fagent">{{
-                    (f.serverAuto ? 'form.agentPreferred' : 'form.agent') | t
-                  }}</label>
-                  <div class="withdot">
-                    <span class="dot" [class.on]="agent()?.online"></span>
-                    <select
-                      id="fagent"
-                      name="agent"
-                      [(ngModel)]="f.agentId"
-                      (ngModelChange)="onAgent()"
-                    >
-                      @for (a of agents(); track a.id) {
-                        <option [value]="a.id">
-                          {{ a.name }} –
-                          {{ a.online ? ('agents.online' | t) : ('agents.offline' | t) }}
-                        </option>
-                      }
-                    </select>
-                  </div>
-                </div>
-                <div class="field">
-                  <label for="fprof">{{ 'form.profile' | t }}</label>
-                  <select
-                    id="fprof"
-                    name="profile"
-                    [(ngModel)]="f.profileId"
-                    (ngModelChange)="onProfile()"
-                  >
-                    @for (p of profiles(); track p.id) {
-                      <option [value]="p.id">{{ p.name }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="fpar">{{ 'form.parallel' | t }}</label>
-                  <select
-                    id="fpar"
-                    name="parallel"
-                    [(ngModel)]="f.parallel"
-                    (ngModelChange)="touch()"
-                  >
-                    @for (n of parallelChoices; track n) {
-                      <option [ngValue]="n">
-                        {{ n === 1 ? ('form.parallelOne' | t) : ('form.parallelN' | t: { n }) }}
-                      </option>
-                    }
-                  </select>
-                </div>
-              </div>
-              @if (f.parallel > 1) {
-                <p class="muted small">{{ 'form.parallelHint' | t: { n: f.parallel - 1 } }}</p>
-                @if (f.botMatchMode === 'simulate' && !f.udt) {
-                  <p class="error small">{{ 'form.parallelSimulate' | t }}</p>
-                } @else if (poolSize() < f.parallel) {
-                  <p class="error small">{{ 'form.parallelPool' | t: { n: poolSize() } }}</p>
-                }
+          <!-- 4 Server and tempo -->
+          <section class="card sec" id="sec-4">
+            <na-sec-head
+              [n]="4"
+              title="form.secServerTempo"
+              [line]="lines()[4] ?? ''"
+              [compact]="compact()"
+              [open]="isOpen(4)"
+              [locked]="locked()"
+              controls="sb-4"
+              (toggle)="toggle(4)"
+            />
+            <div class="sb" id="sb-4" [hidden]="!isOpen(4)">
+              @if (!agents().length) {
+                <p class="notice">
+                  {{ 'form.noAgents' | t }} <a routerLink="/admin/agents">{{ 'nav.agents' | t }}</a>
+                </p>
               }
-            </fieldset>
-            <details class="more" [open]="!!f.connectAddress">
-              <summary>{{ 'form.connectAddress' | t }}</summary>
-              <input
-                name="addr"
-                [(ngModel)]="f.connectAddress"
-                [placeholder]="profileAddress() || 'ut.example.com:7777'"
-              />
-              <p class="muted small">{{ 'form.connectHint' | t }}</p>
-            </details>
-            @if (isLocal(f.connectAddress || profileAddress())) {
-              <p class="error small">{{ 'form.localAddress' | t }}</p>
-            }
+              <fieldset class="plain" [disabled]="locked()">
+                <label class="switch optrow"
+                  ><span class="ot"
+                    ><b>{{ 'form.serverAuto' | t }}</b
+                    ><span class="muted small">{{ 'form.serverAutoShortHint' | t }}</span></span
+                  ><input
+                    type="checkbox"
+                    name="serverAuto"
+                    [(ngModel)]="f.serverAuto"
+                    (ngModelChange)="touch()" /><span class="tr"></span
+                ></label>
+
+                <!-- Tempo (decision 324): one after the other or parallel, each with its time. -->
+                <na-tempo-pick
+                  [parallel]="f.parallel"
+                  (parallelChange)="setParallel($event)"
+                  [remembered]="parPick()"
+                  [max]="maxParallel"
+                  [online]="serversNow()"
+                  [pool]="poolAgents()"
+                  [estimate]="estimateFn"
+                  [simulated]="f.botMatchMode === 'simulate' && !f.udt"
+                  [disabled]="locked()"
+                />
+
+                <details class="more" [open]="!f.serverAuto || !!f.connectAddress">
+                  <summary>{{ 'form.serverMore' | t }}</summary>
+                  <div class="fields">
+                    <div class="field">
+                      <label for="fagent">{{
+                        (f.serverAuto ? 'form.agentPreferred' : 'form.agent') | t
+                      }}</label>
+                      <div class="withdot">
+                        <span class="dot" [class.on]="agent()?.online"></span>
+                        <select
+                          id="fagent"
+                          name="agent"
+                          [(ngModel)]="f.agentId"
+                          (ngModelChange)="onAgent()"
+                        >
+                          @for (a of agents(); track a.id) {
+                            <option [value]="a.id">
+                              {{ a.name }} –
+                              {{ a.online ? ('agents.online' | t) : ('agents.offline' | t) }}
+                            </option>
+                          }
+                        </select>
+                      </div>
+                    </div>
+                    <div class="field">
+                      <label for="fprof">{{ 'form.profile' | t }}</label>
+                      <select
+                        id="fprof"
+                        name="profile"
+                        [(ngModel)]="f.profileId"
+                        (ngModelChange)="onProfile()"
+                      >
+                        @for (p of profiles(); track p.id) {
+                          <option [value]="p.id">{{ p.name }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="faddr">{{ 'form.connectAddress' | t }}</label>
+                      <input
+                        id="faddr"
+                        name="addr"
+                        [(ngModel)]="f.connectAddress"
+                        [placeholder]="profileAddress() || 'ut.example.com:7777'"
+                      />
+                    </div>
+                  </div>
+                  <p class="muted small">{{ 'form.connectHint' | t }}</p>
+                </details>
+              </fieldset>
+              @if (isLocal(f.connectAddress || profileAddress())) {
+                <p class="error small">{{ 'form.localAddress' | t }}</p>
+              }
+            </div>
           </section>
 
           <!-- 5 Discord -->
-          <section class="card sec">
-            <header class="sh"><span class="no">5</span>{{ 'form.notify' | t }}</header>
-            <na-segment
-              [options]="notifyOptions()"
-              [value]="f.notifyMode"
-              (valueChange)="f.notifyMode = $event; touch()"
-              label="form.notify"
+          <section class="card sec" id="sec-5">
+            <na-sec-head
+              [n]="5"
+              title="form.notify"
+              [line]="lines()[5] ?? ''"
+              [compact]="compact()"
+              [open]="isOpen(5)"
+              controls="sb-5"
+              (toggle)="toggle(5)"
             />
-            @if (f.notifyMode === 'custom') {
-              <div class="field hook">
-                <label for="fwh">{{ 'form.webhookUrl' | t }}</label>
-                <input
-                  id="fwh"
-                  name="wh"
-                  [(ngModel)]="f.webhookUrl"
-                  placeholder="https://discord.com/api/webhooks/…"
-                  maxlength="300"
-                />
-              </div>
-            }
-            <p class="muted small">
-              {{ 'form.notifyHint' | t }}
-              {{ (notifyStatus().directMessages ? 'form.notifyDmOn' : 'form.notifyDmOff') | t }}
-            </p>
+            <div class="sb" id="sb-5" [hidden]="!isOpen(5)">
+              <na-segment
+                [options]="notifyOptions()"
+                [value]="f.notifyMode"
+                (valueChange)="f.notifyMode = $event; touch()"
+                label="form.notify"
+              />
+              @if (f.notifyMode === 'custom') {
+                <div class="field hook">
+                  <label for="fwh">{{ 'form.webhookUrl' | t }}</label>
+                  <input
+                    id="fwh"
+                    name="wh"
+                    [(ngModel)]="f.webhookUrl"
+                    placeholder="https://discord.com/api/webhooks/…"
+                    maxlength="300"
+                  />
+                </div>
+              }
+              <p class="muted small">
+                {{ 'form.notifyHint' | t }}
+                {{ (notifyStatus().directMessages ? 'form.notifyDmOn' : 'form.notifyDmOff') | t }}
+              </p>
+            </div>
           </section>
 
           <!-- 6 Advanced -->
-          <details class="card sec adv">
-            <summary class="sh">
-              <span class="no">6</span>{{ 'form.secAdvanced' | t }}
-              <span class="muted small">{{ 'form.secAdvancedHint' | t }}</span>
-            </summary>
-            <fieldset class="plain" [disabled]="locked()">
-              <div class="fields">
-                <div class="field">
-                  <label for="fci">{{ 'form.checkIn' | t }}</label>
-                  <input
-                    id="fci"
-                    type="number"
-                    name="ci"
-                    min="1"
-                    max="120"
-                    [(ngModel)]="f.checkInWindowMin"
-                  />
+          <section class="card sec" id="sec-6">
+            <na-sec-head
+              [n]="6"
+              title="form.secAdvanced"
+              [line]="lines()[6] ?? ''"
+              [compact]="compact()"
+              [open]="isOpen(6)"
+              controls="sb-6"
+              (toggle)="toggle(6)"
+            />
+            <div class="sb" id="sb-6" [hidden]="!isOpen(6)">
+              <fieldset class="plain" [disabled]="locked()">
+                <div class="fields">
+                  <div class="field">
+                    <label for="fci">{{ 'form.checkIn' | t }}</label>
+                    <input
+                      id="fci"
+                      type="number"
+                      name="ci"
+                      min="1"
+                      max="120"
+                      [(ngModel)]="f.checkInWindowMin"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fns">{{ 'form.noShow' | t }}</label>
+                    <input
+                      id="fns"
+                      type="number"
+                      name="ns"
+                      min="30"
+                      max="1800"
+                      [(ngModel)]="f.noShowSec"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="frg">{{ 'form.reconnectGrace' | t }}</label>
+                    <input
+                      id="frg"
+                      type="number"
+                      name="rg"
+                      min="30"
+                      max="1800"
+                      [(ngModel)]="f.reconnectGraceSec"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fmr">{{ 'form.maxReconnects' | t }}</label>
+                    <input
+                      id="fmr"
+                      type="number"
+                      name="mr"
+                      min="0"
+                      max="10"
+                      [(ngModel)]="f.maxReconnects"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fsd">{{ 'form.shutdown' | t }}</label>
+                    <input
+                      id="fsd"
+                      type="number"
+                      name="sd"
+                      min="0"
+                      max="7200"
+                      [(ngModel)]="f.postTournamentShutdownSec"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fvt">{{ 'form.voteTimeout' | t }}</label>
+                    <input
+                      id="fvt"
+                      type="number"
+                      name="vt"
+                      min="10"
+                      max="120"
+                      [(ngModel)]="f.voteTimeoutSec"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fcd">{{ 'form.countdown' | t }}</label>
+                    <input
+                      id="fcd"
+                      type="number"
+                      name="cd"
+                      min="3"
+                      max="30"
+                      [(ngModel)]="f.countdownSec"
+                    />
+                  </div>
+                  <div class="field">
+                    <label for="fbmm">{{ 'form.botMatches' | t }}</label>
+                    <select id="fbmm" name="bmm" [(ngModel)]="f.botMatchMode" [disabled]="f.udt">
+                      <option value="watch">{{ 'form.botWatch' | t }}</option>
+                      @if (!f.udt) {
+                        <option value="simulate">{{ 'form.botSimulate' | t }}</option>
+                      }
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="fbp">{{ 'form.botPlacement' | t }}</label>
+                    <select id="fbp" name="bp" [(ngModel)]="f.botPlacement">
+                      <option value="byes">{{ 'form.botByes' | t }}</option>
+                      <option value="random">{{ 'form.botRandom' | t }}</option>
+                    </select>
+                  </div>
                 </div>
-                <div class="field">
-                  <label for="fns">{{ 'form.noShow' | t }}</label>
-                  <input
-                    id="fns"
-                    type="number"
-                    name="ns"
-                    min="30"
-                    max="1800"
-                    [(ngModel)]="f.noShowSec"
-                  />
-                </div>
-                <div class="field">
-                  <label for="frg">{{ 'form.reconnectGrace' | t }}</label>
-                  <input
-                    id="frg"
-                    type="number"
-                    name="rg"
-                    min="30"
-                    max="1800"
-                    [(ngModel)]="f.reconnectGraceSec"
-                  />
-                </div>
-                <div class="field">
-                  <label for="fmr">{{ 'form.maxReconnects' | t }}</label>
-                  <input
-                    id="fmr"
-                    type="number"
-                    name="mr"
-                    min="0"
-                    max="10"
-                    [(ngModel)]="f.maxReconnects"
-                  />
-                </div>
-                <div class="field">
-                  <label for="fsd">{{ 'form.shutdown' | t }}</label>
-                  <input
-                    id="fsd"
-                    type="number"
-                    name="sd"
-                    min="0"
-                    max="7200"
-                    [(ngModel)]="f.postTournamentShutdownSec"
-                  />
-                </div>
-                <div class="field">
-                  <label for="fvt">{{ 'form.voteTimeout' | t }}</label>
-                  <input
-                    id="fvt"
-                    type="number"
-                    name="vt"
-                    min="10"
-                    max="120"
-                    [(ngModel)]="f.voteTimeoutSec"
-                  />
-                </div>
-                <div class="field">
-                  <label for="fcd">{{ 'form.countdown' | t }}</label>
-                  <input
-                    id="fcd"
-                    type="number"
-                    name="cd"
-                    min="3"
-                    max="30"
-                    [(ngModel)]="f.countdownSec"
-                  />
-                </div>
-                <div class="field">
-                  <label for="fbmm">{{ 'form.botMatches' | t }}</label>
-                  <select id="fbmm" name="bmm" [(ngModel)]="f.botMatchMode" [disabled]="f.udt">
-                    <option value="watch">{{ 'form.botWatch' | t }}</option>
-                    @if (!f.udt) {
-                      <option value="simulate">{{ 'form.botSimulate' | t }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="field">
-                  <label for="fbp">{{ 'form.botPlacement' | t }}</label>
-                  <select id="fbp" name="bp" [(ngModel)]="f.botPlacement">
-                    <option value="byes">{{ 'form.botByes' | t }}</option>
-                    <option value="random">{{ 'form.botRandom' | t }}</option>
-                  </select>
-                </div>
-              </div>
-              <p class="muted small">{{ 'form.botPlacementHint' | t }}</p>
-            </fieldset>
-          </details>
+                <p class="muted small">{{ 'form.botPlacementHint' | t }}</p>
+              </fieldset>
+            </div>
+          </section>
         </div>
 
         <!-- Summary -->
         <aside class="side">
           <div class="card sum">
-            <header class="sh">{{ 'form.summary' | t }}</header>
+            <div class="sumh">{{ 'form.summary' | t }}</div>
             <div class="sname">{{ previewName() || ('form.unnamed' | t) }}</div>
             @if (f.seasonal) {
               <span class="badge season">{{ 'form.seasonBadge' | t }}</span>
             }
             <dl>
+              <!-- Each line leads to its section (opened in compact mode, decision 324). -->
               <dt>{{ 'form.sumWhen' | t }}</dt>
-              <dd>{{ whenText() }}</dd>
+              <dd>
+                <button type="button" class="link sgo" (click)="go(1)">{{ whenText() }}</button>
+              </dd>
               <dt>{{ 'form.game' | t }}</dt>
               <dd>
-                {{ (f.game === 'mh' ? 'form.gameMhShort' : 'form.gameDm') | t }} ·
-                {{ f.teamSize === 1 ? '1v1' : f.teamSize + 'v' + f.teamSize }}
+                <button type="button" class="link sgo" (click)="go(2)">
+                  {{ (f.game === 'mh' ? 'form.gameMhShort' : 'form.gameDm') | t }} ·
+                  {{ f.teamSize === 1 ? '1v1' : f.teamSize + 'v' + f.teamSize }}
+                </button>
               </dd>
               <dt>{{ 'form.bracket' | t }}</dt>
               <dd>
-                {{ 'format.' + f.format | t }} · {{ f.size }} · Bo{{ f.boDefault }}
-                @if (f.format === 'double' && f.boGrand) {
-                  ({{ 'form.gfShort' | t }} Bo{{ f.boGrand }})
-                }
+                <button type="button" class="link sgo" (click)="go(2)">
+                  {{ 'format.' + f.format | t }} · {{ f.size }} · Bo{{ f.boDefault }}
+                  @if (f.format === 'double' && f.boGrand) {
+                    ({{ 'form.gfShort' | t }} Bo{{ f.boGrand }})
+                  }
+                </button>
               </dd>
               <dt>{{ 'form.rules' | t }}</dt>
-              <dd>{{ rulesText() }}</dd>
+              <dd>
+                <button type="button" class="link sgo" (click)="go(3)">{{ rulesText() }}</button>
+              </dd>
               <dt>{{ 'form.server' | t }}</dt>
               <dd>
-                @if (serverAuto()) {
-                  {{ 'form.serverAutoShort' | t: { name: agent()?.name ?? '–' } }}
-                } @else {
-                  <span class="dot" [class.on]="agent()?.online"></span>
-                  {{ agent()?.name ?? '–' }}
-                  @if (profile(); as p) {
-                    · {{ p.name }}
+                <button type="button" class="link sgo" (click)="go(4)">
+                  @if (serverAuto()) {
+                    {{ 'form.serverAutoShort' | t: { name: agent()?.name ?? '–' } }}
+                  } @else {
+                    <span class="dot" [class.on]="agent()?.online"></span>
+                    {{ agent()?.name ?? '–' }}
+                    @if (profile(); as p) {
+                      · {{ p.name }}
+                    }
                   }
-                }
-                @if (f.parallel > 1) {
-                  · {{ 'form.parallelN' | t: { n: f.parallel } }}
-                }
+                  @if (f.parallel > 1) {
+                    · {{ 'form.parallelN' | t: { n: f.parallel } }}
+                  }
+                </button>
               </dd>
               <dt>{{ 'form.secBots' | t }}</dt>
               <dd>{{ botsText() }}</dd>
               <dt>Discord</dt>
-              <dd>{{ notifyLabel(f.notifyMode) | t }}</dd>
+              <dd>
+                <button type="button" class="link sgo" (click)="go(5)">
+                  {{ notifyLabel(f.notifyMode) | t }}
+                </button>
+              </dd>
             </dl>
             <button class="primary go" type="submit" [disabled]="busy() || !f.name.trim()">
               {{ submitLabel() | t }}
@@ -1243,46 +1317,43 @@ function toLocalInput(iso: string | null): string {
     }
     .sec {
       padding: 18px 20px 14px;
+      scroll-margin-top: 84px;
     }
-    .sh {
+    .hacts {
       display: flex;
+      flex-wrap: wrap;
       align-items: center;
+      gap: 10px 18px;
+    }
+    .when-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr);
       gap: 10px;
-      font-family: var(--font-display);
-      font-weight: 700;
-      font-size: var(--fs-lg);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--text);
-      margin-bottom: 14px;
+      align-items: stretch;
     }
-    .sh .grow {
-      flex: 1;
+    .wcol {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
     }
-    .no {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 26px;
-      height: 26px;
-      border-radius: 50%;
-      border: 1px solid var(--accent-dim);
-      color: var(--accent);
-      font-family: var(--font-mono);
-      font-size: var(--fs-sm);
+    .when-row .optrow {
+      margin: 0;
+      background: var(--panel-2);
+      border-radius: var(--radius);
+      padding: 10px 12px;
     }
-    .lock .sh::after {
-      content: '🔒';
-      font-size: var(--fs-sm);
+    .sgo {
+      display: inline;
+      text-align: left;
+      color: inherit;
+      text-decoration: underline dotted var(--line);
+      text-underline-offset: 3px;
     }
     input.big {
       font-size: var(--fs-xl);
       font-weight: 600;
       min-height: 46px;
       margin-bottom: 4px;
-    }
-    .seg.when {
-      margin: 14px 0 12px;
     }
     .seg.days,
     .seg.tmode {
@@ -1397,6 +1468,7 @@ function toLocalInput(iso: string | null): string {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
+      justify-content: flex-start;
       gap: 4px;
       text-align: left;
       padding: 14px 16px;
@@ -1438,20 +1510,6 @@ function toLocalInput(iso: string | null): string {
       font-weight: 600;
       font-size: var(--fs-md);
       margin-bottom: 10px;
-    }
-    details.adv > summary {
-      cursor: pointer;
-      list-style: none;
-      margin-bottom: 0;
-    }
-    details.adv[open] > summary {
-      margin-bottom: 14px;
-    }
-    details.adv > summary .muted {
-      font-family: var(--font);
-      text-transform: none;
-      letter-spacing: 0;
-      font-weight: 400;
     }
     .maphead {
       display: flex;
@@ -1539,9 +1597,12 @@ function toLocalInput(iso: string | null): string {
       position: sticky;
       top: 84px;
     }
-    .sum .sh {
+    .sumh {
       margin-bottom: 8px;
-      font-size: var(--fs-md);
+      font-family: var(--font-display);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
       color: var(--text-2);
     }
     .sname {
@@ -1628,6 +1689,11 @@ function toLocalInput(iso: string | null): string {
       }
       .mapsearch {
         width: 100%;
+      }
+    }
+    @media (max-width: 760px) {
+      .when-row {
+        grid-template-columns: minmax(0, 1fr);
       }
     }
   `,
@@ -1763,8 +1829,29 @@ export class TournamentFormPage {
   );
   protected readonly profiles = computed(() => this.agent()?.profiles ?? []);
   protected readonly serverAuto = computed(() => !!this.model()?.serverAuto);
-  /** Parallel matches: 1 to 8 servers at once (decision 291). */
-  protected readonly parallelChoices = Array.from({ length: MAX_PARALLEL }, (_, i) => i + 1);
+  protected readonly maxParallel = MAX_PARALLEL;
+  /** Servers of the parallel tile while "one after the other" is chosen. */
+  protected readonly parPick = signal(2);
+  /** The servers of the pool (decision 282). */
+  protected readonly poolAgents = computed(() =>
+    this.agents().filter((a) => a.inPool && a.profiles.length),
+  );
+  /** Servers that could play at once now: the pool's online ones and the chosen one. */
+  protected readonly serversNow = computed(() => {
+    const on = new Set(
+      this.poolAgents()
+        .filter((a) => a.online)
+        .map((a) => a.id),
+    );
+    const a = this.agent();
+    if (a?.online) on.add(a.id);
+    return Math.max(1, on.size);
+  });
+
+  /** Compact (decision 324): a new tournament shows section 1, the others as one line. */
+  protected readonly allOpen = signal(readAllOpen());
+  protected readonly compact = computed(() => !this.editing() && !this.allOpen());
+  private readonly opened = signal<ReadonlySet<number>>(new Set());
   /** Servers in the pool (decision 282). */
   protected readonly poolSize = computed(
     () => this.agents().filter((a) => a.inPool && a.profiles.length).length,
@@ -1830,18 +1917,103 @@ export class TournamentFormPage {
     return this.lengths.find((l) => this.isLength(f, l)) ?? 'custom';
   });
 
-  /** At most how long the bracket takes (every match to its last game, every game to the limit). */
+  /**
+   * At most how long the bracket takes (every match to its last game, every game to the limit);
+   * parallel matches with the servers chosen (decision 324; the tempo shows how many are online).
+   */
   protected readonly durationText = computed(() => {
     const f = this.model();
     if (!f) return '';
-    const n = this.maxGames(f);
+    const n = maxGames(f);
     const per = f.timeLimitMin || 15;
-    const total = n * (per + BETWEEN_GAMES_MIN);
-    const h = Math.floor(total / 60);
-    const min = total % 60;
-    const d = h ? `${h} h ${min ? `${min} min` : ''}`.trim() : `${min} min`;
-    return this.i18n.t('form.lenDuration', { d, n, m: per });
+    const p = f.parallel;
+    const text = this.i18n.t('form.lenDuration', {
+      d: hoursText(maxMinutes(f, per, p)),
+      n,
+      m: per,
+    });
+    return p > 1 ? `${text} ${this.i18n.t('form.lenParallel', { n: p })}` : text;
   });
+
+  /** "≈ 2 h 10 min" with `servers` matches at once. */
+  protected estimate(servers: number): string {
+    const f = this.model();
+    if (!f) return '';
+    return `≈ ${hoursText(maxMinutes(f, f.timeLimitMin || 15, servers))}`;
+  }
+
+  /** `estimate` for the tempo tiles (re-created when the model changes, so they update). */
+  protected get estimateFn(): (servers: number) => string {
+    return this.estimates();
+  }
+  private readonly estimates = computed(() => {
+    this.model();
+    this.serversNow();
+    return (n: number) => this.estimate(n);
+  });
+
+  protected setParallel(n: number) {
+    const f = this.m();
+    if (!f) return;
+    const p = Math.min(MAX_PARALLEL, Math.max(1, n));
+    if (p > 1) this.parPick.set(p);
+    f.parallel = p;
+    this.touch();
+  }
+
+  /** One line per section for compact mode. */
+  protected readonly lines = computed((): Record<number, string> => {
+    const f = this.model();
+    if (!f) return {};
+    const t = (k: string, p?: Record<string, string | number>) => this.i18n.t(k, p);
+    const server = f.serverAuto
+      ? t('form.serverAutoShort', { name: this.agent()?.name ?? '–' })
+      : (this.agent()?.name ?? '–');
+    const tempo = f.parallel > 1 ? t('form.parallelN', { n: f.parallel }) : t('form.tempoOne');
+    return {
+      2: [
+        t(f.game === 'mh' ? 'form.gameMhShort' : 'form.gameDm'),
+        f.teamSize === 1 ? '1v1' : `${f.teamSize}v${f.teamSize}`,
+        t(`format.${f.format}`),
+        String(f.size),
+        `Bo${f.boDefault}`,
+        t(`form.len.${this.lengthNow()}`),
+      ].join(' · '),
+      3: this.rulesText(),
+      4: [server, tempo, this.estimate(f.parallel)].join(' · '),
+      5: t(this.notifyLabel(f.notifyMode)),
+      6: t('form.secAdvancedHint'),
+    };
+  });
+
+  protected isOpen(n: number): boolean {
+    return !this.compact() || n === 1 || this.opened().has(n);
+  }
+
+  protected toggle(n: number) {
+    this.opened.update((s) => {
+      const x = new Set(s);
+      if (!x.delete(n)) x.add(n);
+      return x;
+    });
+  }
+
+  /** A line of the summary: opens its section and scrolls there. */
+  protected go(n: number) {
+    if (!this.isOpen(n)) this.toggle(n);
+    setTimeout(() =>
+      document.getElementById(`sec-${n}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+    );
+  }
+
+  protected setAllOpen(on: boolean) {
+    this.allOpen.set(on);
+    try {
+      localStorage.setItem(OPEN_KEY, on ? '1' : '0');
+    } catch {
+      // storage unavailable: for this visit
+    }
+  }
 
   /** The schedule as the API takes it. */
   private readonly scheduleBody = computed(() => {
@@ -2263,26 +2435,6 @@ export class TournamentFormPage {
     if (f.game === 'mh') return `${bo.join(' · ')} · ${x.mhMinutes} min`;
     const lim = lengthLimits(l, f.teamSize);
     return `${bo.join(' · ')} · ${lim.fragLimit} ${this.i18n.t('form.uFrags')} · ${lim.timeLimitMin} min`;
-  }
-
-  /** Games of the bracket if every match goes the distance. */
-  private maxGames(f: Model): number {
-    const rounds = Math.log2(f.size);
-    const bo = (x: number) => x || f.boDefault;
-    // Winners' side (single elimination: the bracket): matches per round, semi-finals, final.
-    let games = 0;
-    for (let r = 1; r <= rounds; r++) {
-      const matches = f.size / 2 ** r;
-      const b = r === rounds ? bo(f.boFinal) : r === rounds - 1 ? bo(f.boSemi) : f.boDefault;
-      games += matches * b;
-    }
-    if (f.format === 'double') {
-      // Losers' side: size - 2 matches (its final with its own best of), the grand final (reset).
-      const lb = f.size - 2;
-      games += Math.max(0, lb - 1) * f.boDefault + (lb > 0 ? bo(f.boLbFinal) : 0);
-      games += bo(f.boGrand) * (f.grandFinalReset ? 2 : 1);
-    }
-    return games;
   }
 
   /** A new tournament: every map of the server for its game (until maps are chosen by hand). */
