@@ -332,4 +332,10 @@ export class UdtTestService {
     const ai = this.ai.daily(this.udt.season(), this.udt.today());
     return { managers: managers.length, bought, entries, trades: traded, ai };
   }
+
+  /** AI managers and challenges at once: their answers and one challenge each. */
+  challengesAct() {
+    this.assertTestMode();
+    return this.ai.challengesAct();
+  }
 }

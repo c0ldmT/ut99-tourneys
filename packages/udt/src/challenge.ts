@@ -169,3 +169,34 @@ export function brokenRecord<R extends RecordRun>(
 export function hardnessOfSkill(skill: number): MhHardness | null {
   return MH_HARDNESS_IDS.find((h) => MH_HARDNESS[h].monsterSkill === skill) ?? null;
 }
+
+/** The chance to win a best of `bestOf` series with a chance `p` per game (games independent). */
+export function seriesChance(p: number, bestOf: number): number {
+  const need = Math.floor(Math.max(1, bestOf) / 2) + 1;
+  let out = 0;
+  let ways = 1; // C(need - 1 + k, k)
+  for (let k = 0; k < need; k++) {
+    if (k > 0) ways = (ways * (need - 1 + k)) / k;
+    out += ways * p ** need * (1 - p) ** k;
+  }
+  return out;
+}
+
+/**
+ * AI managers and challenges (decision 336): the least win chance a personality takes a
+ * challenge with, and the band of its own chance in which it challenges a human. With the fee
+ * of 5 % a human's best case is +0.10 × stake against the gambler (0.42), otherwise at most
+ * +0.05; AI managers are no source of Neuro.
+ */
+export const AI_CHALLENGE_TAKE = {
+  gambler: 0.42,
+  tactician: 0.5,
+  breeder: 0.5,
+  saver: 0.58,
+} as const;
+export const AI_CHALLENGE_BAND = [0.45, 0.6] as const;
+
+/** A human's expected gain per staked Neuro against a side with win chance `p` (the pot less the fee). */
+export function humanEdge(p: number, feePct: number): number {
+  return (1 - p) * 2 * (1 - feePct / 100) - 1;
+}

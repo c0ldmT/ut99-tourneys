@@ -13,6 +13,7 @@ import { EventLogService } from '../src/tournaments/event-log.service.js';
 import { StatsService } from '../src/stats/stats.service.js';
 import { UdtChallengesService } from '../src/udt/udt-challenges.service.js';
 import { UdtRewardsService } from '../src/udt/udt-rewards.service.js';
+import { UdtAiService } from '../src/udt/udt-ai.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
 
 let api: RunningApi | undefined;
@@ -580,5 +581,127 @@ describe('challenge matches (decision 335)', () => {
     const winner = done.winnerUser!;
     expect(free(winner)).toBe(winner === timId ? -500 - bonus : -500);
     expect(free(marioId) + free(timId)).toBe(-bonus);
+  });
+});
+
+describe('AI managers in challenges (decision 336)', () => {
+  /** Two AI managers with a team (tactician, gambler), the test mode on. */
+  async function withAi(ai = true) {
+    const ctx = await setup(2, { TEST_MODE: 'true' });
+    const put = await ctx.admin.put('/settings/udt', {
+      enabled: true,
+      aiEnabled: true,
+      aiCount: 2,
+      challenge: { enabled: true, ai },
+    });
+    expect(put.status, JSON.stringify(put.body)).toBe(200);
+    const aiSvc = api!.app.get(UdtAiService);
+    aiSvc.ensure(1);
+    const [tactician, gambler] = aiSvc.managers().map((m) => m.user.id);
+    const svc = api!.app.get(UdtChallengesService);
+    const row = (id: string) =>
+      ctx.db.select().from(udtChallenges).where(eq(udtChallenges.id, id)).get()!;
+    const act = async () => {
+      const r = await ctx.admin.post('/udt/test/challenges/act');
+      expect(r.status, JSON.stringify(r.body)).toBe(200);
+      return r.body as { answered: number; offered: number };
+    };
+    return { ...ctx, aiSvc, svc, row, act, tactician: tactician!, gambler: gambler! };
+  }
+
+  it('an AI manager accepts with a good chance, declines with a bad one, after a while', async () => {
+    const { mario, svc, row, aiSvc, tactician, gambler, clock } = await withAi();
+    const chance = vi.spyOn(svc, 'chance').mockReturnValue(0.55);
+    const one = await mario.post('/udt/challenges', body({ to: gambler, teamSize: 1, stake: 0 }));
+    expect(one.status, JSON.stringify(one.body)).toBe(201);
+    // Not at once: 15 to 120 minutes later.
+    aiSvc.answerChallenges(clock.now());
+    expect(row(one.body.id).status).toBe('pending');
+    clock.advance(121 * 60_000);
+    svc.tick();
+    expect(row(one.body.id).status).toBe('accepted');
+    // The tactician needs 0.50: with 0.45 it says no (no stake: no counter offer).
+    chance.mockReturnValue(0.45);
+    const two = await mario.post(
+      '/udt/challenges',
+      body({ to: tactician, teamSize: 1, stake: 0, at: at('20:00') }),
+    );
+    expect(two.status, JSON.stringify(two.body)).toBe(201);
+    clock.advance(121 * 60_000);
+    svc.tick();
+    expect(row(two.body.id).status).toBe('declined');
+  });
+
+  it('a stake above its share of the free Neuro is a no; tacticians may offer half', async () => {
+    const { mario, svc, row, act, tactician, gambler, ledger } = await withAi();
+    vi.spyOn(svc, 'chance').mockReturnValue(0.9);
+    // The gambler spends at most 60 % of its free Neuro.
+    const free = ledger.spendable(gambler).spendable;
+    const stake = Math.min(1000, Math.floor((free * 0.6) / 10) * 10 + 100);
+    expect(stake).toBeGreaterThanOrEqual(100);
+    const big = await mario.post('/udt/challenges', body({ to: gambler, teamSize: 1, stake }));
+    expect(big.status, JSON.stringify(big.body)).toBe(201);
+    // The tactician (40 %) with a stake it cannot take: declined or half as a counter offer.
+    const tFree = ledger.spendable(tactician).spendable;
+    const tStake = Math.min(1000, Math.floor((tFree * 0.4) / 10) * 10 + 200);
+    const t = await mario.post(
+      '/udt/challenges',
+      body({ to: tactician, teamSize: 1, stake: tStake, at: at('20:00') }),
+    );
+    expect(t.status, JSON.stringify(t.body)).toBe(201);
+    expect((await act()).answered).toBe(2);
+    expect(row(big.body.id).status).toBe('declined');
+    const answered = row(t.body.id);
+    expect(['declined', 'countered']).toContain(answered.status);
+    if (answered.status === 'countered') {
+      const offer = (await mario.get('/udt/challenges')).body.incoming[0];
+      expect(offer).toMatchObject({ counterOf: t.body.id, stake: Math.floor(tStake / 20) * 10 });
+    }
+  });
+
+  it('an AI manager takes an open challenge it likes; AI managers challenge humans', async () => {
+    const { mario, svc, row, act, marioId } = await withAi();
+    vi.spyOn(svc, 'chance').mockReturnValue(0.5);
+    const open = await mario.post(
+      '/udt/challenges',
+      body({ to: null, open: 'all', teamSize: 1, stake: 0 }),
+    );
+    expect(open.status, JSON.stringify(open.body)).toBe(201);
+    const r = await act();
+    expect(r.answered).toBe(1);
+    expect(row(open.body.id).status).toBe('accepted');
+    // Both offered one (0.5 lies in their band 0.45-0.60): to Tim, Ana or Mario.
+    expect(r.offered).toBe(2);
+    const sent = api!.app
+      .get<Db>(DB)
+      .select()
+      .from(udtChallenges)
+      .all()
+      .filter((c) => c.status === 'pending');
+    expect(sent).toHaveLength(2);
+    const pool = svc.mapPool('dm');
+    for (const c of sent) {
+      expect(c).toMatchObject({ mode: 'dm', bestOf: 1, teamSize: 1 });
+      expect(pool).toContain(c.map);
+      expect(c.stake % 10).toBe(0);
+      // Sent by the AI managers (Mario's open one is taken).
+      expect(c.fromUser).not.toBe(marioId);
+    }
+    // A chance outside the band: no challenge.
+    vi.spyOn(svc, 'chance').mockReturnValue(0.7);
+    expect((await act()).offered).toBe(0);
+  });
+
+  it('does nothing with the switch "AI managers in challenges" off', async () => {
+    const { mario, row, act, gambler } = await withAi(false);
+    const r = await mario.post('/udt/challenges', body({ to: gambler, teamSize: 1, stake: 0 }));
+    expect(r.status).toBe(409);
+    expect(r.body.key).toBe('the AI managers are switched off');
+    const open = await mario.post(
+      '/udt/challenges',
+      body({ to: null, open: 'all', teamSize: 1, stake: 0 }),
+    );
+    expect(await act()).toEqual({ answered: 0, offered: 0 });
+    expect(row(open.body.id).status).toBe('pending');
   });
 });

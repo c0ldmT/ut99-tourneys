@@ -2,6 +2,8 @@ import { Inject, Injectable, type OnModuleInit } from '@nestjs/common';
 import { asc } from 'drizzle-orm';
 import { createRng } from '@tourney/bracket';
 import {
+  AI_CHALLENGE_BAND,
+  AI_CHALLENGE_TAKE,
   BLUEPRINTS,
   buildCost,
   cannotBreakthrough,
@@ -16,7 +18,11 @@ import {
   valueAtTop,
   valueReady,
   clubUpgradePrice,
+  MH_TEAM_SIZE,
+  MIN_STAKE,
+  type ChallengeMode,
   type ClubUpgrade,
+  type MhHardness,
   type PrestigeStat,
   type Rarity,
 } from '@tourney/udt';
@@ -36,6 +42,7 @@ import { lockedTournaments } from './udt-playing.js';
 import { ROSTER_MAX, UdtMarketService } from './udt-market.service.js';
 import { UdtPacksService } from './udt-packs.service.js';
 import { UdtTradesService } from './udt-trades.service.js';
+import { MAX_ROUNDS, UdtChallengesService, type ChallengeRow } from './udt-challenges.service.js';
 import { UdtService, type RosterBot } from './udt.service.js';
 import { pickTeamNames } from '../common/names.js';
 
@@ -108,6 +115,7 @@ export class UdtAiService implements OnModuleInit {
     @Inject(UdtPacksService) private readonly packs: UdtPacksService,
     @Inject(UdtAcademyService) private readonly academy: UdtAcademyService,
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
+    @Inject(UdtChallengesService) private readonly challenges: UdtChallengesService,
   ) {}
 
   onModuleInit(): void {
@@ -116,6 +124,7 @@ export class UdtAiService implements OnModuleInit {
     this.market.afterDay((season, day) => this.daily(season, day));
     this.market.atClosing((season, day) => this.closing(season, day));
     this.events.aiFill = (id) => this.fill(id);
+    this.challenges.aiTick = (now) => void this.answerChallenges(now);
   }
 
   /**
@@ -250,7 +259,14 @@ export class UdtAiService implements OnModuleInit {
   /** After a market day (and in the test mode on "managers act"): every AI manager acts once. */
   daily(season: Season, day: string) {
     const cfg = this.cfg();
-    const out = { managers: 0, entries: 0, packs: 0, trades: 0, made: [] as string[] };
+    const out = {
+      managers: 0,
+      entries: 0,
+      packs: 0,
+      trades: 0,
+      challenges: 0,
+      made: [] as string[],
+    };
     if (!cfg.enabled || !cfg.aiEnabled) {
       this.leaveAll();
       return out;
@@ -292,6 +308,9 @@ export class UdtAiService implements OnModuleInit {
         () => (out.entries += this.enter(m.user, cfg.aiStrength === 'calm' ? 0.5 : 1, rng)),
       );
       if (rng() < 0.15) act('offer', () => (out.trades += this.offerTrade(m.user, rng)));
+      // Challenges with an own random stream (the other decisions stay as they were).
+      const ch = createRng(`ai-challenge-${day}-${m.n}`);
+      if (ch() < 0.15) act('challenge', () => (out.challenges += this.offerChallenge(m, ch)));
     }
     this.log.info(
       `udt AI managers ${day}: ${out.managers} acted, ${out.entries} sign-ups, ${out.packs} packs, ${out.trades} trades`,
@@ -739,6 +758,214 @@ export class UdtAiService implements OnModuleInit {
       }
     }
     return 0;
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Challenges (decision 336)
+  // ------------------------------------------------------------------------------------------
+
+  /** AI managers play challenges: both switches on (AI managers, challenges with AI). */
+  private challengesOn(): boolean {
+    const cfg = this.cfg();
+    return (
+      cfg.enabled &&
+      cfg.aiEnabled &&
+      cfg.challenge.enabled &&
+      cfg.challenge.ai &&
+      this.udt.seasonNumber() !== null
+    );
+  }
+
+  /** When an AI manager answers: 15 to 120 minutes after the challenge came, before its deadline. */
+  private answerAt(c: ChallengeRow): number {
+    const delay = (15 + createRng(`ai-answer-${c.id}`)() * 105) * 60_000;
+    return Math.min(Date.parse(c.createdAt) + delay, Date.parse(c.expiresAt) - 60_000);
+  }
+
+  /**
+   * AI managers answer the challenges sent to them and take open ones of humans (the first that
+   * wants it), each once its answer time has come (`force`: now, the test mode). Every tick of
+   * the challenges.
+   */
+  answerChallenges(now: number, force = false): number {
+    if (!this.challengesOn()) return 0;
+    const season = this.udt.season().number;
+    const ms = this.managers()
+      .slice(0, this.cfg().aiCount)
+      .filter((m) => this.udt.team(m.user.id, season));
+    const byId = new Map(ms.map((m) => [m.user.id, m]));
+    let n = 0;
+    for (const c of this.challenges.waiting()) {
+      if (byId.has(c.fromUser) || (!force && now < this.answerAt(c))) continue;
+      if (c.toUser) {
+        const m = byId.get(c.toUser);
+        if (m) n += this.answerChallenge(m, c);
+        continue;
+      }
+      // Open: each AI manager looks at it once (and again after a restart).
+      if (!force && this.openSeen.has(c.id)) continue;
+      this.openSeen.add(c.id);
+      for (const m of ms) {
+        if (!this.wantsChallenge(m, c, c.fromUser)) continue;
+        try {
+          this.challenges.accept(m.user, c.id);
+          n++;
+          break;
+        } catch {
+          // out of its scope, limits: the next one
+        }
+      }
+    }
+    return n;
+  }
+
+  private readonly openSeen = new Set<string>();
+
+  /**
+   * Whether an AI manager takes a challenge against `other`: its lineup can play and is not tired
+   * (at most one tired bot in a team), it plays no other challenge that day, the stake fits its
+   * style's share of the free Neuro, and its win chance in the model reaches its personality's
+   * threshold.
+   */
+  private wantsChallenge(
+    m: { user: User; personality: AiPersonality },
+    c: ChallengeRow,
+    other: string,
+  ): boolean {
+    try {
+      const mine = this.challenges.lineupState(m.user.id, c);
+      if (!mine.full || mine.tired > (c.teamSize > 1 ? 1 : 0)) return false;
+      if (this.challenges.playsOn(m.user.id, c.scheduledAt, c.id) > 0) return false;
+      if (c.stake > this.spendable(m.user) * STYLE[m.personality].spend) return false;
+      return this.challenges.chance(c, m.user.id, other) >= AI_CHALLENGE_TAKE[m.personality];
+    } catch {
+      return false;
+    }
+  }
+
+  /** A challenge to an AI manager: accept, decline, or (tacticians, half the time) half the stake. */
+  private answerChallenge(m: { user: User; personality: AiPersonality }, c: ChallengeRow): number {
+    if (this.wantsChallenge(m, c, c.fromUser))
+      try {
+        this.challenges.accept(m.user, c.id);
+        return 1;
+      } catch {
+        // the stake or the lineup changed meanwhile: as a no
+      }
+    if (
+      m.personality === 'tactician' &&
+      c.stake >= 2 * MIN_STAKE &&
+      c.round < MAX_ROUNDS &&
+      createRng(`ai-counter-${c.id}`)() < 0.5
+    )
+      try {
+        this.challenges.counter(m.user, c.id, {
+          to: c.fromUser,
+          mode: c.mode as ChallengeMode,
+          teamSize: c.teamSize as 1 | 3 | 5,
+          bestOf: c.bestOf as 1 | 3 | 5,
+          map: c.map,
+          ...(c.hardness ? { hardness: c.hardness as MhHardness } : {}),
+          stake: Math.max(MIN_STAKE, Math.floor(c.stake / 20) * 10),
+          at: c.scheduledAt,
+        });
+        return 1;
+      } catch {
+        // no counter offer possible: a no
+      }
+    try {
+      this.challenges.decline(m.user, c.id);
+      return 1;
+    } catch {
+      return 0;
+    }
+  }
+
+  /**
+   * Now and then (15 % a day) an AI manager challenges a human it has a chance of 0.45-0.60
+   * against: Bo1 deathmatch at the biggest team size both can field, one time in five Monster
+   * Hunt (normal or hard) when both have five Monster Hunt bots; a random pool map, a free start
+   * on the next two days of the window, 10-25 % of its free Neuro (below 100: a friendly).
+   */
+  offerChallenge(m: { user: User; personality: AiPersonality }, rng: () => number): number {
+    if (!this.challengesOn()) return 0;
+    const season = this.udt.season().number;
+    const view = this.challenges.view(m.user);
+    const r = view.rules;
+    if (view.outgoing.length >= r.maxOpen) return 0;
+    const ai = this.udt.aiIds();
+    const humans = this.udt
+      .teams(season)
+      .map((t) => t.userId)
+      .filter((u) => !ai.has(u) && u !== m.user.id)
+      .sort(() => rng() - 0.5);
+    if (!humans.length) return 0;
+    const hardness = r.mh.hardness.filter((h) => h !== 'nightmare');
+    const mh = r.modes.includes('mh') && r.maps.mh.length > 0 && hardness.length > 0 && rng() < 0.2;
+    const sizes = mh ? [MH_TEAM_SIZE] : [...r.teamSizes].sort((a, b) => b - a);
+    for (const teamSize of sizes) {
+      const f = {
+        mode: mh ? ('mh' as const) : ('dm' as const),
+        teamSize,
+        bestOf: 1,
+        map: null,
+        hardness: mh ? hardness[Math.floor(rng() * hardness.length)]! : null,
+      };
+      if (!this.challenges.lineupState(m.user.id, f).full) continue;
+      for (const to of humans) {
+        if (!this.challenges.lineupState(to, f).full) continue;
+        const p = this.challenges.chance(f, m.user.id, to);
+        if (p < AI_CHALLENGE_BAND[0] || p > AI_CHALLENGE_BAND[1]) continue;
+        const slots = this.challenges.slots(m.user, {
+          mode: f.mode,
+          bestOf: 1,
+          opponent: to,
+          days: 7,
+        });
+        const starts = slots.days
+          .filter((d) => d.free > 0)
+          .slice(0, 2)
+          .flatMap((d) => d.starts.filter((s) => s.state === 'free'));
+        if (!starts.length) continue;
+        const pool = r.maps[f.mode];
+        let stake = Math.min(
+          r.stakeCap,
+          Math.floor((this.spendable(m.user) * (0.1 + 0.15 * rng())) / 10) * 10,
+        );
+        if (stake < r.minStake) stake = 0;
+        try {
+          this.challenges.create(m.user, {
+            to,
+            mode: f.mode,
+            teamSize: teamSize as 1 | 3 | 5,
+            bestOf: 1,
+            map: pool.length ? pool[Math.floor(rng() * pool.length)]! : null,
+            ...(f.hardness ? { hardness: f.hardness } : {}),
+            stake,
+            at: starts[Math.floor(rng() * starts.length)]!.at,
+          });
+          return 1;
+        } catch {
+          // limits (pair, open ones): the next human
+        }
+      }
+    }
+    return 0;
+  }
+
+  /** Test mode: the AI managers answer every waiting challenge now and each makes one. */
+  challengesAct() {
+    const now = this.clock.now();
+    const answered = this.answerChallenges(now, true);
+    let offered = 0;
+    if (this.challengesOn())
+      for (const m of this.managers().slice(0, this.cfg().aiCount))
+        try {
+          offered += this.offerChallenge(m, createRng(`ai-challenge-test-${now}-${m.n}`));
+        } catch (e) {
+          this.log.debug(`AI ${m.n} challenge: ${(e as Error).message}`);
+        }
+    return { answered, offered };
   }
 }
 

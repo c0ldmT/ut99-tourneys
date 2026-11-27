@@ -1515,8 +1515,11 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  /** A manager's lineup strength in the model (five bots, base bots for missing places). */
-  private lineupStrength(userId: string, settings: TournamentSettings): number {
+  /**
+   * A manager's lineup strength in the model (base bots for missing places); the challenges ask
+   * it for the AI managers' answers.
+   */
+  lineupStrength(userId: string, settings: TournamentSettings): number {
     return this.lineupOf(userId, settings).strength;
   }
 

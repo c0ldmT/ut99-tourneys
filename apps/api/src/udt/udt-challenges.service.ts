@@ -20,6 +20,8 @@ import {
   MH_RUN_MIN,
   MH_TEAM_SIZE,
   PER_EVENING,
+  gameChance,
+  seriesChance,
   stakeCap,
   stakeProblem,
   weekdayOf,
@@ -102,6 +104,9 @@ export const RematchBody = z.object({
 export type RematchInput = z.infer<typeof RematchBody>;
 
 type Row = typeof udtChallenges.$inferSelect;
+export type ChallengeRow = Row;
+/** What a challenge's game depends on (its format). */
+export type ChallengeFormat = Pick<Row, 'mode' | 'teamSize' | 'bestOf' | 'map' | 'hardness'>;
 type Status =
   | 'pending'
   | 'accepted'
@@ -148,6 +153,8 @@ const overlaps = (a: number, b: number, c: number, d: number) => a < d && c < b;
 @Injectable()
 export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   private timer?: NodeJS.Timeout;
+  /** Set by the AI managers (decision 336): they answer and take challenges on every tick. */
+  aiTick: (now: number) => void = () => {};
   /** A challenge whose own reservation is left out while it is being moved (counter offers). */
   private ignore: string | null = null;
 
@@ -949,6 +956,63 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       } catch (e) {
         this.log.error(`challenge ${c.id}: ${(e as Error).message}`);
       }
+    try {
+      this.aiTick(now);
+    } catch (e) {
+      this.log.error(`challenges of the AI managers: ${(e as Error).message}`);
+    }
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // For the AI managers (decision 336)
+  // ------------------------------------------------------------------------------------------
+
+  /** Challenges of the running season that still wait for an answer (oldest first). */
+  waiting(): Row[] {
+    const season = this.udt.seasonNumber();
+    if (season === null) return [];
+    const now = this.nowIso();
+    return this.db
+      .select()
+      .from(udtChallenges)
+      .where(and(eq(udtChallenges.season, season), eq(udtChallenges.status, 'pending')))
+      .all()
+      .filter((c) => c.expiresAt > now)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  /** A team in the model for a format: lineup strength, a full lineup, its tired bots. */
+  lineupState(userId: string, f: ChallengeFormat) {
+    const season = this.udt.season().number;
+    const settings = this.gameSettings(f);
+    const l = this.events.lineup(userId, settings, UdtEventRulesSchema.parse({}));
+    const tiredBelow = this.udt.clubFx(season, userId).tiredBelow;
+    return {
+      strength: this.league.lineupStrength(userId, settings),
+      full: l.bots.length >= f.teamSize,
+      tired: l.bots.filter((b) => b.stamina < tiredBelow).length,
+    };
+  }
+
+  /** The chance of team `a` to win a challenge of this format against team `b` (the model). */
+  chance(f: ChallengeFormat, a: string, b: string): number {
+    const sa = this.lineupState(a, f).strength;
+    const sb = this.lineupState(b, f).strength;
+    return seriesChance(gameChance(sa, sb, f.teamSize), f.bestOf);
+  }
+
+  /** Booked challenges of a team on the day of a start (another one than `except`). */
+  playsOn(userId: string, at: string, except: string | null = null): number {
+    const season = this.udt.seasonNumber();
+    if (season === null) return 0;
+    const day = today(Date.parse(at), this.tz);
+    return this.active(season).filter(
+      (c) =>
+        c.id !== except &&
+        c.status !== 'pending' &&
+        this.involves(c, userId) &&
+        today(Date.parse(c.scheduledAt), this.tz) === day,
+    ).length;
   }
 
   /** Who makes the tournaments: an admin, else the challenger. */
@@ -957,7 +1021,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** The game of a challenge: a fixtures bracket of two, its mode, length, map and rules. */
-  gameSettings(c: Pick<Row, 'mode' | 'teamSize' | 'bestOf' | 'map' | 'hardness'>) {
+  gameSettings(c: ChallengeFormat) {
     const mh = c.mode === 'mh';
     const maps = c.map ? [c.map] : this.mapPool(c.mode as ChallengeMode);
     const league = this.settings.get().udt.league;

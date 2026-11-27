@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AI_CHALLENGE_BAND,
+  AI_CHALLENGE_TAKE,
   brokenRecord,
+  humanEdge,
+  seriesChance,
   challengeMinutes,
   challengePot,
   leagueClashDays,
@@ -92,5 +96,24 @@ describe('brokenRecord (decision 335)', () => {
     expect(hardnessOfSkill(5)).toBe('normal');
     expect(hardnessOfSkill(7)).toBe('nightmare');
     expect(hardnessOfSkill(3)).toBeNull();
+  });
+});
+
+describe('AI managers and challenges (decision 336)', () => {
+  it('wins a series by the chance per game', () => {
+    expect(seriesChance(0.6, 1)).toBeCloseTo(0.6);
+    expect(seriesChance(0.6, 3)).toBeCloseTo(0.648);
+    expect(seriesChance(0.6, 5)).toBeCloseTo(0.68256);
+    expect(seriesChance(0.5, 5)).toBeCloseTo(0.5);
+  });
+
+  it('makes no AI manager a source of Neuro', () => {
+    // Taking: the best case for a human is the gambler at 0.42 (+0.10 per staked Neuro).
+    const takes = Object.values(AI_CHALLENGE_TAKE);
+    expect(humanEdge(Math.min(...takes), 5)).toBeCloseTo(0.102);
+    expect(takes.filter((t) => humanEdge(t, 5) > 0.05)).toHaveLength(1);
+    // Offering: at worst +0.045 per staked Neuro for the human, mostly a loss.
+    expect(humanEdge(AI_CHALLENGE_BAND[0], 5)).toBeLessThan(0.05);
+    expect(humanEdge(AI_CHALLENGE_BAND[1], 5)).toBeLessThan(-0.2);
   });
 });

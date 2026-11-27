@@ -68,4 +68,11 @@ export class UdtTestController {
   act() {
     return this.test.act();
   }
+
+  /** The AI managers answer every waiting challenge now and each makes one (decision 336). */
+  @Post('challenges/act')
+  @HttpCode(200)
+  challengesAct() {
+    return this.test.challengesAct();
+  }
 }
