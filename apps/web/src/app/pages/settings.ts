@@ -25,6 +25,7 @@ import { SettingsUdt } from '../components/settings-udt';
 import { Auth } from '../core/auth';
 import { I18n, TPipe } from '../core/i18n';
 import { Guide } from '../components/guide';
+import { PageToc } from '../components/page-toc';
 
 const TABS = ['season', 'bets', 'bots', 'udt', 'league', 'system'] as const;
 export type SettingsTab = (typeof TABS)[number];
@@ -38,6 +39,7 @@ export type SettingsTab = (typeof TABS)[number];
 @Component({
   selector: 'app-settings',
   imports: [
+    PageToc,
     Guide,
     Tabs,
     TPipe,
@@ -96,20 +98,7 @@ export type SettingsTab = (typeof TABS)[number];
           }
         }
       </div>
-      @if (toc().length > 1) {
-        <nav class="toc" [attr.aria-label]="'settings.toc' | t">
-          <span class="kpi">{{ 'settings.toc' | t }}</span>
-          @for (s of toc(); track s.id; let i = $index) {
-            <a
-              [href]="'#' + s.id"
-              [class.on]="i === current()"
-              [attr.aria-current]="i === current() || null"
-              (click)="jump($event, s.id)"
-              >{{ s.text }}</a
-            >
-          }
-        </nav>
-      }
+      <na-toc [items]="toc()" />
     </div>
   `,
   styles: `
@@ -118,41 +107,12 @@ export type SettingsTab = (typeof TABS)[number];
       flex: 1 1 auto;
     }
     /* Section index in the free space right of the forms (wide screens, tabs with 2+ cards). */
-    .toc {
-      display: none;
-    }
     @media (min-width: 1100px) {
       .st-body.withtoc {
         display: grid;
         grid-template-columns: minmax(0, 820px) 200px;
         gap: 32px;
         align-items: start;
-      }
-      .toc {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        position: sticky;
-        top: 84px;
-        padding-left: 14px;
-        border-left: 1px solid var(--border);
-      }
-      .toc .kpi {
-        margin-bottom: 6px;
-      }
-      .toc a {
-        color: var(--muted);
-        font-size: var(--fs-sm);
-        padding: 5px 0;
-        text-decoration: none;
-        line-height: 1.3;
-      }
-      .toc a:hover {
-        color: var(--text);
-      }
-      .toc a.on {
-        color: var(--accent);
-        font-weight: 600;
       }
     }
     .panel h2 {
@@ -212,10 +172,8 @@ export class SettingsPage {
   private readonly dirty = signal<ReadonlySet<string>>(new Set());
   protected readonly unsaved = computed(() => this.dirty().size > 0);
   private readonly panel = viewChild.required<ElementRef<HTMLElement>>('panel');
-  /** The card headings of the open tab (the league tab has its own side column: none). */
+  /** The card headings of the open tab (the league tab shows its own in its side column). */
   protected readonly toc = signal<{ id: string; text: string }[]>([]);
-  /** The section the reader is in (index into `toc`). */
-  protected readonly current = signal(0);
 
   constructor() {
     // Tabs load their data after opening: collect the headings whenever the panel changes.
@@ -225,15 +183,12 @@ export class SettingsPage {
       frame = requestAnimationFrame(() => this.collect());
     };
     const watch = new MutationObserver(collect);
-    const onScroll = () => this.track();
     queueMicrotask(() =>
       watch.observe(this.panel().nativeElement, { childList: true, subtree: true }),
     );
-    window.addEventListener('scroll', onScroll, { passive: true });
     inject(DestroyRef).onDestroy(() => {
       watch.disconnect();
       cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
     });
 
     // Another tab (also by the back button): the old tab's values are gone with it.
@@ -261,27 +216,6 @@ export class SettingsPage {
       next.some((s, i) => s.id !== old[i].id || s.text !== old[i].text)
     )
       this.toc.set(next);
-    this.track();
-  }
-
-  /** The last heading above the upper quarter of the window is the current section. */
-  private track() {
-    const toc = this.toc();
-    if (toc.length < 2) return;
-    let at = 0;
-    toc.forEach((s, i) => {
-      const el = document.getElementById(s.id);
-      if (el && el.getBoundingClientRect().top < window.innerHeight * 0.25) at = i;
-    });
-    // At the bottom of the page the last section counts (it may be too short to reach the line).
-    if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4)
-      at = toc.length - 1;
-    this.current.set(at);
-  }
-
-  protected jump(e: Event, id: string) {
-    e.preventDefault();
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   /** Opens tab `t`; false when the admin keeps the unsaved changes of the open tab. */

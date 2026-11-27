@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Settings › Dream Team league: keeper choice window (last days of the season) as a field, On this page like the other tabs, server choice as One server or Server pool with the pool's servers and their switches, automatic map pool as chips, money table and cup bonus aligned (decision 332, patch note 332).
 - How it works on the administration pages (overview, new tournament, series, servers, bots, settings); long hints of the tournament form, series and bots pages moved into the guides (decision 329, patch note 331).
 - League team names link to the team's squad (table, matchday, Final Four, next game) and the hub's league card has All teams (decision 330, patch note 331).
 - Other teams' bots show their potential in the read-only details (decision 331, patch note 331).
@@ -251,6 +252,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Fixed
 
+- Phone pages no longer get wider when a tab row shows a dot (screen reader text of the dot positioned at the row's start) (decision 332).
 - Page heads with a guide button: key figures, admin buttons, the season select and the balance stay at the right again instead of moving next to the title (decision 329).
 - Packs: the inventory, scrap and crafting list change only when the cards of a pull are face up (they told the result while the box was charging); bot cards on a squad page are as tall as their row, so their marks line up (decision 321).
 

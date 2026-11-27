@@ -28,6 +28,7 @@ import type {
   UdtSettings,
 } from '../core/types';
 import { SETTINGS_STYLES, type SettingsForm } from './settings-shared';
+import { PageToc, type TocItem } from './page-toc';
 
 const LENGTHS: LeagueLength[] = ['short', 'medium', 'long'];
 const AI_GAMES: LeagueAiGames[] = ['simulate', 'topGame', 'all'];
@@ -63,14 +64,14 @@ interface StatusView {
  */
 @Component({
   selector: 'app-settings-league',
-  imports: [Segment, FormsModule, RouterLink, TPipe],
+  imports: [Segment, FormsModule, RouterLink, TPipe, PageToc],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <form class="lgs" data-form="league" (ngSubmit)="save()">
       <div class="lgs-main">
         <section class="card">
           <div class="lgs-head">
-            <h2>{{ 'settings.tab.league' | t }}</h2>
+            <h2 id="lgs-s-league">{{ 'settings.tab.league' | t }}</h2>
             <label class="switch"
               ><input type="checkbox" name="lgOn" [(ngModel)]="f.enabled" /><span class="tr"></span
               >{{ 'lgs.on' | t }}</label
@@ -133,7 +134,7 @@ interface StatusView {
         </section>
 
         <section class="card">
-          <h2>{{ 'lgs.when' | t }}</h2>
+          <h2 id="lgs-s-when">{{ 'lgs.when' | t }}</h2>
           <p class="muted small">{{ 'lgs.whenHint' | t }}</p>
           <div class="lgs-days" role="group" [attr.aria-label]="'lgs.days' | t">
             <span class="kpi">{{ 'lgs.days' | t }}</span>
@@ -194,19 +195,69 @@ interface StatusView {
         </section>
 
         <section class="card">
-          <h2>{{ 'lgs.server' | t }}</h2>
+          <h2 id="lgs-s-server">{{ 'lgs.server' | t }}</h2>
           <p class="muted small">{{ 'lgs.rulesNow' | t }}</p>
-          <label class="switch optrow"
-            ><span class="ot"
-              ><b>{{ 'lgs.serverAuto' | t }}</b
-              ><span class="muted small">{{ 'lgs.serverAutoHint' | t }}</span></span
-            ><input type="checkbox" name="lgServerAuto" [(ngModel)]="f.serverAuto" /><span
-              class="tr"
-            ></span
-          ></label>
+          <!-- One server or the pool, the pool's servers in sight (decision 332). -->
+          <div
+            class="lgs-lengths lgs-modes2"
+            role="radiogroup"
+            [attr.aria-label]="'lgs.serverMode' | t"
+          >
+            @for (m of [false, true]; track m) {
+              <button
+                type="button"
+                role="radio"
+                class="lgs-len"
+                [attr.aria-checked]="f.serverAuto === m"
+                [attr.tabindex]="f.serverAuto === m ? 0 : -1"
+                (click)="f.serverAuto = m; estimate(); touch($event)"
+                (keydown)="serverKey($event)"
+              >
+                <b>{{ (m ? 'lgs.modePool' : 'lgs.modeOne') | t }}</b>
+                <span class="small muted">{{
+                  (m ? 'lgs.modePoolHint' : 'lgs.modeOneHint') | t
+                }}</span>
+              </button>
+            }
+          </div>
+          @if (f.serverAuto) {
+            <div class="lgs-pool">
+              <div class="lgs-poolhead">
+                <b>{{ 'lgs.poolHead' | t: { n: poolCount(), on: poolOnline() } }}</b>
+                <span class="muted small"
+                  >{{ 'lgs.poolHint' | t }}
+                  <a routerLink="/admin/agents">{{ 'nav.agents' | t }} →</a></span
+                >
+              </div>
+              @for (a of agents(); track a.id) {
+                <div class="lgs-srv" [class.in]="a.inPool">
+                  <span class="dot" [class.on]="a.online"></span>
+                  <span class="lgs-srvn"
+                    ><b>{{ a.name }}</b> <span class="muted small">{{ serverState(a) }}</span></span
+                  >
+                  @if (a.id === agentId) {
+                    <span class="badge">{{ 'lgs.preferred' | t }}</span>
+                  }
+                  <label class="switch"
+                    ><input
+                      type="checkbox"
+                      [checked]="a.inPool"
+                      [disabled]="poolBusy()"
+                      [attr.aria-label]="'lgs.inPool' | t: { name: a.name }"
+                      (input)="$event.stopPropagation()"
+                      (change)="
+                        $event.stopPropagation(); setPool(a, $any($event.target).checked)
+                      " /><span class="tr"></span
+                  ></label>
+                </div>
+              } @empty {
+                <p class="muted small">{{ 'adm.noServers' | t }}</p>
+              }
+            </div>
+          }
           <div class="lgs-fields">
             <label
-              >{{ 'lgs.agent' | t }}
+              >{{ (f.serverAuto ? 'lgs.agentPreferred' : 'lgs.agent') | t }}
               <span class="lgs-withdot">
                 <span class="dot" [class.on]="agentOnline()"></span>
                 <select name="lgAgent" [(ngModel)]="agentId" (ngModelChange)="agentChanged()">
@@ -311,10 +362,18 @@ interface StatusView {
             }
           </div>
           @if (!ownMaps) {
-            <p class="lgs-auto small">
-              {{ 'lgs.mapsAutoText' | t }}
-              <b>{{ autoPool() || '–' }}</b>
-            </p>
+            <div class="lgs-auto">
+              <p class="small">
+                {{ 'lgs.mapsAutoText' | t }} · {{ 'lgs.mapsN' | t: { n: autoMaps().length } }}
+              </p>
+              @if (autoMaps().length) {
+                <ul class="lgs-chips">
+                  @for (m of autoMaps(); track m) {
+                    <li>{{ m }}</li>
+                  }
+                </ul>
+              }
+            </div>
           } @else {
             <div class="lgs-maps">
               @for (m of shownMaps(); track m.id) {
@@ -355,7 +414,7 @@ interface StatusView {
         </section>
 
         <section class="card">
-          <h2>{{ 'lgs.moneyTitle' | t }}</h2>
+          <h2 id="lgs-s-money">{{ 'lgs.moneyTitle' | t }}</h2>
           <p class="muted small">{{ 'lgs.moneyHint' | t }}</p>
           <div class="lgs-scroll">
             <table class="lgs-money">
@@ -413,31 +472,38 @@ interface StatusView {
             </table>
           </div>
           <p class="muted small">{{ 'lgs.champNote' | t: { v: amount(0, 0) } }}</p>
+          <!-- Cup bonus like a row of the table above: place, amount (decision 332). -->
           <div class="lgs-cup">
-            <div>
+            <div class="lgs-cuphead">
               <span class="lgs-lbl">{{ 'lgs.cupBonusShort' | t }}</span>
               <span class="muted small">{{ 'lgs.cupBonusHint' | t }}</span>
             </div>
-            <div class="lgs-podium">
+            <div class="lgs-cupfields">
               @for (i of [0, 1, 2]; track i) {
-                <label [class]="'lgs-pod p' + i"
-                  ><span class="lgs-medal">{{ i + 1 }}.</span>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100000"
-                    step="50"
-                    [name]="'lgCup' + i"
-                    [(ngModel)]="cup[i]"
-                    [attr.aria-label]="'lgs.cupOf' | t: { p: i + 1 }"
-                /></label>
+                <div [class]="'lgs-pod p' + i">
+                  <span class="lgs-podl"
+                    ><span class="lgs-medal" aria-hidden="true">{{ i + 1 }}</span
+                    >{{ 'lgs.place' | t: { p: i + 1 } }}</span
+                  >
+                  <span class="lgs-unit coin"
+                    ><input
+                      type="number"
+                      min="0"
+                      max="100000"
+                      step="50"
+                      [name]="'lgCup' + i"
+                      [(ngModel)]="cup[i]"
+                      [attr.aria-label]="'lgs.cupOf' | t: { p: i + 1 }"
+                    /><span aria-hidden="true">◎</span></span
+                  >
+                </div>
               }
             </div>
           </div>
         </section>
 
         <section class="card">
-          <h2>{{ 'lgs.aiKeep' | t }}</h2>
+          <h2 id="lgs-s-ai">{{ 'lgs.aiKeep' | t }}</h2>
           <div class="lgs-two">
             <div>
               <span class="lgs-lbl">{{ 'lgs.factorsShort' | t }}</span>
@@ -516,6 +582,27 @@ interface StatusView {
                   ? ('lgs.keepLossN' | t: { n: keepLoss, skill: skillAfter(keepLoss) })
                   : ('lgs.keepLoss0' | t)
               }}</span>
+              <span class="lgs-lbl">{{ 'lgs.keepDays' | t }}</span>
+              <span class="lgs-step">
+                <button
+                  type="button"
+                  [attr.aria-label]="'lgs.keepDaysLess' | t"
+                  [disabled]="keepDays <= 1"
+                  (click)="keepDays = clamp(keepDays - 1, 1, 14); touch($event)"
+                >
+                  −
+                </button>
+                <b class="mono">{{ keepDays }}</b>
+                <button
+                  type="button"
+                  [attr.aria-label]="'lgs.keepDaysMore' | t"
+                  [disabled]="keepDays >= 14"
+                  (click)="keepDays = clamp(keepDays + 1, 1, 14); touch($event)"
+                >
+                  +
+                </button>
+              </span>
+              <span class="muted small">{{ 'lgs.keepDaysHint' | t: { n: keepDays } }}</span>
             </div>
           </div>
         </section>
@@ -584,6 +671,8 @@ interface StatusView {
           <p>{{ 'lgs.whenFixed' | t }}</p>
           <p>{{ 'lgs.whenNow' | t }}</p>
         </section>
+        <!-- On this page, like the other tabs (decision 332). -->
+        <na-toc [items]="tocItems()" />
       </aside>
     </form>
 
@@ -706,7 +795,7 @@ export class SettingsLeague {
   protected readonly modes = ['real', 'test'] as const;
   protected readonly admin = signal<LeagueAdmin | null>(null);
   protected readonly est = signal<LeagueEstimate | null>(null);
-  private readonly agents = signal<AgentView[]>([]);
+  protected readonly agents = signal<AgentView[]>([]);
   /** The form (plain fields with ngModel: markForCheck after loading). */
   protected f: LeagueSettings = defaults();
   /** Table money per band of four places, the factor per tier, AI strength per tier. */
@@ -716,6 +805,8 @@ export class SettingsLeague {
   protected cup: number[] = [];
   protected keepMax = 2;
   protected keepLoss = 1;
+  /** The keeper choice is open on the season's last this many days. */
+  protected keepDays = 2;
   /** The league's server ("" = the server of the newest Dream Team tournament). */
   protected agentId = '';
   protected profileId = '';
@@ -794,7 +885,33 @@ export class SettingsLeague {
   });
 
   /** The pool the league uses without an own choice (from the admin view). */
-  protected readonly autoPool = computed(() => (this.admin()?.mapPool ?? []).join(' · '));
+  protected readonly autoMaps = computed(() => this.admin()?.mapPool ?? []);
+
+  /** The sections for "On this page". */
+  protected readonly tocItems = computed((): TocItem[] => {
+    this.i18n.lang();
+    return (['league', 'when', 'server', 'money', 'ai'] as const).map((id) => ({
+      id: 'lgs-s-' + id,
+      text: this.i18n.t(
+        (
+          {
+            league: 'settings.tab.league',
+            when: 'lgs.when',
+            server: 'lgs.server',
+            money: 'lgs.moneyTitle',
+            ai: 'lgs.aiKeep',
+          } as const
+        )[id],
+      ),
+    }));
+  });
+
+  /** Servers in the pool and how many of them are online. */
+  protected readonly poolCount = computed(() => this.agents().filter((a) => a.inPool).length);
+  protected readonly poolOnline = computed(
+    () => this.agents().filter((a) => a.inPool && a.online).length,
+  );
+  protected readonly poolBusy = signal(false);
 
   protected readonly running = computed(() => this.admin()?.status.state === 'running');
 
@@ -847,6 +964,7 @@ export class SettingsLeague {
     this.cup = [0, 1, 2].map((i) => u.cupBonus[i] ?? 0);
     this.keepMax = u.keepers.max;
     this.keepLoss = u.keepers.skillLoss;
+    this.keepDays = u.keepers.days;
     this.agentId = l.agentId && l.profileId ? l.agentId : '';
     this.profileId = this.agentId ? (l.profileId ?? '') : '';
     this.agentSig.set(this.agentId);
@@ -1104,6 +1222,41 @@ export class SettingsLeague {
   // Server and maps
   // ---------------------------------------------------------------------------------------------
 
+  /** Arrow keys on the server tiles: one server or the pool. */
+  protected serverKey(e: KeyboardEvent) {
+    if (!['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(e.key)) return;
+    e.preventDefault();
+    this.f.serverAuto = !this.f.serverAuto;
+    void this.estimate();
+    this.touch(e);
+    this.cdr.markForCheck();
+    const radios = (e.target as HTMLElement).parentElement?.querySelectorAll<HTMLElement>(
+      '[role="radio"]',
+    );
+    setTimeout(() => radios?.[this.f.serverAuto ? 1 : 0]?.focus());
+  }
+
+  /** A server into or out of the pool: at once, for tournaments too (as on the servers page). */
+  protected async setPool(a: AgentView, inPool: boolean) {
+    this.poolBusy.set(true);
+    try {
+      const next = await this.api.setAgentPool(a.id, inPool);
+      this.agents.update((list) => list.map((x) => (x.id === a.id ? { ...x, ...next } : x)));
+      void this.estimate();
+    } catch {
+      // the toast shows the error; the switch follows the list
+      this.agents.update((list) => [...list]);
+    } finally {
+      this.poolBusy.set(false);
+    }
+  }
+
+  /** "free", "playing" or "offline". */
+  protected serverState(a: AgentView): string {
+    if (!a.online) return this.i18n.t('agents.offline');
+    return this.i18n.t(a.status?.tournamentId || a.activeTournamentId ? 'lgs.srvBusy' : 'adm.free');
+  }
+
   protected agentChanged() {
     this.agentSig.set(this.agentId);
     const a = this.agents().find((x) => x.id === this.agentId);
@@ -1311,7 +1464,12 @@ export class SettingsLeague {
           tierMult: this.mult.map((v) => n(v, 0, 5)),
           factors: this.factors.map((v) => n(v, 0, 5)),
         },
-        keepers: { ...this.udt.keepers, max: this.keepMax, skillLoss: this.keepLoss },
+        keepers: {
+          ...this.udt.keepers,
+          max: this.keepMax,
+          skillLoss: this.keepLoss,
+          days: Math.round(n(this.keepDays, 1, 14)),
+        },
         cupBonus: this.cup.map((v) => Math.round(n(v, 0, 100_000))),
       });
       this.udt = s.udt;

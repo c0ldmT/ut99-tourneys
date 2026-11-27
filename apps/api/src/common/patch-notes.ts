@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 332,
+    date: '2026-11-27',
+    en: {
+      title: 'League settings tidied',
+      items: [
+        'Settings › Dream Team league: how many of the season’s last days the keeper choice is open can now be set (1–14).',
+        'Server: "One server" or "Server pool – in parallel"; with the pool you see every server and can put it into the pool or take it out.',
+        '"On this page" on the right like in the other tabs; the automatic map pool as chips; money table and cup bonus aligned.',
+      ],
+    },
+    de: {
+      title: 'Liga-Einstellungen aufgeräumt',
+      items: [
+        'Einstellungen › Dream-Team-Liga: An wie vielen letzten Tagen der Season die Keeper-Wahl offen ist, lässt sich jetzt einstellen (1–14).',
+        'Server: „Ein Server“ oder „Server-Pool – parallel“; beim Pool siehst du jeden Server und nimmst ihn direkt in den Pool auf oder heraus.',
+        '„Auf dieser Seite“ rechts wie in den anderen Reitern; der automatische Map-Pool als Chips; Geld-Tabelle und Cup-Bonus sauber ausgerichtet.',
+      ],
+    },
+  },
+  {
     id: 331,
     date: '2026-11-27',
     en: {

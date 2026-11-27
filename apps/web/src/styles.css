@@ -772,6 +772,9 @@ button.icon.dng:hover:not(:disabled) {
 }
 .sr {
   position: absolute;
+  /* Not at its place in a scrolled row (tabs): there it widened phone pages (decision 332). */
+  left: 0;
+  top: 0;
   width: 1px;
   height: 1px;
   overflow: hidden;
@@ -3701,6 +3704,11 @@ tr[class*='lg-z-'] .pl {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Full height, so "On this page" at its end can stay in sight (decision 332). */
+  align-self: stretch;
+}
+.lgs h2 {
+  scroll-margin-top: 84px;
 }
 .lgs-side .card {
   margin: 0;
@@ -3913,14 +3921,76 @@ tr[class*='lg-z-'] .pl {
   max-width: 100%;
 }
 .lgs-auto {
-  margin: 0;
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px dashed var(--line);
   color: var(--text-2);
 }
-.lgs-auto b {
+.lgs-auto p {
+  margin: 0;
+}
+/* The automatic map pool as chips (decision 332). */
+.lgs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  max-height: 156px;
+  overflow-y: auto;
+}
+.lgs-chips li {
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--panel-2);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
   color: var(--text);
+}
+/* Server: one or the pool; the pool's servers with their switch (decision 332). */
+.lgs-modes2 {
+  margin-top: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.lgs-pool {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.lgs-poolhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  background: var(--panel-2);
+}
+.lgs-poolhead b {
+  font-size: var(--fs-sm);
+}
+.lgs-srv {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+.lgs-srv:not(.in) .lgs-srvn b {
+  color: var(--muted);
+}
+.lgs-srvn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
+}
+.lgs-pool > p {
+  margin: 0;
+  padding: 8px 12px;
 }
 .lgs-maps {
   display: grid;
@@ -3999,7 +4069,7 @@ tr[class*='lg-z-'] .pl {
   vertical-align: bottom;
 }
 .lgs-money thead th:nth-child(n + 3),
-.lgs-amt {
+.lgs-money td.lgs-amt {
   text-align: right;
 }
 .lgs-money thead th:nth-child(n + 3) .lgs-step {
@@ -4017,42 +4087,49 @@ tr[class*='lg-z-'] .pl {
 .lgs-amt {
   font-weight: 700;
   color: var(--neuro-text);
+  font-variant-numeric: tabular-nums;
 }
 .lgs-cup {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.lgs-cuphead {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px 18px;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-top: 16px;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 8px 12px;
+  background: var(--panel-2);
 }
-.lgs-cup .lgs-lbl {
-  margin-top: 0;
+.lgs-cuphead .lgs-lbl {
+  margin: 0;
 }
-.lgs-podium {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
+.lgs-cupfields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
 }
 .lgs-pod {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 6px;
-  padding: 10px;
-  border-radius: var(--radius-sm);
-  background: var(--panel-2);
+  margin: 0;
+  min-width: 0;
 }
-.lgs-pod.p0 {
-  padding-bottom: 18px;
-}
-.lgs-pod input {
-  width: 88px;
+.lgs-podl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  color: var(--muted);
 }
 .lgs-medal {
   display: inline-flex;
-  width: 26px;
-  height: 26px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   border-radius: 50%;
@@ -4066,6 +4143,19 @@ tr[class*='lg-z-'] .pl {
 }
 .lgs-pod.p2 .lgs-medal {
   background: #d08a4e;
+}
+@media (max-width: 560px) {
+  .lgs-cupfields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .lgs-pod {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .lgs-pod .lgs-unit {
+    width: 160px;
+  }
 }
 .lgs-two {
   display: grid;
