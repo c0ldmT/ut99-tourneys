@@ -7,6 +7,7 @@ here; the UT mod has its own version (shown in the game type name and the bracke
 
 ### Added
 
+- Packs: inventory, crafting and workshop in one card with tabs; search over name and effect, category, rarities and craftable only (remembered per browser); traits as tiles, crafting grouped by category with the reason a craft is locked; the workshop shows the chosen card with reroll and upgrade side by side; new cards marked New; Dream Team tab Workshop (decision 323, patch note 323).
 - Tournament page live: the live row keeps the live match's height and the bets scroll inside it (names, pools and odds stay on top); a live bar under the header once the live row has scrolled away, with score, clock, the parallel matches to switch between, a way back up and, for a player of the match, the copy button for the connect command; phones show the first bets with All n bets (decision 322, patch note 322).
 - Status and controls by one rule: season states and server online/offline as the phase badges of the tournament list; filters that act at once (statistics: show bots, settled only) and the admin/moderator roles on the user list as switches (decision 320).
 - Administration start page (/admin, first entry of the Admin menu): servers (online, pool, what they play), moderation queue, season, tournaments, users and the latest problems (paused and aborted tournaments, server warnings and errors since the last restart) with links; GET /admin/overview (decision 319).

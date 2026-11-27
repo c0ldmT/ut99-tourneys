@@ -71,6 +71,7 @@ export const UDT_AREAS: readonly UdtArea[] = [
       { label: 'udt.tab.open', link: '/udt/packs' },
       { label: 'udt.tab.inventory', link: '/udt/packs', fragment: 'inventory' },
       { label: 'udt.tab.craft', link: '/udt/packs', fragment: 'craft' },
+      { label: 'udt.tab.workshop', link: '/udt/packs', fragment: 'workshop' },
     ],
     paths: ['/udt/packs'],
   },

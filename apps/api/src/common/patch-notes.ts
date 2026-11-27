@@ -22,6 +22,30 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 323,
+    date: '2026-11-27',
+    en: {
+      title: 'Trait cards at a glance',
+      items: [
+        'Packs: inventory, crafting and workshop in one card with tabs instead of three long lists.',
+        'Search traits by name or effect, filter by category and rarity, on the crafting tab also by what you can craft now. The page remembers your filter.',
+        'Crafting shows why a trait is locked (already in your inventory, scrap missing).',
+        'Workshop: pick a card on the left, reroll or upgrade side by side with their costs. "Workshop" on a card in the inventory opens it there.',
+        'New cards from a pack, a craft or the workshop are marked "New".',
+      ],
+    },
+    de: {
+      title: 'Trait-Karten im Überblick',
+      items: [
+        'Packs: Inventar, Craften und Werkstatt stehen in einer Karte mit Reitern statt in drei langen Listen.',
+        'Traits nach Name oder Wirkung suchen, nach Kategorie und Seltenheit filtern, beim Craften auch nach „jetzt craftbar“. Die Seite merkt sich deinen Filter.',
+        'Craften zeigt, warum ein Trait gesperrt ist (schon im Inventar, Schrott fehlt).',
+        'Werkstatt: links die Karte wählen, rechts Neu würfeln und Aufwerten nebeneinander mit ihren Kosten. „Werkstatt“ an einer Inventar-Karte öffnet sie dort.',
+        'Neue Karten aus Pack, Craften oder Werkstatt sind mit „Neu“ markiert.',
+      ],
+    },
+  },
+  {
     id: 322,
     date: '2026-11-27',
     en: {

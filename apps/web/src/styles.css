@@ -919,6 +919,19 @@ button.icon.dng:hover:not(:disabled) {
   background: var(--panel-3);
   color: var(--text);
 }
+/* A segment that fills its row on phones, its buttons shrink instead of wrapping (decision 323). */
+@media (max-width: 640px) {
+  .seg.fit {
+    display: flex;
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+  .seg.fit button {
+    flex: 1 1 auto;
+    padding: 6px 4px;
+    font-size: var(--fs-sm);
+  }
+}
 label.switch {
   display: inline-flex;
   align-items: center;
