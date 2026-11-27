@@ -1,4 +1,4 @@
-import { HelpMore } from '../components/help-more';
+import { Guide, Guides } from '../components/guide';
 import { EmptyState } from '../components/empty-state';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
@@ -24,43 +24,32 @@ import { ReportButton } from '../components/report-button';
  */
 @Component({
   selector: 'app-udt-trades',
-  imports: [
-    HelpMore,
-    EmptyState,
-    FormsModule,
-    TPipe,
-    NeuroPipe,
-    Coin,
-    UdtCard,
-    UdtNav,
-    ReportButton,
-  ],
+  imports: [Guide, EmptyState, FormsModule, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, ReportButton],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     @if (data(); as d) {
       <div class="udt-head">
+        <na-guide
+          page="trades"
+          [params]="{
+            fee: d.rules.feePct,
+            h: d.rules.expiryHours,
+            lock: d.rules.lockDays,
+            bal: d.rules.balancePct,
+            pair: d.rules.pairPerWeek ?? 0,
+            n: d.rules.pairPerWeek ?? 0,
+          }"
+        />
         <div>
           <div class="kpi udt-kick">{{ 'udt.area.trans' | t }}</div>
           <h1 class="disp">{{ 'udt.trades.title' | t }}</h1>
           <p class="muted">
             {{ 'udt.trades.lead' | t: { fee: d.rules.feePct, h: d.rules.expiryHours } }}
           </p>
-          <na-help id="trades">
-            {{
-              'udt.trades.rules'
-                | t
-                  : {
-                      fee: d.rules.feePct,
-                      bal: d.rules.balancePct,
-                      lock: d.rules.lockDays,
-                      h: d.rules.expiryHours,
-                    }
-            }}
-            @if (d.rules.pairPerWeek) {
-              {{ 'udt.trades.pair' | t: { n: d.rules.pairPerWeek } }}
-            }
-          </na-help>
+          <button type="button" class="link small" (click)="guides.open('trades', 'rules')">
+            {{ 'guide.trades.mRules' | t }}
+          </button>
         </div>
       </div>
 
@@ -498,6 +487,7 @@ import { ReportButton } from '../components/report-button';
   `,
 })
 export class UdtTradesPage {
+  protected readonly guides = inject(Guides);
   private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);

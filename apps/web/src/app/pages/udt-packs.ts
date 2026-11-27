@@ -1,3 +1,4 @@
+import { Guide } from '../components/guide';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -31,12 +32,13 @@ const BOX_RARITY: Record<UdtBox, UdtRarity> = {
  */
 @Component({
   selector: 'app-udt-packs',
-  imports: [RouterLink, TPipe, NeuroPipe, Coin, UdtNav, UdtPackStage, UdtTraits],
+  imports: [Guide, RouterLink, TPipe, NeuroPipe, Coin, UdtNav, UdtPackStage, UdtTraits],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     @if (view(); as v) {
       <div class="udt-head">
+        <na-guide page="packs" [params]="{ i: v.index.toFixed(2) }" />
         <div>
           <div class="kpi udt-kick">{{ 'udt.area.packs' | t }}</div>
           <h1 class="disp">{{ 'udt.packs.title' | t }}</h1>

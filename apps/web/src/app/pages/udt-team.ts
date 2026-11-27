@@ -1,3 +1,4 @@
+import { Guide, Guides } from '../components/guide';
 import { emptyLook, lookBody, UdtBotLook, type UdtLooks } from '../components/udt-bot-look';
 import { UdtBotPanel } from '../components/udt-bot-panel';
 import { UdtKeepersPanel } from '../components/udt-keepers';
@@ -30,6 +31,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
 @Component({
   selector: 'app-udt-team',
   imports: [
+    Guide,
     WhenPipe,
     FormsModule,
     TPipe,
@@ -59,6 +61,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
         <app-udt-keepers />
       } @else if (!v.team) {
         <div class="udt-head">
+          <na-guide page="team" [params]="{ n: restPrice }" />
           <div>
             <div class="kpi udt-kick">
               {{ 'udt.area.team' | t }} · {{ 'udt.season' | t: { n: v.season } }}
@@ -134,6 +137,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
         </form>
       } @else {
         <div class="udt-head">
+          <na-guide page="team" [params]="{ n: restPrice }" />
           <div>
             <div class="kpi udt-kick">
               {{ 'udt.area.team' | t }} · {{ 'udt.season' | t: { n: v.season } }}
@@ -179,14 +183,9 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
             (trait)="assign($event)"
             (open)="openBot($event)"
           />
-          <details class="help small">
-            <summary>{{ 'udt.staminaHelp.title' | t }}</summary>
-            <ul>
-              @for (k of ['loss', 'rest', 'tired', 'bench', 'traits', 'buy']; track k) {
-                <li>{{ 'udt.staminaHelp.' + k | t: { n: restPrice } }}</li>
-              }
-            </ul>
-          </details>
+          <button type="button" class="link small" (click)="guides.open('team', 'stamina')">
+            {{ 'udt.staminaHelp.title' | t }}
+          </button>
         </section>
         <udt-bot-panel
           [bot]="panelBot()"
@@ -266,6 +265,7 @@ import { DEFAULT_ECONOMY, STARTER_SKILL } from '@tourney/udt';
   `,
 })
 export class UdtTeamPage {
+  protected readonly guides = inject(Guides);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);
   private readonly toasts = inject(Toasts);

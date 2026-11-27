@@ -1,3 +1,4 @@
+import { Guide } from '../components/guide';
 import { type Choice, Segment } from '../components/choice';
 import {
   ChangeDetectionStrategy,
@@ -37,7 +38,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
  */
 @Component({
   selector: 'app-udt-league',
-  imports: [Segment, TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark, LiveList],
+  imports: [Guide, Segment, TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark, LiveList],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -62,6 +63,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
         }
       } @else {
         <div class="lg-top">
+          <na-guide page="league" />
           <div>
             <div class="kpi lg-kick">
               {{

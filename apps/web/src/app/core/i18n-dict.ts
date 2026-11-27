@@ -444,7 +444,6 @@ const en = {
   'common.save': 'Save',
   'common.cancel': 'Cancel',
   'confirm.ok': 'Confirm',
-  'help.how': 'How it works',
   'common.lack': '{n} short',
   'common.delete': 'Delete',
   'common.close': 'Close',
@@ -2454,14 +2453,7 @@ const en = {
   'ok.udt.built': 'Bot built from the blueprint. You can rename it once for free.',
   'ok.udt.breakthrough': 'Breakthrough! Skill and potential +1.',
   'udt.help.button': 'How it works',
-  'udt.help.title': 'How the Dream Team works',
-  'udt.help.intro':
-    'You are the manager: you put together a team of bots that plays Dream Team tournaments on the game server. When your team does well, you earn Neuro and can afford better bots.',
-  'udt.help.team.title': 'Found your team',
-  'udt.help.team.text':
-    'Under My team you choose a name and a tag and build your starter bot with the start points. The starter is free and draws no salary; like every bot you made it can be traded (one bot always stays).',
   'udt.help.bots.title': 'Get new bots',
-  'udt.help.bots.text': 'There are four ways to new bots:',
   'udt.help.way.market.title': 'Market: buy at once',
   'udt.help.way.market.text':
     'Every market day brings new bots at a fixed price. Buy one and it joins your roster right away; first come, first served.',
@@ -2476,14 +2468,9 @@ const en = {
     'Swap bots and Neuro with other managers – bought ones and the ones you made, the starter too (one bot always stays). Bots you made keep their perks at the new team, and you stay their breeder.',
   'udt.help.bots.roster':
     'A roster holds up to 7 bots (5 play, 2 on the bench). Selling a bot back to the market pays 85 % of its value, at most what it cost (not while it plays in a drawn or running Dream Team tournament).',
-  'udt.help.lineup.title': 'Line up',
-  'udt.help.events.title': 'Play tournaments',
-  'udt.help.events.text':
-    'Under Events you enter your team (or let it enter automatically). Games, wins and places bring Neuro and experience; the table shows the best teams of the season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
     "Neuro is the website's currency: you win it with bets and Dream Team rewards and can spend what is above the rescue floor. Neuro in bought bots count towards that floor: the rescue after a lost bet only tops up what is missing beyond them. Bought bots draw a salary every Monday; a bot whose salary cannot be paid goes on strike until a market day can collect what it is owed (a sale pays it too). Prices follow the economy index; salaries, standard packs and licences only its square root above 1 (at index 5 about ×2.2 instead of ×5), premium and elite packs even less (premium index^0.4, elite index^0.35: at index 5 about ×1.9 and ×1.8).",
-  'udt.help.go': "Let's go",
   'udt.rename.once': 'Once per bot, free (the look can change any time).',
   'ok.udt.autoOn': 'Automatic sign-up on: {n} {n|tournament|tournaments} entered right away.',
   'udt.kind.udt_purchase': 'Purchase',
@@ -2513,8 +2500,6 @@ const en = {
   'udt.form.title.cold':
     'Form of the day: out of form, −10 accuracy in Dream Team games. Random every day; it counts for the tournaments drawn today.',
   'udt.form.title.normal': 'Form of the day: normal (random every day).',
-  'udt.help.lineup.text':
-    'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn. Every game costs stamina and tired bots play worse: rest them or buy rest with Neuro. Each bot also has a form of the day (Form ▲ / ▼ on the card). In the bot details the training camp gives a bot experience for Neuro, once a day - handy for bots that play little.',
   'udt.market.legendLink': 'What do the line and % show?',
   'udt.market.legend':
     "Line and % on the right: how the bot's market value moved over the last market days, without the economy index – so form and demand of this bot, not the whole economy.",
@@ -3326,6 +3311,180 @@ const en = {
   'lgs.badNumber': '"{field}": please enter a number from {lo} to {hi}.',
   'lgs.needProfile': 'The chosen server has no profile: choose another server or "automatic".',
   'league.mineOnly': 'Only my games',
+  'guide.button': 'How it works',
+  'guide.ok': 'Got it',
+  'guide.new': 'Not opened yet',
+  'guide.go': 'Go there',
+  'guide.facts': 'In short',
+  'guide.mentorsLink': 'How mentors work',
+  'guide.dt.title': 'How the Dream Team works',
+  'guide.dt.lead':
+    'You are the manager: your team of bots plays Dream Team tournaments on the game server. Success brings Neuro, and Neuro brings better bots.',
+  'guide.dt.f1': 'Roster up to 7 bots',
+  'guide.dt.f2': '5 play, 2 on the bench',
+  'guide.dt.f3': 'Salaries every Monday',
+  'guide.dt.f4': 'Selling back: 85 % of the value',
+  'guide.dt.s1': 'Found your team',
+  'guide.dt.s1d':
+    'Under My team you choose a name and a tag and build your starter bot. It is free and draws no salary.',
+  'guide.dt.s2': 'Get new bots',
+  'guide.dt.s2d': 'Four ways: market, academy, packs and trades – more below.',
+  'guide.dt.s3': 'Line up',
+  'guide.dt.s3d':
+    'Under My team you decide who plays deathmatch and Monster Hunt; the lineup counts until the bracket is drawn.',
+  'guide.dt.s4': 'Play tournaments',
+  'guide.dt.s4d':
+    'Enter your team in cups and play the league; games, wins and places bring Neuro and experience.',
+  'guide.dt.s5': 'Neuro',
+  'guide.dt.s5d':
+    'You win Neuro with bets and Dream Team rewards and can spend what is above the rescue floor.',
+  'guide.dt.mRoster': 'Roster and selling',
+  'guide.team.title': 'How My team works',
+  'guide.team.lead': 'Here you line up, develop your bots and keep an eye on stamina and money.',
+  'guide.team.f1': '5 in the lineup',
+  'guide.team.f2': '2 on the bench',
+  'guide.team.f3': 'Roster up to 7',
+  'guide.team.f4': 'Rest: {n} Neuro per point',
+  'guide.team.s1': 'Line up',
+  'guide.team.s1d':
+    'Drag cards onto the deathmatch and Monster Hunt places; it is saved at once. The lineup counts until the bracket is drawn.',
+  'guide.team.s2': 'Develop',
+  'guide.team.s2d':
+    'Bots you made get points as they level up; spend them in the bot details (tab Development).',
+  'guide.team.s3': 'Traits',
+  'guide.team.s3d':
+    'Drag a trait from the trait bar onto a bot. Taking it off destroys it and gives scrap.',
+  'guide.team.s4': 'Stamina',
+  'guide.team.s4d':
+    'Every game costs stamina and tired bots play worse. Rest comes with each market day or for Neuro in the bot details.',
+  'guide.team.mPoints': 'Development points',
+  'guide.league.title': 'How the league works',
+  'guide.league.lead':
+    'The league plays 5v5 with your deathmatch lineup on league evenings; the table decides who goes up and down.',
+  'guide.league.f1': '5v5 deathmatch',
+  'guide.league.f2': 'Win 2 · overtime loss 1',
+  'guide.league.f3': 'The home team picks the map',
+  'guide.league.f4': 'Table money on Mondays',
+  'guide.league.s1': 'Check the lineup',
+  'guide.league.s1d':
+    'The league plays with your deathmatch lineup; the bench replaces tired bots. It locks at kick-off.',
+  'guide.league.s2': 'Pick the map',
+  'guide.league.s2d':
+    'At home you pick the map; the analysis recommends the one with the best record.',
+  'guide.league.s3': 'Matchday',
+  'guide.league.s3d':
+    'Games with a manager are played for real on the servers and take bets; AI against AI is simulated.',
+  'guide.league.s4': 'Up and down',
+  'guide.league.s4d':
+    'At the end of the season the top teams go up and the bottom ones down; the relegation is played best of 3.',
+  'guide.league.mScoring': 'Points and ties',
+  'guide.league.mGames': 'Games and servers',
+  'guide.packs.title': 'How packs work',
+  'guide.packs.lead':
+    'Packs bring traits for your bots and now and then a blueprint; every box shows its drop rates.',
+  'guide.packs.f1': 'Drop rates open',
+  'guide.packs.f2': 'Pity: epic and legendary guaranteed',
+  'guide.packs.f3': 'Duplicates → scrap',
+  'guide.packs.f4': 'Crafting: 4× the scrap value',
+  'guide.packs.s1': 'Open a box',
+  'guide.packs.s1d':
+    'Pick a box; the 10-pack has a guaranteed rarity. The cards are dealt face down.',
+  'guide.packs.s2': 'Inventory',
+  'guide.packs.s2d':
+    'New traits land in the inventory. Put them on bots under My team or scrap them.',
+  'guide.packs.s3': 'Craft',
+  'guide.packs.s3d': 'With scrap you craft the trait you want; search and filter help to find it.',
+  'guide.packs.s4': 'Workshop',
+  'guide.packs.s4d': 'Reroll a card or upgrade it one rarity, for Neuro and scrap.',
+  'guide.packs.mMod': 'Mod version',
+  'guide.cups.title': 'How cups work',
+  'guide.cups.lead':
+    "Dream Team cups are tournaments of the managers' lineups: enter your team, the bots play on the game server.",
+  'guide.cups.f1': 'Lineup counts until the draw',
+  'guide.cups.f2': 'Rewards per game and place',
+  'guide.cups.f3': 'One tournament at a time',
+  'guide.cups.f4': 'AI teams fill up',
+  'guide.cups.s1': 'Enter',
+  'guide.cups.s1d': 'Enter an open cup, or let your team enter by itself.',
+  'guide.cups.s2': 'Line up',
+  'guide.cups.s2d': 'Change your lineup under My team before the draw; after it, it is fixed.',
+  'guide.cups.s3': 'Watch',
+  'guide.cups.s3d':
+    'The cup runs on the server: follow it live on the tournament page and bet on the matches.',
+  'guide.cups.s4': 'Table',
+  'guide.cups.s4d': 'Places count for the season table of the cups.',
+  'guide.cups.mAuto': 'Enter automatically',
+  'guide.cups.mLimits': 'Value cap, star limit, ticket',
+  'guide.cups.mLimitsd':
+    'Some cups cap the value of the lineup or the number of stars; high-stakes cups cost a ticket in Neuro, and the season finale has rules of its own.',
+  'guide.market.title': 'How the market works',
+  'guide.market.f1': 'New offers every market day',
+  'guide.market.f2': 'First come, first served',
+  'guide.market.f3': 'Loan: 15 % of the value',
+  'guide.market.f4': 'Settled after 10 games',
+  'guide.market.s1': 'Look at the offers',
+  'guide.market.s1d': 'Pick a bot on the left: card, price, value and salary appear on the right.',
+  'guide.market.s2': 'Buy',
+  'guide.market.s2d': 'A bought bot joins your roster at once; its salary is due every Monday.',
+  'guide.market.s3': 'Or loan',
+  'guide.market.s3d': 'A loan costs a fee instead of the price and no salary; one loan per team.',
+  'guide.market.s4': 'Settle in',
+  'guide.market.s4d': 'Bought bots settle in after 10 Dream Team games and get 2 prestige points.',
+  'guide.market.mPrice': 'Price and selling back',
+  'guide.market.mLoan': 'Loan',
+  'guide.trades.title': 'How trades work',
+  'guide.trades.f1': 'Fee {fee} %',
+  'guide.trades.f2': 'Offers run {h} h',
+  'guide.trades.f3': 'Tradable after {lock} days',
+  'guide.trades.s1': 'Pick a partner',
+  'guide.trades.s1d': 'Choose the manager you want to trade with.',
+  'guide.trades.s2': 'Put it together',
+  'guide.trades.s2d':
+    'What you give and what you get: bots and Neuro; the balance shows whether it works.',
+  'guide.trades.s3': 'Send',
+  'guide.trades.s3d': 'The other manager accepts or declines; after {h} h the offer runs out.',
+  'guide.trades.s4': 'Answer offers',
+  'guide.trades.s4d': 'Offers to you wait here; the hub counts them.',
+  'guide.trades.mRules': 'The rules in detail',
+  'guide.academy.title': 'How the academy works',
+  'guide.academy.f1': '3 talents per report',
+  'guide.academy.f2': 'Each licence twice the last',
+  'guide.academy.f3': 'Own bots: no salary',
+  'guide.academy.f4': 'Blueprint bots: 75 % salary',
+  'guide.academy.s1': 'Scout',
+  'guide.academy.s1d':
+    'A scouting report shows three talents with value ranges; sign one with a licence.',
+  'guide.academy.s2': 'Build from a blueprint',
+  'guide.academy.s2d': 'Blueprints from packs become bots of your own here.',
+  'guide.academy.s3': 'Mentor',
+  'guide.academy.s3d':
+    'An experienced bot teaches one of them as its apprentice – free, once per season.',
+  'guide.academy.s4': 'Develop and graduate',
+  'guide.academy.s4d':
+    'Bots you made develop with points; after the season they can graduate into the library.',
+  'guide.academy.mTalents': 'Talents and hidden traits',
+  'guide.club.title': 'How the club house works',
+  'guide.club.f1': 'Works for the whole roster',
+  'guide.club.f2': 'Levels build on each other',
+  'guide.club.f3': 'Reset at the season change',
+  'guide.club.s1': 'Pick a building',
+  'guide.club.s1d': 'Each building shows what its next level brings.',
+  'guide.club.s2': 'Build',
+  'guide.club.s2d':
+    'A level costs Neuro at the full index; missing Neuro is shown below the button.',
+  'guide.club.s3': 'Use it',
+  'guide.club.s3d': 'The effect counts at once, until the season ends.',
+  'guide.yearbook.title': 'How the yearbook works',
+  'guide.yearbook.f1': 'All bots of a season',
+  'guide.yearbook.f2': 'Graduation after the season',
+  'guide.yearbook.f3': 'Breeder bonus',
+  'guide.yearbook.s1': 'Browse the seasons',
+  'guide.yearbook.s1d': 'Pick a season to see its bots and their breeders.',
+  'guide.yearbook.s2': 'Approve graduations',
+  'guide.yearbook.s2d':
+    "After the season you approve your bots' graduation; they join the library with their breeder.",
+  'guide.yearbook.s3': 'Best breeders',
+  'guide.yearbook.s3d': 'The ranking of the managers by graduates and honours.',
 } as const;
 
 export type TKey = keyof typeof en;
@@ -3774,7 +3933,6 @@ const de: Record<TKey, string> = {
   'common.save': 'Speichern',
   'common.cancel': 'Abbrechen',
   'confirm.ok': 'Bestätigen',
-  'help.how': 'So funktioniert’s',
   'common.lack': 'Es fehlen {n}',
   'common.delete': 'Löschen',
   'common.close': 'Schließen',
@@ -5807,14 +5965,7 @@ const de: Record<TKey, string> = {
   'ok.udt.built': 'Bot aus dem Bauplan gebaut. Einmal umbenennen kannst du ihn kostenlos.',
   'ok.udt.breakthrough': 'Durchbruch! Skill und Potenzial +1.',
   'udt.help.button': "So funktioniert's",
-  'udt.help.title': 'So funktioniert das Dream Team',
-  'udt.help.intro':
-    'Du bist Manager: Du stellst ein Team aus Bots zusammen, das auf dem Spielserver Dream-Team-Turniere spielt. Läuft es gut für dein Team, verdienst du Neuro und kannst dir bessere Bots leisten.',
-  'udt.help.team.title': 'Team gründen',
-  'udt.help.team.text':
-    'Unter Mein Team wählst du Namen und Tag und baust deinen Starter-Bot mit den Startpunkten. Der Starter kostet nichts und bekommt kein Gehalt; wie jeder selbst gemachte Bot ist er handelbar (ein Bot bleibt immer).',
   'udt.help.bots.title': 'Neue Bots bekommen',
-  'udt.help.bots.text': 'Es gibt vier Wege zu neuen Bots:',
   'udt.help.way.market.title': 'Markt: sofort kaufen',
   'udt.help.way.market.text':
     'Jeder Markttag bringt neue Bots zum Festpreis. Kaufst du einen, ist er sofort in deinem Kader; wer zuerst kommt, bekommt ihn.',
@@ -5829,14 +5980,9 @@ const de: Record<TKey, string> = {
     'Tausche Bots und Neuro mit anderen Managern – gekaufte und selbst gemachte, auch den Starter (ein Bot bleibt immer). Selbst gemachte Bots behalten beim neuen Team ihre Vorteile, du bleibst ihr Züchter.',
   'udt.help.bots.roster':
     'Ein Kader hat bis zu 7 Bots (5 spielen, 2 auf der Bank). Einen Bot an den Markt zurückzuverkaufen bringt 85 % seines Werts, höchstens den Kaufpreis (nicht, solange er in einem ausgelosten oder laufenden Dream-Team-Turnier spielt).',
-  'udt.help.lineup.title': 'Aufstellen',
-  'udt.help.events.title': 'Turniere spielen',
-  'udt.help.events.text':
-    'Unter Events meldest du dein Team an (oder lässt es automatisch anmelden). Spiele, Siege und Platzierungen bringen Neuro und Erfahrung; die Tabelle zeigt die besten Teams der Season.',
   'udt.help.neuro.title': 'Neuro',
   'udt.help.neuro.text':
     'Neuro ist die Währung der Website: Du gewinnst sie mit Wetten und Dream-Team-Prämien und kannst ausgeben, was über der Rettungsgrenze liegt. Neuro in gekauften Bots zählen zur Rettungsgrenze: Die Rettung nach einer verlorenen Wette füllt nur auf, was darüber hinaus fehlt. Gekaufte Bots bekommen jeden Montag Gehalt; kann es nicht gezahlt werden, streikt der Bot, bis ein Markttag das Offene einziehen kann (ein Verkauf zahlt es auch). Preise folgen dem Wirtschaftsindex; Gehälter, Standard-Packs und Lizenzen über 1 nur seiner Wurzel (bei Index 5 etwa ×2,2 statt ×5), Premium- und Elite-Packs noch flacher (Premium Index^0,4, Elite Index^0,35: bei Index 5 etwa ×1,9 und ×1,8).',
-  'udt.help.go': "Los geht's",
   'udt.rename.once': 'Einmal pro Bot, kostenlos (das Aussehen jederzeit).',
   'ok.udt.autoOn': 'Automatische Anmeldung an: {n} {n|Turnier|Turniere} sofort angemeldet.',
   'udt.kind.udt_purchase': 'Kauf',
@@ -5868,8 +6014,6 @@ const de: Record<TKey, string> = {
   'udt.form.title.cold':
     'Tagesform: Formtief, −10 Treffsicherheit in Dream-Team-Spielen. Jeden Tag neu ausgewürfelt; gilt für die Turniere, die heute ausgelost werden.',
   'udt.form.title.normal': 'Tagesform: normal (jeden Tag neu ausgewürfelt).',
-  'udt.help.lineup.text':
-    'Unter Mein Team legst du fest, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung. Jedes Spiel kostet Ausdauer, und müde Bots spielen schlechter: Lass sie ruhen oder kauf Erholung mit Neuro. Jeder Bot hat außerdem eine Tagesform (Form ▲ / ▼ auf der Karte). In den Bot-Details gibt das Trainingslager einem Bot einmal am Tag Erfahrung gegen Neuro – praktisch für Bots, die wenig spielen.',
   'udt.market.legendLink': 'Was zeigen Linie und %?',
   'udt.market.legend':
     'Linie und % rechts: wie sich der Marktwert des Bots über die letzten Markttage entwickelt hat, ohne den Wirtschaftsindex – also Form und Nachfrage dieses Bots, nicht die ganze Wirtschaft.',
@@ -6685,6 +6829,188 @@ const de: Record<TKey, string> = {
   'lgs.needProfile':
     'Der gewählte Server hat kein Profil: anderen Server oder „automatisch“ wählen.',
   'league.mineOnly': 'Nur meine Spiele',
+  'guide.button': 'So funktioniert’s',
+  'guide.ok': 'Verstanden',
+  'guide.new': 'Noch nicht geöffnet',
+  'guide.go': 'Hin',
+  'guide.facts': 'Kurz',
+  'guide.mentorsLink': 'So funktionieren Mentoren',
+  'guide.dt.title': 'So funktioniert das Dream Team',
+  'guide.dt.lead':
+    'Du bist Manager: Dein Team aus Bots spielt Dream-Team-Turniere auf dem Gameserver. Erfolge bringen Neuro, und mit Neuro holst du bessere Bots.',
+  'guide.dt.f1': 'Kader bis 7 Bots',
+  'guide.dt.f2': '5 spielen, 2 auf der Bank',
+  'guide.dt.f3': 'Gehalt jeden Montag',
+  'guide.dt.f4': 'Zurückverkaufen: 85 % des Werts',
+  'guide.dt.s1': 'Team gründen',
+  'guide.dt.s1d':
+    'Unter Mein Team wählst du Name und Tag und baust deinen Starter-Bot. Er ist kostenlos und bekommt kein Gehalt.',
+  'guide.dt.s2': 'Bots holen',
+  'guide.dt.s2d': 'Vier Wege: Markt, Akademie, Packs und Handel – mehr dazu unten.',
+  'guide.dt.s3': 'Aufstellen',
+  'guide.dt.s3d':
+    'Unter Mein Team bestimmst du, wer Deathmatch und Monster Hunt spielt; die Aufstellung zählt bis zur Auslosung.',
+  'guide.dt.s4': 'Turniere spielen',
+  'guide.dt.s4d':
+    'Melde dein Team zu Cups an und spiel die Liga; Spiele, Siege und Plätze bringen Neuro und Erfahrung.',
+  'guide.dt.s5': 'Neuro',
+  'guide.dt.s5d':
+    'Neuro gewinnst du mit Wetten und Dream-Team-Prämien; ausgeben kannst du, was über der Rettungsgrenze liegt.',
+  'guide.dt.mRoster': 'Kader und Verkauf',
+  'guide.team.title': 'So funktioniert Mein Team',
+  'guide.team.lead':
+    'Hier stellst du auf, entwickelst deine Bots und behältst Ausdauer und Geld im Blick.',
+  'guide.team.f1': '5 in der Aufstellung',
+  'guide.team.f2': '2 auf der Bank',
+  'guide.team.f3': 'Kader bis 7',
+  'guide.team.f4': 'Erholen: {n} Neuro je Punkt',
+  'guide.team.s1': 'Aufstellen',
+  'guide.team.s1d':
+    'Zieh Karten auf die Deathmatch- und Monster-Hunt-Plätze; es wird sofort gespeichert. Die Aufstellung zählt bis zur Auslosung.',
+  'guide.team.s2': 'Entwickeln',
+  'guide.team.s2d':
+    'Selbst gemachte Bots bekommen mit ihren Leveln Punkte; verteile sie in den Bot-Details (Reiter Entwicklung).',
+  'guide.team.s3': 'Traits',
+  'guide.team.s3d':
+    'Zieh einen Trait aus der Trait-Leiste auf einen Bot. Abnehmen zerstört ihn und gibt Schrott.',
+  'guide.team.s4': 'Ausdauer',
+  'guide.team.s4d':
+    'Jedes Spiel kostet Ausdauer, müde Bots spielen schlechter. Erholung kommt mit jedem Markttag oder für Neuro in den Bot-Details.',
+  'guide.team.mPoints': 'Entwicklungspunkte',
+  'guide.league.title': 'So funktioniert die Liga',
+  'guide.league.lead':
+    'Die Liga spielt 5v5 mit deiner Deathmatch-Aufstellung an Liga-Abenden; die Tabelle entscheidet über Auf- und Abstieg.',
+  'guide.league.f1': '5v5 Deathmatch',
+  'guide.league.f2': 'Sieg 2 · Overtime-Niederlage 1',
+  'guide.league.f3': 'Das Heimteam wählt die Map',
+  'guide.league.f4': 'Tabellengeld montags',
+  'guide.league.s1': 'Aufstellung prüfen',
+  'guide.league.s1d':
+    'Die Liga spielt mit deiner Deathmatch-Aufstellung; müde Bots ersetzt die Bank. Sie sperrt beim Anpfiff.',
+  'guide.league.s2': 'Map wählen',
+  'guide.league.s2d':
+    'Zu Hause wählst du die Map; die Analyse empfiehlt die mit der besten Bilanz.',
+  'guide.league.s3': 'Spieltag',
+  'guide.league.s3d':
+    'Partien mit Managern laufen echt auf den Servern und sind wettbar; KI gegen KI wird simuliert.',
+  'guide.league.s4': 'Auf- und Abstieg',
+  'guide.league.s4d':
+    'Zum Season-Ende steigen die Besten auf und die Letzten ab; die Relegation geht über Bo3.',
+  'guide.league.mScoring': 'Punkte und Gleichstand',
+  'guide.league.mGames': 'Partien und Server',
+  'guide.packs.title': 'So funktionieren Packs',
+  'guide.packs.lead':
+    'Packs bringen Traits für deine Bots und ab und zu einen Bauplan; jede Box zeigt ihre Raten.',
+  'guide.packs.f1': 'Raten offen',
+  'guide.packs.f2': 'Pity: Episch und Legendär garantiert',
+  'guide.packs.f3': 'Duplikate → Schrott',
+  'guide.packs.f4': 'Craften: 4× Schrottwert',
+  'guide.packs.s1': 'Box öffnen',
+  'guide.packs.s1d':
+    'Wähle eine Box; der 10er hat eine garantierte Seltenheit. Die Karten liegen erst verdeckt.',
+  'guide.packs.s2': 'Inventar',
+  'guide.packs.s2d':
+    'Neue Traits landen im Inventar. Setz sie unter Mein Team auf Bots oder verschrotte sie.',
+  'guide.packs.s3': 'Craften',
+  'guide.packs.s3d':
+    'Mit Schrott craftest du den Trait, den du willst; Suche und Filter helfen beim Finden.',
+  'guide.packs.s4': 'Werkstatt',
+  'guide.packs.s4d':
+    'Würfle eine Karte neu oder werte sie eine Seltenheit auf – für Neuro und Schrott.',
+  'guide.packs.mMod': 'Mod-Version',
+  'guide.cups.title': 'So funktionieren Cups',
+  'guide.cups.lead':
+    'Dream-Team-Cups sind Turniere der Manager-Aufstellungen: Melde dein Team an, die Bots spielen auf dem Gameserver.',
+  'guide.cups.f1': 'Aufstellung zählt bis zur Auslosung',
+  'guide.cups.f2': 'Prämien je Spiel und Platz',
+  'guide.cups.f3': 'Ein Turnier gleichzeitig',
+  'guide.cups.f4': 'KI-Teams füllen auf',
+  'guide.cups.s1': 'Anmelden',
+  'guide.cups.s1d': 'Melde dich zu einem offenen Cup an oder lass dein Team sich selbst anmelden.',
+  'guide.cups.s2': 'Aufstellen',
+  'guide.cups.s2d':
+    'Ändere die Aufstellung unter Mein Team vor der Auslosung; danach steht sie fest.',
+  'guide.cups.s3': 'Zuschauen',
+  'guide.cups.s3d':
+    'Der Cup läuft auf dem Server: Verfolge ihn live auf der Turnierseite und wette auf die Matches.',
+  'guide.cups.s4': 'Tabelle',
+  'guide.cups.s4d': 'Plätze zählen für die Season-Tabelle der Cups.',
+  'guide.cups.mAuto': 'Automatisch anmelden',
+  'guide.cups.mLimits': 'Wertgrenze, Star-Limit, Ticket',
+  'guide.cups.mLimitsd':
+    'Manche Cups begrenzen den Wert der Aufstellung oder die Zahl der Stars; High-Stakes-Cups kosten ein Ticket in Neuro, und das Season-Finale hat eigene Regeln.',
+  'guide.market.title': 'So funktioniert der Markt',
+  'guide.market.f1': 'Neue Angebote je Markttag',
+  'guide.market.f2': 'Wer zuerst kauft',
+  'guide.market.f3': 'Leihe: 15 % des Werts',
+  'guide.market.f4': 'Eingewöhnt nach 10 Spielen',
+  'guide.market.s1': 'Angebote ansehen',
+  'guide.market.s1d': 'Wähle links einen Bot: Karte, Preis, Wert und Gehalt erscheinen rechts.',
+  'guide.market.s2': 'Kaufen',
+  'guide.market.s2d':
+    'Gekauft ist der Bot sofort in deinem Kader; sein Gehalt fällt jeden Montag an.',
+  'guide.market.s3': 'Oder leihen',
+  'guide.market.s3d':
+    'Eine Leihe kostet eine Gebühr statt des Preises und kein Gehalt; eine Leihe je Team.',
+  'guide.market.s4': 'Eingewöhnen',
+  'guide.market.s4d':
+    'Gekaufte Bots sind nach 10 Dream-Team-Spielen eingewöhnt und bekommen 2 Prestige-Punkte.',
+  'guide.market.mPrice': 'Preis und Rückverkauf',
+  'guide.market.mLoan': 'Leihe',
+  'guide.trades.title': 'So funktioniert der Handel',
+  'guide.trades.f1': 'Gebühr {fee} %',
+  'guide.trades.f2': 'Angebote {h} h gültig',
+  'guide.trades.f3': 'Handelbar nach {lock} Tagen',
+  'guide.trades.s1': 'Partner wählen',
+  'guide.trades.s1d': 'Wähle den Manager, mit dem du handeln willst.',
+  'guide.trades.s2': 'Zusammenstellen',
+  'guide.trades.s2d':
+    'Was du gibst und was du bekommst: Bots und Neuro; die Bilanz zeigt, ob es aufgeht.',
+  'guide.trades.s3': 'Senden',
+  'guide.trades.s3d':
+    'Der andere Manager nimmt an oder lehnt ab; nach {h} h läuft das Angebot aus.',
+  'guide.trades.s4': 'Angebote beantworten',
+  'guide.trades.s4d': 'Angebote an dich warten hier; der Hub zählt sie.',
+  'guide.trades.mRules': 'Die Regeln im Detail',
+  'guide.academy.title': 'So funktioniert die Akademie',
+  'guide.academy.f1': '3 Talente je Bericht',
+  'guide.academy.f2': 'Jede Lizenz doppelt so teuer',
+  'guide.academy.f3': 'Eigene Bots: kein Gehalt',
+  'guide.academy.f4': 'Bauplan-Bots: 75 % Gehalt',
+  'guide.academy.s1': 'Scouten',
+  'guide.academy.s1d':
+    'Ein Scout-Bericht zeigt drei Talente mit Wertspannen; eines holst du mit einer Lizenz.',
+  'guide.academy.s2': 'Aus Bauplan bauen',
+  'guide.academy.s2d': 'Baupläne aus Packs werden hier zu eigenen Bots.',
+  'guide.academy.s3': 'Mentor',
+  'guide.academy.s3d':
+    'Ein erfahrener Bot bildet einen von ihnen als Lehrling aus – kostenlos, einmal pro Season.',
+  'guide.academy.s4': 'Entwickeln und Abschluss',
+  'guide.academy.s4d':
+    'Eigene Bots entwickelst du mit Punkten; nach der Season können sie in die Bibliothek abschließen.',
+  'guide.academy.mTalents': 'Talente und Anlagen',
+  'guide.club.title': 'So funktioniert das Vereinshaus',
+  'guide.club.f1': 'Wirkt für den ganzen Kader',
+  'guide.club.f2': 'Stufen bauen aufeinander auf',
+  'guide.club.f3': 'Reset zum Season-Wechsel',
+  'guide.club.s1': 'Gebäude wählen',
+  'guide.club.s1d': 'Jedes Gebäude zeigt, was seine nächste Stufe bringt.',
+  'guide.club.s2': 'Ausbauen',
+  'guide.club.s2d':
+    'Eine Stufe kostet Neuro mit vollem Index; fehlt Neuro, steht der Betrag unter dem Knopf.',
+  'guide.club.s3': 'Nutzen',
+  'guide.club.s3d': 'Die Wirkung gilt sofort, bis die Season endet.',
+  'guide.yearbook.title': 'So funktioniert das Jahrbuch',
+  'guide.yearbook.f1': 'Alle Bots einer Season',
+  'guide.yearbook.f2': 'Abschluss nach der Season',
+  'guide.yearbook.f3': 'Züchter-Prämie',
+  'guide.yearbook.s1': 'Seasons durchblättern',
+  'guide.yearbook.s1d': 'Wähle eine Season, um ihre Bots und Züchter zu sehen.',
+  'guide.yearbook.s2': 'Abschlüsse freigeben',
+  'guide.yearbook.s2d':
+    'Nach der Season gibst du den Abschluss deiner Bots frei; sie gehen mit ihrem Züchter in die Bibliothek.',
+  'guide.yearbook.s3': 'Beste Züchter',
+  'guide.yearbook.s3d': 'Die Rangliste der Manager nach Absolventen und Auszeichnungen.',
 };
 
 export const DICT: Record<Lang, Record<string, string>> = { en, de };

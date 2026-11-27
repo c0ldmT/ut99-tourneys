@@ -22,6 +22,26 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 327,
+    date: '2026-11-27',
+    en: {
+      title: 'How it works, on every Dream Team page',
+      items: [
+        'Each Dream Team page has a "How it works" button in its head: one sentence, the key facts, a few steps and details to unfold.',
+        'A dot marks a guide you have not opened yet.',
+        'Links like "Stamina" on My team or "The rules in detail" on Trades open the guide right at that part.',
+      ],
+    },
+    de: {
+      title: 'So funktioniert’s – auf jeder Dream-Team-Seite',
+      items: [
+        'Jede Dream-Team-Seite hat oben einen Knopf „So funktioniert’s“: ein Satz, die wichtigsten Fakten, ein paar Schritte und Details zum Aufklappen.',
+        'Ein Punkt markiert Anleitungen, die du noch nicht geöffnet hast.',
+        'Links wie „So funktioniert Ausdauer“ unter Mein Team oder „Die Regeln im Detail“ beim Handel öffnen die Anleitung gleich an der richtigen Stelle.',
+      ],
+    },
+  },
+  {
     id: 326,
     date: '2026-11-27',
     en: {

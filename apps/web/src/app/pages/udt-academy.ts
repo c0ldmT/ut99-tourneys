@@ -1,4 +1,4 @@
-import { HelpMore } from '../components/help-more';
+import { Guide, Guides } from '../components/guide';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -27,7 +27,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
 @Component({
   selector: 'app-udt-academy',
   imports: [
-    HelpMore,
+    Guide,
     FormsModule,
     RouterLink,
     TPipe,
@@ -43,6 +43,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
     <udt-nav (changed)="load()" />
     @if (a(); as v) {
       <div class="udt-head">
+        <na-guide page="academy" />
         <div>
           <div class="kpi udt-kick">{{ 'udt.area.team' | t }}</div>
           <h1 class="disp">{{ 'udt.academy.title' | t }}</h1>
@@ -147,7 +148,9 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
           @if (v.rosterFull) {
             <p class="muted small">{{ 'udt.academy.full' | t }}</p>
           }
-          <na-help id="academy-scout">{{ 'udt.scout.note' | t }}</na-help>
+          <button type="button" class="link small" (click)="guides.open('academy', 'talents')">
+            {{ 'guide.academy.mTalents' | t }}
+          </button>
         </section>
 
         @if (v.blueprints.length) {
@@ -489,6 +492,7 @@ import { ANLAGE_LEVEL } from '@tourney/udt';
   `,
 })
 export class UdtAcademyPage {
+  protected readonly guides = inject(Guides);
   private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);

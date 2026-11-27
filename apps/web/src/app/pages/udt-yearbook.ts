@@ -1,3 +1,4 @@
+import { Guide } from '../components/guide';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -21,7 +22,7 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
  */
 @Component({
   selector: 'app-udt-yearbook',
-  imports: [FormsModule, RouterLink, TPipe, NeuroPipe, UdtCard, UdtNav],
+  imports: [Guide, FormsModule, RouterLink, TPipe, NeuroPipe, UdtCard, UdtNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -67,6 +68,7 @@ import { botRarity, UdtCard, UdtNav, type CardBot } from '../core/udt';
     }
     @if (book(); as y) {
       <div class="udt-head">
+        <na-guide page="yearbook" />
         <div>
           <div class="kpi udt-kick">{{ 'udt.area.team' | t }}</div>
           <h1 class="disp">{{ 'udt.yearbook.title' | t }}</h1>

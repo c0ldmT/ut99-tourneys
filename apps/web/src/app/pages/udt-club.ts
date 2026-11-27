@@ -1,3 +1,4 @@
+import { Guide } from '../components/guide';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
@@ -51,7 +52,7 @@ interface WallItem {
  */
 @Component({
   selector: 'app-udt-club',
-  imports: [RouterLink, TPipe, NeuroPipe, UdtNav, UdtCrestMark],
+  imports: [Guide, RouterLink, TPipe, NeuroPipe, UdtNav, UdtCrestMark],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -63,6 +64,7 @@ interface WallItem {
       } @else {
         <!-- Page head like every Dream Team page, the buildings without a card around them (decision 304). -->
         <div class="udt-head">
+          <na-guide page="club" [params]="{ i: indexText() }" />
           <div>
             <div class="kpi udt-kick">
               {{ 'udt.area.team' | t }} · {{ 'udt.season' | t: { n: v.season ?? 0 } }}

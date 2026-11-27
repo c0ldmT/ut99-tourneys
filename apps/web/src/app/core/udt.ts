@@ -10,7 +10,6 @@ import {
   input,
   output,
   signal,
-  viewChild,
   booleanAttribute,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -29,7 +28,6 @@ import {
   valueScore,
   weeklySalary,
 } from '@tourney/udt';
-import { UdtHelp } from '../components/udt-help';
 import { Api } from './api';
 import { Auth } from './auth';
 import { Coin } from './brand';
@@ -404,7 +402,7 @@ export function staminaColor(s: number): string {
  */
 @Component({
   selector: 'udt-nav',
-  imports: [RouterLink, TPipe, WhenPipe, UdtHelp],
+  imports: [RouterLink, TPipe, WhenPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (!bare()) {
@@ -442,10 +440,6 @@ export function staminaColor(s: number): string {
               }
             </a>
           }
-          <button type="button" class="udt-help-btn" (click)="help().open()">
-            <span class="q" aria-hidden="true">?</span
-            ><span class="hl">{{ 'udt.help.button' | t }}</span>
-          </button>
         </div>
         @if (current(); as c) {
           <div class="udt-tabs" [style.--ac]="c.color">
@@ -466,7 +460,6 @@ export function staminaColor(s: number): string {
         }
       </nav>
     }
-    <udt-help />
     @if (testBar()) {
       <div class="udt-test" role="region" [attr.aria-label]="'udt.test.title' | t">
         <b>{{ 'udt.test.title' | t }}</b>
@@ -534,13 +527,6 @@ export class UdtNav {
   protected readonly testBar = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );
-
-  protected readonly help = viewChild.required(UdtHelp);
-
-  /** Opens the help (the hub's button in its middle). */
-  openHelp(): void {
-    this.help().open();
-  }
 
   /** A tab is the page shown: same path (the league's table also on /udt/league/table), same anchor. */
   protected isActive(i: UdtAreaItem): boolean {

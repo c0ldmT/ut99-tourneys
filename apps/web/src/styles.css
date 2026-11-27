@@ -1166,30 +1166,6 @@ main section[id] {
   color: var(--text);
   border-bottom-color: var(--ac, var(--accent));
 }
-.udt-nav .udt-help-btn {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px 6px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--udt);
-  background: color-mix(in srgb, var(--udt) 12%, transparent);
-  color: var(--text);
-  font-weight: 700;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--udt) 12%, transparent);
-}
-.udt-nav .udt-help-btn:hover {
-  background: color-mix(in srgb, var(--udt) 22%, transparent);
-}
-@media (max-width: 1100px) {
-  .udt-nav .udt-help-btn {
-    padding: 6px;
-  }
-  .udt-nav .udt-help-btn .hl {
-    display: none;
-  }
-}
 @media (max-width: 900px) {
   .udt-areas {
     gap: 4px;
@@ -1226,16 +1202,6 @@ main section[id] {
   .udt-tabs a {
     padding: 10px 10px;
   }
-}
-.udt-help-btn .q {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--udt);
-  color: var(--bg);
-  font-weight: 800;
 }
 .udt-test {
   display: flex;

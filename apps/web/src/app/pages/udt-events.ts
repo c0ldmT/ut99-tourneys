@@ -1,3 +1,4 @@
+import { Guide } from '../components/guide';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
@@ -10,11 +11,12 @@ import { UdtNav } from '../core/udt';
 /** Dream Team tournaments: sign the team up, see which lineup would play (and why not). */
 @Component({
   selector: 'app-udt-events',
-  imports: [RouterLink, TPipe, NeuroPipe, UdtNav],
+  imports: [Guide, RouterLink, TPipe, NeuroPipe, UdtNav],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     <div class="udt-head">
+      <na-guide page="cups" />
       <div>
         <div class="kpi udt-kick">{{ 'udt.area.cups' | t }}</div>
         <h1 class="disp">{{ 'udt.events.title' | t }}</h1>
@@ -262,11 +264,12 @@ export class UdtEventsPage {
 /** Dream Team season table. */
 @Component({
   selector: 'app-udt-table',
-  imports: [TPipe, UdtNav, RouterLink],
+  imports: [Guide, TPipe, UdtNav, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     <div class="udt-head">
+      <na-guide page="cups" />
       <div>
         <div class="kpi udt-kick">{{ 'udt.area.cups' | t }}</div>
         <h1 class="disp">{{ 'udt.table.title' | t }}</h1>

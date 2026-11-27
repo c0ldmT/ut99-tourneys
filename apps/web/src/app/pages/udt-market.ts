@@ -1,5 +1,5 @@
+import { Guide, Guides } from '../components/guide';
 import { type Choice, Segment } from '../components/choice';
-import { HelpMore } from '../components/help-more';
 import { Confirm } from '../components/confirm-dialog';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Api } from '../core/api';
@@ -16,12 +16,13 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
 /** Dream Team transfer market: today's offers at fixed prices (buy at once), the next market day. */
 @Component({
   selector: 'app-udt-market',
-  imports: [Segment, HelpMore, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
+  imports: [Guide, Segment, TPipe, NeuroPipe, Coin, UdtCard, UdtNav, UdtSignatureBox],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
     @if (market(); as m) {
       <div class="udt-head">
+        <na-guide page="market" />
         <div>
           <div class="kpi udt-kick">{{ 'udt.area.trans' | t }}</div>
           <h1 class="disp">{{ 'udt.market.title' | t }}</h1>
@@ -54,9 +55,13 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
         <div class="wrap">
           <div class="list">
             <na-segment [options]="filterOptions" [(value)]="filter" label="udt.market.filter" />
-            <na-help id="market-legend" label="udt.market.legendLink" class="legend">{{
-              'udt.market.legend' | t
-            }}</na-help>
+            <button
+              type="button"
+              class="link small legend"
+              (click)="guides.open('market', 'legend')"
+            >
+              {{ 'udt.market.legendLink' | t }}
+            </button>
             @for (o of shown(); track o.botId) {
               <button
                 type="button"
@@ -339,6 +344,7 @@ type Filter = 'all' | 'weak' | 'mid' | 'strong';
   `,
 })
 export class UdtMarketPage {
+  protected readonly guides = inject(Guides);
   private readonly confirm = inject(Confirm);
   private readonly api = inject(Api);
   private readonly i18n = inject(I18n);

@@ -1,4 +1,4 @@
-import { HelpMore } from './help-more';
+import { Guides } from './guide';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -22,7 +22,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
  */
 @Component({
   selector: 'udt-mentor-panel',
-  imports: [HelpMore, TPipe, UdtCard],
+  imports: [TPipe, UdtCard],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @let v = academy();
@@ -38,7 +38,9 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
           <span class="udt-mark star">{{ 'udt.mentor.ruleXp' | t: { xp: xp() } }}</span>
         </div>
       </div>
-      <na-help id="mentors">{{ 'udt.mentor.intro' | t }}</na-help>
+      <button type="button" class="link small" (click)="guides.open('academy', 'mentors')">
+        {{ 'guide.mentorsLink' | t }}
+      </button>
 
       @if (v.mentorships.length) {
         <h3>{{ 'udt.mentor.running' | t }}</h3>
@@ -389,6 +391,7 @@ type LessonKey = 'accuracy' | 'alertness' | 'strafing' | 'combatStyle' | 'campin
   `,
 })
 export class UdtMentorPanel {
+  protected readonly guides = inject(Guides);
   private readonly i18n = inject(I18n);
   readonly academy = input.required<UdtAcademy>();
   readonly busy = input(false);

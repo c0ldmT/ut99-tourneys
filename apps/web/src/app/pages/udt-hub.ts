@@ -1,12 +1,6 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  signal,
-  viewChild,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Guide } from '../components/guide';
 import { UdtCrestMark } from '../components/udt-crest';
 import { UdtFirstSteps } from '../components/udt-first-steps';
 import { UdtForYou } from '../components/udt-for-you';
@@ -43,10 +37,12 @@ interface AreaView {
  */
 @Component({
   selector: 'app-udt-hub',
-  imports: [RouterLink, TPipe, UdtNav, UdtCrestMark, UdtFirstSteps, UdtForYou],
+  imports: [RouterLink, TPipe, Guide, UdtNav, UdtCrestMark, UdtFirstSteps, UdtForYou],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav [bare]="true" (changed)="load()" />
+    <!-- The centre of the shape opens the Dream Team guide (decision 327). -->
+    <na-guide #guide page="dt" [button]="false" />
     <div class="hub-head">
       <h1 class="disp">{{ 'udt.title' | t }}</h1>
       <span class="muted hub-who">
@@ -119,7 +115,7 @@ interface AreaView {
         [style.left.%]="center()[0]"
         [style.top.%]="center()[1]"
         [attr.aria-label]="'udt.help.button' | t"
-        (click)="nav().openHelp()"
+        (click)="guide.open()"
       >
         <span
           ><b>?</b><small>{{ 'udt.hub.help' | t }}</small></span
@@ -200,7 +196,7 @@ interface AreaView {
           [style.left.%]="miniCenter()[0]"
           [style.top.%]="miniCenter()[1]"
           [attr.aria-label]="'udt.help.button' | t"
-          (click)="nav().openHelp()"
+          (click)="guide.open()"
         >
           <span><b>?</b></span>
         </button>
@@ -512,7 +508,6 @@ export class UdtHubPage {
   private readonly api = inject(Api);
   private readonly auth = inject(Auth);
   private readonly i18n = inject(I18n);
-  protected readonly nav = viewChild.required(UdtNav);
 
   protected readonly hub = signal<UdtHub | null>(null);
   /** The area under the pointer or the keyboard (segment and field light up together). */
