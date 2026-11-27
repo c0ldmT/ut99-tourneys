@@ -1472,6 +1472,7 @@ const en = {
   'udt.found.name': 'Team name',
   'udt.found.tag': 'Tag (1–8 signs, as it stands in front of the bot names)',
   'udt.nav.squads': 'Teams',
+  'udt.hub.allTeams': 'All teams',
   'udt.squads.title': 'Teams',
   'udt.squads.intro':
     'Every team of the season and its bots: lineup, level, traits, stamina and value.',
@@ -5258,6 +5259,7 @@ const de: Record<TKey, string> = {
   'udt.found.name': 'Teamname',
   'udt.found.tag': 'Tag (1–8 Zeichen, steht so vor den Botnamen)',
   'udt.nav.squads': 'Teams',
+  'udt.hub.allTeams': 'Alle Teams',
   'udt.squads.title': 'Teams',
   'udt.squads.intro':
     'Alle Teams der Season und ihre Bots: Aufstellung, Level, Traits, Ausdauer und Wert.',

@@ -19,6 +19,7 @@ import { Loading } from '../core/loading';
 import type { LeagueGame, LeagueHistorySeason, LeagueRow, LeagueView } from '../core/types';
 import { UdtNav } from '../core/udt';
 import { UdtCrestMark } from '../components/udt-crest';
+import { UdtClub } from '../components/udt-club';
 import { LiveList, type LiveListItem } from '../components/live-list';
 import { leagueItem } from '../core/live-items';
 
@@ -38,7 +39,17 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
  */
 @Component({
   selector: 'app-udt-league',
-  imports: [Guide, Segment, TPipe, RouterLink, UdtNav, NgTemplateOutlet, UdtCrestMark, LiveList],
+  imports: [
+    Guide,
+    Segment,
+    TPipe,
+    RouterLink,
+    UdtNav,
+    NgTemplateOutlet,
+    UdtCrestMark,
+    LiveList,
+    UdtClub,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <udt-nav (changed)="load()" />
@@ -133,7 +144,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                                   shortTag(r.tag)
                                 }}</span>
                               }
-                              <span class="nm">{{ r.name }}</span>
+                              <span class="nm"><udt-club [club]="r" /></span>
                               <span
                                 class="lg-chip"
                                 [class.me]="r.me"
@@ -183,14 +194,14 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                     <div class="lg-when">{{ gameTitle(n) }} · {{ when(n.scheduledAt) }}</div>
                     <div class="lg-vs">
                       <div>
-                        <b>{{ n.home.name }}</b>
+                        <b><udt-club [club]="n.home" /></b>
                         <span class="muted small">{{
                           'league.placeHome' | t: { p: n.place ?? '–' }
                         }}</span>
                       </div>
                       <span class="mono muted">vs</span>
                       <div>
-                        <b>{{ n.away.name }}</b>
+                        <b><udt-club [club]="n.away" /></b>
                         <span class="muted small">{{
                           (n.away.manager ? 'league.placeMgr' : 'league.placeAi')
                             | t: { p: n.awayPlace ?? '–' }
@@ -270,15 +281,15 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                             @if (g.home.crest; as c) {
                               <udt-crest [crest]="c" [tag]="g.home.tag" [size]="18" />
                             }
-                            {{ g.home.name }}</span
-                          >
+                            <udt-club [club]="g.home"
+                          /></span>
                           <span class="muted">vs</span>
                           <span [class.lg-win]="g.winner === g.away.id">
                             @if (g.away.crest; as c) {
                               <udt-crest [crest]="c" [tag]="g.away.tag" [size]="18" />
                             }
-                            {{ g.away.name }}</span
-                          >
+                            <udt-club [club]="g.away"
+                          /></span>
                         </span>
                         <span class="mono small muted">{{ info(g) }}</span>
                         @if (g.tournament; as t) {
@@ -303,11 +314,11 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                       @for (g of simGames(); track g.id) {
                         <div class="lg-sim">
                           <div [class.lg-win]="g.winner === g.home.id">
-                            <span>{{ g.home.name }}</span
+                            <span><udt-club [club]="g.home" /></span
                             ><b class="mono">{{ g.homeFrags ?? '·' }}</b>
                           </div>
                           <div [class.lg-win]="g.winner === g.away.id">
-                            <span>{{ g.away.name }}</span
+                            <span><udt-club [club]="g.away" /></span
                             ><b class="mono">{{ g.awayFrags ?? '·' }}</b>
                           </div>
                           <div class="muted small">
@@ -350,7 +361,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                           "
                           >{{ r.move > 0 ? '▲' : r.move < 0 ? '▼' : '–' }}</span
                         >
-                        <span class="nm">{{ r.name }}</span>
+                        <span class="nm"><udt-club [club]="r" /></span>
                         <b>{{ r.points }}</b>
                       </li>
                     }
@@ -401,11 +412,13 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                   @for (g of d.games; track g.id) {
                     <div class="lg-prow" [class.me]="g.home.me || g.away.me">
                       <span class="small muted">{{ g.matchday }}</span>
-                      <span class="r" [class.lg-win]="g.winner === g.home.id">{{
-                        g.home.name
-                      }}</span>
+                      <span class="r" [class.lg-win]="g.winner === g.home.id"
+                        ><udt-club [club]="g.home"
+                      /></span>
                       <span class="mono">{{ score(g) }}</span>
-                      <span [class.lg-win]="g.winner === g.away.id">{{ g.away.name }}</span>
+                      <span [class.lg-win]="g.winner === g.away.id"
+                        ><udt-club [club]="g.away"
+                      /></span>
                       <span class="small muted">{{ g.real ? ('league.real' | t) : '' }}</span>
                     </div>
                   }
@@ -484,14 +497,14 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                         <span
                           ><span class="lg-from up2"
                             >{{ tierShort(tier) }} · {{ placeIn(tier, g.away.id) }}</span
-                          ><br />{{ g.away.name }}</span
+                          ><br /><udt-club [club]="g.away" /></span
                         ><b class="mono">{{ g.awayWins ?? '' }}</b>
                       </div>
                       <div [class.lg-win]="g.winner === g.home.id">
                         <span
                           ><span class="lg-from rel"
                             >{{ tierShort(tier - 1) }} · {{ placeIn(tier - 1, g.home.id) }}</span
-                          ><br />{{ g.home.name }}</span
+                          ><br /><udt-club [club]="g.home" /></span
                         ><b class="mono">{{ g.homeWins ?? '' }}</b>
                       </div>
                       <div class="lg-res small muted">{{ relResult(g, tier) }}</div>
@@ -512,7 +525,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                     <ul>
                       @for (c of m.clubs; track c.id) {
                         <li>
-                          <b>{{ c.name }}</b>
+                          <b><udt-club [club]="c" /></b>
                           @if (c.manager) {
                             <span class="lg-chip" [class.me]="c.me" [class.mgr]="!c.me">{{
                               chip(c) | t
@@ -534,7 +547,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                     @if (seeds) {
                       <span class="muted">{{ proPlace(g.home.id) }}</span>
                     }
-                    {{ g.home.name }}
+                    <udt-club [club]="g.home" />
                     @if (g.home.manager) {
                       <span class="lg-chip" [class.me]="g.home.me" [class.mgr]="!g.home.me">{{
                         chip(g.home) | t
@@ -547,7 +560,7 @@ type Zone = 'final' | 'up' | 'relup' | 'rel' | 'down' | '';
                     @if (seeds) {
                       <span class="muted">{{ proPlace(g.away.id) }}</span>
                     }
-                    {{ g.away.name }}
+                    <udt-club [club]="g.away" />
                     @if (g.away.manager) {
                       <span class="lg-chip" [class.me]="g.away.me" [class.mgr]="!g.away.me">{{
                         chip(g.away) | t

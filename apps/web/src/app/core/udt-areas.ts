@@ -24,6 +24,8 @@ export interface UdtArea {
   /** SVG path (24 × 24, stroke). */
   icon: string;
   items: UdtAreaItem[];
+  /** More pills on the hub's card only (not tabs of the area), e.g. all teams (decision 330). */
+  hub?: UdtAreaItem[];
   /** Pages of the area (path prefixes; the first item's link is the area's start). */
   paths: string[];
 }
@@ -58,6 +60,7 @@ export const UDT_AREAS: readonly UdtArea[] = [
       { label: 'league.view.final', link: '/udt/league/final' },
       { label: 'league.view.history', link: '/udt/league/history' },
     ],
+    hub: [{ label: 'udt.hub.allTeams', link: '/udt/squads' }],
     paths: ['/udt/league'],
   },
   {

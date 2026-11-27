@@ -2618,14 +2618,23 @@ export class UdtLeagueService implements OnModuleInit, OnModuleDestroy {
       if (!crests.has(userId)) crests.set(userId, this.udt.crestOf(season, userId));
       return crests.get(userId) ?? null;
     };
+    // A manager's club links to the team's squad while the team plays this season (decision 330).
+    const nowSeason = this.udt.season().number;
+    const squads = new Map<string, boolean>();
+    const squadOf = (userId: string) => {
+      if (!squads.has(userId)) squads.set(userId, !!this.udt.team(userId, nowSeason));
+      return squads.get(userId) ? userId : null;
+    };
     const club = (id: string) => {
       const c = clubs.get(id);
       const crest = c?.userId ? crestOf(c.userId) : null;
+      const squad = c?.userId ? squadOf(c.userId) : null;
       return {
         id,
         name: c?.name ?? '?',
         tag: c?.tag ?? '',
         manager: !!c?.userId,
+        ...(squad ? { userId: squad } : {}),
         /** An AI manager's club (decision 250). */
         ai: !!c?.userId && ai.has(c.userId),
         me: c?.userId === user.id,

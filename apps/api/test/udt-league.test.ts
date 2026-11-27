@@ -347,6 +347,12 @@ describe('Dream Team league', () => {
     ) as { club: string; manager: boolean; ai?: boolean }[];
     // Two humans and two AI managers have clubs; the AI managers' clubs are marked.
     expect(rows.filter((r) => r.manager)).toHaveLength(4);
+    // Managers' clubs link to their squads, AI clubs have none (decision 330).
+    const linked = rows as { manager: boolean; userId?: string }[];
+    expect(linked.filter((r) => r.userId)).toHaveLength(4);
+    expect(linked.every((r) => !!r.userId === r.manager)).toBe(true);
+    const squad = await mario.get(`/udt/teams/${linked.find((r) => r.userId)!.userId}`);
+    expect(squad.status).toBe(200);
     const aiClubs = new Set(rows.filter((r) => r.ai).map((r) => r.club));
     expect(aiClubs.size).toBe(2);
     const humans = new Set(rows.filter((r) => r.manager && !r.ai).map((r) => r.club));

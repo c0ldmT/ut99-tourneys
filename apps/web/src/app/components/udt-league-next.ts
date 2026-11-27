@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
 import { I18n, TPipe } from '../core/i18n';
 import type { LeagueView, UdtAnalysis } from '../core/types';
+import { UdtClub } from './udt-club';
 import { UdtCrestMark } from './udt-crest';
 
 /** A map's record counts for the recommendation from this many games on. */
@@ -17,7 +18,7 @@ const MIN_GAMES = 5;
  */
 @Component({
   selector: 'app-udt-league-next',
-  imports: [TPipe, RouterLink, NgTemplateOutlet, UdtCrestMark],
+  imports: [TPipe, RouterLink, NgTemplateOutlet, UdtCrestMark, UdtClub],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     @if (next(); as n) {
@@ -35,11 +36,11 @@ const MIN_GAMES = 5;
               @if (n.home.crest; as c) {
                 <udt-crest [crest]="c" [tag]="n.home.tag" [size]="22" />
               }
-              {{ n.home.name }} vs
+              <udt-club [club]="n.home" /> vs
               @if (n.away.crest; as c) {
                 <udt-crest [crest]="c" [tag]="n.away.tag" [size]="22" />
               }
-              {{ n.away.name }}
+              <udt-club [club]="n.away" />
             </h2>
           </div>
           @if (an()?.next) {

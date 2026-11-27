@@ -148,6 +148,9 @@ interface AreaView {
                 }
               </a>
             }
+            @for (i of s.area.hub ?? []; track i.label) {
+              <a class="hub-pill" [routerLink]="i.link">{{ i.label | t }}</a>
+            }
           </div>
         </section>
       }
@@ -220,6 +223,11 @@ interface AreaView {
                 <span class="udt-badge">{{ tradesIn() }}</span>
               }
               <span class="go" aria-hidden="true">›</span></a
+            >
+          }
+          @for (i of p.area.hub ?? []; track i.label) {
+            <a class="hub-row" [routerLink]="i.link"
+              >{{ i.label | t }} <span class="go" aria-hidden="true">›</span></a
             >
           }
         </section>

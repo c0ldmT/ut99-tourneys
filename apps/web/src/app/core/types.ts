@@ -1829,6 +1829,8 @@ export interface LeagueClubRef {
   /** An AI manager's club (decision 250; `manager` is true as well). */
   ai?: boolean;
   me: boolean;
+  /** The manager, while the team plays this season: its squad page (decision 330). */
+  userId?: string;
 }
 
 export type LeagueFormMark = 'W' | 'OW' | 'OL' | 'L';
