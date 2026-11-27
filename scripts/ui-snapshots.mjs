@@ -208,7 +208,7 @@ async function routes(admin) {
     ['agents', '/admin/agents'],
     ['bots', '/admin/bots'],
     ['settings', '/admin/settings'],
-    ...['bets', 'bots', 'udt', 'league', 'system'].map((t) => [
+    ...['bets', 'bots', 'udt', 'league', 'challenge', 'system'].map((t) => [
       `settings-${t}`,
       `/admin/settings?tab=${t}`,
     ]),

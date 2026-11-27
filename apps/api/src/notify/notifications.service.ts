@@ -28,6 +28,22 @@ import { ServerActivity } from '../common/activity.js';
 type TournamentRow = typeof tournaments.$inferSelect;
 type UserRow = typeof users.$inferSelect;
 
+/** A challenge for the notifications: its managers and the texts' facts (decision 339). */
+export interface ChallengeNote {
+  fromUser: string;
+  toUser: string | null;
+  info: M.ChallengeInfo;
+}
+
+/** Challenge tournaments (decision 335) post their own embeds. */
+function isChallenge(t: TournamentRow): boolean {
+  try {
+    return !!(JSON.parse(t.udtJson ?? 'null') as { challenge?: unknown } | null)?.challenge;
+  } catch {
+    return false;
+  }
+}
+
 export const NOTIFY_MODES = ['default', 'custom', 'off'] as const;
 export type NotifyMode = (typeof NOTIFY_MODES)[number];
 
@@ -224,6 +240,12 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     this.safely('events', () => {
       const t = this.row(id);
       if (!t) return;
+      // A challenge posts its own embeds (decision 339): only "bets closed" comes from here.
+      if (isChallenge(t)) {
+        for (const e of stored)
+          if (e.type === 'match.started') this.betsClosed(t, after, e.data.matchId, e.at);
+        return;
+      }
       const info = this.info(t);
       for (const e of stored) {
         switch (e.type) {
@@ -254,20 +276,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             }
             break;
           }
-          case 'match.started': {
-            const s = this.bets.discordMatch(t.id, e.data.matchId, e.at);
-            if (s)
-              this.post(
-                t,
-                M.betsClosedEmbed(
-                  this.lang,
-                  s,
-                  this.betNames(after),
-                  this.matchLink(t, e.data.matchId),
-                ),
-              );
+          case 'match.started':
+            this.betsClosed(t, after, e.data.matchId, e.at);
             break;
-          }
           case 'match.result': {
             const r = e.data.result as MatchResult;
             const s = this.bets.discordMatch(t.id, r.matchId);
@@ -320,6 +331,13 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  /** "Bets closed" with the pools when the first game of a match started. */
+  private betsClosed(t: TournamentRow, p: TournamentProjection, matchId: string, at: string) {
+    const s = this.bets.discordMatch(t.id, matchId, at);
+    if (s)
+      this.post(t, M.betsClosedEmbed(this.lang, s, this.betNames(p), this.matchLink(t, matchId)));
+  }
+
   /** Entrants that just got their final place hear about it. */
   private placements(
     info: M.TournamentInfo,
@@ -335,5 +353,100 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         M.dmPlacement(this.lang, info, s.placement as number, team),
       );
     }
+  }
+
+  // ------------------------------------------------------------------------------------------
+  // Challenges (decision 339): the channel (accepted, bets open, result, record), direct
+  // messages (new, answer, reminder before the lock, expired, called off)
+  // ------------------------------------------------------------------------------------------
+
+  /** The default channel (challenges have no channel of their own). */
+  private postDefault(text: DiscordPost): void {
+    const url = this.defaultWebhook();
+    if (url) this.out.webhook(url, text);
+  }
+
+  /** A new challenge, a counter offer or a rematch: the challenged manager hears about it. */
+  challengeSent(c: ChallengeNote, kind: 'new' | 'counter' | 'rematch'): void {
+    this.safely('challenge', () => {
+      if (c.toUser) this.dm([c.toUser], () => M.dmChallenge(this.lang, c.info, kind));
+    });
+  }
+
+  /**
+   * The answer: the challenger hears it; an accepted challenge goes to the channel (Monster Hunt
+   * as the showcase with the record of its map).
+   */
+  challengeAnswered(
+    c: ChallengeNote,
+    accepted: boolean,
+    show?: { record: M.ChallengeRecordInfo | null; bonus: number },
+  ): void {
+    this.safely('challenge', () => {
+      this.dm([c.fromUser], () => M.dmChallengeAnswer(this.lang, c.info, accepted));
+      if (accepted) this.postDefault(M.challengeEmbed(this.lang, c.info, show));
+    });
+  }
+
+  /** Before the lock: both managers check their lineups. */
+  challengeReminder(c: ChallengeNote, lockIso: string): void {
+    this.safely('challenge', () => {
+      this.dm([c.fromUser], () =>
+        M.dmChallengeReminder(this.lang, c.info, c.info.to ?? '', lockIso),
+      );
+      if (c.toUser)
+        this.dm([c.toUser], () => M.dmChallengeReminder(this.lang, c.info, c.info.from, lockIso));
+    });
+  }
+
+  /** No answer in time: the challenger's stake is back. */
+  challengeExpired(c: ChallengeNote): void {
+    this.safely('challenge', () => {
+      this.dm([c.fromUser], () => M.dmChallengeExpired(this.lang, c.info));
+    });
+  }
+
+  /** A booked challenge will not be played: both managers hear why. */
+  challengeVoid(c: ChallengeNote, why: string | null): void {
+    this.safely('challenge', () => {
+      this.dm([c.fromUser], () => M.dmChallengeVoid(this.lang, c.info.to ?? '', why));
+      if (c.toUser) this.dm([c.toUser], () => M.dmChallengeVoid(this.lang, c.info.from, why));
+    });
+  }
+
+  /** The lock: the tournament is seeded, its match takes bets until the start. */
+  challengeBetsOpen(c: ChallengeNote, tournamentId: string): void {
+    this.safely('challenge', () => {
+      const t = this.row(tournamentId);
+      const [matchId] = this.bets.discordOpenMatches(tournamentId);
+      if (!t || !matchId) return;
+      this.post(t, M.challengeBetsEmbed(this.lang, c.info, this.matchLink(t, matchId)));
+    });
+  }
+
+  /** The result (with the bets of its match); `tournamentId`: null when won without a game. */
+  challengeResult(
+    c: ChallengeNote,
+    o: Omit<M.ChallengeOutcome, 'bets'>,
+    tournamentId: string | null,
+    matchId: string | null,
+  ): void {
+    this.safely('challenge', () => {
+      const t = tournamentId ? this.row(tournamentId) : undefined;
+      let bets: string | null = null;
+      let link = c.info.link;
+      if (t && matchId) {
+        link = this.matchLink(t, matchId);
+        const s = this.bets.discordMatch(t.id, matchId);
+        const p = this.events.projection(t.id);
+        if (s && p) bets = M.betsPayout(this.lang, s, this.betNames(p));
+      }
+      this.postDefault(M.challengeResultEmbed(this.lang, c.info, { ...o, bets }, link));
+    });
+  }
+
+  /** A Monster Hunt run broke the season record of its map: the record bonus. */
+  challengeRecord(r: Parameters<typeof M.challengeRecordEmbed>[1], link: string): void {
+    this.safely('challenge', () => this.postDefault(M.challengeRecordEmbed(this.lang, r, link)));
   }
 }

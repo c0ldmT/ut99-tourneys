@@ -32,4 +32,4 @@ export const SETTINGS_STYLES = `
  * page marks a tab as unsaved while one of its keyed forms has changes.
  */
 export type SettingsForm =
-  'rating' | 'season' | 'betting' | 'shop' | 'botAi' | 'live' | 'udt' | 'league';
+  'rating' | 'season' | 'betting' | 'shop' | 'botAi' | 'live' | 'udt' | 'league' | 'challenge';

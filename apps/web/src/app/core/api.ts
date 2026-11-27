@@ -40,6 +40,7 @@ import type {
   UdtKeepers,
   CalendarView,
   LeagueAdmin,
+  ChallengeAdmin,
   LeaguePlanSummary,
   LeagueEstimate,
   LeagueHistorySeason,
@@ -636,6 +637,8 @@ export class Api {
   calendar = (from?: string, to?: string) =>
     this.call<CalendarView>('GET', `/calendar${from && to ? `?from=${from}&to=${to}` : ''}`);
   udtLeagueAdmin = () => this.call<LeagueAdmin>('GET', '/udt/league/admin');
+  /** The admin tab "Challenges" (decision 339). */
+  udtChallengeAdmin = () => this.call<ChallengeAdmin>('GET', '/udt/challenges/admin');
   udtLeagueEstimate = (q: Record<string, string | number>) =>
     this.call<LeagueEstimate>(
       'GET',

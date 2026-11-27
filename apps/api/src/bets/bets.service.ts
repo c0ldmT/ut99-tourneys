@@ -887,6 +887,17 @@ export class BetsService {
   }
 
   /**
+   * Matches of a tournament taking bets now, for the channel (a challenge at its lock, decision
+   * 339): empty when the channel gets no bets.
+   */
+  discordOpenMatches(tournamentId: string): string[] {
+    const t = this.db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).get();
+    if (!t || !this.discordOn(t) || this.closedReason(t)) return [];
+    const books = this.book(tournamentId)?.books ?? new Map();
+    return [...books.entries()].filter(([, m]) => m.state === 'open').map(([id]) => id);
+  }
+
+  /**
    * Pools and odds of a match whose bets just closed (its first game started at `at`), or its
    * payout once decided. Null when nobody bet or the channel gets no bets.
    */

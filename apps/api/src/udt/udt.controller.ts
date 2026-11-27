@@ -510,6 +510,13 @@ export class UdtController {
     return { incoming: this.challenges.incoming(user.id) };
   }
 
+  /** The admin tab "Challenges": league evening, pool, indexed limits (decision 339). */
+  @AdminOnly()
+  @Get('challenges/admin')
+  challengeAdmin() {
+    return this.challenges.adminView();
+  }
+
   /** The manager's challenge record: won, lost, Neuro, rivals, last results (decision 338). */
   @Get('challenges/record')
   challengeRecord(@CurrentUser() user: User) {

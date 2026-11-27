@@ -22,6 +22,34 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 339,
+    date: '2026-11-27',
+    en: {
+      title: 'Dream Team: Challenges',
+      items: [
+        'New area Challenges: challenge another team (or everybody, or your league tier) to a match at a fixed time in the challenge window – deathmatch 1v1, 3v3 or 5v5, best of 1, 3 or 5, a map from the pool or a vote.',
+        'Stakes from 0 (a friendly) up to the cap; both stakes are held until the match, the winner takes the pot less a 5 % fee. Answer with yes, no or a counter offer; after the match there is a rematch.',
+        'An hour before the start the lineups are fixed and the bets open. Challenges tire your bots like a cup but bring no experience, game money or ranking points.',
+        'Monster Hunt is the showcase: 5v5, one race, three difficulties, no fee – and whoever breaks the season record of the map gets the record bonus.',
+        'Evenings with their main fight, your record with rivals, the record against a team on its card, the calendar and "For you" show what is on. The AI managers accept and challenge too.',
+        'Discord: accepted challenges, bets and results (with upsets and new records) in the channel; a new challenge, the answer, the reminder before the lock and expiries as direct messages.',
+        'Admins: Settings › Challenges with the window on the week next to the league evening – an overlap cannot be saved.',
+      ],
+    },
+    de: {
+      title: 'Dream Team: Challenges',
+      items: [
+        'Neuer Bereich Challenges: Fordere ein anderes Team (oder alle, oder deine Liga-Stufe) zu einem Match zu einem festen Termin im Challenge-Zeitraum heraus – Deathmatch 1v1, 3v3 oder 5v5, Best of 1, 3 oder 5, eine Map aus dem Pool oder Abstimmung.',
+        'Einsatz von 0 (Freundschaftsspiel) bis zur Obergrenze; beide Einsätze liegen bis zum Match in Treuhand, der Sieger bekommt den Topf abzüglich 5 % Gebühr. Antworten mit Ja, Nein oder Gegenvorschlag; nach dem Match gibt es die Revanche.',
+        'Eine Stunde vor dem Start stehen die Aufstellungen fest und die Wetten öffnen. Challenges kosten Ausdauer wie ein Cup, bringen aber keine Erfahrung, kein Spielgeld und keine Ranglistenpunkte.',
+        'Monster Hunt ist der Showcase: 5v5, ein Rennen, drei Härtegrade, keine Gebühr – und wer den Season-Rekord der Map bricht, bekommt die Rekordprämie.',
+        'Abende mit ihrem Hauptkampf, deine Bilanz mit Rivalen, die Bilanz gegen ein Team auf seiner Karte, der Kalender und „Für dich“ zeigen, was ansteht. Auch die KI-Manager nehmen an und fordern heraus.',
+        'Discord: angenommene Challenges, Wetten und Ergebnisse (mit Überraschungen und neuen Rekorden) im Kanal; neue Challenge, Antwort, Erinnerung vor der Sperre und Ablauf als Direktnachricht.',
+        'Admins: Einstellungen › Challenges mit dem Zeitraum auf der Woche neben dem Liga-Abend – eine Überschneidung lässt sich nicht speichern.',
+      ],
+    },
+  },
+  {
     id: 333,
     date: '2026-11-27',
     en: {

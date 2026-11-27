@@ -299,6 +299,11 @@ export const GUIDES = {
         title: 'guide.settings.mSeason',
         paras: [p('settings.ratingHint'), p('bets.settingsHint')],
       },
+      {
+        id: 'challenges',
+        title: 'guide.settings.mChallenges',
+        paras: [p('guide.settings.ch1'), p('guide.settings.ch2'), p('guide.settings.ch3')],
+      },
       { id: 'reset', title: 'guide.settings.mReset', paras: [p('reset.what'), p('reset.keeps')] },
     ],
   },

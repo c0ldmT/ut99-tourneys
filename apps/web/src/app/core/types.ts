@@ -1972,8 +1972,43 @@ export interface UdtSettings {
   aiStrength: 'calm' | 'normal' | 'ambitious';
   keepers: { max: number; skillLoss: number; days: number };
   league: LeagueSettings;
+  /** Challenges (decision 334): sent as a whole block. */
+  challenge: ChallengeSettings;
   /** Weekly cup bonus (index 1) for places 1-3 of the cup ranking. */
   cupBonus: number[];
+}
+
+/** The challenge window and its rules (decision 334; the admin tab, decision 339). */
+export interface ChallengeSettings {
+  enabled: boolean;
+  /** Weekdays, 0 = Monday. */
+  days: number[];
+  from: string;
+  to: string;
+  servers: number;
+  modes: ('dm' | 'mh')[];
+  teamSizes: (1 | 3 | 5)[];
+  bestOf: (1 | 3 | 5)[];
+  stakeMax: number;
+  feePct: number;
+  pairPerWeek: number;
+  perDay: number;
+  maxOpen: number;
+  expiryHours: number;
+  lockMin: number;
+  betBots: number;
+  ai: boolean;
+  mh: { feePct: number; recordBonus: number; hardness: ('normal' | 'hard' | 'nightmare')[] };
+}
+
+/** The admin tab "Challenges": the league evening, the pool, indexed limits (decision 339). */
+export interface ChallengeAdmin {
+  league: { enabled: boolean; days: number[]; time: string; minutes: number };
+  pool: number;
+  index: number;
+  stakeCap: number;
+  recordBonus: number;
+  booked: number;
 }
 
 export type LeagueLength = 'short' | 'medium' | 'long';

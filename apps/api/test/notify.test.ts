@@ -334,3 +334,89 @@ describe('bet texts', () => {
     ).toBe('📊 Bets: man vs. machine: players +210 N / bots −215 N');
   });
 });
+
+describe('challenge texts (decision 339)', () => {
+  const info: M.ChallengeInfo = {
+    from: 'Nexus',
+    to: 'Iron_Wolves',
+    mode: 'dm',
+    teamSize: 3,
+    bestOf: 3,
+    map: null,
+    hardness: 'normal',
+    stake: 0,
+    pot: 0,
+    prize: 0,
+    at: '2026-11-27T19:15:00.000Z',
+    expiresAt: '2026-11-27T18:15:00.000Z',
+    link: 'https://x/udt/challenges',
+  };
+
+  it('writes the direct messages in English, names escaped, friendlies without stakes', () => {
+    const t = Math.floor(Date.parse(info.at) / 1000);
+    expect(M.dmChallenge('en', info, 'new')).toBe(
+      `⚔️ **Nexus** challenges your team: 3v3 deathmatch · Bo3 · map vote · friendly · <t:${t}:F>. Answer by <t:${t - 3600}:R>: https://x/udt/challenges`,
+    );
+    expect(M.dmChallengeAnswer('en', info, true)).toBe(
+      `✅ **Iron\\_Wolves** accepts your challenge: <t:${t}:F>. https://x/udt/challenges`,
+    );
+    expect(M.dmChallengeExpired('en', { ...info, to: null })).toContain('to **everybody**');
+    expect(M.dmChallengeVoid('en', 'Nexus', 'strange')).toContain('(aborted)');
+  });
+
+  it('shows the Monster Hunt showcase, a race result and an upset', () => {
+    const mh = { ...info, mode: 'mh' as const, map: 'MH-Lonely', hardness: 'nightmare' as const };
+    const show = M.challengeEmbed(
+      'en',
+      { ...mh, stake: 500, pot: 1000, prize: 1000 },
+      {
+        record: null,
+        bonus: 310,
+      },
+    ).embeds![0]!;
+    expect(show.title).toBe('👹 Monster Hunt showcase: Nexus vs Iron_Wolves');
+    expect(show.fields!.map((f) => f.name)).toEqual([
+      'Format',
+      'Map',
+      'Season record',
+      'Stake',
+      'Start',
+    ]);
+    expect(show.fields![2]!.value).toBe(
+      'none yet – the first run sets it\nWhoever breaks it gets 310 N.',
+    );
+    const race = M.challengeResultEmbed(
+      'en',
+      mh,
+      {
+        winner: 'Nexus',
+        loser: 'Iron',
+        forfeit: false,
+        upset: false,
+        games: [{ w: 590_000, l: 612_300, map: 'MH-Lonely' }],
+      },
+      'https://x/t/1',
+    ).embeds![0]!;
+    expect(race.title).toBe('🏁 Nexus wins the race against Iron');
+    expect(race.description).toBe('**9:50.0 / 10:12.3** · MH-Lonely');
+    const upset = M.challengeResultEmbed(
+      'en',
+      { ...info, stake: 100, pot: 200, prize: 190 },
+      {
+        winner: 'Iron',
+        loser: 'Nexus',
+        forfeit: false,
+        upset: true,
+        games: [
+          { w: 20, l: 12, map: 'DM-Deck16][' },
+          { w: 9, l: 20, map: 'DM-Morpheus' },
+          { w: 20, l: 18, map: 'DM-Deck16][' },
+        ],
+      },
+      'https://x/t/1',
+    ).embeds![0]!;
+    expect(upset.title).toBe('💥 Upset! Iron beats Nexus');
+    expect(upset.fields![0]).toMatchObject({ name: 'Series', value: '**2 : 1**' });
+    expect(upset.fields!.at(-1)).toMatchObject({ name: 'Prize', value: '**190 N** → Iron' });
+  });
+});

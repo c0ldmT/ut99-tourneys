@@ -77,6 +77,57 @@ const T = {
     betsTop: 'größter Gewinner {who} {net}',
     betsFlop: 'größter Verlierer {who} {net}',
     betsVersus: 'Mensch vs. Maschine: Menschen {h} / Bots {b}',
+    // Challenges (decision 339)
+    chFriendly: 'Freundschaftsspiel',
+    chStake: '{n} je Team',
+    chDm: '{k}v{k} Deathmatch · Bo{n}',
+    chMh: 'Monster Hunt 5v5 · {hard}',
+    chVote: 'Map-Abstimmung',
+    chHard_normal: 'Normal',
+    chHard_hard: 'Hart',
+    chHard_nightmare: 'Albtraum',
+    chOpen: 'alle',
+    chNew:
+      '⚔️ **{from}** fordert dein Team heraus: {format} · {map} · {stake} · {when}. Antworten bis {until}: {link}',
+    chCounter:
+      '↩️ **{from}** antwortet mit einem Gegenvorschlag: {format} · {map} · {stake} · {when}. Antworten bis {until}: {link}',
+    chRematch:
+      '🔁 **{from}** will eine Revanche: {format} · {map} · {stake} · {when}. Antworten bis {until}: {link}',
+    chAccepted: '✅ **{to}** nimmt deine Challenge an: {when}.{held} {link}',
+    chHeld: ' Beide Einsätze ({stake}) liegen in Treuhand.',
+    chDeclined: '❌ **{to}** lehnt deine Challenge ab. Dein Einsatz ist zurück.',
+    chReminder:
+      '⏰ Deine Challenge gegen **{opp}** beginnt {when}. Die Aufstellung wird {lock} festgeschrieben – jetzt prüfen: {link}',
+    chExpired:
+      '⌛ Deine Challenge an **{to}** ist ohne Antwort abgelaufen. Dein Einsatz ist zurück.',
+    chVoid: '🚫 Die Challenge gegen **{opp}** fällt aus ({why}). Die Einsätze sind zurück.',
+    chWhy_lineups: 'keine gültige Aufstellung',
+    chWhy_late: 'Start nicht mehr möglich',
+    chWhy_server: 'kein Server',
+    chWhy_aborted: 'abgebrochen',
+    chWhy_removed: 'Turnier gelöscht',
+    chWhy_season: 'Season zu Ende',
+    eChTitle: '⚔️ {a} fordert {b} heraus',
+    eChShowTitle: '👹 Monster-Hunt-Showcase: {a} gegen {b}',
+    eChShow: 'Beide Teams laufen die Map nacheinander – die schnellere Zeit gewinnt.',
+    eChFormat: 'Format',
+    eChMap: 'Map',
+    eChHard: 'Härtegrad',
+    eChRecord: 'Season-Rekord',
+    eChNoRecord: 'noch keiner – der erste Lauf setzt ihn',
+    eChBonus: 'Wer ihn bricht, bekommt {n}.',
+    eChStake: 'Einsatz',
+    eChPot: 'Topf {pot} · Sieger {prize}',
+    eChStart: 'Start',
+    eChBetsOpen: 'Wetten bis zum Start {when}. [Jetzt wetten]({link})',
+    eChWon: '⚔️ {w} schlägt {l}',
+    eChUpset: '💥 Überraschung! {w} schlägt {l}',
+    eChRace: '🏁 {w} gewinnt das Rennen gegen {l}',
+    eChForfeit: '⏭️ {w} gewinnt kampflos gegen {l}',
+    eChPrize: 'Gewinn',
+    eChTimes: 'Zeiten',
+    eChRecordTitle: '🏆 Neuer Rekord auf {map}: {time}',
+    eChRecordBy: '**{team}** bricht den Season-Rekord ({hard}, vorher {old}) und bekommt {bonus}.',
   },
   en: {
     single: 'single elimination',
@@ -147,6 +198,56 @@ const T = {
     betsTop: 'biggest winner {who} {net}',
     betsFlop: 'biggest loser {who} {net}',
     betsVersus: 'man vs. machine: players {h} / bots {b}',
+    // Challenges (decision 339)
+    chFriendly: 'friendly',
+    chStake: '{n} per team',
+    chDm: '{k}v{k} deathmatch · Bo{n}',
+    chMh: 'Monster Hunt 5v5 · {hard}',
+    chVote: 'map vote',
+    chHard_normal: 'normal',
+    chHard_hard: 'hard',
+    chHard_nightmare: 'nightmare',
+    chOpen: 'everybody',
+    chNew:
+      '⚔️ **{from}** challenges your team: {format} · {map} · {stake} · {when}. Answer by {until}: {link}',
+    chCounter:
+      '↩️ **{from}** answers with a counter offer: {format} · {map} · {stake} · {when}. Answer by {until}: {link}',
+    chRematch:
+      '🔁 **{from}** wants a rematch: {format} · {map} · {stake} · {when}. Answer by {until}: {link}',
+    chAccepted: '✅ **{to}** accepts your challenge: {when}.{held} {link}',
+    chHeld: ' Both stakes ({stake}) are held.',
+    chDeclined: '❌ **{to}** declines your challenge. Your stake is back.',
+    chReminder:
+      '⏰ Your challenge against **{opp}** starts {when}. The lineup locks {lock} – check it now: {link}',
+    chExpired: '⌛ Your challenge to **{to}** expired without an answer. Your stake is back.',
+    chVoid: '🚫 The challenge against **{opp}** is called off ({why}). The stakes are back.',
+    chWhy_lineups: 'no valid lineup',
+    chWhy_late: 'too late to start',
+    chWhy_server: 'no server',
+    chWhy_aborted: 'aborted',
+    chWhy_removed: 'tournament removed',
+    chWhy_season: 'the season is over',
+    eChTitle: '⚔️ {a} challenges {b}',
+    eChShowTitle: '👹 Monster Hunt showcase: {a} vs {b}',
+    eChShow: 'Both teams run the map one after the other – the faster time wins.',
+    eChFormat: 'Format',
+    eChMap: 'Map',
+    eChHard: 'Difficulty',
+    eChRecord: 'Season record',
+    eChNoRecord: 'none yet – the first run sets it',
+    eChBonus: 'Whoever breaks it gets {n}.',
+    eChStake: 'Stake',
+    eChPot: 'pot {pot} · winner {prize}',
+    eChStart: 'Start',
+    eChBetsOpen: 'Bets until the start {when}. [Bet now]({link})',
+    eChWon: '⚔️ {w} beats {l}',
+    eChUpset: '💥 Upset! {w} beats {l}',
+    eChRace: '🏁 {w} wins the race against {l}',
+    eChForfeit: '⏭️ {w} wins by forfeit against {l}',
+    eChPrize: 'Prize',
+    eChTimes: 'Times',
+    eChRecordTitle: '🏆 New record on {map}: {time}',
+    eChRecordBy: '**{team}** breaks the season record ({hard}, before {old}) and gets {bonus}.',
   },
 } as const;
 
@@ -396,6 +497,8 @@ export const COLOR = {
   gold: 0xf5b83d,
   magenta: 0xf0468c,
   grey: 0x5d6679,
+  /** Challenges (decision 339): the area's orange. */
+  chall: 0xff8a3d,
 } as const;
 
 const post = (...embeds: Embed[]): DiscordPost => ({ embeds });
@@ -558,5 +661,232 @@ export function betsClosedEmbed(
     url: link,
     color: COLOR.magenta,
     fields,
+  });
+}
+
+// --- Challenges (decision 339) ----------------------------------------------------------------
+
+/** A challenge as the texts need it (team names, the format, the stake, the start). */
+export interface ChallengeInfo {
+  from: string;
+  /** null: an open challenge. */
+  to: string | null;
+  mode: 'dm' | 'mh';
+  teamSize: number;
+  bestOf: number;
+  /** null: map vote. */
+  map: string | null;
+  hardness: 'normal' | 'hard' | 'nightmare';
+  stake: number;
+  pot: number;
+  prize: number;
+  /** The start (ISO). */
+  at: string;
+  /** Answers until (ISO). */
+  expiresAt: string;
+  link: string;
+}
+
+const hardText = (lang: Lang, h: ChallengeInfo['hardness']) => fill(lang, `chHard_${h}` as Key);
+
+export function challengeFormat(lang: Lang, c: ChallengeInfo): string {
+  return c.mode === 'mh'
+    ? fill(lang, 'chMh', { hard: hardText(lang, c.hardness) })
+    : fill(lang, 'chDm', { k: c.teamSize, n: c.bestOf });
+}
+
+const stakeText = (lang: Lang, stake: number) =>
+  stake > 0 ? fill(lang, 'chStake', { n: neuro(lang, stake) }) : fill(lang, 'chFriendly');
+
+/** A new challenge, a counter offer or a rematch for the challenged manager. */
+export function dmChallenge(
+  lang: Lang,
+  c: ChallengeInfo,
+  kind: 'new' | 'counter' | 'rematch',
+): string {
+  return fill(lang, kind === 'counter' ? 'chCounter' : kind === 'rematch' ? 'chRematch' : 'chNew', {
+    from: md(c.from),
+    format: challengeFormat(lang, c),
+    map: c.map ? md(c.map) : fill(lang, 'chVote'),
+    stake: stakeText(lang, c.stake),
+    when: when(c.at),
+    until: when(c.expiresAt, 'R'),
+    link: c.link,
+  });
+}
+
+/** The challenger hears the answer: accepted (the start) or declined. */
+export function dmChallengeAnswer(lang: Lang, c: ChallengeInfo, accepted: boolean): string {
+  const to = md(c.to ?? '');
+  if (!accepted) return fill(lang, 'chDeclined', { to });
+  return fill(lang, 'chAccepted', {
+    to,
+    when: when(c.at),
+    held: c.stake > 0 ? fill(lang, 'chHeld', { stake: neuro(lang, c.stake) }) : '',
+    link: c.link,
+  });
+}
+
+/** Both managers before the lock: the lineup is fixed then. */
+export function dmChallengeReminder(lang: Lang, c: ChallengeInfo, opp: string, lockIso: string) {
+  return fill(lang, 'chReminder', {
+    opp: md(opp),
+    when: when(c.at, 'R'),
+    lock: when(lockIso, 'R'),
+    link: c.link,
+  });
+}
+
+export function dmChallengeExpired(lang: Lang, c: ChallengeInfo): string {
+  return fill(lang, 'chExpired', { to: md(c.to ?? fill(lang, 'chOpen')) });
+}
+
+/** A booked challenge that will not be played (`why`: the reason of the row). */
+export function dmChallengeVoid(lang: Lang, opp: string, why: string | null): string {
+  const key = `chWhy_${why ?? 'aborted'}`;
+  const text = key in T[lang] ? fill(lang, key as Key) : fill(lang, 'chWhy_aborted');
+  return fill(lang, 'chVoid', { opp: md(opp), why: text });
+}
+
+/** The season record of a Monster Hunt map and difficulty (null: none yet). */
+export interface ChallengeRecordInfo {
+  finalMs: number;
+  team: string | null;
+}
+
+/**
+ * The channel post of an accepted challenge; Monster Hunt gets the showcase embed with the map,
+ * the difficulty, the season record and the record bonus.
+ */
+export function challengeEmbed(
+  lang: Lang,
+  c: ChallengeInfo,
+  show?: { record: ChallengeRecordInfo | null; bonus: number },
+): DiscordPost {
+  const fields: { name: string; value: string; inline?: boolean }[] = [
+    { name: fill(lang, 'eChFormat'), value: challengeFormat(lang, c), inline: true },
+    { name: fill(lang, 'eChMap'), value: c.map ?? fill(lang, 'chVote'), inline: true },
+    {
+      name: fill(lang, 'eChStake'),
+      value:
+        c.stake > 0
+          ? `**${neuro(lang, c.stake)}** · ${fill(lang, 'eChPot', { pot: neuro(lang, c.pot), prize: neuro(lang, c.prize) })}`
+          : fill(lang, 'chFriendly'),
+      inline: false,
+    },
+    { name: fill(lang, 'eChStart'), value: `${when(c.at)} (${when(c.at, 'R')})`, inline: false },
+  ];
+  if (show) {
+    const rec = show.record;
+    fields.splice(2, 0, {
+      name: fill(lang, 'eChRecord'),
+      value:
+        (rec
+          ? `**${raceTime(rec.finalMs)}**${rec.team ? ` · ${md(rec.team)}` : ''}`
+          : fill(lang, 'eChNoRecord')) +
+        (show.bonus > 0 ? `\n${fill(lang, 'eChBonus', { n: neuro(lang, show.bonus) })}` : ''),
+      inline: false,
+    });
+  }
+  return post({
+    title: fill(lang, show ? 'eChShowTitle' : 'eChTitle', { a: c.from, b: c.to ?? '' }),
+    url: c.link,
+    ...(show ? { description: fill(lang, 'eChShow') } : {}),
+    color: show ? COLOR.gold : COLOR.chall,
+    fields,
+  });
+}
+
+/** Bets open at the lock: until the start. */
+export function challengeBetsEmbed(lang: Lang, c: ChallengeInfo, link: string): DiscordPost {
+  return post({
+    title: fill(lang, 'eBetsOpenTitle', { a: c.from, b: c.to ?? '' }),
+    url: link,
+    description: fill(lang, 'eChBetsOpen', { when: when(c.at, 'R'), link }),
+    color: COLOR.gold,
+  });
+}
+
+/** How a challenge ended for the channel. */
+export interface ChallengeOutcome {
+  winner: string;
+  loser: string;
+  forfeit: boolean;
+  upset: boolean;
+  /** Games: the winner's and the loser's score (race: final times in ms) and the map. */
+  games: { w: number; l: number; map: string | null }[];
+  /** The bets line, if any. */
+  bets?: string | null;
+}
+
+export function challengeResultEmbed(
+  lang: Lang,
+  c: ChallengeInfo,
+  o: ChallengeOutcome,
+  link: string,
+): DiscordPost {
+  const race = c.mode === 'mh';
+  const names = { w: o.winner, l: o.loser };
+  const title = o.forfeit
+    ? fill(lang, 'eChForfeit', names)
+    : o.upset
+      ? fill(lang, 'eChUpset', names)
+      : race
+        ? fill(lang, 'eChRace', names)
+        : fill(lang, 'eChWon', names);
+  const fields: { name: string; value: string; inline?: boolean }[] = [];
+  const pair = (g: ChallengeOutcome['games'][number]) =>
+    race ? `${raceTime(g.w)} / ${raceTime(g.l)}` : `${g.w} : ${g.l}`;
+  if (o.games.length > 1) {
+    const wins = o.games.filter((g) => (race ? g.w < g.l : g.w > g.l)).length;
+    fields.push({ name: fill(lang, 'eSeries'), value: `**${wins} : ${o.games.length - wins}**` });
+    o.games.forEach((g, i) =>
+      fields.push({
+        name: `${fill(lang, 'eGame', { n: i + 1 })} · ${g.map ?? '?'}`,
+        value: pair(g),
+        inline: true,
+      }),
+    );
+  }
+  if (c.stake > 0)
+    fields.push({
+      name: fill(lang, 'eChPrize'),
+      value: `**${neuro(lang, c.prize)}** → ${md(o.winner)}`,
+    });
+  if (o.bets) fields.push({ name: fill(lang, 'eBets'), value: o.bets.replace(/^💰 /, '') });
+  const one = o.games.length === 1 ? o.games[0]! : null;
+  return post({
+    author: { name: `Challenge · ${challengeFormat(lang, c)}`, url: link },
+    title,
+    url: link,
+    ...(one ? { description: `**${pair(one)}** · ${one.map ?? ''}` } : {}),
+    color: o.forfeit ? COLOR.grey : o.upset ? COLOR.magenta : COLOR.chall,
+    ...(fields.length ? { fields } : {}),
+  });
+}
+
+/** A Monster Hunt run that broke the season record of its map (the record bonus). */
+export function challengeRecordEmbed(
+  lang: Lang,
+  r: {
+    team: string;
+    map: string;
+    hardness: ChallengeInfo['hardness'];
+    finalMs: number;
+    oldMs: number;
+    bonus: number;
+  },
+  link: string,
+): DiscordPost {
+  return post({
+    title: fill(lang, 'eChRecordTitle', { map: r.map, time: raceTime(r.finalMs) }),
+    url: link,
+    description: fill(lang, 'eChRecordBy', {
+      team: md(r.team),
+      hard: hardText(lang, r.hardness),
+      old: raceTime(r.oldMs),
+      bonus: neuro(lang, r.bonus),
+    }),
+    color: COLOR.gold,
   });
 }

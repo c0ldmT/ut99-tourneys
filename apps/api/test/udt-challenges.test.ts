@@ -5,7 +5,7 @@ import { AgentsService } from '../src/agents/agents.service.js';
 import { DB, type Db } from '../src/db/database.js';
 import { and, eq } from 'drizzle-orm';
 import { vi } from 'vitest';
-import { neuroLedger, settings, udtChallenges, udtRoster } from '../src/db/schema.js';
+import { neuroLedger, settings, udtChallenges, udtRoster, users } from '../src/db/schema.js';
 import { SettingsService } from '../src/settings/settings.service.js';
 import { LedgerService } from '../src/ledger/ledger.service.js';
 import { TournamentsService } from '../src/tournaments/tournaments.service.js';
@@ -15,6 +15,7 @@ import { UdtChallengesService } from '../src/udt/udt-challenges.service.js';
 import { UdtRewardsService } from '../src/udt/udt-rewards.service.js';
 import { UdtAiService } from '../src/udt/udt-ai.service.js';
 import { Client, startApi, startSeason, tournamentBody } from './helpers.js';
+import type { DiscordOut, DiscordPost } from '../src/notify/discord-out.js';
 
 let api: RunningApi | undefined;
 afterEach(async () => {
@@ -36,9 +37,9 @@ const profile = (port: number) => ({
   manage: true,
 });
 
-async function setup(servers = 2, env: Record<string, string> = {}) {
+async function setup(servers = 2, env: Record<string, string> = {}, discordOut?: DiscordOut) {
   const clock = new FakeClock(NOW);
-  ({ api } = await startApi(env, { clock }));
+  ({ api } = await startApi(env, { clock, ...(discordOut ? { discordOut } : {}) }));
   const admin = await Client.login(api, 'Boss', true);
   const agents = api.app.get(AgentsService);
   for (let i = 1; i <= servers; i++) {
@@ -90,6 +91,25 @@ const body = (over: Record<string, unknown> = {}) => ({
   at: at('18:30'),
   ...over,
 });
+
+const DISCORD = {
+  DISCORD_WEBHOOK_URL: 'https://discord.com/api/webhooks/123456/abc-DEF_1',
+  DISCORD_BOT_TOKEN: 't',
+  NOTIFY_LANG: 'de',
+};
+
+/** Records the channel posts and direct messages. */
+function recorder() {
+  const posts: DiscordPost[] = [];
+  const dms: { to: string; text: string }[] = [];
+  const out: DiscordOut = {
+    webhook: (_url, text) =>
+      void posts.push(typeof text === 'string' ? { content: text, embeds: [] } : text),
+    dm: (to, text) => void dms.push({ to, text }),
+    idle: async () => {},
+  };
+  return { out, posts, dms };
+}
 
 describe('Dream Team challenges (decision 334)', () => {
   it('lists the start times of the window with their state', async () => {
@@ -323,13 +343,27 @@ describe('challenge window and league', () => {
     expect(r.body.key).toBe(
       'the challenge window {from} - {to} runs into the league evening at {time}',
     );
+    // The admin tab draws the evening and the limits (decision 339).
+    const v = await admin.get('/udt/challenges/admin');
+    expect(v.status, JSON.stringify(v.body)).toBe(200);
+    expect(v.body).toMatchObject({
+      league: { enabled: true, days: [0, 1, 2, 3, 4, 5], time: '22:00' },
+      pool: 2,
+      booked: 0,
+    });
+    expect(v.body.league.minutes).toBeGreaterThan(15);
+    const mario = await Client.login(api!, 'Mario');
+    const rules = (await mario.get('/udt/challenges')).body.rules;
+    expect(v.body.stakeCap).toBe(rules.stakeCap);
+    expect(v.body.recordBonus).toBe(rules.mh.recordBonus);
+    expect((await mario.get('/udt/challenges/admin')).status).toBe(403);
   });
 });
 
 describe('challenge matches (decision 335)', () => {
   /** Setup with the test mode (simulated games) and library bots for the rosters. */
-  async function played() {
-    const ctx = await setup(2, { TEST_MODE: 'true' });
+  async function played(env: Record<string, string> = {}, out?: DiscordOut) {
+    const ctx = await setup(2, { TEST_MODE: 'true', ...env }, out);
     for (let i = 1; i <= 12; i++)
       await ctx.admin.post('/bots', { name: `Lib${i}`, skill: 1 + (i % 6) });
     const svc = api!.app.get(UdtChallengesService);
@@ -567,9 +601,96 @@ describe('challenge matches (decision 335)', () => {
     expect(ok.body.rules.maps.dm).toEqual(pool);
   });
 
+  it('tells Discord: new, answer, reminder, bets open, result, expiry (decision 339)', async () => {
+    const { out, posts, dms } = recorder();
+    const { admin, marioId, timId, mario, tim, svc, row, book, toLock, clock, db } = await played(
+      DISCORD,
+      out,
+    );
+    const ids = { [marioId]: '300000000000000001', [timId]: '300000000000000002' };
+    for (const [u, d] of Object.entries(ids))
+      db.update(users).set({ discordId: d }).where(eq(users.id, u)).run();
+    const to = (u: string) => dms.filter((d) => d.to === ids[u]).map((d) => d.text);
+    // A challenge and its answer: Tim hears of it, Mario of the answer, the channel of the match.
+    const id = await book({ teamSize: 1, stake: 500 });
+    expect(to(timId)).toEqual([expect.stringContaining('**Nexus** fordert dein Team heraus')]);
+    expect(to(timId)[0]).toContain('1v1 Deathmatch · Bo1');
+    expect(to(marioId)).toEqual([expect.stringContaining('**Iron** nimmt deine Challenge an')]);
+    expect(to(marioId)[0]).toContain('500 N');
+    expect(posts).toHaveLength(1);
+    expect(posts[0]!.embeds![0]).toMatchObject({ title: '⚔️ Nexus fordert Iron heraus' });
+    expect(JSON.stringify(posts[0])).toContain('Topf 1.000 N · Sieger 950 N');
+    // A second one Tim declines; a third one waits and expires.
+    const two = await mario.post('/udt/challenges', body({ to: timId, at: at('20:00'), stake: 0 }));
+    expect((await tim.post(`/udt/challenges/${two.body.id}/decline`)).status).toBe(200);
+    expect(to(marioId).at(-1)).toContain('**Iron** lehnt deine Challenge ab');
+    const three = await mario.post(
+      '/udt/challenges',
+      body({ to: timId, teamSize: 1, at: at('20:30'), stake: 0 }),
+    );
+    expect(three.status, JSON.stringify(three.body)).toBe(201);
+    expect(to(timId).at(-1)).toContain('Freundschaftsspiel');
+    // Half an hour before the lock both managers are reminded, once.
+    const lock = Date.parse(row(id).scheduledAt) - 60 * 60_000;
+    clock.advance(lock - 31 * 60_000 - clock.now());
+    svc.tick();
+    expect(to(timId).filter((t) => t.startsWith('⏰'))).toEqual([]);
+    clock.advance(2 * 60_000);
+    svc.tick();
+    svc.tick();
+    expect(to(marioId).filter((t) => t.startsWith('⏰'))).toEqual([
+      expect.stringContaining('gegen **Iron**'),
+    ]);
+    expect(to(timId).filter((t) => t.startsWith('⏰'))).toEqual([
+      expect.stringContaining('gegen **Nexus**'),
+    ]);
+    // The lock opens the bets in the channel (until the start).
+    const c = toLock(id);
+    expect(c.status).toBe('locked');
+    expect(posts.at(-1)!.embeds![0]).toMatchObject({ title: '🎲 Wetten offen: Nexus vs Iron' });
+    expect(posts.at(-1)!.embeds![0]!.description).toContain('Wetten bis zum Start');
+    const before = posts.length;
+    await admin.post(`/udt/test/simulate/${c.tournamentId}`);
+    const done = row(id);
+    expect(done.status).toBe('played');
+    // Only the challenge's own result (no generic check-in, match or champion post).
+    const after = posts.slice(before).map((p) => p.embeds![0]!);
+    const result = after.find((e) => /schlägt|kampflos/.test(e.title ?? ''));
+    expect(result, JSON.stringify(after)).toBeDefined();
+    const [w, l] = done.winnerUser === marioId ? ['Nexus', 'Iron'] : ['Iron', 'Nexus'];
+    expect(result!.title).toContain(`${w} schlägt ${l}`);
+    expect(JSON.stringify(result)).toContain('950 N');
+    expect(after.filter((e) => !/Wetten|schlägt|kampflos/.test(e.title ?? ''))).toEqual([]);
+    // The third one expires at its deadline: Mario's stake (none) is back, he hears it.
+    clock.advance(Date.parse(row(three.body.id).expiresAt) + 1000 - clock.now());
+    svc.tick();
+    expect(row(three.body.id).status).toBe('expired');
+    expect(to(marioId).at(-1)).toContain('an **Iron** ist ohne Antwort abgelaufen');
+  });
+
+  it('without a game: the forfeit in the channel, a called-off one by message (decision 339)', async () => {
+    const { out, posts, dms } = recorder();
+    const { marioId, db, book, toLock, give } = await played(DISCORD, out);
+    db.update(users).set({ discordId: '300000000000000001' }).where(eq(users.id, marioId)).run();
+    // 3v3: Tim cannot field three, Mario wins without a game.
+    give(marioId, 2, 'dmSlot');
+    const id = await book({ teamSize: 3, stake: 300 });
+    expect(toLock(id).status).toBe('played');
+    expect(posts.at(-1)!.embeds![0]).toMatchObject({
+      title: '⏭️ Nexus gewinnt kampflos gegen Iron',
+    });
+    // 5v5: neither can, called off; Mario hears why.
+    const two = await book({ teamSize: 5, stake: 200, at: at('20:00') });
+    expect(toLock(two).status).toBe('void');
+    expect(dms.at(-1)!.text).toBe(
+      '🚫 Die Challenge gegen **Iron** fällt aus (keine gültige Aufstellung). Die Einsätze sind zurück.',
+    );
+  });
+
   it('Monster Hunt: five bots each, no fee, the record bonus for beating the season record', async () => {
+    const { out, posts } = recorder();
     const { admin, mario, marioId, timId, free, svc, tours, row, give, book, toLock, db } =
-      await played();
+      await played(DISCORD, out);
     for (const u of [marioId, timId]) {
       db.update(udtRoster).set({ mhSlot: null }).where(eq(udtRoster.userId, u)).run();
       give(u, 5, 'mhSlot', 1);
@@ -623,6 +744,12 @@ describe('challenge matches (decision 335)', () => {
     const winner = done.winnerUser!;
     expect(free(winner)).toBe(winner === timId ? -500 - bonus : -500);
     expect(free(marioId) + free(timId)).toBe(-bonus);
+    // Discord: the showcase when accepted, the new record after the race (decision 339).
+    const titles = posts.map((p) => p.embeds?.[0]?.title ?? '');
+    expect(titles[0]).toBe('👹 Monster-Hunt-Showcase: Nexus gegen Iron');
+    expect(JSON.stringify(posts[0])).toContain('Hart');
+    expect(titles).toContain('🏆 Neuer Rekord auf MH-Lonely: 9:40.0');
+    expect(JSON.stringify(posts)).toContain('vorher 10:00.0');
     // The yearbook names the record (decision 338).
     const yb = await mario.get('/udt/yearbook');
     expect(yb.body.challengeRecords).toEqual([

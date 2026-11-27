@@ -40,6 +40,7 @@ import { CLOCK, CONFIG, type ApiClock, type ApiConfig } from '../config.js';
 import { DB, type Db } from '../db/database.js';
 import { neuroLedger, tournaments, udtChallenges, udtEntries, udtRoster } from '../db/schema.js';
 import { LedgerService } from '../ledger/ledger.service.js';
+import { NotificationsService, type ChallengeNote } from '../notify/notifications.service.js';
 import { nextDay, today, zonedMs } from '../seasons/season-time.js';
 import {
   SettingsService,
@@ -61,6 +62,8 @@ import { UdtService } from './udt.service.js';
 
 const DAY = 86_400_000;
 const MIN = 60_000;
+/** Discord reminds both managers this long before the lock (decision 339). */
+const REMIND_MIN = 30;
 
 const Size = z.union([z.literal(1), z.literal(3), z.literal(5)]);
 
@@ -162,6 +165,8 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   aiTick: (now: number) => void = () => {};
   /** A challenge whose own reservation is left out while it is being moved (counter offers). */
   private ignore: string | null = null;
+  /** Challenges whose managers were reminded of the lock (decision 339; once per run). */
+  private readonly reminded = new Set<string>();
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -179,6 +184,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     @Inject(EventLogService) private readonly eventLog: EventLogService,
     @Inject(StatsService) private readonly stats: StatsService,
     @Inject(UsersService) private readonly users: UsersService,
+    @Inject(NotificationsService) private readonly notify: NotificationsService,
   ) {}
 
   onModuleInit(): void {
@@ -203,7 +209,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     });
     this.tournaments.onRemove((t) => {
       const c = this.find(challengeIdOf(t.udtJson));
-      if (c?.status === 'locked') this.close(c, 'void', 'removed');
+      if (c?.status === 'locked') this.callOff(c, 'removed');
     });
     this.settings.checkUdt((next, sent) => {
       if (sent.challenge || sent.league) this.checkWindow(next);
@@ -698,6 +704,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     this.assertOn();
     this.sweep();
     const row = this.db.transaction(() => this.book(user, body, { rematchOf }));
+    this.notify.challengeSent(this.note(row), rematchOf ? 'rematch' : 'new');
     return { id: row.id, ...this.view(user) };
   }
 
@@ -732,6 +739,38 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     this.refund(c, c.fromUser);
     if (c.toUser) this.refund(c, c.toUser);
     return true;
+  }
+
+  /** A booked challenge that will not be played: stakes back, both managers hear why. */
+  private callOff(c: Row, reason: string): boolean {
+    if (!this.close(c, 'void', reason)) return false;
+    this.notify.challengeVoid(this.note(c), reason);
+    return true;
+  }
+
+  /** The facts of a challenge for Discord (decision 339). */
+  private note(c: Row): ChallengeNote {
+    const name = (u: string | null) => (u ? (this.udt.team(u, c.season)?.name ?? '?') : null);
+    const { pot, prize } = challengePot(c.stake, c.feePct);
+    return {
+      fromUser: c.fromUser,
+      toUser: c.toUser,
+      info: {
+        from: name(c.fromUser) ?? '?',
+        to: name(c.toUser),
+        mode: c.mode as ChallengeMode,
+        teamSize: c.teamSize,
+        bestOf: c.bestOf,
+        map: c.map,
+        hardness: (c.hardness ?? 'normal') as MhHardness,
+        stake: c.stake,
+        pot,
+        prize,
+        at: c.scheduledAt,
+        expiresAt: c.expiresAt,
+        link: `${this.config.publicUrl}/udt/challenges`,
+      },
+    };
   }
 
   /** Can this manager take this challenge (the challenged one, or an open one in scope)? */
@@ -781,7 +820,20 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
           meta: { challengeId: c.id },
         });
     });
+    this.answered(this.get(c.id));
     return this.view(user);
+  }
+
+  /** Discord: the challenger hears the answer, the channel gets the match (MH: the showcase). */
+  private answered(c: Row): void {
+    if (c.mode !== 'mh') return this.notify.challengeAnswered(this.note(c), true);
+    const rec = this.mhRecords(c.season).find(
+      (r) => r.map.toLowerCase() === (c.map ?? '').toLowerCase() && r.hardness === c.hardness,
+    );
+    this.notify.challengeAnswered(this.note(c), true, {
+      record: rec ? { finalMs: rec.finalMs, team: rec.team ?? null } : null,
+      bonus: stakeCap(this.cfg().mh.recordBonus, this.udt.index(c.season)),
+    });
   }
 
   /** The challenged team says no: the challenger's stake comes back. */
@@ -790,7 +842,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     const c = this.get(id);
     if (c.toUser !== user.id) throw forbidden('only the challenged team can answer');
     if (c.status !== 'pending') throw conflict('the challenge is {status}', { status: c.status });
-    this.close(c, 'declined');
+    if (this.close(c, 'declined')) this.notify.challengeAnswered(this.note(c), false);
     return this.view(user);
   }
 
@@ -822,6 +874,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       this.close(c, 'countered');
       return made;
     });
+    this.notify.challengeSent(this.note(row), 'counter');
     return { id: row.id, ...this.view(user) };
   }
 
@@ -839,12 +892,39 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       .where(inArray(udtChallenges.status, ['pending', 'accepted']))
       .all())
       if (c.status === 'pending' && (c.expiresAt <= now || c.season !== season)) {
-        if (this.close(c, 'expired')) n++;
+        if (this.close(c, 'expired')) {
+          n++;
+          this.notify.challengeExpired(this.note(c));
+        }
       } else if (c.status === 'accepted' && c.season !== season) {
         // Booked for a season that is over (its last day): never played.
-        if (this.close(c, 'void', 'season')) n++;
+        if (this.callOff(c, 'season')) n++;
       }
     return n;
+  }
+
+  /**
+   * The admin tab (decision 339): the league evening the window must keep clear of (its weekdays,
+   * start and the minutes it keeps the servers), the pool, the indexed stake cap and record bonus,
+   * the challenges booked in the running season.
+   */
+  adminView() {
+    const s = this.settings.get().udt;
+    const season = this.udt.seasonNumber();
+    const index = season === null ? 1 : this.udt.index(season);
+    return {
+      league: {
+        enabled: s.enabled && s.league.enabled,
+        days: s.league.slotDays,
+        time: s.league.slotTime,
+        minutes: this.leagueSpan(s),
+      },
+      pool: this.agents.pool().length,
+      index,
+      stakeCap: stakeCap(s.challenge.stakeMax, index),
+      recordBonus: stakeCap(s.challenge.mh.recordBonus, index),
+      booked: season === null ? 0 : this.active(season).length,
+    };
   }
 
   /** Waiting answers of a manager (the count on the navigation). */
@@ -957,6 +1037,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     for (const c of this.active(season))
       try {
         if (c.status === 'accepted' && Date.parse(c.scheduledAt) - lock <= now) this.lock(c);
+        else if (c.status === 'accepted') this.remind(c, now);
         else if (c.status === 'locked') this.watch(c, now);
       } catch (e) {
         this.log.error(`challenge ${c.id}: ${(e as Error).message}`);
@@ -1072,7 +1153,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   private lock(c: Row): void {
     const to = c.toUser!;
     if (this.now() > this.deadline(c)) {
-      this.close(c, 'void', 'late');
+      this.callOff(c, 'late');
       return;
     }
     const settings = this.gameSettings(c);
@@ -1083,18 +1164,20 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     const okFrom = ready(c.fromUser);
     const okTo = ready(to);
     if (!okFrom && !okTo) {
-      this.close(c, 'void', 'lineups');
+      this.callOff(c, 'lineups');
       return;
     }
     if (!okFrom || !okTo) {
-      this.decide(c, okFrom ? c.fromUser : to, 'forfeit');
+      const winner = okFrom ? c.fromUser : to;
+      if (this.decide(c, winner, 'forfeit'))
+        this.announce(c, winner, { forfeit: true, upset: false, games: [] }, null, null);
       return;
     }
     const by = this.maker(c);
     const server = this.agents.pool().find((p) => p.agentId === c.agentId);
     if (!by || !server) {
       this.log.warn(`challenge ${c.id}: ${by ? 'its server left the pool' : 'nobody to make it'}`);
-      this.close(c, 'void', 'server');
+      this.callOff(c, 'server');
       return;
     }
     const name = (u: string) => this.udt.team(u, c.season)?.name ?? '?';
@@ -1131,7 +1214,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       );
     } catch (e) {
       this.log.warn(`challenge ${c.id}: no tournament (${(e as Error).message})`);
-      this.close(c, 'void', 'server');
+      this.callOff(c, 'server');
       return;
     }
     const locked = this.db
@@ -1148,7 +1231,48 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     } catch (e) {
       this.log.warn(`challenge ${c.id}: not seeded (${(e as Error).message})`);
       this.tournaments.remove(t.id); // voids it (onRemove)
+      return;
     }
+    this.notify.challengeBetsOpen(this.note(c), t.id);
+  }
+
+  /** The result in the channel (decision 339). */
+  private announce(
+    c: Row,
+    winner: string,
+    o: { forfeit: boolean; upset: boolean; games: { w: number; l: number; map: string | null }[] },
+    tournamentId: string | null,
+    matchId: string | null,
+  ): void {
+    const n = this.note(c);
+    const won = winner === c.fromUser;
+    this.notify.challengeResult(
+      n,
+      {
+        ...o,
+        winner: (won ? n.info.from : n.info.to) ?? '?',
+        loser: (won ? n.info.to : n.info.from) ?? '?',
+      },
+      tournamentId,
+      matchId,
+    );
+  }
+
+  /**
+   * A result against the odds: the winner's chance before the match (the model of the lineups,
+   * as the AI managers judge challenges) was at most this (decision 339).
+   */
+  private static readonly UPSET_CHANCE = 0.35;
+
+  /** Reminds both managers of the lock (once per challenge and run, decision 339). */
+  private remind(c: Row, now: number): void {
+    const lock = Date.parse(c.scheduledAt) - this.cfg().lockMin * MIN;
+    const from = lock - REMIND_MIN * MIN;
+    if (now < from || now >= lock || this.reminded.has(c.id)) return;
+    this.reminded.add(c.id);
+    // Accepted just now: the answer said it all.
+    if (c.answeredAt && Date.parse(c.answeredAt) >= from) return;
+    this.notify.challengeReminder(this.note(c), new Date(lock).toISOString());
   }
 
   /** The two lineups of a challenge's tournament in their slots (the challenger first). */
@@ -1167,7 +1291,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   private watch(c: Row, now: number): void {
     const t = c.tournamentId ? this.tournaments.get(c.tournamentId) : undefined;
     if (!t) {
-      this.close(c, 'void', 'removed');
+      this.callOff(c, 'removed');
       return;
     }
     if (t.phase === 'finished' || t.phase === 'aborted') {
@@ -1193,17 +1317,24 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
     const p = this.eventLog.projection(tournamentId);
     if (!p) return;
     if (p.phase === 'aborted') {
-      this.close(c, 'void', 'aborted');
+      this.callOff(c, 'aborted');
       return;
     }
     const r = p.results[0];
     const winner = r ? udtManagerOf(r.winnerId) : undefined;
     if (!r || !winner) {
       // Over without a result (ended by hand): nobody won, the stakes go back.
-      if (p.phase === 'finished') this.close(c, 'void', 'aborted');
+      if (p.phase === 'finished') this.callOff(c, 'aborted');
       return;
     }
     const games = Math.max(1, p.games[r.matchId]?.length ?? 0);
+    const loser = winner === c.fromUser ? c.toUser! : c.fromUser;
+    let upset = false;
+    try {
+      upset = this.chance(c, winner, loser) <= UdtChallengesService.UPSET_CHANCE;
+    } catch {
+      // no model, no upset
+    }
     const played = this.decide(c, winner, r.outcome === 'forfeit' ? 'forfeit' : null, () => {
       // Stamina as in a cup (per game, the fatigue traits), nothing else.
       const onBots = this.udt.traitsOnBots(c.season);
@@ -1237,7 +1368,24 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
         }
       }
     });
-    if (played && c.mode === 'mh') this.recordBonus(c, tournamentId);
+    if (!played) return;
+    const forfeit = r.outcome === 'forfeit';
+    this.announce(
+      c,
+      winner,
+      {
+        forfeit,
+        upset: upset && !forfeit,
+        games: (r.games ?? []).map((g) => ({
+          w: g.scores[r.winnerId] ?? 0,
+          l: g.scores[r.entrants.find((e) => e !== r.winnerId) ?? ''] ?? 0,
+          map: g.map ?? null,
+        })),
+      },
+      tournamentId,
+      r.matchId,
+    );
+    if (c.mode === 'mh') this.recordBonus(c, tournamentId);
   }
 
   /** Decides a challenge for `winner`: the pot less the fee (once, by its refs). */
@@ -1278,17 +1426,34 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   private recordBonus(c: Row, tournamentId: string): void {
     try {
       const facts = this.stats.udtFacts(c.season).find((f) => f.tournamentId === tournamentId);
-      const run = facts && brokenRecord(facts.runs, this.stats.mapRecords(c.season, tournamentId));
+      const before = this.stats.mapRecords(c.season, tournamentId);
+      const run = facts && brokenRecord(facts.runs, before);
       const userId = run ? udtManagerOf(run.entrantId) : undefined;
       if (!run || !userId) return;
-      this.ledger.book({
+      const bonus = stakeCap(this.cfg().mh.recordBonus, this.udt.index(c.season));
+      const booked = this.ledger.book({
         season: c.season,
         userId,
         kind: 'udt_challenge_record',
-        amount: stakeCap(this.cfg().mh.recordBonus, this.udt.index(c.season)),
+        amount: bonus,
         ref: `challenge-record:${c.id}`,
         meta: { challengeId: c.id, map: run.map, finalMs: run.finalMs },
       });
+      const old = before.find(
+        (b) => b.map.toLowerCase() === run.map.toLowerCase() && b.monsterSkill === run.monsterSkill,
+      );
+      if (booked && old)
+        this.notify.challengeRecord(
+          {
+            team: this.udt.team(userId, c.season)?.name ?? '?',
+            map: run.map,
+            hardness: hardnessOfSkill(run.monsterSkill) ?? 'normal',
+            finalMs: run.finalMs,
+            oldMs: old.finalMs,
+            bonus,
+          },
+          `${this.config.publicUrl}/t/${tournamentId}`,
+        );
     } catch (e) {
       this.log.error(`challenge record ${c.id}: ${(e as Error).message}`);
     }

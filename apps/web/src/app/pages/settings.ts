@@ -17,6 +17,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { SettingsBets } from '../components/settings-bets';
 import { SettingsBots } from '../components/settings-bots';
+import { SettingsChallenges } from '../components/settings-challenges';
 import { SettingsLeague } from '../components/settings-league';
 import { SettingsSeason } from '../components/settings-season';
 import type { SettingsForm } from '../components/settings-shared';
@@ -27,7 +28,7 @@ import { I18n, TPipe } from '../core/i18n';
 import { Guide } from '../components/guide';
 import { PageToc } from '../components/page-toc';
 
-const TABS = ['season', 'bets', 'bots', 'udt', 'league', 'system'] as const;
+const TABS = ['season', 'bets', 'bots', 'udt', 'league', 'challenge', 'system'] as const;
 export type SettingsTab = (typeof TABS)[number];
 
 /**
@@ -48,6 +49,7 @@ export type SettingsTab = (typeof TABS)[number];
     SettingsBots,
     SettingsUdt,
     SettingsLeague,
+    SettingsChallenges,
     SettingsSystem,
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -92,6 +94,9 @@ export type SettingsTab = (typeof TABS)[number];
           }
           @case ('league') {
             <app-settings-league (saved)="saved($event)" />
+          }
+          @case ('challenge') {
+            <app-settings-challenges (saved)="saved($event)" />
           }
           @case ('system') {
             <app-settings-system />
@@ -232,9 +237,9 @@ export class SettingsPage {
     return true;
   }
 
-  /** The league tab needs the Dream Team module (switched on in the tab "Dream Team"). */
+  /** The league and challenge tabs need the Dream Team module (tab "Dream Team"). */
   protected off(t: SettingsTab): boolean {
-    return t === 'league' && !this.auth.config().udt;
+    return (t === 'league' || t === 'challenge') && !this.auth.config().udt;
   }
 
   /** A field of a saving form changed. */
