@@ -51,6 +51,14 @@ import {
 } from './udt-academy.service.js';
 import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.service.js';
 import {
+  ChallengeBody,
+  CounterBody,
+  SlotsQuery,
+  UdtChallengesService,
+  type ChallengeInput,
+  type SlotsInput,
+} from './udt-challenges.service.js';
+import {
   AssignBody,
   CraftBody,
   OpenBody,
@@ -81,6 +89,7 @@ export class UdtController {
     @Inject(UdtRewardsService) private readonly rewards: UdtRewardsService,
     @Inject(UdtPacksService) private readonly packs: UdtPacksService,
     @Inject(UdtTradesService) private readonly trades: UdtTradesService,
+    @Inject(UdtChallengesService) private readonly challenges: UdtChallengesService,
     @Inject(UdtAcademyService) private readonly academy: UdtAcademyService,
     @Inject(UdtCareerService) private readonly career: UdtCareerService,
     @Inject(UdtAiService) private readonly ai: UdtAiService,
@@ -129,6 +138,8 @@ export class UdtController {
         tradesIn: n !== null ? this.trades.incoming(user.id) : 0,
         marketAt: n !== null ? new Date(this.market.nextAt()).toISOString() : null,
       },
+      /** Challenges waiting for the manager's answer (decision 334). */
+      challengesIn: n !== null ? this.challenges.incoming(user.id) : 0,
     };
   }
 
@@ -480,6 +491,57 @@ export class UdtController {
   @Delete('trades/:id')
   withdrawTrade(@CurrentUser() user: User, @Param('id') id: string) {
     return this.trades.withdraw(user, id);
+  }
+
+  /** Challenges (decision 334): incoming, sent, open ones, coming, decided; the window's rules. */
+  @Get('challenges')
+  challengeList(@CurrentUser() user: User) {
+    return this.challenges.view(user);
+  }
+
+  /** Bookable start times of the next days for a mode and length (and an opponent). */
+  @Get('challenges/slots')
+  challengeSlots(@CurrentUser() user: User, @Query(new ZodPipe(SlotsQuery)) q: SlotsInput) {
+    return this.challenges.slots(user, q);
+  }
+
+  @Post('challenges')
+  challenge(@CurrentUser() user: User, @Body(new ZodPipe(ChallengeBody)) body: ChallengeInput) {
+    if (body.message) this.moderation.screen(user, [body.message]);
+    const out = this.challenges.create(user, body);
+    if (body.message) this.moderation.review('challenge', out.id);
+    return out;
+  }
+
+  @Post('challenges/:id/accept')
+  @HttpCode(200)
+  acceptChallenge(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.challenges.accept(user, id);
+  }
+
+  @Post('challenges/:id/decline')
+  @HttpCode(200)
+  declineChallenge(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.challenges.decline(user, id);
+  }
+
+  /** A counter offer: a new challenge the other way, the answered one ends. */
+  @Post('challenges/:id/counter')
+  counterChallenge(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body(new ZodPipe(CounterBody)) body: ChallengeInput,
+  ) {
+    if (body.message) this.moderation.screen(user, [body.message]);
+    const out = this.challenges.counter(user, id, body);
+    if (body.message) this.moderation.review('challenge', out.id);
+    return out;
+  }
+
+  /** The challenger takes a challenge back before the answer (the stake comes back). */
+  @Delete('challenges/:id')
+  withdrawChallenge(@CurrentUser() user: User, @Param('id') id: string) {
+    return this.challenges.withdraw(user, id);
   }
 
   /** Academy: licences, the scout report, mentors, the manager's own bots. */

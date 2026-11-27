@@ -125,7 +125,8 @@ export interface Me {
 }
 
 /** What a moderated text belongs to (decision 283). */
-export type ModKind = 'name' | 'udt-team' | 'udt-bot' | 'bot-lines' | 'team' | 'trade';
+export type ModKind =
+  'name' | 'udt-team' | 'udt-bot' | 'bot-lines' | 'team' | 'trade' | 'challenge';
 
 /** An item of the moderation queue. */
 export interface ModItem {

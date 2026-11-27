@@ -716,6 +716,7 @@ function run(
     named('udt_hall', (r) => ({ name: names.get(r.name!)! }));
     named('league_clubs', (r) => ({ name: names.get(r.name!)!, tag: names.tag(r.tag!) }));
     named('udt_trades', () => ({ message: null }));
+    named('udt_challenges', () => ({ message: null }));
     // Free texts of the players' feedback (the export CLI writes them apart, for reading).
     named('feedback', () => ({ texts_json: '{}' }));
 
@@ -750,6 +751,7 @@ function run(
       'teams.tag',
       'udt_hall.name',
       'udt_trades.message',
+      'udt_challenges.message',
       'feedback.texts_json',
       'league_clubs.name',
       'league_clubs.tag',

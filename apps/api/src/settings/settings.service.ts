@@ -138,6 +138,62 @@ export const LeagueSettingsSchema = z.object({
 export type LeagueSettings = z.infer<typeof LeagueSettingsSchema>;
 
 /**
+ * Challenges (decision 334): managers challenge each other's teams to a match at a fixed start in
+ * the window (`days`, `from`-`to`, season time zone) on up to `servers` servers of the pool, with
+ * a stake both pay into a pot (at most `stakeMax` × index^0.2, `feePct` of the pot as fee). The
+ * window never runs into the league evening (checked on saving either block). Monster Hunt is the
+ * showcase: no fee, a record bonus, difficulties.
+ */
+export const ChallengeSettingsSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Weekdays, 0 = Monday. */
+  days: z.array(z.number().int().min(0).max(6)).max(7).default([0, 1, 2, 3, 4, 5, 6]),
+  from: HHMM.default('19:00'),
+  to: HHMM.default('22:00'),
+  /** Servers of the pool challenges may use at once. */
+  servers: z.number().int().min(1).max(8).default(2),
+  modes: z
+    .array(z.enum(['dm', 'mh']))
+    .min(1)
+    .default(['dm', 'mh']),
+  teamSizes: z
+    .array(z.union([z.literal(1), z.literal(3), z.literal(5)]))
+    .min(1)
+    .default([1, 3, 5]),
+  bestOf: z
+    .array(z.union([z.literal(1), z.literal(3), z.literal(5)]))
+    .min(1)
+    .default([1, 3, 5]),
+  /** Highest stake per team at index 1 (× index^0.2). */
+  stakeMax: z.number().int().min(0).max(1_000_000).default(2000),
+  feePct: z.number().int().min(0).max(50).default(5),
+  /** Challenges between the same two managers per 7 days (0 = no limit). */
+  pairPerWeek: z.number().int().min(0).max(50).default(2),
+  /** Challenges a team plays per day at most. */
+  perDay: z.number().int().min(1).max(10).default(2),
+  /** Challenges a manager has sent and waiting at once. */
+  maxOpen: z.number().int().min(1).max(20).default(3),
+  expiryHours: z.number().int().min(1).max(336).default(48),
+  /** Minutes before the start: lineups are fixed and the bets open; answers close. */
+  lockMin: z.number().int().min(15).max(240).default(60),
+  betBots: z.number().int().min(0).max(50).default(10),
+  /** AI managers answer challenges and challenge humans. */
+  ai: z.boolean().default(true),
+  mh: z
+    .object({
+      feePct: z.number().int().min(0).max(50).default(0),
+      /** Neuro at index 1 (× index^0.2) for a new season record of the map. */
+      recordBonus: z.number().int().min(0).max(100_000).default(300),
+      hardness: z
+        .array(z.enum(['normal', 'hard', 'nightmare']))
+        .min(1)
+        .default(['normal', 'hard', 'nightmare']),
+    })
+    .default({ feePct: 0, recordBonus: 300, hardness: ['normal', 'hard', 'nightmare'] }),
+});
+export type ChallengeSettings = z.infer<typeof ChallengeSettingsSchema>;
+
+/**
  * Unreal Dream Team (add-on): off by default. The market day runs once a day at `marketTime`
  * (SEASON_TZ); `offersPerDay` bots are on offer; the starter bot may cost up to `starterBudget`
  * (reference value at index 1.0, about skill 3 with average values).
@@ -185,6 +241,8 @@ export const UdtSettingsSchema = z.object({
   league: LeagueSettingsSchema.default(LeagueSettingsSchema.parse({})),
   /** Weekly cup bonus (index 1) for places 1-3 of the cup ranking while a league runs (L-E10). */
   cupBonus: z.array(z.number().int().min(0).max(100_000)).max(3).default([1000, 600, 300]),
+  /** Challenges between managers (decision 334); the block is sent whole. */
+  challenge: ChallengeSettingsSchema.default(ChallengeSettingsSchema.parse({})),
 });
 export type UdtSettings = z.infer<typeof UdtSettingsSchema>;
 

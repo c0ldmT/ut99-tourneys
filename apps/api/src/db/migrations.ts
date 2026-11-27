@@ -922,4 +922,41 @@ export const MIGRATIONS: string[] = [
   );
   CREATE UNIQUE INDEX tournament_presets_name ON tournament_presets (user_id, name_key);
   `,
+  // 62: Dream Team challenges (decision 334): one manager challenges another (or everybody) to a
+  // match at a fixed time in the challenge window, both stakes held until it is decided.
+  `
+  CREATE TABLE udt_challenges (
+    id TEXT PRIMARY KEY,
+    season INTEGER NOT NULL,
+    from_user TEXT NOT NULL,
+    to_user TEXT,
+    open_scope TEXT,
+    open_tier INTEGER,
+    status TEXT NOT NULL DEFAULT 'pending',
+    mode TEXT NOT NULL,
+    team_size INTEGER NOT NULL,
+    best_of INTEGER NOT NULL,
+    map TEXT,
+    hardness TEXT,
+    stake INTEGER NOT NULL DEFAULT 0,
+    fee_pct INTEGER NOT NULL DEFAULT 0,
+    scheduled_at TEXT NOT NULL,
+    ends_at TEXT NOT NULL,
+    agent_id TEXT,
+    tournament_id TEXT,
+    counter_of TEXT,
+    rematch_of TEXT,
+    round INTEGER NOT NULL DEFAULT 1,
+    message TEXT,
+    reason TEXT,
+    winner_user TEXT,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    answered_at TEXT,
+    decided_at TEXT
+  );
+  CREATE INDEX udt_challenges_time ON udt_challenges (season, scheduled_at);
+  CREATE INDEX udt_challenges_to ON udt_challenges (to_user, status);
+  CREATE INDEX udt_challenges_from ON udt_challenges (from_user, status);
+  `,
 ];

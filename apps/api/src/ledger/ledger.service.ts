@@ -34,7 +34,10 @@ export type LedgerKind =
   | 'udt_loan'
   | 'udt_fanshop'
   | 'udt_league'
-  | 'udt_cup_bonus';
+  | 'udt_cup_bonus'
+  | 'udt_challenge'
+  | 'udt_challenge_fee'
+  | 'udt_challenge_record';
 
 export interface Booking {
   season: number;

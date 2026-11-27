@@ -10,6 +10,7 @@ import {
   teams,
   udtTeams,
   udtTrades,
+  udtChallenges,
   users,
 } from '../db/schema.js';
 import { badRequest, conflict, forbidden, notFound } from '../common/http.js';
@@ -25,7 +26,15 @@ import { checkText, cleanList, type FilterHit, type FilterLists } from './filter
 import { BUILTIN_BLOCK, BUILTIN_FLAG } from './word-lists.js';
 
 /** What a moderated text belongs to (decision 283). */
-export const MOD_KINDS = ['name', 'udt-team', 'udt-bot', 'bot-lines', 'team', 'trade'] as const;
+export const MOD_KINDS = [
+  'name',
+  'udt-team',
+  'udt-bot',
+  'bot-lines',
+  'team',
+  'trade',
+  'challenge',
+] as const;
 export type ModKind = (typeof MOD_KINDS)[number];
 
 export type Sanction = 'warn' | 'text-ban' | 'ban' | 'unban';
@@ -215,6 +224,10 @@ export class ModerationService {
         const t = this.db.select().from(udtTrades).where(eq(udtTrades.id, ref)).get();
         return t?.message ? { text: t.message, userId: t.fromUser } : null;
       }
+      case 'challenge': {
+        const c = this.db.select().from(udtChallenges).where(eq(udtChallenges.id, ref)).get();
+        return c?.message ? { text: c.message, userId: c.fromUser } : null;
+      }
       default:
         return null;
     }
@@ -276,6 +289,9 @@ export class ModerationService {
       case 'trade':
         this.db.update(udtTrades).set({ message: null }).where(eq(udtTrades.id, ref)).run();
         return;
+      case 'challenge':
+        this.db.update(udtChallenges).set({ message: null }).where(eq(udtChallenges.id, ref)).run();
+        return;
       default:
         throw badRequest('unknown kind {kind}', { kind });
     }
@@ -311,6 +327,10 @@ export class ModerationService {
       case 'trade': {
         const t = this.db.select().from(udtTrades).where(eq(udtTrades.id, ref)).get();
         return t ? { text: t.message ?? '' } : null;
+      }
+      case 'challenge': {
+        const c = this.db.select().from(udtChallenges).where(eq(udtChallenges.id, ref)).get();
+        return c ? { text: c.message ?? '' } : null;
       }
       default:
         return null;
@@ -415,20 +435,29 @@ export class ModerationService {
         this.teamsSvc.update(t.tournamentId, t.id, { name, tag: tag || null });
         break;
       }
-      case 'trade': {
+      case 'trade':
+      case 'challenge': {
         const text = (f.text ?? '').trim();
-        if (text.length > 200)
+        const max = item.kind === 'trade' ? 200 : 120;
+        if (text.length > max)
           throw badRequest('the text must have {min} to {max} characters{ascii}', {
             min: 0,
-            max: 200,
+            max,
             ascii: '',
           });
         blocked([text]);
-        this.db
-          .update(udtTrades)
-          .set({ message: text || null })
-          .where(eq(udtTrades.id, item.ref))
-          .run();
+        if (item.kind === 'trade')
+          this.db
+            .update(udtTrades)
+            .set({ message: text || null })
+            .where(eq(udtTrades.id, item.ref))
+            .run();
+        else
+          this.db
+            .update(udtChallenges)
+            .set({ message: text || null })
+            .where(eq(udtChallenges.id, item.ref))
+            .run();
         break;
       }
       default:
@@ -661,6 +690,8 @@ export class ModerationService {
       take('team', t.id, `${t.tag ? `${t.tag} ` : ''}${t.name}`, t.captainId);
     for (const t of this.db.select().from(udtTrades).all())
       if (t.message) take('trade', t.id, t.message, t.fromUser);
+    for (const c of this.db.select().from(udtChallenges).all())
+      if (c.message) take('challenge', c.id, c.message, c.fromUser);
     this.audit(mod, 'scan', null, null, null, { checked, queued });
     return { checked, queued };
   }

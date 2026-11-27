@@ -442,6 +442,53 @@ export const ERRORS_DE: Record<string, string> = {
     '{name} wurde vor weniger als {tradeLockDays} Tagen gekauft oder getauscht.',
   '{name} is nominated for the graduation: withdraw the nomination first':
     '{name} ist für den Abschluss nominiert: Zieh die Nominierung zuerst zurück.',
+
+  // --- Dream Team: challenges (decision 334)
+  'an open challenge needs a scope':
+    'Eine offene Challenge braucht einen Kreis (alle oder deine Liga-Stufe).',
+  'challenges are switched off': 'Challenges sind ausgeschaltet.',
+  'the challenge window must end after it starts ({from} - {to})':
+    'Der Challenge-Zeitraum muss nach seinem Beginn enden ({from} – {to}).',
+  'the challenge window {from} - {to} runs into the league evening at {time}':
+    'Der Challenge-Zeitraum {from} – {to} reicht in den Liga-Abend um {time}.',
+  'a challenge needs two teams': 'Eine Challenge braucht zwei Teams.',
+  'this mode is not open for challenges': 'Dieser Modus ist für Challenges nicht freigegeben.',
+  'this difficulty is not open for challenges':
+    'Dieser Härtegrad ist für Challenges nicht freigegeben.',
+  'this format is not open for challenges': 'Dieses Format ist für Challenges nicht freigegeben.',
+  'stakes go in steps of 10 Neuro': 'Einsätze gehen in Schritten von 10 Neuro.',
+  'a stake is 0 or at least {min} Neuro': 'Ein Einsatz ist 0 oder mindestens {min} Neuro.',
+  'at most {cap} Neuro per team': 'Höchstens {cap} Neuro je Team.',
+  'challenges start in the window {from} - {to}':
+    'Challenges beginnen im Zeitraum {from} – {to} (im 15-Minuten-Raster).',
+  'the start is after the end of the season': 'Der Start liegt nach dem Ende der Season.',
+  'too late: challenges are booked until {min} minutes before the start':
+    'Zu spät: Challenges gehen bis {min} Minuten vor dem Start.',
+  'your team plays another challenge then': 'Dein Team spielt da schon eine andere Challenge.',
+  'the other team plays another challenge then':
+    'Das andere Team spielt da schon eine andere Challenge.',
+  'your team plays {n} challenges that day already':
+    'Dein Team spielt an diesem Tag schon {n} Challenges.',
+  'the other team plays {n} challenges that day already':
+    'Das andere Team spielt an diesem Tag schon {n} Challenges.',
+  'your team plays a cup then': 'Dein Team spielt da einen Cup.',
+  'the other team plays a cup then': 'Das andere Team spielt da einen Cup.',
+  'no server is free for challenges then': 'Zu dieser Zeit ist kein Server für Challenges frei.',
+  'at most {max} challenges can wait for an answer at once':
+    'Höchstens {max} Challenges können gleichzeitig auf eine Antwort warten.',
+  'at most {n} challenges between two managers per week':
+    'Höchstens {n} Challenges zwischen zwei Managern pro Woche.',
+  'Monster Hunt needs {n} bots in your lineup':
+    'Monster Hunt braucht {n} Bots in deiner MH-Aufstellung.',
+  'Monster Hunt needs {n} bots in the other lineup':
+    'Monster Hunt braucht {n} Bots in der MH-Aufstellung des anderen Teams.',
+  'your team plays in no league tier': 'Dein Team spielt in keiner Liga-Stufe.',
+  'challenge not found': 'Challenge nicht gefunden.',
+  'only the challenged team can answer': 'Nur das geforderte Team kann antworten.',
+  'only the challenger can withdraw': 'Nur wer gefordert hat, kann zurückziehen.',
+  'the challenge is {status}': 'Die Challenge ist nicht mehr offen ({status}).',
+  'the challenge was answered meanwhile': 'Die Challenge wurde inzwischen beantwortet.',
+  'at most {n} rounds of counter offers': 'Höchstens {n} Runden mit Gegenvorschlägen.',
 };
 
 /**
@@ -451,6 +498,7 @@ export const ERRORS_DE: Record<string, string> = {
 const PARAM_KEYS: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   '*': { phase: 'phase.' },
   'the offer is {status}': { status: 'udt.trades.st.' },
+  'the challenge is {status}': { status: 'udt.ch.st.' },
   'the bot is {status}': { status: 'udt.academy.st.' },
   'the server is reserved for {label} from {from} to {to}': { label: 'cal.label.' },
   'the league does not fit into season {season}: {hint}': { hint: 'league.fitHint.' },

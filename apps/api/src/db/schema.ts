@@ -554,6 +554,50 @@ export const udtTrades = sqliteTable('udt_trades', {
 });
 
 /**
+ * Dream Team challenges (decision 334): a manager challenges another manager's team (or, open,
+ * everybody or their league tier) to a match at a fixed start in the challenge window. Status:
+ * pending (stake of the challenger held), accepted (both held), declined, withdrawn, expired,
+ * countered (replaced by a counter offer), void; the match itself follows (locked, played).
+ */
+export const udtChallenges = sqliteTable('udt_challenges', {
+  id: text('id').primaryKey(),
+  season: integer('season').notNull(),
+  fromUser: text('from_user').notNull(),
+  /** The challenged manager; null while an open challenge waits for a taker. */
+  toUser: text('to_user'),
+  /** Open challenges: 'all' or 'tier' (the challenger's league tier, `openTier`). */
+  openScope: text('open_scope'),
+  openTier: integer('open_tier'),
+  status: text('status').notNull().default('pending'),
+  mode: text('mode').notNull(),
+  teamSize: integer('team_size').notNull(),
+  bestOf: integer('best_of').notNull(),
+  /** A map of the pool; null: the vote (best of 3/5: the loser picks). */
+  map: text('map'),
+  /** Monster Hunt: normal, hard or nightmare. */
+  hardness: text('hardness'),
+  /** Per team; 0 is a friendly. */
+  stake: integer('stake').notNull().default(0),
+  feePct: integer('fee_pct').notNull().default(0),
+  scheduledAt: text('scheduled_at').notNull(),
+  /** End of the time the challenge keeps its server. */
+  endsAt: text('ends_at').notNull(),
+  agentId: text('agent_id'),
+  tournamentId: text('tournament_id'),
+  counterOf: text('counter_of'),
+  rematchOf: text('rematch_of'),
+  /** 1 for a challenge, +1 per counter offer (at most 3). */
+  round: integer('round').notNull().default(1),
+  message: text('message'),
+  reason: text('reason'),
+  winnerUser: text('winner_user'),
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  answeredAt: text('answered_at'),
+  decidedAt: text('decided_at'),
+});
+
+/**
  * Bots a manager made (starter, scouted talent, apprentice of a mentor): potential (highest
  * skill), development points spent, the mentor.
  */
