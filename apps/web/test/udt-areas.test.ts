@@ -17,6 +17,25 @@ describe('Dream Team areas and the hub shape (decision 228)', () => {
     expect(udtAreas(false).map((a) => a.id)).toEqual(['team', 'packs', 'cups', 'trans']);
   });
 
+  it('has the challenges between the cups and the transfers while they show (decision 337)', () => {
+    expect(udtAreas(true, true).map((a) => a.id)).toEqual([
+      'team',
+      'league',
+      'packs',
+      'cups',
+      'chall',
+      'trans',
+    ]);
+    expect(udtAreas(false, true)).toHaveLength(5);
+    expect(udtAreaOf('/udt/challenges')).toBe('chall');
+  });
+
+  it('cuts a hexagon with a flat top for six areas', () => {
+    const hex = hubShape(6, { x: 0, y: 0 }, 10);
+    expect(hex.segments[0]!.normal.y).toBeCloseTo(-1);
+    expect(hex.segments[3]!.normal.y).toBeCloseTo(1);
+  });
+
   it('cuts a square with a flat top and a pentagon with a corner on top', () => {
     const c = { x: 0, y: 0 };
     const sq = hubShape(4, c, 10);

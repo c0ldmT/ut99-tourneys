@@ -19,6 +19,7 @@ export function searchPages(o: {
   moderator: boolean;
   udt: boolean;
   league: boolean;
+  challenges?: boolean;
 }): SearchPage[] {
   const main = 'search.group.site';
   const out: SearchPage[] = [
@@ -32,7 +33,7 @@ export function searchPages(o: {
   ];
   if (o.udt) {
     out.push({ label: 'udt.title', group: 'udt.title', link: '/udt' });
-    for (const a of udtAreas(o.league))
+    for (const a of udtAreas(o.league, !!o.challenges))
       for (const i of a.items)
         out.push({
           label: i.label,

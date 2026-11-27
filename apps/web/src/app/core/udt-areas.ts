@@ -2,15 +2,15 @@
  * The areas of Dream Team (decision 228): the hub's segments and the two rows of the Dream Team
  * navigation. Each area has its pages (tabs); the league only while it shows.
  */
-export type UdtAreaId = 'team' | 'league' | 'packs' | 'cups' | 'trans';
+export type UdtAreaId = 'team' | 'league' | 'packs' | 'cups' | 'chall' | 'trans';
 
 export interface UdtAreaItem {
   /** i18n key of the label. */
   label: string;
   link: string;
   fragment?: string;
-  /** A count shown next to it (trade offers waiting). */
-  badge?: 'trades';
+  /** A count shown next to it (trade offers or challenges waiting). */
+  badge?: 'trades' | 'challenges';
 }
 
 export interface UdtArea {
@@ -92,6 +92,17 @@ export const UDT_AREAS: readonly UdtArea[] = [
     paths: ['/udt/events', '/udt/table'],
   },
   {
+    // Challenges (decision 337): orange, crossed swords; only while they are on.
+    id: 'chall',
+    label: 'udt.area.chall',
+    short: 'udt.area.challShort',
+    color: '#ff8a3d',
+    rgb: '255,138,61',
+    icon: 'M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2',
+    items: [{ label: 'udt.nav.challenges', link: '/udt/challenges', badge: 'challenges' }],
+    paths: ['/udt/challenges'],
+  },
+  {
     id: 'trans',
     label: 'udt.area.trans',
     short: 'udt.area.transShort',
@@ -107,9 +118,9 @@ export const UDT_AREAS: readonly UdtArea[] = [
   },
 ];
 
-/** The areas shown (the league only while it shows). */
-export function udtAreas(league: boolean): UdtArea[] {
-  return UDT_AREAS.filter((a) => league || a.id !== 'league');
+/** The areas shown (the league and the challenges only while they show). */
+export function udtAreas(league: boolean, challenges = false): UdtArea[] {
+  return UDT_AREAS.filter((a) => (league || a.id !== 'league') && (challenges || a.id !== 'chall'));
 }
 
 /** The area of a page (by its path), null for the hub and unknown pages. */

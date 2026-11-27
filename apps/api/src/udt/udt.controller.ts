@@ -53,6 +53,7 @@ import { TradeBody, UdtTradesService, type TradeInput } from './udt-trades.servi
 import {
   ChallengeBody,
   CounterBody,
+  OpponentsQuery,
   RematchBody,
   SlotsQuery,
   UdtChallengesService,
@@ -142,6 +143,8 @@ export class UdtController {
       },
       /** Challenges waiting for the manager's answer (decision 334). */
       challengesIn: n !== null ? this.challenges.incoming(user.id) : 0,
+      /** The challenges area (decision 337): answers waiting, open ones, the next booked. */
+      challenges: n !== null ? this.challenges.hub(user.id) : null,
     };
   }
 
@@ -499,6 +502,21 @@ export class UdtController {
   @Get('challenges')
   challengeList(@CurrentUser() user: User) {
     return this.challenges.view(user);
+  }
+
+  /** Challenges waiting for the manager's answer (the count on the navigation). */
+  @Get('challenges/count')
+  challengeCount(@CurrentUser() user: User) {
+    return { incoming: this.challenges.incoming(user.id) };
+  }
+
+  /** Teams to challenge: strength for the format, full lineup, Monster Hunt bots, pair limit. */
+  @Get('challenges/opponents')
+  challengeOpponents(
+    @CurrentUser() user: User,
+    @Query(new ZodPipe(OpponentsQuery)) q: { mode: 'dm' | 'mh'; teamSize: number },
+  ) {
+    return this.challenges.opponents(user, q);
   }
 
   /** Bookable start times of the next days for a mode and length (and an opponent). */

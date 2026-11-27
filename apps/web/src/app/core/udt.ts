@@ -408,7 +408,7 @@ export function staminaColor(s: number): string {
   template: `
     @if (!bare()) {
       <nav class="udt-nav" [attr.aria-label]="'udt.title' | t">
-        <div class="udt-areas">
+        <div class="udt-areas" [class.six]="areas().length > 5">
           <a
             routerLink="/udt"
             class="udt-hubbtn"
@@ -426,6 +426,7 @@ export function staminaColor(s: number): string {
               [attr.aria-current]="a.id === area() ? 'true' : null"
               [style.--ac]="a.color"
               [style.--acr]="a.rgb"
+              [attr.aria-label]="a.label | t"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
                 <path [attr.d]="a.icon" />
@@ -437,6 +438,13 @@ export function staminaColor(s: number): string {
                   class="udt-badge"
                   [attr.aria-label]="'udt.trades.waiting' | t: { n: tradesIn() }"
                   >{{ tradesIn() }}</span
+                >
+              }
+              @if (a.id === 'chall' && challengesIn()) {
+                <span
+                  class="udt-badge"
+                  [attr.aria-label]="'udt.ch.waiting' | t: { n: challengesIn() }"
+                  >{{ challengesIn() }}</span
                 >
               }
             </a>
@@ -454,6 +462,9 @@ export function staminaColor(s: number): string {
                 >{{ i.label | t }}
                 @if (i.badge === 'trades' && tradesIn()) {
                   <span class="udt-badge">{{ tradesIn() }}</span>
+                }
+                @if (i.badge === 'challenges' && challengesIn()) {
+                  <span class="udt-badge">{{ challengesIn() }}</span>
                 }
               </a>
             }
@@ -513,7 +524,9 @@ export class UdtNav {
     ),
     { initialValue: this.router.url },
   );
-  protected readonly areas = computed(() => udtAreas(!!this.auth.config().udtLeague));
+  protected readonly areas = computed(() =>
+    udtAreas(!!this.auth.config().udtLeague, !!this.auth.config().udtChallenges),
+  );
   protected readonly area = computed(() => udtAreaOf(this.url()));
   /** The area of the page (also one hidden from the row, e.g. a league before the config knows). */
   protected readonly current = computed(() => UDT_AREAS.find((a) => a.id === this.area()) ?? null);
@@ -525,6 +538,8 @@ export class UdtNav {
   protected readonly state = signal<UdtTestState | null>(null);
   /** Trade offers waiting for the manager. */
   protected readonly tradesIn = signal(0);
+  /** Challenges waiting for the manager's answer (decision 337). */
+  protected readonly challengesIn = signal(0);
   protected readonly testBar = computed(
     () => !!this.auth.config().testMode && !!this.auth.me()?.isAdmin,
   );
@@ -584,6 +599,17 @@ export class UdtNav {
     } catch {
       this.tradesIn.set(0);
     }
+    if (!this.auth.config().udtChallenges) return;
+    try {
+      this.challengesIn.set((await this.api.udtChallengeCount()).incoming);
+    } catch {
+      this.challengesIn.set(0);
+    }
+  }
+
+  /** The challenges page changed the waiting answers. */
+  setChallengesIn(n: number): void {
+    this.challengesIn.set(n);
   }
 
   private async load() {

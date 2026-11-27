@@ -128,6 +128,21 @@ export const GUIDES = {
       },
     ],
   },
+  challenges: {
+    ...base('challenges', 'udt', 4, 4, 'udt.ch.lead'),
+    more: [
+      {
+        id: 'rules',
+        title: 'guide.challenges.mRules',
+        paras: [p('guide.challenges.r1'), p('guide.challenges.r2'), p('guide.challenges.r3')],
+      },
+      {
+        id: 'mh',
+        title: 'guide.challenges.mMh',
+        paras: [p('guide.challenges.mh1'), p('guide.challenges.mh2')],
+      },
+    ],
+  },
   academy: {
     ...base('academy', 'udt', 4, 4, 'udt.academy.intro'),
     more: [

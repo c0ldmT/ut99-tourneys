@@ -432,7 +432,7 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
         ),
       )
       .all()
-      .filter((t) => !t.udtJson?.includes('"league":{'));
+      .filter((t) => !t.udtJson?.includes('"league":{') && !t.udtJson?.includes('"challenge":{'));
     const mine = new Set(
       rows.length
         ? this.db
@@ -752,8 +752,8 @@ export class UdtEventsService implements OnModuleInit, OnModuleDestroy {
       .where(eq(tournaments.kind, 'udt'))
       .orderBy(desc(tournaments.createdAt))
       .all()
-      // League games show on the league's pages, not among the cups.
-      .filter((t) => !this.rules(t).league);
+      // League games show on the league's pages, challenges on theirs, not among the cups.
+      .filter((t) => !this.rules(t).league && !this.rules(t).challenge);
     const open = rows.filter((t) => t.phase !== 'finished' && t.phase !== 'aborted');
     const done = rows.filter((t) => t.phase === 'finished').slice(0, 5);
     const ai = this.udt.aiIds();

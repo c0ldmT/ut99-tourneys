@@ -66,6 +66,8 @@
 
   /* Dream Team */
   --udt: #b26bff; /* violet: Dream Team accent */
+  --chall: #ff8a3d; /* orange: Dream Team challenges (decision 337) */
+  --chall-ink: #1c0d00; /* text on orange */
   --holo: linear-gradient(135deg, #22d3ee, #8b5cf6 35%, #f0468c 65%, #a3e635);
   color-scheme: dark;
 }
@@ -1204,6 +1206,39 @@ main section[id] {
   }
   .udt-tabs a {
     padding: 10px 10px;
+  }
+}
+/* Six areas (with the challenges, decision 337) do not fit on phones with names: the area
+   shown keeps its short name, the others show their icon (the name is their aria-label). */
+@media (max-width: 520px) {
+  .udt-areas.six .udt-area {
+    min-height: 48px;
+    padding: 4px 2px;
+  }
+  .udt-areas.six .udt-area:not(.on) .s {
+    display: none;
+  }
+  .udt-areas.six .udt-area.on {
+    flex: 0 0 auto;
+    flex-direction: row;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+  .udt-areas.six .udt-area.on .s {
+    font-size: var(--fs-xs);
+  }
+  .udt-areas.six .udt-area .udt-badge {
+    top: -6px;
+    right: -4px;
+  }
+}
+@media (max-width: 360px) {
+  .udt-areas.six .udt-area.on {
+    flex: 1 1 0;
+    padding: 4px 2px;
+  }
+  .udt-areas.six .udt-area.on .s {
+    display: none;
   }
 }
 .udt-test {

@@ -88,6 +88,11 @@ export type ChallengeInput = z.infer<typeof ChallengeBody>;
 /** A counter offer: the same fields; it always goes back to the challenger. */
 export const CounterBody = ChallengeFields;
 
+export const OpponentsQuery = z.object({
+  mode: z.enum(['dm', 'mh']).default('dm'),
+  teamSize: z.coerce.number().int().min(1).max(5).default(5),
+});
+
 export const SlotsQuery = z.object({
   mode: z.enum(['dm', 'mh']).default('dm'),
   bestOf: z.coerce.number().int().min(1).max(5).default(1),
@@ -1326,6 +1331,99 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
   // Views
   // ------------------------------------------------------------------------------------------
 
+  /** Whether challenges show (Dream Team and challenges on): their area in Dream Team. */
+  visible(): boolean {
+    const u = this.settings.get().udt;
+    return u.enabled && u.challenge.enabled;
+  }
+
+  /**
+   * The hub's state of the challenges (decision 337): answers waiting, open challenges the
+   * manager can take, the next booked one.
+   */
+  hub(userId: string) {
+    const season = this.udt.seasonNumber();
+    if (season === null || !this.visible()) return null;
+    const now = this.nowIso();
+    const tier = this.tierOf(userId);
+    const rows = this.db
+      .select()
+      .from(udtChallenges)
+      .where(and(eq(udtChallenges.season, season), inArray(udtChallenges.status, ACTIVE)))
+      .all();
+    const pending = rows.filter((c) => c.status === 'pending' && c.expiresAt > now);
+    const next = rows
+      .filter((c) => c.status !== 'pending' && this.involves(c, userId))
+      .sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt))[0];
+    const other = next ? (next.fromUser === userId ? next.toUser : next.fromUser) : null;
+    return {
+      incoming: pending.filter((c) => c.toUser === userId).length,
+      open: pending.filter(
+        (c) =>
+          c.toUser === null &&
+          c.fromUser !== userId &&
+          (c.openScope !== 'tier' || c.openTier === tier),
+      ).length,
+      next: next
+        ? {
+            at: next.scheduledAt,
+            mode: next.mode as ChallengeMode,
+            stake: next.stake,
+            opponent: (other && this.udt.team(other, season)?.name) || '?',
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Teams a manager can challenge (decision 337): every other team of the season with its
+   * lineup strength for the format, whether it can field it, the Monster Hunt lineup, and how
+   * many challenges the pair has left this week.
+   */
+  opponents(user: User, q: { mode: ChallengeMode; teamSize: number }) {
+    this.assertOn();
+    const s = this.udt.season();
+    const c = this.cfg();
+    const f = {
+      mode: q.mode,
+      teamSize: q.mode === 'mh' ? MH_TEAM_SIZE : q.teamSize,
+      bestOf: 1,
+      map: null,
+      hardness: null,
+    };
+    const ai = this.udt.aiIds();
+    const aiOn = this.udt.aiOn() && c.ai;
+    const mine = this.udt.team(user.id, s.number) ? this.lineupState(user.id, f) : null;
+    const teams = this.udt
+      .teams(s.number)
+      .filter((t) => t.userId !== user.id && (aiOn || !ai.has(t.userId)))
+      .map((t) => {
+        const st = this.lineupState(t.userId, f);
+        const used = c.pairPerWeek ? this.pairCount(s.number, user.id, t.userId, null) : 0;
+        return {
+          userId: t.userId,
+          name: t.name,
+          tag: t.tag,
+          ai: ai.has(t.userId),
+          strength: Math.round(st.strength * 10) / 10,
+          full: st.full,
+          mh: this.mhBots(t.userId),
+          pairLeft: c.pairPerWeek ? Math.max(0, c.pairPerWeek - used) : null,
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name));
+    return {
+      me: mine
+        ? {
+            strength: Math.round(mine.strength * 10) / 10,
+            full: mine.full,
+            mh: this.mhBots(user.id),
+          }
+        : null,
+      teams,
+    };
+  }
+
   private side(userId: string | null, season: number, ai: Set<string>) {
     if (!userId) return null;
     const t = this.udt.team(userId, season);
@@ -1435,6 +1533,7 @@ export class UdtChallengesService implements OnModuleInit, OnModuleDestroy {
       },
       spendable: this.ledger.spendable(user.id).spendable,
       tier,
+      me: user.id,
     };
   }
 }

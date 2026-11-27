@@ -146,6 +146,9 @@ interface AreaView {
                 @if (i.badge === 'trades' && tradesIn()) {
                   <span class="udt-badge">{{ tradesIn() }}</span>
                 }
+                @if (i.badge === 'challenges' && challengesIn()) {
+                  <span class="udt-badge">{{ challengesIn() }}</span>
+                }
               </a>
             }
             @for (i of s.area.hub ?? []; track i.label) {
@@ -221,6 +224,9 @@ interface AreaView {
               >{{ i.label | t }}
               @if (i.badge === 'trades' && tradesIn()) {
                 <span class="udt-badge">{{ tradesIn() }}</span>
+              }
+              @if (i.badge === 'challenges' && challengesIn()) {
+                <span class="udt-badge">{{ challengesIn() }}</span>
               }
               <span class="go" aria-hidden="true">›</span></a
             >
@@ -530,9 +536,13 @@ export class UdtHubPage {
   protected readonly fieldWidth = pct(PW, W);
 
   protected readonly areas = computed(() =>
-    udtAreas(!!this.auth.config().udtLeague || !!this.hub()?.league.visible),
+    udtAreas(
+      !!this.auth.config().udtLeague || !!this.hub()?.league.visible,
+      !!this.auth.config().udtChallenges || !!this.hub()?.challenges,
+    ),
   );
   protected readonly tradesIn = computed(() => this.hub()?.transfers.tradesIn ?? 0);
+  protected readonly challengesIn = computed(() => this.hub()?.challenges?.incoming ?? 0);
 
   private readonly views = computed(() => {
     const out = new Map<UdtAreaId, AreaView>();
@@ -590,7 +600,7 @@ export class UdtHubPage {
 
   private readonly miniShape = computed(() => {
     const n = this.areas().length;
-    const c = { x: MW / 2, y: n === 3 ? 190 : n === 5 ? 175 : 165 };
+    const c = { x: MW / 2, y: n === 3 ? 190 : n >= 5 ? 175 : 165 };
     return { c, ...hubShape(n, c, n > 4 ? 150 : 165) };
   });
 
@@ -747,6 +757,23 @@ export class UdtHubPage {
           };
         }
         return { hint: t('udt.hub.cups.none'), badge: null };
+      }
+      case 'chall': {
+        const c = h.challenges;
+        if (!c) return { hint: t('udt.hub.chall.none'), badge: null };
+        const parts: string[] = [];
+        if (c.incoming) parts.push(t('udt.hub.chall.in', { n: c.incoming }));
+        if (c.next)
+          parts.push(t('udt.hub.chall.next', { when: this.when(c.next.at), opp: c.next.opponent }));
+        if (!parts.length && c.open) parts.push(t('udt.hub.chall.open', { n: c.open }));
+        return {
+          hint: parts.join(' · ') || t('udt.hub.chall.none'),
+          badge: c.incoming
+            ? String(c.incoming)
+            : c.next && this.isToday(c.next.at)
+              ? t('udt.hub.todayBadge')
+              : null,
+        };
       }
       case 'trans': {
         const x = h.transfers;

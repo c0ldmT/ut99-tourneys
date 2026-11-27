@@ -309,6 +309,7 @@ export class QuickSearch {
       moderator: !!me.isModerator,
       udt: !!cfg.udt,
       league: !!cfg.udtLeague,
+      challenges: !!cfg.udtChallenges,
     })
       .map((p) => ({
         kind: 'page' as const,

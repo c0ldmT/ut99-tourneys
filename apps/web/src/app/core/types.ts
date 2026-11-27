@@ -34,6 +34,8 @@ export interface SiteConfig {
   testMode?: boolean;
   /** The Dream Team league shows (its area in Dream Team). */
   udtLeague?: boolean;
+  /** Dream Team challenges show (their area, decision 337). */
+  udtChallenges?: boolean;
   /** The newest patch note's id (decision 243). */
   patchLatest?: number;
 }
@@ -100,6 +102,149 @@ export interface UdtHub {
     next: { id: string; name: string; at: string | null; entered: boolean } | null;
   } | null;
   transfers: { tradesIn: number; marketAt: string | null };
+  /** The challenges area (decision 337); null while they are off. */
+  challenges?: {
+    incoming: number;
+    open: number;
+    next: { at: string; mode: ChallengeMode; stake: number; opponent: string } | null;
+  } | null;
+}
+
+// --- Dream Team challenges (decisions 334-337)
+
+export type ChallengeMode = 'dm' | 'mh';
+export type ChallengeHardness = 'normal' | 'hard' | 'nightmare';
+export type ChallengeStatus =
+  | 'pending'
+  | 'accepted'
+  | 'declined'
+  | 'withdrawn'
+  | 'expired'
+  | 'countered'
+  | 'void'
+  | 'locked'
+  | 'played';
+
+export interface ChallengeSide {
+  userId: string;
+  name: string;
+  tag: string;
+  ai: boolean;
+}
+
+export interface UdtChallenge {
+  id: string;
+  status: ChallengeStatus;
+  mode: ChallengeMode;
+  teamSize: number;
+  bestOf: number;
+  map: string | null;
+  hardness: ChallengeHardness | null;
+  stake: number;
+  feePct: number;
+  pot: number;
+  prize: number;
+  scheduledAt: string;
+  endsAt: string;
+  expiresAt: string;
+  createdAt: string;
+  answeredAt: string | null;
+  decidedAt: string | null;
+  round: number;
+  counterOf: string | null;
+  rematchOf: string | null;
+  message: string | null;
+  reason: string | null;
+  tournamentId: string | null;
+  winner: string | null;
+  from: ChallengeSide;
+  to: ChallengeSide | null;
+  open: { scope: 'all' | 'tier'; tier: number | null } | null;
+  incoming: boolean;
+  mine: boolean;
+}
+
+export interface UdtChallengeRules {
+  days: number[];
+  from: string;
+  to: string;
+  servers: number;
+  modes: ChallengeMode[];
+  teamSizes: number[];
+  bestOf: number[];
+  stakeCap: number;
+  minStake: number;
+  feePct: number;
+  mh: {
+    feePct: number;
+    recordBonus: number;
+    hardness: ChallengeHardness[];
+    records: { map: string; hardness: ChallengeHardness; finalMs: number; team: string }[];
+  };
+  maps: { dm: string[]; mh: string[] };
+  pairPerWeek: number;
+  perDay: number;
+  maxOpen: number;
+  expiryHours: number;
+  lockMin: number;
+  maxRounds: number;
+}
+
+export interface UdtChallenges {
+  incoming: UdtChallenge[];
+  outgoing: UdtChallenge[];
+  open: UdtChallenge[];
+  upcoming: UdtChallenge[];
+  recent: UdtChallenge[];
+  rules: UdtChallengeRules;
+  spendable: number;
+  tier: number | null;
+  /** The manager's own id (winner of a challenge). */
+  me: string;
+}
+
+export type ChallengeSlotState = 'free' | 'full' | 'mine' | 'opponent' | 'closed';
+
+export interface UdtChallengeSlots {
+  minutes: number;
+  lockMin: number;
+  window: { from: string; to: string };
+  days: {
+    date: string;
+    weekday: number;
+    free: number;
+    starts: { time: string; at: string; state: ChallengeSlotState }[];
+  }[];
+}
+
+export interface UdtChallengeOpponent {
+  userId: string;
+  name: string;
+  tag: string;
+  ai: boolean;
+  strength: number;
+  full: boolean;
+  mh: number;
+  pairLeft: number | null;
+}
+
+export interface UdtChallengeOpponents {
+  me: { strength: number; full: boolean; mh: number } | null;
+  teams: UdtChallengeOpponent[];
+}
+
+/** What the challenge dialog sends (a new one, a counter offer). */
+export interface UdtChallengeBody {
+  to: string | null;
+  open?: 'all' | 'tier';
+  mode: ChallengeMode;
+  teamSize: number;
+  bestOf: number;
+  map: string | null;
+  hardness?: ChallengeHardness;
+  stake: number;
+  at: string;
+  message?: string;
 }
 
 export interface Me {

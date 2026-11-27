@@ -10,6 +10,7 @@ import {
 import { UdtBotPanel } from '../components/udt-bot-panel';
 import { RouterLink } from '@angular/router';
 import { Api } from '../core/api';
+import { Auth } from '../core/auth';
 import { TPipe } from '../core/i18n';
 import { NeuroPipe } from '../core/neuro';
 import type { UdtRosterBot, UdtSquad, UdtSquadRow } from '../core/types';
@@ -123,6 +124,12 @@ export class UdtSquadsPage {
             <div class="v">{{ value(s) | neuro }}</div>
           </div>
         </div>
+        <!-- Challenges (decision 337): the dialog opens with this team. -->
+        @if (canChallenge()) {
+          <a class="btn primary" routerLink="/udt/challenges" [queryParams]="{ to: userId() }">{{
+            'udt.ch.challenge' | t
+          }}</a>
+        }
       </div>
       <div class="cards">
         @for (b of s.roster; track b.botId) {
@@ -212,6 +219,11 @@ export class UdtSquadPage {
   protected readonly openId = signal<string | null>(null);
   protected readonly openBot = computed(
     () => this.squad()?.roster.find((b) => b.botId === this.openId()) ?? null,
+  );
+  private readonly auth = inject(Auth);
+  /** Another manager's team while challenges are on. */
+  protected readonly canChallenge = computed(
+    () => !!this.auth.config().udtChallenges && this.auth.me()?.id !== this.userId(),
   );
   protected readonly teamInfo = computed(() => {
     const s = this.squad();

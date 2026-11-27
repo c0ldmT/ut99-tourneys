@@ -10,6 +10,10 @@ import { Toasts } from './toast';
 import type { UdtLooks } from '../components/udt-bot-look';
 import type {
   AdminOverview,
+  UdtChallengeBody,
+  UdtChallengeOpponents,
+  UdtChallenges,
+  UdtChallengeSlots,
   TraitReport,
   UdtBotLookBody,
   UdtTeam,
@@ -441,6 +445,63 @@ export class Api {
     this.call<UdtTrades>('DELETE', `/udt/trades/${encodeURIComponent(id)}`, undefined, {
       ok: 'ok.udt.tradeWithdrawn',
     });
+  // Challenges (decisions 334-337)
+  udtChallenges = (quiet = false) =>
+    this.call<UdtChallenges>('GET', '/udt/challenges', undefined, { quiet });
+  udtChallengeCount = () =>
+    this.call<{ incoming: number }>('GET', '/udt/challenges/count', undefined, { quiet: true });
+  udtChallengeSlots = (q: { mode: string; bestOf: number; opponent?: string | null }) =>
+    this.call<UdtChallengeSlots>(
+      'GET',
+      `/udt/challenges/slots?mode=${q.mode}&bestOf=${q.bestOf}&days=14${q.opponent ? `&opponent=${encodeURIComponent(q.opponent)}` : ''}`,
+      undefined,
+      { quiet: true },
+    );
+  udtChallengeOpponents = (mode: string, teamSize: number) =>
+    this.call<UdtChallengeOpponents>(
+      'GET',
+      `/udt/challenges/opponents?mode=${mode}&teamSize=${teamSize}`,
+      undefined,
+      { quiet: true },
+    );
+  udtChallenge = (body: UdtChallengeBody) =>
+    this.call<UdtChallenges & { id: string }>('POST', '/udt/challenges', body, {
+      ok: 'ok.udt.challengeSent',
+    });
+  udtChallengeCounter = (id: string, body: UdtChallengeBody) =>
+    this.call<UdtChallenges & { id: string }>(
+      'POST',
+      `/udt/challenges/${encodeURIComponent(id)}/counter`,
+      body,
+      { ok: 'ok.udt.challengeCounter' },
+    );
+  udtChallengeAccept = (id: string) =>
+    this.call<UdtChallenges>(
+      'POST',
+      `/udt/challenges/${encodeURIComponent(id)}/accept`,
+      undefined,
+      {
+        ok: 'ok.udt.challengeAccepted',
+      },
+    );
+  udtChallengeDecline = (id: string) =>
+    this.call<UdtChallenges>(
+      'POST',
+      `/udt/challenges/${encodeURIComponent(id)}/decline`,
+      undefined,
+      { ok: 'ok.udt.challengeDeclined' },
+    );
+  udtChallengeWithdraw = (id: string) =>
+    this.call<UdtChallenges>('DELETE', `/udt/challenges/${encodeURIComponent(id)}`, undefined, {
+      ok: 'ok.udt.challengeWithdrawn',
+    });
+  udtChallengeRematch = (id: string, at: string) =>
+    this.call<UdtChallenges & { id: string }>(
+      'POST',
+      `/udt/challenges/${encodeURIComponent(id)}/rematch`,
+      { at },
+      { ok: 'ok.udt.challengeSent' },
+    );
   udtAcademy = () => this.call<UdtAcademy>('GET', '/udt/academy');
   udtScout = () =>
     this.call<UdtAcademy>('POST', '/udt/academy/scout', undefined, { ok: 'ok.udt.scouted' });

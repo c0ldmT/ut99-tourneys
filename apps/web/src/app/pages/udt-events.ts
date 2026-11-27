@@ -160,7 +160,7 @@ import { UdtNav } from '../core/udt';
     .evs {
       display: grid;
       gap: 14px;
-      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
     }
     .ev {
       margin: 0;

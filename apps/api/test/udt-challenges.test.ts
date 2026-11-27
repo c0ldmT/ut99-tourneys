@@ -118,6 +118,15 @@ describe('Dream Team challenges (decision 334)', () => {
     const inbox = await tim.get('/udt/challenges');
     expect(inbox.body.incoming.map((c: { id: string }) => c.id)).toEqual([id]);
     expect((await tim.get('/udt/hub')).body.challengesIn).toBe(1);
+    expect((await tim.get('/udt/hub')).body.challenges).toMatchObject({ incoming: 1 });
+    expect((await tim.get('/udt/challenges/count')).body).toEqual({ incoming: 1 });
+    const opps = await mario.get('/udt/challenges/opponents?mode=dm&teamSize=1');
+    expect(opps.status, JSON.stringify(opps.body)).toBe(200);
+    expect(opps.body.me).toMatchObject({ full: true });
+    expect(opps.body.teams.find((x: { userId: string }) => x.userId === timId)).toMatchObject({
+      full: true,
+      pairLeft: 1,
+    });
     const slots = await tim.get(`/udt/challenges/slots?opponent=${marioId}`);
     expect(slots.body.days[0].starts[2]).toMatchObject({ time: '19:30', state: 'mine' });
     // The server calendar keeps a cup out of the challenge's server.
@@ -380,6 +389,9 @@ describe('challenge matches (decision 335)', () => {
     expect(t.agentId).toBe(c.agentId);
     expect(JSON.parse(t.udtJson!).challenge).toEqual({ id });
     expect(tours.settings(t)).toMatchObject({ format: 'fixtures', size: 2, teamSize: 1 });
+    // Not among the cups (decision 337).
+    const cups = (await mario.get('/udt/events')).body as { id: string }[];
+    expect(cups.map((x) => x.id)).not.toContain(t.id);
     const proj = api!.app.get(EventLogService).projection(t.id)!;
     expect(proj.bracket?.definition.slots).toEqual([`udt-${marioId}`, `udt-${timId}`]);
     // Bets are open: the two managers cannot bet on their own match, Ana can.

@@ -85,6 +85,8 @@ export class AuthController {
       udt: this.settings.get().udt.enabled,
       /** The Dream Team league shows (its area in Dream Team, decision 228). */
       udtLeague: this.settings.get().udt.enabled && this.league.visible(),
+      /** Dream Team challenges show (their area, decision 337). */
+      udtChallenges: this.settings.get().udt.enabled && this.settings.get().udt.challenge.enabled,
       testMode: this.config.testMode,
       /** The newest patch note (decision 243): above what the visitor saw, the modal shows. */
       patchLatest: LATEST_PATCH,

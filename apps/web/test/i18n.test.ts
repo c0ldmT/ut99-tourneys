@@ -28,6 +28,30 @@ describe('translations', () => {
     expect(used.size).toBeGreaterThan(100);
   });
 
+  it('has the challenge keys (decision 337)', () => {
+    for (const lang of ['en', 'de'] as const) {
+      for (const h of ['normal', 'hard', 'nightmare']) {
+        expect(DICT[lang][`udt.ch.hard.${h}`]).toBeDefined();
+        expect(DICT[lang][`udt.ch.hardD.${h}`]).toBeDefined();
+      }
+      for (const s of [
+        'pending',
+        'accepted',
+        'declined',
+        'withdrawn',
+        'expired',
+        'countered',
+        'void',
+        'locked',
+        'played',
+      ])
+        expect(DICT[lang][`udt.ch.st.${s}`]).toBeDefined();
+      for (const s of ['free', 'full', 'mine', 'opponent', 'closed'])
+        expect(DICT[lang][`udt.ch.slot.${s}`]).toBeDefined();
+      for (const m of ['dm', 'mh']) expect(DICT[lang][`udt.ch.mode.${m}`]).toBeDefined();
+    }
+  });
+
   it('has the club house keys (decision 268)', () => {
     for (const lang of ['en', 'de'] as const) {
       for (const k of CLUB_UPGRADES) {
