@@ -825,6 +825,21 @@ export const feedback = sqliteTable('feedback', {
   updatedAt: text('updated_at').notNull(),
 });
 
+/**
+ * Tournament presets (decision 325): an admin's own form settings (server, tempo, bracket, rules,
+ * Discord, Dream Team rules) without name, date and series schedule; names unique per admin.
+ */
+export const tournamentPresets = sqliteTable('tournament_presets', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(),
+  nameKey: text('name_key').notNull(),
+  /** The template of the form (`TemplateBody` without bots). */
+  bodyJson: text('body_json').notNull(),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+});
+
 /** Season surveys an admin opened (open while `closedAt` is null). */
 export const feedbackSurveys = sqliteTable('feedback_surveys', {
   season: integer('season').primaryKey(),

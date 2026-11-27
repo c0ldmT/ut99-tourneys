@@ -133,6 +133,9 @@ export const ERRORS_DE: Record<string, string> = {
   'at most {max} tournaments a day': 'Höchstens {max} Turniere pro Tag.',
   'no admin to create the tournament': 'Kein Admin, der das Turnier anlegen kann.',
   'series {id} not found': 'Serie {id} nicht gefunden.',
+  'preset not found': 'Vorlage nicht gefunden.',
+  'a preset named {name} already exists': 'Es gibt schon eine Vorlage „{name}“.',
+  'at most {n} presets': 'Höchstens {n} Vorlagen je Admin.',
   'the series has no next start': 'Die Serie hat keinen nächsten Start.',
 
   // --- shop

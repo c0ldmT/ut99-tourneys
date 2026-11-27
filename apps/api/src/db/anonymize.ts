@@ -621,6 +621,8 @@ function run(
       'moderation_items',
       'moderation_reports',
       'moderation_log',
+      // Tournament presets (decision 325): admins' own settings, Discord webhooks among them.
+      'tournament_presets',
       ...(o.replays ? [] : ['game_replays']),
     ])
       if (has(t)) removed[t] = db.prepare(`DELETE FROM "${t}"`).run().changes;

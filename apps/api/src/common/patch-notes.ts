@@ -22,6 +22,28 @@ export interface PatchNote {
 
 export const PATCH_NOTES: readonly PatchNote[] = [
   {
+    id: 325,
+    date: '2026-11-27',
+    en: {
+      title: 'New tournament, quicker',
+      items: [
+        'Admins: the form opens with name and date; the other sections show their settings in one line and open with "Change". "All sections open" is remembered.',
+        'Date, registration and autostart sit in one row; the kind tiles show whether a season is running.',
+        '"Server and tempo": one match after the other or several at once, each with how long the tournament takes at most, and which servers of the pool are online.',
+        'Presets: save the settings under a name and apply them with one click; name and date stay. Every admin has their own.',
+      ],
+    },
+    de: {
+      title: 'Neues Turnier, schneller angelegt',
+      items: [
+        'Admins: Das Formular öffnet mit Name und Termin; die übrigen Abschnitte zeigen ihre Einstellungen in einer Zeile und öffnen mit „Ändern“. „Alle Abschnitte offen“ wird gemerkt.',
+        'Termin, Anmeldung und automatischer Start stehen in einer Zeile; die Art-Kacheln zeigen, ob eine Season läuft.',
+        '„Server und Tempo“: ein Match nach dem anderen oder mehrere gleichzeitig, jeweils mit der längsten Dauer des Turniers, dazu welche Pool-Server online sind.',
+        'Vorlagen: Einstellungen unter einem Namen speichern und mit einem Klick übernehmen; Name und Termin bleiben. Jeder Admin hat seine eigenen.',
+      ],
+    },
+  },
+  {
     id: 323,
     date: '2026-11-27',
     en: {

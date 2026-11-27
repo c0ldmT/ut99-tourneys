@@ -67,6 +67,7 @@ import { UdtEventsService } from './udt/udt-events.service.js';
 import { UdtMarketService } from './udt/udt-market.service.js';
 import { UdtSnapshotService } from './udt/udt-snapshots.service.js';
 import { FeedbackController } from './feedback/feedback.controller.js';
+import { PresetsController, PresetsService } from './tournaments/presets.js';
 import { FeedbackService } from './feedback/feedback.service.js';
 import { UdtService } from './udt/udt.service.js';
 import { ShopService } from './shop/shop.service.js';
@@ -117,6 +118,7 @@ class AppModule {
         UdtTestController,
         NeuroController,
         FeedbackController,
+        PresetsController,
         ModerationController,
         SearchController,
         AdminOverviewController,
@@ -172,6 +174,7 @@ class AppModule {
         UdtMarketService,
         UdtSnapshotService,
         FeedbackService,
+        PresetsService,
         UdtEventsService,
         UdtRewardsService,
         UdtPacksService,

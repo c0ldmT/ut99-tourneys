@@ -909,4 +909,17 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE tournaments ADD COLUMN parallel INTEGER NOT NULL DEFAULT 1;
   ALTER TABLE tournaments ADD COLUMN lanes_json TEXT NOT NULL DEFAULT '[]';
   `,
+  // 61: tournament presets per admin (decision 325): the form's settings without name and date.
+  `
+  CREATE TABLE tournament_presets (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    body_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+  CREATE UNIQUE INDEX tournament_presets_name ON tournament_presets (user_id, name_key);
+  `,
 ];

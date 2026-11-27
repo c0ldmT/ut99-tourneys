@@ -78,6 +78,8 @@ import type {
   SeasonsOverview,
   SeriesFields,
   SeriesPreview,
+  TournamentPreset,
+  TournamentPresetBody,
   SeriesView,
   LookView,
   SearchResult,
@@ -829,6 +831,20 @@ export class Api {
     this.call<SeriesView>('POST', `/series/${id}/run`, undefined, { ok: 'ok.series.run' });
   deleteSeries = (id: string) =>
     this.call<void>('DELETE', `/series/${id}`, undefined, { ok: 'ok.series.deleted' });
+  /** The admin's own presets of the tournament form (decision 325). */
+  presets = () =>
+    this.call<TournamentPreset[]>('GET', '/tournament-presets', undefined, { quiet: true });
+  savePreset = (name: string, body: TournamentPresetBody, replace = false) =>
+    this.call<TournamentPreset[]>(
+      'POST',
+      '/tournament-presets',
+      { name, body, ...(replace ? { replace } : {}) },
+      { ok: 'ok.preset.saved' },
+    );
+  deletePreset = (id: string) =>
+    this.call<void>('DELETE', `/tournament-presets/${encodeURIComponent(id)}`, undefined, {
+      ok: 'ok.preset.deleted',
+    });
   createTournament = (body: unknown) =>
     this.call<TournamentDetail>('POST', '/tournaments', body, { ok: 'ok.tournament.created' });
   updateTournament = (id: string, body: unknown) =>

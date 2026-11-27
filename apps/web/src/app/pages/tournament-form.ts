@@ -1,6 +1,7 @@
 import { type Choice, Segment } from '../components/choice';
 import { TempoPick } from '../components/tempo-pick';
 import { FormSectionHead } from '../components/form-section-head';
+import { FormPresets } from '../components/form-presets';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -27,6 +28,8 @@ import type {
   SeriesPreview,
   SeriesView,
   TournamentDetail,
+  TournamentPreset,
+  TournamentPresetBody,
   TournamentSettings,
   UdtEventRules,
 } from '../core/types';
@@ -216,7 +219,17 @@ function toLocalInput(iso: string | null): string {
  */
 @Component({
   selector: 'app-tournament-form',
-  imports: [Segment, TempoPick, FormSectionHead, FormsModule, RouterLink, TPipe, Icon, UdtMark],
+  imports: [
+    Segment,
+    TempoPick,
+    FormSectionHead,
+    FormPresets,
+    FormsModule,
+    RouterLink,
+    TPipe,
+    Icon,
+    UdtMark,
+  ],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="head">
@@ -244,6 +257,15 @@ function toLocalInput(iso: string | null): string {
       <p class="notice">{{ 'form.locked' | t }}</p>
     }
     @if (m(); as f) {
+      @if (!locked()) {
+        <!-- The admin's presets (decision 325): apply, save as, delete. -->
+        <na-form-presets
+          [body]="presetBody()"
+          [suggest]="f.name"
+          [disabled]="busy()"
+          (apply)="applyPreset($event)"
+        />
+      }
       <form class="layout" (ngSubmit)="save()">
         <div class="main">
           <!-- 1 Basics and date -->
@@ -2580,6 +2602,76 @@ export class TournamentFormPage {
         },
       },
     };
+  }
+
+  /** What a preset keeps (decision 325): the template and whether players sign up. */
+  protected readonly presetBody = computed((): TournamentPresetBody => {
+    const f = this.model();
+    if (!f) return { agentId: '', profileId: '', settings: {} as TournamentSettings };
+    // The template's settings are built as plain values (the API checks them).
+    return {
+      ...this.template(f),
+      registrationOpen: f.registrationOpen,
+    } as unknown as TournamentPresetBody;
+  });
+
+  /**
+   * Applies a preset: its settings, server, tempo, Discord and Dream Team rules; the name (when
+   * one is typed), the date and a series' schedule stay. A server that is gone falls back to the
+   * first online one; a season kind needs a season (or a series).
+   */
+  protected applyPreset(p: TournamentPreset) {
+    const f = this.m();
+    if (!f) return;
+    const b = p.body;
+    const agent =
+      this.agents().find((a) => a.id === b.agentId) ??
+      this.agents().find((a) => a.online) ??
+      this.agents()[0];
+    const n = this.fromParts(
+      {
+        agentId: agent?.id ?? b.agentId,
+        profileId: agent?.profiles.some((x) => x.id === b.profileId)
+          ? b.profileId
+          : (agent?.profiles[0]?.id ?? b.profileId),
+        serverAuto: !!b.serverAuto,
+        parallel: b.parallel ?? 1,
+        connectAddress: b.connectAddress ?? null,
+        settings: b.settings,
+        notifyMode: b.notifyMode ?? 'default',
+        webhookUrl: b.webhookUrl ?? null,
+        seasonal: !!b.seasonal,
+        registrationOpen: b.registrationOpen ?? true,
+        autoStart: !!b.autoStart,
+        kind: b.kind ?? 'standard',
+        udt: b.udt ?? null,
+      },
+      f.name.trim() ? f.name : p.name,
+      null,
+    );
+    const keep: (keyof Model)[] = [
+      'when',
+      'scheduledAt',
+      'repeat',
+      'days',
+      'everyWeeks',
+      'timeMode',
+      'times',
+      'everyHours',
+      'fromTime',
+      'toTime',
+      'leadValue',
+      'leadUnit',
+    ];
+    for (const k of keep) (n as unknown as Record<string, unknown>)[k] = f[k];
+    if (this.currentSeason() === null && n.when === 'once') {
+      n.seasonal = false;
+      n.udt = false;
+    }
+    if (n.parallel > 1) this.parPick.set(n.parallel);
+    this.mapsByHand = true;
+    this.m.set(n);
+    this.touch();
   }
 
   /** What every tournament of a series gets (the bots: the control center). */

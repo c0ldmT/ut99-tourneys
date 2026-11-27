@@ -1671,6 +1671,31 @@ export interface UdtMarket {
   loanDays?: number;
 }
 
+/** The tournament form's settings an admin keeps under a name (decision 325). */
+export interface TournamentPresetBody {
+  agentId: string;
+  profileId: string;
+  serverAuto?: boolean;
+  parallel?: number;
+  connectAddress?: string | null;
+  settings: TournamentSettings;
+  registrationOpen?: boolean;
+  notifyMode?: 'default' | 'custom' | 'off';
+  webhookUrl?: string | null;
+  seasonal?: boolean;
+  autoStart?: boolean;
+  kind?: 'standard' | 'udt';
+  udt?: UdtEventRules | null;
+}
+
+export interface TournamentPreset {
+  id: string;
+  name: string;
+  body: TournamentPresetBody;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface UdtEventRules {
   valueCap: number | null;
   starLimit: number | null;
